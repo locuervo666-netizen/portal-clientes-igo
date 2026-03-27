@@ -5,7 +5,8 @@ import os
 import json
 from datetime import datetime, date, timezone, timedelta
 from streamlit_autorefresh import st_autorefresh
-from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
+# 🎯 Removi o comando que não existia da importação
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
 
@@ -104,7 +105,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V16 (FLUIDO)
+# 🚀 4. DASHBOARD ENTERPRISE V17
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -235,7 +236,6 @@ else:
                     if 'DATA_ENTREGA' in df_final.columns: gb.configure_column("DATA_ENTREGA", headerName="Entregue Em")
                     if 'STATUS' in df_final.columns: gb.configure_column("STATUS", width=160)
                     if 'LABORATORIO' in df_final.columns: gb.configure_column("LABORATORIO", width=180)
-                    if 'ENDERECO' in df_final.columns: gb.configure_column("ENDERECO", width=200)
 
                     gridOptions = gb.build()
 
@@ -244,7 +244,7 @@ else:
                         ".ag-cell": {"font-size": "12px !important", "font-family": "Inter, sans-serif !important"}
                     }
 
-                    # 🎯 AQUI ESTÁ A MÁGICA DA EXPANSÃO TOTAL (FIT_ALL_COLUMNS_TO_CATCH)
+                    # 🎯 CORREÇÃO DO MOTOR AQUI: Usamos fit_columns_on_grid_load=True nativo do AgGrid
                     AgGrid(
                         df_final,
                         gridOptions=gridOptions,
@@ -252,7 +252,7 @@ else:
                         allow_unsafe_jscode=True,
                         theme='alpine',
                         custom_css=grid_css,
-                        columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_CATCH, 
+                        fit_columns_on_grid_load=True, # <-- O comando correto que estica a tabela!
                         height=550
                     )
                 else:
