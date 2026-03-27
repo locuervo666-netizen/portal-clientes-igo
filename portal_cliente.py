@@ -125,7 +125,7 @@ if not st.session_state.logado:
                 else: st.error("Usuário ou senha incorretos.")
 
 # =======================================================
-# 🚀 4. DASHBOARD V27 (DETALHES NO FINAL)
+# 🚀 4. DASHBOARD V28 (ESPAÇAMENTO ELITE)
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -163,7 +163,6 @@ else:
 
             df_cliente['DETALHES'] = df_cliente.apply(formatar_detalhes, axis=1)
 
-            # 🎯 MUDANÇA AQUI: 'DETALHES' movido para depois de 'FOTO_URL'
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
             colunas_ocultas = ['ENDERECO', 'Nº', 'CEP']
@@ -185,7 +184,6 @@ else:
                     st.session_state.logado = False
                     st.rerun()
 
-            # --- FILTROS ---
             df_f = df_cliente.copy()
             if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
             if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
@@ -193,7 +191,6 @@ else:
                 b = str(busca_ped).upper()
                 df_f = df_f[df_f['PEDIDO'].astype(str).str.contains(b) | df_f['NUMERO'].astype(str).str.contains(b)]
 
-            # --- STATUS DISPLAY ---
             def tratar_status(row):
                 s = str(row.get('STATUS', '')).strip().upper()
                 previsao = str(row.get('DATA_LIMITE', '')).strip()
@@ -211,7 +208,6 @@ else:
             
             df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
 
-            # --- DASHBOARD ---
             v_total = len(df_f)
             v_atrasados = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)])
             v_frustradas = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', na=False)])
@@ -228,14 +224,20 @@ else:
             c3.markdown(f"""<div class="kpi-card bg-red"><div class="kpi-title">🚨 Atrasados</div><div class="kpi-value">{v_atrasados}</div></div>""", unsafe_allow_html=True)
             c4.markdown(f"""<div class="kpi-card bg-green"><div class="kpi-title">📅 Hoje</div><div class="kpi-value">{v_hoje}</div></div>""", unsafe_allow_html=True)
 
-            # --- AG-GRID ---
+            # --- AG-GRID OTIMIZADO ---
             df_grid = df_f.copy()
             df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
             df_final = df_grid[colunas_selecionadas].copy()
             
             gb = GridOptionsBuilder.from_dataframe(df_final)
-            gb.configure_default_column(resizable=True, sortable=True, minWidth=110)
+            gb.configure_default_column(resizable=True, sortable=True, minWidth=100) # Diminuí o tamanho base
             gb.configure_selection('single', use_checkbox=False)
+            
+            # 📏 Larguras Específicas para poupar espaço
+            if 'DATA' in df_final.columns: gb.configure_column("DATA", width=90)
+            if 'UF' in df_final.columns: gb.configure_column("UF", width=60)
+            if 'PEDIDO' in df_final.columns: gb.configure_column("PEDIDO", width=95)
+            if 'STATUS' in df_final.columns: gb.configure_column("STATUS", width=120)
             
             if 'FOTO_URL' in df_final.columns:
                 link_jscode = JsCode("""
@@ -244,21 +246,22 @@ else:
                         this.eGui = document.createElement('div');
                         this.eGui.style.textAlign = 'center';
                         if (params.value && params.value !== '' && params.value !== 'nan') {
-                            this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 4px;" title="Ver Foto em Alta">📸</a>';
+                            this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 2px;" title="Ver Foto em Alta">📸</a>';
                         }
                     }
                     getGui() { return this.eGui; }
                 }
                 """)
-                gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=link_jscode, width=80)
+                gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=link_jscode, width=70)
             
-            # Detalhes agora configurado para ficar mais à direita e mostrar balão no hover
             if 'DETALHES' in df_final.columns:
                 gb.configure_column("DETALHES", width=250, tooltipField="DETALHES")
 
+            # 🅰️ Fonte menor (11px)
             grid_css = {
-                ".ag-header-cell-text": {"font-size": "12px !important", "font-weight": "bold"},
-                ".ag-cell": {"font-size": "12px !important"}
+                ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold"},
+                ".ag-cell": {"font-size": "11px !important"}
             }
 
-            AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=True, height=550)
+            # 🪄 A MÁGICA: fit_columns_on_grid_load=False (Permite rolagem horizontal)
+            AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=False, height=550)
