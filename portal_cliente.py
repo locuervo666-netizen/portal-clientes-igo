@@ -36,21 +36,12 @@ st.markdown("""
 # =======================================================
 # 🏦 2. CENTRAL DE CLIENTES (CADASTRE NOVOS AQUI)
 # =======================================================
-# Adicione quantos clientes quiser seguindo o padrão: "USUARIO": {"senha": "...", "logo": "..."}
 CLIENTES_CONFIG = {
     "GRALAB": {
         "senha": "123",
         "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png"
     },
-    "SYNVIA": {
-        "senha": "456",
-        "logo": "https://cdn-icons-png.flaticon.com/512/3004/3004415.png"
-    },
-    "HEXALIFE": {
-        "senha": "789",
-        "logo": "https://cdn-icons-png.flaticon.com/512/2782/2782058.png"
-    },
-    "IGO_LOGISTICA": { # Seu acesso de ADM
+    "IGO_LOGISTICA": {
         "senha": "admin",
         "logo": "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
     }
@@ -88,7 +79,7 @@ def carregar_dados_nuvem():
     return pd.DataFrame()
 
 # =======================================================
-# 🔐 4. TELA DE LOGIN (INTELIGENTE)
+# 🔐 4. TELA DE LOGIN
 # =======================================================
 if 'logado' not in st.session_state:
     st.session_state.logado = False
@@ -100,13 +91,9 @@ if not st.session_state.logado:
         with st.container(border=True):
             st.image(LOGO_PADRAO, width=60)
             st.markdown("<h2 style='font-size: 24px; color: #0f172a;'>Portal IGO Logística</h2>", unsafe_allow_html=True)
-            st.markdown("<p style='color: #64748b;'>Área Exclusiva do Cliente</p>", unsafe_allow_html=True)
-            
             usuario = st.text_input("Usuário").upper().strip()
             senha = st.text_input("Senha", type="password")
-            
             if st.button("Entrar", type="primary", use_container_width=True):
-                # 🎯 Verifica se o usuário existe na nossa Central
                 if usuario in CLIENTES_CONFIG and senha == CLIENTES_CONFIG[usuario]["senha"]:
                     st.session_state.logado = True
                     st.session_state.cliente = usuario
@@ -115,13 +102,11 @@ if not st.session_state.logado:
                     st.error("Usuário ou senha incorretos.")
 
 # =======================================================
-# 🚀 5. DASHBOARD ELITE (DINÂMICO)
+# 🚀 5. DASHBOARD ELITE V23 (RECONHECENDO FRUSTRADAS)
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
-
     if not df_sistema.empty and 'TOMADOR' in df_sistema.columns:
-        # 🎯 Se for o seu acesso ADM, vê tudo. Se for cliente, vê só o dele.
         if st.session_state.cliente == "IGO_LOGISTICA":
             df_cliente = df_sistema.copy()
         else:
@@ -130,8 +115,8 @@ else:
         if not df_cliente.empty:
             # 📸 Tradutor de Fotos
             if 'FOTO' in df_cliente.columns:
-                def construir_link_foto(foto_path):
-                    f_str = str(foto_path).strip()
+                def construir_link_foto(f_path):
+                    f_str = str(f_path).strip()
                     if f_str and f_str.upper() not in ['NAN', 'NONE', '']:
                         return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={f_str}"
                     return ""
@@ -141,121 +126,98 @@ else:
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
             colunas_ocultas_padrao = ['ENDERECO', 'Nº', 'CEP']
             colunas_visiveis_iniciais = [col for col in colunas_disponiveis if col not in colunas_ocultas_padrao]
-
             hoje_br = datetime.now(FUSO_BR).date()
 
             with st.sidebar:
-                # 🎯 Puxa a logo certa da Central de Clientes
-                info_cliente = CLIENTES_CONFIG.get(st.session_state.cliente)
-                st.image(info_cliente["logo"], width=160)
-                
-                st.markdown(f"**Cliente: {st.session_state.cliente}**")
+                info_cli = CLIENTES_CONFIG.get(st.session_state.cliente, CLIENTES_CONFIG["GRALAB"])
+                st.image(info_cli["logo"], width=160)
                 st.divider()
-                
-                min_date = df_cliente['DATA_OBJ'].dropna().min() if 'DATA_OBJ' in df_cliente.columns else hoje_br
-                max_date = df_cliente['DATA_OBJ'].dropna().max() if 'DATA_OBJ' in df_cliente.columns else hoje_br
-                datas_selecionadas = st.date_input("🗓️ Período:", value=(min_date, max_date), format="DD/MM/YYYY")
-                
-                lista_cidades = sorted(df_cliente['CIDADE'].dropna().unique().tolist())
-                cidades_selecionadas = st.multiselect("📍 Cidades:", options=lista_cidades, default=lista_cidades)
-                
-                busca_pedido = st.text_input("🔍 Pedido / Nº:")
-                st.divider()
-                
+                min_d = df_cliente['DATA_OBJ'].dropna().min() if 'DATA_OBJ' in df_cliente.columns else hoje_br
+                max_d = df_cliente['DATA_OBJ'].dropna().max() if 'DATA_OBJ' in df_cliente.columns else hoje_br
+                datas_sel = st.date_input("🗓️ Período:", value=(min_d, max_d), format="DD/MM/YYYY")
+                cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
+                busca_ped = st.text_input("🔍 Pedido / Nº:")
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True):
-                    colunas_selecionadas = st.multiselect("Visualizar:", options=colunas_disponiveis, default=colunas_visiveis_iniciais)
-                
-                st.markdown("<br>", unsafe_allow_html=True)
+                    colunas_selecionadas = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_visiveis_iniciais)
                 if st.button("🚪 Sair", use_container_width=True):
                     st.session_state.logado = False
                     st.rerun()
 
-            # --- APLICANDO FILTROS ---
-            df_filtrado = df_cliente.copy()
-            if len(datas_selecionadas) == 2:
-                df_filtrado = df_filtrado[(df_filtrado['DATA_OBJ'] >= datas_selecionadas[0]) & (df_filtrado['DATA_OBJ'] <= datas_selecionadas[1])]
-            if cidades_selecionadas:
-                df_filtrado = df_filtrado[df_filtrado['CIDADE'].isin(cidades_selecionadas)]
-            if busca_pedido:
-                busca = str(busca_pedido).upper()
-                df_filtrado = df_filtrado[df_filtrado['PEDIDO'].astype(str).str.contains(busca) | df_filtrado['NUMERO'].astype(str).str.contains(busca)]
+            # --- FILTROS ---
+            df_f = df_cliente.copy()
+            if len(datas_sel) == 2:
+                df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
+            if cidades_sel:
+                df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
+            if busca_ped:
+                b = str(busca_ped).upper()
+                df_f = df_f[df_f['PEDIDO'].astype(str).str.contains(b) | df_f['NUMERO'].astype(str).str.contains(b)]
 
-            # --- STATUS E ATRASOS ---
+            # --- 🛠️ LÓGICA DE STATUS REFINADA (FRUSTRADAS INCLUÍDAS) ---
             def tratar_status(row):
-                status = str(row.get('STATUS', '')).strip().upper()
-                previsao_str = str(row.get('DATA_LIMITE', '')).strip()
-                if status == 'ENTREGUE': status = '✅ Entregue'
-                elif status in ['EM ROTA', 'EM ROTA DE ENTREGA']: status = '🚚 Em Rota'
-                elif status == 'COLETADO': status = '📦 Coletado'
-                elif status == 'CANCELADO': status = '❌ Cancelado'
-                else: status = f'⏳ Pendente'
+                s = str(row.get('STATUS', '')).strip().upper()
+                previsao = str(row.get('DATA_LIMITE', '')).strip()
                 
-                if status not in ['✅ Entregue', '❌ Cancelado'] and previsao_str:
+                if s == 'ENTREGUE': res = '✅ Entregue'
+                elif s in ['EM ROTA', 'EM ROTA DE ENTREGA']: res = '🚚 Em Rota'
+                elif s == 'COLETADO': res = '📦 Coletado'
+                elif 'FRUSTRADA' in s: res = '❌ Frustrada' # 🎯 RECONHECE AQUI!
+                elif s == 'CANCELADO': res = '🚫 Cancelado'
+                else: res = '⏳ Pendente'
+                
+                if res not in ['✅ Entregue', '🚫 Cancelado', '❌ Frustrada'] and previsao:
                     try:
-                        if datetime.strptime(previsao_str, "%d/%m/%Y").date() < hoje_br:
-                            status = f"🚨 ATRASADO ({status})"
+                        if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br:
+                            res = f"🚨 ATRASADO ({res})"
                     except: pass
-                return status
+                return res
             
-            if not df_filtrado.empty:
-                df_filtrado['STATUS'] = df_filtrado.apply(tratar_status, axis=1)
+            df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
 
             # --- KPIs ---
-            v_total = len(df_filtrado)
-            v_atrasados = len(df_filtrado[df_filtrado['STATUS'].str.contains('ATRASADO', na=False)])
-            v_op = len(df_filtrado[df_filtrado['STATUS'].str.contains('Pendente|Coletado|Em Rota', case=False, na=False)])
-            v_hoje = len(df_filtrado[df_filtrado['DATA_OBJ'] == hoje_br])
+            v_total = len(df_f)
+            v_atrasados = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)])
+            v_frustradas = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]) # 🎯 CONTAGEM NOVA
+            v_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br])
 
-            c_titulo, c_botao = st.columns([4, 1])
-            with c_titulo:
-                st.markdown(f"<h1>Painel de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
-            with c_botao:
-                csv_data = df_filtrado[colunas_selecionadas].to_csv(index=False, sep=";").encode('utf-8-sig')
-                st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Cargas_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
-                st.markdown(f"<div class='sync-status'>🟢 Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}</div>", unsafe_allow_html=True)
-
-            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f"<h1>Painel de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
+            csv_data = df_f[colunas_selecionadas].to_csv(index=False, sep=";").encode('utf-8-sig')
+            st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Cargas_{st.session_state.cliente}.csv", mime="text/csv")
+            st.markdown(f"<div class='sync-status'>🟢 Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}</div>", unsafe_allow_html=True)
 
             c1, c2, c3, c4 = st.columns(4)
             c1.markdown(f"""<div class="kpi-card bg-blue"><div class="kpi-title">📦 Total</div><div class="kpi-value">{v_total}</div></div>""", unsafe_allow_html=True)
-            c2.markdown(f"""<div class="kpi-card bg-orange"><div class="kpi-title">⏳ Operação</div><div class="kpi-value">{v_op}</div></div>""", unsafe_allow_html=True)
-            c3.markdown(f"""<div class="kpi-card bg-red"><div class="kpi-title">🚨 Atrasos</div><div class="kpi-value">{v_atrasados}</div></div>""", unsafe_allow_html=True)
+            c2.markdown(f"""<div class="kpi-card bg-orange"><div class="kpi-title">❌ Frustradas</div><div class="kpi-value">{v_frustradas}</div></div>""", unsafe_allow_html=True)
+            c3.markdown(f"""<div class="kpi-card bg-red"><div class="kpi-title">🚨 Atrasados</div><div class="kpi-value">{v_atrasados}</div></div>""", unsafe_allow_html=True)
             c4.markdown(f"""<div class="kpi-card bg-green"><div class="kpi-title">📅 Hoje</div><div class="kpi-value">{v_hoje}</div></div>""", unsafe_allow_html=True)
 
-            if 'CIDADE' in df_filtrado.columns:
-                df_filtrado = df_filtrado.sort_values(by=['CIDADE', 'DATA'], ascending=[True, False])
-
-            if not colunas_selecionadas:
-                st.warning("Selecione as colunas.")
-            else:
-                df_final = df_filtrado[colunas_selecionadas].copy()
-                if not df_final.empty:
-                    gb = GridOptionsBuilder.from_dataframe(df_final)
-                    gb.configure_default_column(resizable=True, sortable=True, minWidth=110)
-                    gb.configure_selection('single', use_checkbox=False)
-                    
-                    if 'FOTO_URL' in df_final.columns:
-                        link_jscode = JsCode("""
-                        class LinkCellRenderer {
-                            init(params) {
-                                this.eGui = document.createElement('div');
-                                this.eGui.style.textAlign = 'center';
-                                if (params.value && params.value !== '' && params.value !== 'nan') {
-                                    this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 4px;" title="Ver Foto">📸</a>';
-                                }
-                            }
-                            getGui() { return this.eGui; }
+            # --- AG-GRID ---
+            df_grid = df_f.copy()
+            df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] # Substitui para a grid mostrar o ícone
+            df_final = df_grid[colunas_selecionadas].copy()
+            
+            gb = GridOptionsBuilder.from_dataframe(df_final)
+            gb.configure_default_column(resizable=True, sortable=True, minWidth=110)
+            gb.configure_selection('single', use_checkbox=False)
+            
+            if 'FOTO_URL' in df_final.columns:
+                link_jscode = JsCode("""
+                class LinkCellRenderer {
+                    init(params) {
+                        this.eGui = document.createElement('div');
+                        this.eGui.style.textAlign = 'center';
+                        if (params.value && params.value !== '' && params.value !== 'nan') {
+                            this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 4px;" title="Ver Foto">📸</a>';
                         }
-                        """)
-                        gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=link_jscode, width=80)
-                    
-                    if 'DATA_LIMITE' in df_final.columns: gb.configure_column("DATA_LIMITE", headerName="Previsão")
-                    if 'DATA_ENTREGA' in df_final.columns: gb.configure_column("DATA_ENTREGA", headerName="Entrega")
+                    }
+                    getGui() { return this.eGui; }
+                }
+                """)
+                gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=link_jscode, width=80)
+            
+            grid_css = {
+                ".ag-header-cell-text": {"font-size": "12px !important", "font-weight": "bold"},
+                ".ag-cell": {"font-size": "12px !important"}
+            }
 
-                    AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', fit_columns_on_grid_load=True, height=550)
-                else:
-                    st.info("Nenhum pedido encontrado.")
-        else:
-            st.info(f"Nenhuma carga alocada para {st.session_state.cliente}.")
-    else:
-        st.warning("Verifique a conexão com o Banco de Dados.")
+            AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=True, height=550)
