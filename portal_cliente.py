@@ -5,7 +5,6 @@ import os
 import json
 from datetime import datetime, date, timezone, timedelta
 from streamlit_autorefresh import st_autorefresh
-# 🎯 Removi o comando que não existia da importação
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
@@ -21,7 +20,6 @@ st.markdown("""
     [data-testid="stAppViewContainer"] { background-color: #f0f2f6; font-family: 'Inter', sans-serif; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
     
-    /* 🎯 REMOVI A TRAVA DA SIDEBAR AQUI! Agora ela some 100% quando recolhida */
     .block-container { padding-top: 1.5rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
     .stTextInput>div>div>input, .stSelectbox>div>div>div, .stDateInput>div>div>input, .stMultiSelect>div>div>div { border-radius: 6px; border: 1px solid #ced4da; font-size: 13px;}
@@ -105,7 +103,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V17
+# 🚀 4. DASHBOARD ENTERPRISE V18
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -114,6 +112,18 @@ else:
         df_cliente = df_sistema[df_sistema['TOMADOR'] == st.session_state.cliente].copy()
         
         if not df_cliente.empty:
+            # 📸 TRADUTOR DE FOTOS APPSHEET
+            if 'FOTO' in df_cliente.columns:
+                def construir_link_foto(foto_path):
+                    f_str = str(foto_path).strip()
+                    if f_str and f_str.upper() not in ['NAN', 'NONE', '']:
+                        return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={f_str}"
+                    return ""
+                
+                df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(construir_link_foto)
+            else:
+                df_cliente['FOTO_URL'] = ""
+
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'NUMERO', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
             
@@ -244,7 +254,6 @@ else:
                         ".ag-cell": {"font-size": "12px !important", "font-family": "Inter, sans-serif !important"}
                     }
 
-                    # 🎯 CORREÇÃO DO MOTOR AQUI: Usamos fit_columns_on_grid_load=True nativo do AgGrid
                     AgGrid(
                         df_final,
                         gridOptions=gridOptions,
@@ -252,7 +261,7 @@ else:
                         allow_unsafe_jscode=True,
                         theme='alpine',
                         custom_css=grid_css,
-                        fit_columns_on_grid_load=True, # <-- O comando correto que estica a tabela!
+                        fit_columns_on_grid_load=True, 
                         height=550
                     )
                 else:
