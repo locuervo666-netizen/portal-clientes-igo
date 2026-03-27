@@ -103,7 +103,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V20
+# 🚀 4. DASHBOARD ENTERPRISE V21
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -226,14 +226,15 @@ else:
                     gb.configure_default_column(resizable=True, sortable=True, minWidth=110)
                     gb.configure_selection('single', use_checkbox=False)
                     
-                    # 🎯 A MÁGICA DA CLASSE AG-GRID (Evita o erro do React!)
+                    # 🎯 A MÁGICA VISUAL DO ÍCONE: Apenas a câmera (📸), centralizada e com tooltip!
                     if 'FOTO_URL' in df_final.columns:
                         link_jscode = JsCode("""
                         class LinkCellRenderer {
                             init(params) {
                                 this.eGui = document.createElement('div');
+                                this.eGui.style.textAlign = 'center';
                                 if (params.value && params.value !== '' && params.value !== 'nan') {
-                                    this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="color: #2980B9; text-decoration: none; font-weight: bold; padding: 4px 10px; background-color: #EBF5FB; border-radius: 4px; display: inline-block; margin-top: 4px;">🔗 Ver Foto</a>';
+                                    this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 4px;" title="Clique para ver o comprovante">📸</a>';
                                 }
                             }
                             getGui() {
@@ -241,7 +242,8 @@ else:
                             }
                         }
                         """)
-                        gb.configure_column("FOTO_URL", headerName="Comprovante", cellRenderer=link_jscode, width=130)
+                        # Mudei a largura para apenas 90px (bem estreito para economizar espaço)
+                        gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=link_jscode, width=90)
                     
                     if 'DATA_LIMITE' in df_final.columns: gb.configure_column("DATA_LIMITE", headerName="Previsão")
                     if 'DATA_ENTREGA' in df_final.columns: gb.configure_column("DATA_ENTREGA", headerName="Entregue Em")
