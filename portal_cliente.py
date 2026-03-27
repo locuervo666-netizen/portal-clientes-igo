@@ -14,33 +14,32 @@ st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
 st.markdown("""
     <style>
+    /* 1. Fundo geral e remoção de marcas do Streamlit */
     [data-testid="stAppViewContainer"] { background-color: #f0f2f6; font-family: 'Inter', sans-serif; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
     
-    /* 💎 CARDS KPI PREMIUM (Estilo BI) */
-    .kpi-card {
-        padding: 20px;
-        border-radius: 12px;
-        color: white;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-        margin-bottom: 20px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
-    .kpi-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; margin-bottom: 5px; }
-    .kpi-value { font-size: 34px; font-weight: 900; line-height: 1; margin: 0; }
+    /* 🚀 2. O PULO DO GATO: EMAGRECENDO A SIDEBAR E O TOPO */
+    [data-testid="stSidebar"] { min-width: 260px !important; max-width: 260px !important; } /* Deixa a barra fininha */
+    .block-container { padding-top: 1.5rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; } /* Tira o espaço morto do topo */
     
-    /* Cores em Degradê para os Cards */
-    .bg-blue { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); }      /* Total */
-    .bg-orange { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%); }    /* Pendentes */
-    .bg-red { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%); }       /* Atrasados */
-    .bg-green { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%); }     /* Hoje */
+    /* 3. Inputs mais elegantes */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stDateInput>div>div>input, .stMultiSelect>div>div>div { border-radius: 6px; border: 1px solid #ced4da; font-size: 13px;}
+    
+    /* 💎 4. CARDS KPI PREMIUM (Estilo BI) */
+    .kpi-card { padding: 15px 20px; border-radius: 10px; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 15px; display: flex; flex-direction: column; justify-content: center; }
+    .kpi-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; margin-bottom: 3px; }
+    .kpi-value { font-size: 28px; font-weight: 900; line-height: 1; margin: 0; }
+    
+    .bg-blue { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); }
+    .bg-orange { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%); }
+    .bg-red { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%); }
+    .bg-green { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%); }
 
-    /* TABELA E TÍTULOS */
-    .stDataFrame { border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-    h1 { color: #0f172a; font-weight: 900; font-size: 28px; letter-spacing: -1px; margin-bottom: 0px; }
-    .subtitle { color: #64748b; font-size: 15px; margin-bottom: 20px; }
+    /* 5. TABELA E TÍTULOS */
+    .stDataFrame { border-radius: 8px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    h1 { color: #0f172a; font-weight: 900; font-size: 24px; letter-spacing: -0.5px; margin-bottom: 0px; }
+    .subtitle { color: #64748b; font-size: 13px; margin-bottom: 0px; }
+    .sync-status { text-align: right; font-size: 12px; color: #10B981; font-weight: 600; margin-top: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -102,7 +101,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V9
+# 🚀 4. DASHBOARD ENTERPRISE V10
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -114,28 +113,29 @@ else:
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
 
-            # --- BARRA LATERAL (FILTROS) ---
+            # --- BARRA LATERAL FININHA (FILTROS) ---
             with st.sidebar:
-                st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=55)
-                st.markdown(f"### Olá, **{st.session_state.cliente}**")
-                st.markdown("---")
+                st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=45)
+                st.markdown(f"**{st.session_state.cliente}**")
+                st.divider()
                 
                 min_date = df_cliente['DATA_OBJ'].dropna().min() if 'DATA_OBJ' in df_cliente.columns else date.today()
                 max_date = df_cliente['DATA_OBJ'].dropna().max() if 'DATA_OBJ' in df_cliente.columns else date.today()
                 
-                datas_selecionadas = st.date_input("🗓️ Período de Busca:", value=(min_date, max_date), min_value=min_date, max_value=max_date, format="DD/MM/YYYY")
+                datas_selecionadas = st.date_input("🗓️ Período:", value=(min_date, max_date), min_value=min_date, max_value=max_date, format="DD/MM/YYYY")
                 
                 lista_cidades = sorted(df_cliente['CIDADE'].dropna().unique().tolist()) if 'CIDADE' in df_cliente.columns else []
-                cidades_selecionadas = st.multiselect("📍 Filtrar Cidades:", options=lista_cidades, default=lista_cidades)
+                cidades_selecionadas = st.multiselect("📍 Cidades:", options=lista_cidades, default=lista_cidades)
                 
-                busca_pedido = st.text_input("🔍 Buscar Pedido ou Nº:")
-                st.markdown("---")
+                busca_pedido = st.text_input("🔍 Pedido / Nº:")
+                st.divider()
                 
-                st.markdown("##### ⚙️ Personalizar Tabela")
-                colunas_selecionadas = st.multiselect("Colunas visíveis:", options=colunas_disponiveis, default=colunas_disponiveis)
-                st.markdown("---")
+                # Ocultamos a seleção de colunas num "Popover" elegante para não poluir a sidebar
+                with st.popover("⚙️ Personalizar Colunas", use_container_width=True):
+                    colunas_selecionadas = st.multiselect("Selecione o que deseja ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 
-                if st.button("🚪 Sair do Sistema", use_container_width=True):
+                st.markdown("<br><br><br>", unsafe_allow_html=True)
+                if st.button("🚪 Sair", use_container_width=True):
                     st.session_state.logado = False
                     st.rerun()
 
@@ -174,30 +174,31 @@ else:
             if 'STATUS' in df_filtrado.columns:
                 df_filtrado['STATUS'] = df_filtrado.apply(tratar_status_e_atrasos, axis=1)
 
-            # --- 📊 CÁLCULO DOS KPIs ELITE ---
+            # --- 📊 CÁLCULO DOS KPIs ---
             vol_total = len(df_filtrado)
             vol_atrasados = len(df_filtrado[df_filtrado['STATUS'].str.contains('ATRASADO', na=False)]) if 'STATUS' in df_filtrado.columns else 0
             vol_pendentes = len(df_filtrado[df_filtrado['STATUS'].str.contains('Pendente|Coletado|Em Rota', case=False, na=False)]) if 'STATUS' in df_filtrado.columns else 0
             vol_hoje = len(df_filtrado[df_filtrado['DATA_OBJ'] == hoje]) if 'DATA_OBJ' in df_filtrado.columns else 0
 
-            # --- ÁREA PRINCIPAL (CABEÇALHO) ---
+            # --- ÁREA PRINCIPAL (CABEÇALHO SUPER COMPACTO) ---
             c_titulo, c_botao = st.columns([4, 1])
             with c_titulo:
                 st.markdown(f"<h1>Painel de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
-                st.markdown(f"<p class='subtitle'>Acompanhamento em tempo real. Última atualização: {datetime.now().strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
             with c_botao:
-                st.markdown("<br>", unsafe_allow_html=True)
                 csv_data = df_filtrado[colunas_selecionadas].to_csv(index=False, sep=";").encode('utf-8-sig')
                 st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Cargas_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
+                st.markdown(f"<div class='sync-status'>🟢 Sincronizado {datetime.now().strftime('%H:%M')}</div>", unsafe_allow_html=True)
 
-            # --- 💎 RENDERIZAÇÃO DOS CARDS HTML ---
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # --- 💎 RENDERIZAÇÃO DOS CARDS HTML COMPACTOS ---
             c1, c2, c3, c4 = st.columns(4)
             c1.markdown(f"""<div class="kpi-card bg-blue"><div class="kpi-title">📦 Total Filtrado</div><div class="kpi-value">{vol_total}</div></div>""", unsafe_allow_html=True)
-            c2.markdown(f"""<div class="kpi-card bg-orange"><div class="kpi-title">⏳ Pendentes/Em Rota</div><div class="kpi-value">{vol_pendentes}</div></div>""", unsafe_allow_html=True)
+            c2.markdown(f"""<div class="kpi-card bg-orange"><div class="kpi-title">⏳ Em Operação</div><div class="kpi-value">{vol_pendentes}</div></div>""", unsafe_allow_html=True)
             c3.markdown(f"""<div class="kpi-card bg-red"><div class="kpi-title">🚨 Atrasados</div><div class="kpi-value">{vol_atrasados}</div></div>""", unsafe_allow_html=True)
-            c4.markdown(f"""<div class="kpi-card bg-green"><div class="kpi-title">📅 Pedidos de Hoje</div><div class="kpi-value">{vol_hoje}</div></div>""", unsafe_allow_html=True)
+            c4.markdown(f"""<div class="kpi-card bg-green"><div class="kpi-title">📅 Para Hoje</div><div class="kpi-value">{vol_hoje}</div></div>""", unsafe_allow_html=True)
 
-            # --- EXIBIÇÃO DA TABELA DINÂMICA ---
+            # --- EXIBIÇÃO DA TABELA DINÂMICA (ALTURA MAXIMIZADA) ---
             if 'CIDADE' in df_filtrado.columns:
                 df_filtrado = df_filtrado.sort_values(by=['CIDADE', 'DATA'], ascending=[True, False])
 
@@ -219,7 +220,7 @@ else:
                         df_final, 
                         use_container_width=True, 
                         hide_index=True, 
-                        height=500, 
+                        height=600, # Aumentei a altura da tabela! 
                         column_config=config_colunas,
                         on_select="ignore",
                         selection_mode="single_row"
