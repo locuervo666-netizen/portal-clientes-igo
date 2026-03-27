@@ -14,17 +14,28 @@ st.set_page_config(page_title="Portal IGO Logística", layout="wide", page_icon=
 # ⏱️ Atualização Automática (60 segundos)
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
+# 🖌️ CSS Ajustado: Métricas mais discretas e layout mais "Clean"
 st.markdown("""
     <style>
-    [data-testid="stAppViewContainer"] { background-color: #f8f9fa; font-family: 'Inter', sans-serif; }
+    [data-testid="stAppViewContainer"] { background-color: #f4f6f9; font-family: 'Inter', sans-serif; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
-    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stDateInput>div>div>input, .stMultiSelect>div>div>div { border-radius: 8px; border: 1px solid #ced4da; }
-    [data-testid="stMetric"] { background-color: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border-top: 4px solid #002e5d; }
-    [data-testid="stMetricLabel"] { font-size: 14px; font-weight: 600; text-transform: uppercase; color: #6c757d; }
-    [data-testid="stMetricValue"] { font-size: 32px; font-weight: 800; color: #111827; }
-    .stDataFrame { border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
-    h1 { color: #002e5d; font-weight: 900; letter-spacing: -1px; margin-bottom: 0px; }
-    .subtitle { color: #6c757d; font-size: 16px; margin-bottom: 30px; }
+    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stDateInput>div>div>input, .stMultiSelect>div>div>div { border-radius: 6px; border: 1px solid #ced4da; }
+    
+    /* 📉 PAINÉIS MAIS DISCRETOS E COMPACTOS */
+    [data-testid="stMetric"] { 
+        background-color: #ffffff; 
+        padding: 10px 15px; 
+        border-radius: 6px; 
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
+        border-left: 4px solid #002e5d; 
+    }
+    [data-testid="stMetricLabel"] { font-size: 12px; font-weight: 600; text-transform: uppercase; color: #6c757d; }
+    [data-testid="stMetricValue"] { font-size: 20px; font-weight: 800; color: #002e5d; }
+    
+    /* TABELA E TÍTULOS */
+    .stDataFrame { border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    h1 { color: #002e5d; font-weight: 800; font-size: 26px; letter-spacing: -0.5px; margin-bottom: 0px; }
+    .subtitle { color: #6c757d; font-size: 14px; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -70,9 +81,9 @@ if not st.session_state.logado:
     with col2:
         st.markdown("<br><br><br><br>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=70)
-            st.markdown("<h2>Acesso ao Portal</h2>", unsafe_allow_html=True)
-            st.markdown("<p style='color: #6c757d;'>IGO Logística - Área do Cliente</p>", unsafe_allow_html=True)
+            st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=60)
+            st.markdown("<h2 style='font-size: 22px;'>Acesso ao Portal</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='color: #6c757d; font-size: 14px;'>IGO Logística - Área do Cliente</p>", unsafe_allow_html=True)
             
             usuario = st.text_input("Usuário (Ex: GRALAB)")
             senha = st.text_input("Senha", type="password")
@@ -86,7 +97,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V7
+# 🚀 4. DASHBOARD ENTERPRISE V8
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -101,11 +112,11 @@ else:
 
             # --- BARRA LATERAL (FILTROS) ---
             with st.sidebar:
-                st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=60)
-                st.markdown(f"### Olá, **{st.session_state.cliente}**")
+                st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=50)
+                st.markdown(f"#### Olá, **{st.session_state.cliente}**")
                 st.markdown("---")
                 
-                st.markdown("### 🔍 Filtros de Busca")
+                st.markdown("##### 🔍 Filtros de Busca")
                 min_date = df_cliente['DATA_OBJ'].dropna().min() if 'DATA_OBJ' in df_cliente.columns else date.today()
                 max_date = df_cliente['DATA_OBJ'].dropna().max() if 'DATA_OBJ' in df_cliente.columns else date.today()
                 
@@ -117,13 +128,9 @@ else:
                 busca_pedido = st.text_input("Buscar Pedido ou Nº:")
                 st.markdown("---")
                 
-                st.markdown("### ⚙️ Personalizar Tabela")
+                st.markdown("##### ⚙️ Personalizar Tabela")
                 colunas_selecionadas = st.multiselect("Colunas visíveis:", options=colunas_disponiveis, default=colunas_disponiveis)
                 st.markdown("---")
-                
-                # --- BOTÃO DE EXPORTAÇÃO NATIVO ---
-                # Cria um arquivo CSV com os dados filtrados
-                st.markdown("### 📥 Download dos Dados")
                 
                 if st.button("🚪 Sair do Sistema", use_container_width=True):
                     st.session_state.logado = False
@@ -142,21 +149,19 @@ else:
                 df_filtrado = df_filtrado[cond_pedido | cond_numero]
 
             # --- ÁREA PRINCIPAL ---
-            st.markdown(f"<h1>Espelho de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
-            st.markdown(f"<p class='subtitle'>Acompanhamento operacional atualizado a cada 60s.</p>", unsafe_allow_html=True)
-            
-            kpi1, kpi2, kpi3 = st.columns([1, 1, 2])
-            kpi1.metric("📦 Volume no Período", f"{len(df_filtrado)} Cargas")
-            kpi2.metric("📍 Cobertura Filtrada", f"{df_filtrado['CIDADE'].nunique() if 'CIDADE' in df_filtrado.columns else 0} Cidades")
-            
-            # Colocamos o botão de download bem elegante acima da tabela
-            csv_data = df_filtrado[colunas_selecionadas].to_csv(index=False, sep=";").encode('utf-8-sig')
-            kpi3.download_button(
-                label="📥 Baixar Relatório em Excel (CSV)",
-                data=csv_data,
-                file_name=f"Relatorio_Cargas_{st.session_state.cliente}.csv",
-                mime="text/csv",
-            )
+            c_titulo, c_botao = st.columns([3, 1])
+            with c_titulo:
+                st.markdown(f"<h1>Espelho de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
+                st.markdown(f"<p class='subtitle'>Acompanhamento atualizado automaticamente a cada 60s.</p>", unsafe_allow_html=True)
+            with c_botao:
+                st.markdown("<br>", unsafe_allow_html=True)
+                csv_data = df_filtrado[colunas_selecionadas].to_csv(index=False, sep=";").encode('utf-8-sig')
+                st.download_button(label="📥 Baixar Excel", data=csv_data, file_name=f"Relatorio_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
+
+            # Painéis Menores e Discretos (Pegando menos largura da tela)
+            kpi1, kpi2, kpi3, kpi4 = st.columns([1, 1, 1, 2])
+            kpi1.metric("📦 Volume", f"{len(df_filtrado)}")
+            kpi2.metric("📍 Cidades", f"{df_filtrado['CIDADE'].nunique() if 'CIDADE' in df_filtrado.columns else 0}")
             
             # --- 🛠️ LÓGICA DE STATUS COM ALERTA DE ATRASO (FAROL) ---
             hoje = date.today()
@@ -164,19 +169,17 @@ else:
                 status = str(row.get('STATUS', '')).strip().upper()
                 previsao_str = str(row.get('DATA_LIMITE', '')).strip()
                 
-                # Regra de emojis base
                 if status == 'ENTREGUE': status = '✅ Entregue'
                 elif status in ['EM ROTA', 'EM ROTA DE ENTREGA']: status = '🚚 Em Rota'
                 elif status == 'COLETADO': status = '📦 Coletado'
                 elif status == 'CANCELADO': status = '❌ Cancelado'
-                else: status = f'⏳ {status}' # Pendentes
+                else: status = f'⏳ {status}'
                 
-                # Farol de Atraso (Só aplica se não tiver sido entregue/cancelado)
                 if status not in ['✅ Entregue', '❌ Cancelado'] and previsao_str:
                     try:
                         data_previsao = datetime.strptime(previsao_str, "%d/%m/%Y").date()
                         if data_previsao < hoje:
-                            status = f"🚨 ATRASADO ({status})" # Adiciona o alerta vermelho
+                            status = f"🚨 ATRASADO ({status})"
                     except:
                         pass
                 return status
@@ -202,22 +205,16 @@ else:
                     if 'DATA_ENTREGA' in df_final.columns:
                         config_colunas['DATA_ENTREGA'] = "Entregue Em"
 
-                    # 🦓 A MÁGICA DO EFEITO ZEBRA ACONTECE AQUI!
-                    df_final = df_final.reset_index(drop=True) # Reseta o index para garantir as linhas pares/ímpares
-                    
-                    def aplicar_zebra(x):
-                        return ['background-color: #F8FAFC' if i % 2 == 0 else 'background-color: #FFFFFF' for i in range(len(x))]
-                        
-                    df_estilizado = df_final.style.apply(aplicar_zebra, axis=0)
-
-                    # 🎯 A MÁGICA DA SELEÇÃO DA LINHA INTEIRA ESTÁ AQUI NO "selection_mode"!
+                    # 🎯 A MÁGICA DA SELEÇÃO FUNCIONANDO! 
+                    # Removemos o "estilo zebra" manual para o Streamlit poder aplicar o fundo azul/cinza na linha quando clicada.
                     st.dataframe(
-                        df_estilizado, 
+                        df_final, 
                         use_container_width=True, 
                         hide_index=True, 
                         height=550, 
                         column_config=config_colunas,
-                        selection_mode="single_row" # <-- Transforma o clique de Célula em clique de Linha
+                        on_select="ignore",           # Ignora o recarregamento da página para não travar
+                        selection_mode="single_row"   # Permite clicar e selecionar a LINHA INTEIRA!
                     )
                 else:
                     st.warning("Nenhum pedido encontrado para os filtros selecionados.")
