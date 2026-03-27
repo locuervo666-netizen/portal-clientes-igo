@@ -33,24 +33,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# =======================================================
-# 🏦 2. CENTRAL DE CLIENTES (CADASTRE NOVOS AQUI)
-# =======================================================
+# 🏦 CENTRAL DE CLIENTES
 CLIENTES_CONFIG = {
-    "GRALAB": {
-        "senha": "123",
-        "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png"
-    },
-    "IGO_LOGISTICA": {
-        "senha": "admin",
-        "logo": "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
-    }
+    "GRALAB": {"senha": "123", "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png"},
+    "IGO_LOGISTICA": {"senha": "admin", "logo": "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"}
 }
-
 LOGO_PADRAO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
 
 # =======================================================
-# 🔗 3. MOTOR DE DADOS
+# 🔗 2. MOTOR DE DADOS (COM CRUZAMENTO INTELIGENTE)
 # =======================================================
 @st.cache_data(ttl=60)
 def carregar_dados_nuvem():
@@ -65,12 +56,43 @@ def carregar_dados_nuvem():
             gc = gspread.oauth(credentials_filename="credentials.json", authorized_user_filename="token.json")
             
         planilha = gc.open("DB_IGO_Logistica")
-        aba = planilha.worksheet("Memoria_Sistema")
-        dados = aba.get_all_values()
+        aba_m = planilha.worksheet("Memoria_Sistema")
+        dados_m = aba_m.get_all_values()
         
-        if len(dados) > 1:
-            df = pd.DataFrame(dados[1:], columns=dados[0])
+        if len(dados_m) > 1:
+            df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
+            
+            # 🎯 MÁGICA: O Portal vai "espionar" a aba do AppSheet para pegar os detalhes!
+            try:
+                aba_app = planilha.worksheet("App_Tarefas")
+                dados_app = aba_app.get_all_values()
+                if len(dados_app) > 1:
+                    df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
+                    df_app.columns = df_app.columns.str.strip().str.upper()
+                    
+                    col_quem = next((c for c in df_app.columns if 'QUEM' in c or 'ATENDEU' in c), None)
+                    col_obs = next((c for c in df_app.columns if 'OBS' in c), None)
+                    
+                    if col_quem or col_obs:
+                        cols_merge = ['PEDIDO']
+                        renames = {}
+                        if col_quem: 
+                            cols_merge.append(col_quem)
+                            renames[col_quem] = 'APP_QUEM'
+                        if col_obs: 
+                            cols_merge.append(col_obs)
+                            renames[col_obs] = 'APP_OBS'
+                            
+                        df_app_clean = df_app[cols_merge].copy()
+                        df_app_clean.rename(columns=renames, inplace=True)
+                        df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
+                        
+                        df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
+            except Exception as e:
+                pass # Se falhar, segue a vida sem travar
+            # ---------------------------------------------------------
+            
             if 'DATA' in df.columns:
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
@@ -79,7 +101,7 @@ def carregar_dados_nuvem():
     return pd.DataFrame()
 
 # =======================================================
-# 🔐 4. TELA DE LOGIN
+# 🔐 3. TELA DE LOGIN
 # =======================================================
 if 'logado' not in st.session_state:
     st.session_state.logado = False
@@ -102,30 +124,42 @@ if not st.session_state.logado:
                     st.error("Usuário ou senha incorretos.")
 
 # =======================================================
-# 🚀 5. DASHBOARD ELITE V23 (RECONHECENDO FRUSTRADAS)
+# 🚀 4. DASHBOARD V25 (DETALHES ATIVOS E FOTO GRANDE)
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
     if not df_sistema.empty and 'TOMADOR' in df_sistema.columns:
-        if st.session_state.cliente == "IGO_LOGISTICA":
-            df_cliente = df_sistema.copy()
-        else:
-            df_cliente = df_sistema[df_sistema['TOMADOR'] == st.session_state.cliente].copy()
+        df_cliente = df_sistema if st.session_state.cliente == "IGO_LOGISTICA" else df_sistema[df_sistema['TOMADOR'] == st.session_state.cliente].copy()
         
         if not df_cliente.empty:
             # 📸 Tradutor de Fotos
             if 'FOTO' in df_cliente.columns:
-                def construir_link_foto(f_path):
-                    f_str = str(f_path).strip()
-                    if f_str and f_str.upper() not in ['NAN', 'NONE', '']:
-                        return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={f_str}"
-                    return ""
-                df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(construir_link_foto)
+                df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
 
-            ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
+            # 🛠️ GERAÇÃO DA COLUNA "DETALHES"
+            def formatar_detalhes(row):
+                status = str(row.get('STATUS', '')).upper()
+                if 'FRUSTRADA' in status:
+                    # Agora ele pega as informações fresquinhas cruzadas do AppSheet!
+                    resp = str(row.get('APP_QUEM', '')).strip()
+                    obs = str(row.get('APP_OBS', '')).strip()
+                    
+                    # Limpa se vier com erro do Pandas
+                    if resp.upper() in ['NAN', 'NONE']: resp = ""
+                    if obs.upper() in ['NAN', 'NONE']: obs = ""
+                    
+                    if resp and obs: return f"🗣️ {resp} / 📝 {obs}"
+                    if resp: return f"🗣️ Resp: {resp}"
+                    if obs: return f"📝 Motivo: {obs}"
+                return ""
+
+            df_cliente['DETALHES'] = df_cliente.apply(formatar_detalhes, axis=1)
+
+            # 🎯 CORREÇÃO CRÍTICA AQUI: A coluna DETALHES foi adicionada na ordem padrão!
+            ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'DETALHES', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
-            colunas_ocultas_padrao = ['ENDERECO', 'Nº', 'CEP']
-            colunas_visiveis_iniciais = [col for col in colunas_disponiveis if col not in colunas_ocultas_padrao]
+            colunas_ocultas = ['ENDERECO', 'Nº', 'CEP']
+            colunas_iniciais = [col for col in colunas_disponiveis if col not in colunas_ocultas]
             hoje_br = datetime.now(FUSO_BR).date()
 
             with st.sidebar:
@@ -138,46 +172,40 @@ else:
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 busca_ped = st.text_input("🔍 Pedido / Nº:")
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True):
-                    colunas_selecionadas = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_visiveis_iniciais)
+                    colunas_selecionadas = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_iniciais)
                 if st.button("🚪 Sair", use_container_width=True):
                     st.session_state.logado = False
                     st.rerun()
 
             # --- FILTROS ---
             df_f = df_cliente.copy()
-            if len(datas_sel) == 2:
-                df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
-            if cidades_sel:
-                df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
+            if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
+            if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
             if busca_ped:
                 b = str(busca_ped).upper()
                 df_f = df_f[df_f['PEDIDO'].astype(str).str.contains(b) | df_f['NUMERO'].astype(str).str.contains(b)]
 
-            # --- 🛠️ LÓGICA DE STATUS REFINADA (FRUSTRADAS INCLUÍDAS) ---
+            # --- STATUS DISPLAY ---
             def tratar_status(row):
                 s = str(row.get('STATUS', '')).strip().upper()
                 previsao = str(row.get('DATA_LIMITE', '')).strip()
-                
                 if s == 'ENTREGUE': res = '✅ Entregue'
                 elif s in ['EM ROTA', 'EM ROTA DE ENTREGA']: res = '🚚 Em Rota'
                 elif s == 'COLETADO': res = '📦 Coletado'
-                elif 'FRUSTRADA' in s: res = '❌ Frustrada' # 🎯 RECONHECE AQUI!
+                elif 'FRUSTRADA' in s: res = '❌ Frustrada'
                 elif s == 'CANCELADO': res = '🚫 Cancelado'
                 else: res = '⏳ Pendente'
-                
                 if res not in ['✅ Entregue', '🚫 Cancelado', '❌ Frustrada'] and previsao:
                     try:
-                        if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br:
-                            res = f"🚨 ATRASADO ({res})"
+                        if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: res = f"🚨 ATRASADO ({res})"
                     except: pass
                 return res
             
             df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
 
-            # --- KPIs ---
-            v_total = len(df_f)
-            v_atrasados = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)])
-            v_frustradas = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]) # 🎯 CONTAGEM NOVA
+            # --- DASHBOARD ---
+            v_total, v_atrasados = len(df_f), len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)])
+            v_frustradas = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', na=False)])
             v_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br])
 
             st.markdown(f"<h1>Painel de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
@@ -193,7 +221,7 @@ else:
 
             # --- AG-GRID ---
             df_grid = df_f.copy()
-            df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] # Substitui para a grid mostrar o ícone
+            df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
             df_final = df_grid[colunas_selecionadas].copy()
             
             gb = GridOptionsBuilder.from_dataframe(df_final)
@@ -207,7 +235,7 @@ else:
                         this.eGui = document.createElement('div');
                         this.eGui.style.textAlign = 'center';
                         if (params.value && params.value !== '' && params.value !== 'nan') {
-                            this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 4px;" title="Ver Foto">📸</a>';
+                            this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 4px;" title="Ver Foto em Alta">📸</a>';
                         }
                     }
                     getGui() { return this.eGui; }
@@ -215,6 +243,9 @@ else:
                 """)
                 gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=link_jscode, width=80)
             
+            if 'DETALHES' in df_final.columns:
+                gb.configure_column("DETALHES", width=250, tooltipField="DETALHES")
+
             grid_css = {
                 ".ag-header-cell-text": {"font-size": "12px !important", "font-weight": "bold"},
                 ".ag-cell": {"font-size": "12px !important"}
