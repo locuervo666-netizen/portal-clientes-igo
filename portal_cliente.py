@@ -28,7 +28,8 @@ st.markdown("""
     
     .stDataFrame { border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
     
-    h1 { color: #002e5d; font-weight: 900; letter-spacing: -1px; }
+    h1 { color: #002e5d; font-weight: 900; letter-spacing: -1px; margin-bottom: 0px; }
+    .subtitle { color: #6c757d; font-size: 16px; margin-bottom: 30px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -65,7 +66,7 @@ def carregar_dados_nuvem():
             
             return df
     except Exception as e:
-        st.error(f"Falha de sincronização: {e}")
+        st.error(f"Falha de sincronização com o servidor: {e}")
     return pd.DataFrame()
 
 # =======================================================
@@ -113,7 +114,7 @@ else:
                 
                 st.markdown("### 🔍 Filtros de Busca")
                 
-                # Calendário
+                # Calendário Inteligente
                 min_date = df_cliente['DATA_OBJ'].dropna().min() if 'DATA_OBJ' in df_cliente.columns else date.today()
                 max_date = df_cliente['DATA_OBJ'].dropna().max() if 'DATA_OBJ' in df_cliente.columns else date.today()
                 
@@ -125,89 +126,99 @@ else:
                     format="DD/MM/YYYY"
                 )
                 
-                # Cidades
+                # Filtro de Cidades
                 lista_cidades = sorted(df_cliente['CIDADE'].dropna().unique().tolist()) if 'CIDADE' in df_cliente.columns else []
                 cidades_selecionadas = st.multiselect("Filtrar por Cidades:", options=lista_cidades, default=lista_cidades)
                 
-                # Busca Pedido
-                busca_pedido = st.text_input("Buscar Pedido ou PCL:")
+                # Busca por Pedido ou Número
+                busca_pedido = st.text_input("Buscar Pedido ou Nº:")
                 
                 st.markdown("---")
-                if st.button("🔄 Atualizar Dados"):
+                if st.button("🔄 Atualizar Dados da Nuvem", use_container_width=True):
                     st.cache_data.clear()
                     st.rerun()
                     
-                if st.button("🚪 Sair do Sistema"):
+                if st.button("🚪 Sair com Segurança", use_container_width=True):
                     st.session_state.logado = False
                     st.rerun()
 
             # --- APLICANDO FILTROS ---
             df_filtrado = df_cliente.copy()
             
+            # Aplica Data
             if len(datas_selecionadas) == 2 and 'DATA_OBJ' in df_filtrado.columns:
                 data_inicio, data_fim = datas_selecionadas
                 df_filtrado = df_filtrado[(df_filtrado['DATA_OBJ'] >= data_inicio) & (df_filtrado['DATA_OBJ'] <= data_fim)]
                 
+            # Aplica Cidade
             if cidades_selecionadas and 'CIDADE' in df_filtrado.columns:
                 df_filtrado = df_filtrado[df_filtrado['CIDADE'].isin(cidades_selecionadas)]
                 
+            # Aplica Busca de Texto
             if busca_pedido:
                 busca = str(busca_pedido).upper()
                 cond_pedido = df_filtrado['PEDIDO'].astype(str).str.upper().str.contains(busca) if 'PEDIDO' in df_filtrado.columns else False
-                cond_pcl = df_filtrado['PCL'].astype(str).str.upper().str.contains(busca) if 'PCL' in df_filtrado.columns else False
-                df_filtrado = df_filtrado[cond_pedido | cond_pcl]
+                cond_numero = df_filtrado['NUMERO'].astype(str).str.upper().str.contains(busca) if 'NUMERO' in df_filtrado.columns else False
+                df_filtrado = df_filtrado[cond_pedido | cond_numero]
 
             # --- ÁREA PRINCIPAL (TELA DO CLIENTE) ---
-            st.markdown(f"<h1>Painel Operacional | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
+            st.markdown(f"<h1>Espelho de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
+            st.markdown("<p class='subtitle'>Acompanhamento operacional em tempo real protegido pela IGO Logística.</p>", unsafe_allow_html=True)
             
-            # Cards de KPIs (Apenas 2, bem objetivos)
+            # Cards de KPIs (Direto ao ponto)
             kpi1, kpi2, kpi3 = st.columns([1, 1, 2])
             total_filtrado = len(df_filtrado)
             cidades_filtradas = df_filtrado['CIDADE'].nunique() if 'CIDADE' in df_filtrado.columns else 0
             
-            kpi1.metric("📦 Volume Filtrado", f"{total_filtrado} Cargas")
-            kpi2.metric("📍 Cobertura", f"{cidades_filtradas} Cidades")
+            kpi1.metric("📦 Volume no Período", f"{total_filtrado} Cargas")
+            kpi2.metric("📍 Cobertura Filtrada", f"{cidades_filtradas} Cidades")
 
-            # --- GOVERNANÇA E EXIBIÇÃO DA TABELA ---
-            st.markdown("<br>### 📋 Espelho de Cargas", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
             
+            # --- GOVERNANÇA: O QUE O CLIENTE PODE VER ---
             if 'CIDADE' in df_filtrado.columns:
-                df_filtrado = df_filtrado.sort_values(by='CIDADE', ascending=True)
+                df_filtrado = df_filtrado.sort_values(by=['CIDADE', 'DATA'], ascending=[True, False])
 
-            # 🚨 ATENÇÃO AQUI: Estes devem ser os nomes EXATOS dos cabeçalhos na sua planilha
+            # Lista baseada EXATAMENTE nas colunas que você enviou
             colunas_permitidas = [
-                'DATA', 'PREVISÃO', 'ENTREGA', 'STATUS', 
-                'PEDIDO', 'PCL', 'CIDADE', 'UF', 'BAIRRO', 'RUA', 'NUMERO', 'CEP', 'FOTO'
+                'DATA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 
+                'ENDERECO', 'Nº', 'CEP', 'STATUS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL'
             ]
-            colunas_exibicao = [col for col in colunas_permitidas if col in df_filtrado.columns]
             
+            # Mantém apenas as colunas que realmente existem na planilha
+            colunas_exibicao = [col for col in colunas_permitidas if col in df_filtrado.columns]
             df_final = df_filtrado[colunas_exibicao].copy()
             
             if not df_final.empty:
-                # Configuração Premium das colunas (Transforma link em botão clicável)
+                # CONFIGURAÇÃO VISUAL DAS COLUNAS (Para ficar bonito na tabela)
                 config_colunas = {}
-                if 'FOTO' in df_final.columns:
-                    config_colunas['FOTO'] = st.column_config.LinkColumn(
+                
+                # Transforma a coluna FOTO_URL em um Botão Clicável
+                if 'FOTO_URL' in df_final.columns:
+                    config_colunas['FOTO_URL'] = st.column_config.LinkColumn(
                         "Comprovante",
                         display_text="🔗 Ver Foto"
                     )
-                if 'STATUS' in df_final.columns:
-                    config_colunas['STATUS'] = st.column_config.TextColumn(
-                        "Status",
-                        help="Situação atual da carga"
-                    )
+                
+                # Renomeia colunas para o cliente achar mais bonito
+                if 'DATA_LIMITE' in df_final.columns:
+                    config_colunas['DATA_LIMITE'] = "Previsão"
+                if 'DATA_ENTREGA' in df_final.columns:
+                    config_colunas['DATA_ENTREGA'] = "Data da Entrega"
+                if 'ENDERECO' in df_final.columns:
+                    config_colunas['ENDERECO'] = "Endereço"
 
                 st.dataframe(
                     df_final,
                     use_container_width=True,
                     hide_index=True,
-                    height=500,
+                    height=550,
                     column_config=config_colunas
                 )
             else:
-                st.warning("Nenhum pedido encontrado para os filtros selecionados.")
+                st.warning("Nenhum pedido encontrado para os filtros e datas selecionados.")
                 
         else:
             st.info(f"Base de dados limpa. Nenhuma carga alocada para {st.session_state.cliente}.")
     else:
-        st.warning("Aguardando carregamento da estrutura. Verifique a conexão com o banco de dados.")
+        st.warning("Aguardando carregamento da estrutura. Verifique a conexão com a nuvem.")
