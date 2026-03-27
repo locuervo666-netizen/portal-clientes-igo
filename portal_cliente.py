@@ -14,18 +14,14 @@ st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
 st.markdown("""
     <style>
-    /* 1. Fundo geral e remoção de marcas do Streamlit */
     [data-testid="stAppViewContainer"] { background-color: #f0f2f6; font-family: 'Inter', sans-serif; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
     
-    /* 🚀 2. O PULO DO GATO: EMAGRECENDO A SIDEBAR E O TOPO */
-    [data-testid="stSidebar"] { min-width: 260px !important; max-width: 260px !important; } /* Deixa a barra fininha */
-    .block-container { padding-top: 1.5rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; } /* Tira o espaço morto do topo */
+    [data-testid="stSidebar"] { min-width: 260px !important; max-width: 260px !important; }
+    .block-container { padding-top: 1.5rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    /* 3. Inputs mais elegantes */
     .stTextInput>div>div>input, .stSelectbox>div>div>div, .stDateInput>div>div>input, .stMultiSelect>div>div>div { border-radius: 6px; border: 1px solid #ced4da; font-size: 13px;}
     
-    /* 💎 4. CARDS KPI PREMIUM (Estilo BI) */
     .kpi-card { padding: 15px 20px; border-radius: 10px; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 15px; display: flex; flex-direction: column; justify-content: center; }
     .kpi-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; margin-bottom: 3px; }
     .kpi-value { font-size: 28px; font-weight: 900; line-height: 1; margin: 0; }
@@ -35,13 +31,22 @@ st.markdown("""
     .bg-red { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%); }
     .bg-green { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%); }
 
-    /* 5. TABELA E TÍTULOS */
     .stDataFrame { border-radius: 8px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     h1 { color: #0f172a; font-weight: 900; font-size: 24px; letter-spacing: -0.5px; margin-bottom: 0px; }
     .subtitle { color: #64748b; font-size: 13px; margin-bottom: 0px; }
     .sync-status { text-align: right; font-size: 12px; color: #10B981; font-weight: 600; margin-top: 10px; }
     </style>
     """, unsafe_allow_html=True)
+
+# =======================================================
+# 🖼️ DICIONÁRIO DE LOGOS DOS CLIENTES (WHITE-LABEL)
+# =======================================================
+LOGOS_CLIENTES = {
+    # Logo Oficial do GRALAB inserida aqui!
+    "GRALAB": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png", 
+    "SYNVIA": "https://cdn-icons-png.flaticon.com/512/3004/3004415.png",
+    "DEFAULT": "https://cdn-icons-png.flaticon.com/512/1532/1532692.png" 
+}
 
 # =======================================================
 # 🔗 2. MOTOR DE DADOS
@@ -75,7 +80,7 @@ def carregar_dados_nuvem():
     return pd.DataFrame()
 
 # =======================================================
-# 🔐 3. TELA DE LOGIN
+# 🔐 3. TELA DE LOGIN 
 # =======================================================
 if 'logado' not in st.session_state:
     st.session_state.logado = False
@@ -85,7 +90,7 @@ if not st.session_state.logado:
     with col2:
         st.markdown("<br><br><br><br>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=60)
+            st.image(LOGOS_CLIENTES["DEFAULT"], width=60)
             st.markdown("<h2 style='font-size: 24px; color: #0f172a;'>Acesso ao Portal</h2>", unsafe_allow_html=True)
             st.markdown("<p style='color: #64748b; font-size: 15px;'>IGO Logística - Área do Cliente</p>", unsafe_allow_html=True)
             
@@ -101,7 +106,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V10
+# 🚀 4. DASHBOARD ENTERPRISE V11
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -115,8 +120,11 @@ else:
 
             # --- BARRA LATERAL FININHA (FILTROS) ---
             with st.sidebar:
-                st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=45)
-                st.markdown(f"**{st.session_state.cliente}**")
+                # O sistema puxa a logo do Gralab automaticamente aqui!
+                logo_atual = LOGOS_CLIENTES.get(st.session_state.cliente, LOGOS_CLIENTES["DEFAULT"])
+                st.image(logo_atual, width=160) # Ajustado para 160px para a logo horizontal ficar perfeita
+                
+                st.markdown("<br>", unsafe_allow_html=True)
                 st.divider()
                 
                 min_date = df_cliente['DATA_OBJ'].dropna().min() if 'DATA_OBJ' in df_cliente.columns else date.today()
@@ -130,7 +138,6 @@ else:
                 busca_pedido = st.text_input("🔍 Pedido / Nº:")
                 st.divider()
                 
-                # Ocultamos a seleção de colunas num "Popover" elegante para não poluir a sidebar
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True):
                     colunas_selecionadas = st.multiselect("Selecione o que deseja ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 
@@ -180,7 +187,7 @@ else:
             vol_pendentes = len(df_filtrado[df_filtrado['STATUS'].str.contains('Pendente|Coletado|Em Rota', case=False, na=False)]) if 'STATUS' in df_filtrado.columns else 0
             vol_hoje = len(df_filtrado[df_filtrado['DATA_OBJ'] == hoje]) if 'DATA_OBJ' in df_filtrado.columns else 0
 
-            # --- ÁREA PRINCIPAL (CABEÇALHO SUPER COMPACTO) ---
+            # --- ÁREA PRINCIPAL ---
             c_titulo, c_botao = st.columns([4, 1])
             with c_titulo:
                 st.markdown(f"<h1>Painel de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
@@ -198,7 +205,7 @@ else:
             c3.markdown(f"""<div class="kpi-card bg-red"><div class="kpi-title">🚨 Atrasados</div><div class="kpi-value">{vol_atrasados}</div></div>""", unsafe_allow_html=True)
             c4.markdown(f"""<div class="kpi-card bg-green"><div class="kpi-title">📅 Para Hoje</div><div class="kpi-value">{vol_hoje}</div></div>""", unsafe_allow_html=True)
 
-            # --- EXIBIÇÃO DA TABELA DINÂMICA (ALTURA MAXIMIZADA) ---
+            # --- EXIBIÇÃO DA TABELA DINÂMICA ---
             if 'CIDADE' in df_filtrado.columns:
                 df_filtrado = df_filtrado.sort_values(by=['CIDADE', 'DATA'], ascending=[True, False])
 
@@ -220,7 +227,7 @@ else:
                         df_final, 
                         use_container_width=True, 
                         hide_index=True, 
-                        height=600, # Aumentei a altura da tabela! 
+                        height=600, 
                         column_config=config_colunas,
                         on_select="ignore",
                         selection_mode="single_row"
