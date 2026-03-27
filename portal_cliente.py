@@ -7,35 +7,40 @@ from datetime import datetime, date
 from streamlit_autorefresh import st_autorefresh
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS ELITE
 # =======================================================
 st.set_page_config(page_title="Portal IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
-
-# ⏱️ Atualização Automática (60 segundos)
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
-# 🖌️ CSS Ajustado: Métricas mais discretas e layout mais "Clean"
 st.markdown("""
     <style>
-    [data-testid="stAppViewContainer"] { background-color: #f4f6f9; font-family: 'Inter', sans-serif; }
+    [data-testid="stAppViewContainer"] { background-color: #f0f2f6; font-family: 'Inter', sans-serif; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
-    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stDateInput>div>div>input, .stMultiSelect>div>div>div { border-radius: 6px; border: 1px solid #ced4da; }
     
-    /* 📉 PAINÉIS MAIS DISCRETOS E COMPACTOS */
-    [data-testid="stMetric"] { 
-        background-color: #ffffff; 
-        padding: 10px 15px; 
-        border-radius: 6px; 
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
-        border-left: 4px solid #002e5d; 
+    /* 💎 CARDS KPI PREMIUM (Estilo BI) */
+    .kpi-card {
+        padding: 20px;
+        border-radius: 12px;
+        color: white;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
-    [data-testid="stMetricLabel"] { font-size: 12px; font-weight: 600; text-transform: uppercase; color: #6c757d; }
-    [data-testid="stMetricValue"] { font-size: 20px; font-weight: 800; color: #002e5d; }
+    .kpi-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; margin-bottom: 5px; }
+    .kpi-value { font-size: 34px; font-weight: 900; line-height: 1; margin: 0; }
     
+    /* Cores em Degradê para os Cards */
+    .bg-blue { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); }      /* Total */
+    .bg-orange { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%); }    /* Pendentes */
+    .bg-red { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%); }       /* Atrasados */
+    .bg-green { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%); }     /* Hoje */
+
     /* TABELA E TÍTULOS */
-    .stDataFrame { border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-    h1 { color: #002e5d; font-weight: 800; font-size: 26px; letter-spacing: -0.5px; margin-bottom: 0px; }
-    .subtitle { color: #6c757d; font-size: 14px; margin-bottom: 20px; }
+    .stDataFrame { border-radius: 10px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    h1 { color: #0f172a; font-weight: 900; font-size: 28px; letter-spacing: -1px; margin-bottom: 0px; }
+    .subtitle { color: #64748b; font-size: 15px; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -67,7 +72,7 @@ def carregar_dados_nuvem():
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
     except Exception as e:
-        st.error(f"Falha de sincronização com o servidor: {e}")
+        st.error(f"Falha de sincronização: {e}")
     return pd.DataFrame()
 
 # =======================================================
@@ -82,8 +87,8 @@ if not st.session_state.logado:
         st.markdown("<br><br><br><br>", unsafe_allow_html=True)
         with st.container(border=True):
             st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=60)
-            st.markdown("<h2 style='font-size: 22px;'>Acesso ao Portal</h2>", unsafe_allow_html=True)
-            st.markdown("<p style='color: #6c757d; font-size: 14px;'>IGO Logística - Área do Cliente</p>", unsafe_allow_html=True)
+            st.markdown("<h2 style='font-size: 24px; color: #0f172a;'>Acesso ao Portal</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='color: #64748b; font-size: 15px;'>IGO Logística - Área do Cliente</p>", unsafe_allow_html=True)
             
             usuario = st.text_input("Usuário (Ex: GRALAB)")
             senha = st.text_input("Senha", type="password")
@@ -97,7 +102,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V8
+# 🚀 4. DASHBOARD ENTERPRISE V9
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -106,26 +111,24 @@ else:
         df_cliente = df_sistema[df_sistema['TOMADOR'] == st.session_state.cliente].copy()
         
         if not df_cliente.empty:
-            
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
 
             # --- BARRA LATERAL (FILTROS) ---
             with st.sidebar:
-                st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=50)
-                st.markdown(f"#### Olá, **{st.session_state.cliente}**")
+                st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=55)
+                st.markdown(f"### Olá, **{st.session_state.cliente}**")
                 st.markdown("---")
                 
-                st.markdown("##### 🔍 Filtros de Busca")
                 min_date = df_cliente['DATA_OBJ'].dropna().min() if 'DATA_OBJ' in df_cliente.columns else date.today()
                 max_date = df_cliente['DATA_OBJ'].dropna().max() if 'DATA_OBJ' in df_cliente.columns else date.today()
                 
-                datas_selecionadas = st.date_input("Período:", value=(min_date, max_date), min_value=min_date, max_value=max_date, format="DD/MM/YYYY")
+                datas_selecionadas = st.date_input("🗓️ Período de Busca:", value=(min_date, max_date), min_value=min_date, max_value=max_date, format="DD/MM/YYYY")
                 
                 lista_cidades = sorted(df_cliente['CIDADE'].dropna().unique().tolist()) if 'CIDADE' in df_cliente.columns else []
-                cidades_selecionadas = st.multiselect("Cidades:", options=lista_cidades, default=lista_cidades)
+                cidades_selecionadas = st.multiselect("📍 Filtrar Cidades:", options=lista_cidades, default=lista_cidades)
                 
-                busca_pedido = st.text_input("Buscar Pedido ou Nº:")
+                busca_pedido = st.text_input("🔍 Buscar Pedido ou Nº:")
                 st.markdown("---")
                 
                 st.markdown("##### ⚙️ Personalizar Tabela")
@@ -148,22 +151,7 @@ else:
                 cond_numero = df_filtrado['NUMERO'].astype(str).str.upper().str.contains(busca) if 'NUMERO' in df_filtrado.columns else False
                 df_filtrado = df_filtrado[cond_pedido | cond_numero]
 
-            # --- ÁREA PRINCIPAL ---
-            c_titulo, c_botao = st.columns([3, 1])
-            with c_titulo:
-                st.markdown(f"<h1>Espelho de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
-                st.markdown(f"<p class='subtitle'>Acompanhamento atualizado automaticamente a cada 60s.</p>", unsafe_allow_html=True)
-            with c_botao:
-                st.markdown("<br>", unsafe_allow_html=True)
-                csv_data = df_filtrado[colunas_selecionadas].to_csv(index=False, sep=";").encode('utf-8-sig')
-                st.download_button(label="📥 Baixar Excel", data=csv_data, file_name=f"Relatorio_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
-
-            # Painéis Menores e Discretos (Pegando menos largura da tela)
-            kpi1, kpi2, kpi3, kpi4 = st.columns([1, 1, 1, 2])
-            kpi1.metric("📦 Volume", f"{len(df_filtrado)}")
-            kpi2.metric("📍 Cidades", f"{df_filtrado['CIDADE'].nunique() if 'CIDADE' in df_filtrado.columns else 0}")
-            
-            # --- 🛠️ LÓGICA DE STATUS COM ALERTA DE ATRASO (FAROL) ---
+            # --- 🛠️ LÓGICA DE STATUS COM ALERTA DE ATRASO ---
             hoje = date.today()
             def tratar_status_e_atrasos(row):
                 status = str(row.get('STATUS', '')).strip().upper()
@@ -173,19 +161,41 @@ else:
                 elif status in ['EM ROTA', 'EM ROTA DE ENTREGA']: status = '🚚 Em Rota'
                 elif status == 'COLETADO': status = '📦 Coletado'
                 elif status == 'CANCELADO': status = '❌ Cancelado'
-                else: status = f'⏳ {status}'
+                else: status = f'⏳ Pendente'
                 
                 if status not in ['✅ Entregue', '❌ Cancelado'] and previsao_str:
                     try:
                         data_previsao = datetime.strptime(previsao_str, "%d/%m/%Y").date()
                         if data_previsao < hoje:
                             status = f"🚨 ATRASADO ({status})"
-                    except:
-                        pass
+                    except: pass
                 return status
                 
             if 'STATUS' in df_filtrado.columns:
                 df_filtrado['STATUS'] = df_filtrado.apply(tratar_status_e_atrasos, axis=1)
+
+            # --- 📊 CÁLCULO DOS KPIs ELITE ---
+            vol_total = len(df_filtrado)
+            vol_atrasados = len(df_filtrado[df_filtrado['STATUS'].str.contains('ATRASADO', na=False)]) if 'STATUS' in df_filtrado.columns else 0
+            vol_pendentes = len(df_filtrado[df_filtrado['STATUS'].str.contains('Pendente|Coletado|Em Rota', case=False, na=False)]) if 'STATUS' in df_filtrado.columns else 0
+            vol_hoje = len(df_filtrado[df_filtrado['DATA_OBJ'] == hoje]) if 'DATA_OBJ' in df_filtrado.columns else 0
+
+            # --- ÁREA PRINCIPAL (CABEÇALHO) ---
+            c_titulo, c_botao = st.columns([4, 1])
+            with c_titulo:
+                st.markdown(f"<h1>Painel de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
+                st.markdown(f"<p class='subtitle'>Acompanhamento em tempo real. Última atualização: {datetime.now().strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
+            with c_botao:
+                st.markdown("<br>", unsafe_allow_html=True)
+                csv_data = df_filtrado[colunas_selecionadas].to_csv(index=False, sep=";").encode('utf-8-sig')
+                st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Cargas_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
+
+            # --- 💎 RENDERIZAÇÃO DOS CARDS HTML ---
+            c1, c2, c3, c4 = st.columns(4)
+            c1.markdown(f"""<div class="kpi-card bg-blue"><div class="kpi-title">📦 Total Filtrado</div><div class="kpi-value">{vol_total}</div></div>""", unsafe_allow_html=True)
+            c2.markdown(f"""<div class="kpi-card bg-orange"><div class="kpi-title">⏳ Pendentes/Em Rota</div><div class="kpi-value">{vol_pendentes}</div></div>""", unsafe_allow_html=True)
+            c3.markdown(f"""<div class="kpi-card bg-red"><div class="kpi-title">🚨 Atrasados</div><div class="kpi-value">{vol_atrasados}</div></div>""", unsafe_allow_html=True)
+            c4.markdown(f"""<div class="kpi-card bg-green"><div class="kpi-title">📅 Pedidos de Hoje</div><div class="kpi-value">{vol_hoje}</div></div>""", unsafe_allow_html=True)
 
             # --- EXIBIÇÃO DA TABELA DINÂMICA ---
             if 'CIDADE' in df_filtrado.columns:
@@ -205,19 +215,17 @@ else:
                     if 'DATA_ENTREGA' in df_final.columns:
                         config_colunas['DATA_ENTREGA'] = "Entregue Em"
 
-                    # 🎯 A MÁGICA DA SELEÇÃO FUNCIONANDO! 
-                    # Removemos o "estilo zebra" manual para o Streamlit poder aplicar o fundo azul/cinza na linha quando clicada.
                     st.dataframe(
                         df_final, 
                         use_container_width=True, 
                         hide_index=True, 
-                        height=550, 
+                        height=500, 
                         column_config=config_colunas,
-                        on_select="ignore",           # Ignora o recarregamento da página para não travar
-                        selection_mode="single_row"   # Permite clicar e selecionar a LINHA INTEIRA!
+                        on_select="ignore",
+                        selection_mode="single_row"
                     )
                 else:
-                    st.warning("Nenhum pedido encontrado para os filtros selecionados.")
+                    st.info("Nenhum pedido encontrado para os filtros selecionados.")
                 
         else:
             st.info(f"Base de dados limpa. Nenhuma carga alocada para {st.session_state.cliente}.")
