@@ -77,7 +77,7 @@ def carregar_dados_nuvem():
     return pd.DataFrame()
 
 # =======================================================
-# 🔐 3. TELA DE LOGIN (COM A LOGO DO GRALAB NA PORTA!)
+# 🔐 3. TELA DE LOGIN 
 # =======================================================
 if 'logado' not in st.session_state:
     st.session_state.logado = False
@@ -87,7 +87,6 @@ if not st.session_state.logado:
     with col2:
         st.markdown("<br><br><br><br>", unsafe_allow_html=True)
         with st.container(border=True):
-            # 🎯 MUDANÇA AQUI: Logo do Gralab direto na tela de login
             st.image(LOGOS_CLIENTES["GRALAB"], width=160)
             
             st.markdown("<h2 style='font-size: 24px; color: #0f172a; margin-top: 10px;'>Acesso ao Portal</h2>", unsafe_allow_html=True)
@@ -105,7 +104,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V14
+# 🚀 4. DASHBOARD ENTERPRISE V15
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -114,8 +113,14 @@ else:
         df_cliente = df_sistema[df_sistema['TOMADOR'] == st.session_state.cliente].copy()
         
         if not df_cliente.empty:
-            ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
+            # Todas as colunas que o sistema permite o cliente ver
+            ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'NUMERO', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
+            
+            # 🎯 O SEGREDO AQUI: Definimos quais NÃO vêm marcadas por padrão
+            colunas_ocultas_padrao = ['ENDERECO', 'Nº', 'NUMERO', 'CEP']
+            colunas_visiveis_iniciais = [col for col in colunas_disponiveis if col not in colunas_ocultas_padrao]
+
             hoje_br = datetime.now(FUSO_BR).date()
 
             with st.sidebar:
@@ -136,8 +141,9 @@ else:
                 busca_pedido = st.text_input("🔍 Pedido / Nº:")
                 st.divider()
                 
+                # 🎯 O FILTRO RECEBE A LISTA ENXUTA AGORA
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True):
-                    colunas_selecionadas = st.multiselect("Selecione o que deseja ver:", options=colunas_disponiveis, default=colunas_disponiveis)
+                    colunas_selecionadas = st.multiselect("Selecione o que deseja ver:", options=colunas_disponiveis, default=colunas_visiveis_iniciais)
                 
                 st.markdown("<br><br>", unsafe_allow_html=True)
                 if st.button("🚪 Sair", use_container_width=True):
@@ -207,16 +213,12 @@ else:
                 df_final = df_filtrado[colunas_selecionadas].copy()
                 
                 if not df_final.empty:
-                    # =========================================================
-                    # 💎 AJUSTES FINOS DO AG-GRID
-                    # =========================================================
                     gb = GridOptionsBuilder.from_dataframe(df_final)
                     
-                    # 🎯 SOLUÇÃO DO ACHATAMENTO: Define um tamanho mínimo e permite o scroll lateral
                     gb.configure_default_column(
                         resizable=True,
                         sortable=True,
-                        minWidth=110 # A coluna nunca vai ficar menor que 110 pixels
+                        minWidth=110 
                     )
                     
                     gb.configure_selection('single', use_checkbox=False)
@@ -240,7 +242,6 @@ else:
 
                     gridOptions = gb.build()
 
-                    # 🎯 INJEÇÃO DE CSS PARA DIMINUIR A FONTE DA TABELA (Deixando mais elegante)
                     grid_css = {
                         ".ag-header-cell-text": {"font-size": "12px !important", "color": "#475569 !important", "font-family": "Inter, sans-serif !important"},
                         ".ag-cell": {"font-size": "12px !important", "font-family": "Inter, sans-serif !important"}
@@ -252,8 +253,7 @@ else:
                         enable_enterprise_modules=False,
                         allow_unsafe_jscode=True,
                         theme='alpine',
-                        custom_css=grid_css, # Aplica a fonte menor
-                        # Removemos o "FIT_CONTENTS" para ele usar a barra de rolagem se precisar!
+                        custom_css=grid_css, 
                         height=550
                     )
                 else:
