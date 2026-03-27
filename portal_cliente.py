@@ -41,7 +41,7 @@ CLIENTES_CONFIG = {
 LOGO_PADRAO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
 
 # =======================================================
-# 🔗 2. MOTOR DE DADOS (CÃO FAREJADOR ATIVADO)
+# 🔗 2. MOTOR DE DADOS
 # =======================================================
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
@@ -59,25 +59,19 @@ def carregar_dados_nuvem():
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
             
-            # 🎯 MÁGICA DE CRUZAMENTO BLINDADA
             try:
                 aba_app = planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
                 if len(dados_app) > 1:
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
-                    
-                    # Limpa todos os espaços e pontuações para não errar o nome da coluna
                     cols_limpas = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
                     df_app.columns = cols_limpas
                     
                     col_quem, col_obs = None, None
-                    
-                    # 1. Tenta achar pelo nome
                     for c in cols_limpas:
                         if 'QUEM' in c or 'ATEND' in c or 'RESP' in c: col_quem = c
                         if 'OBS' in c or 'MOTIV' in c: col_obs = c
                     
-                    # 2. Se não achar pelo nome, pega a Maria na força bruta pela posição (K e O)
                     if not col_quem and len(cols_limpas) > 14: col_quem = cols_limpas[14]
                     if not col_obs and len(cols_limpas) > 10: col_obs = cols_limpas[10]
                     
@@ -91,20 +85,16 @@ def carregar_dados_nuvem():
                             cols_merge.append(col_obs)
                             renames[col_obs] = 'APP_OBS'
                             
-                        # Evita erro caso as colunas tenham o mesmo nome sem querer
                         cols_merge = list(dict.fromkeys(cols_merge))
-                        
                         df_app_clean = df_app[cols_merge].copy()
                         df_app_clean.rename(columns=renames, inplace=True)
                         
-                        # Blinda as chaves de cruzamento para ter certeza que são idênticas
                         df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                         df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                         
                         df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                         df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
-            except Exception as e:
-                pass # Se der ruim no cruzamento, o painel segue funcionando sem travar
+            except: pass
             
             if 'DATA' in df.columns:
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
@@ -135,7 +125,7 @@ if not st.session_state.logado:
                 else: st.error("Usuário ou senha incorretos.")
 
 # =======================================================
-# 🚀 4. DASHBOARD V25.1 (A VOLTA DA MARIA!)
+# 🚀 4. DASHBOARD V26 (FRUSTRADAS INTELIGENTES)
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -143,11 +133,10 @@ else:
         df_cliente = df_sistema if st.session_state.cliente == "IGO_LOGISTICA" else df_sistema[df_sistema['TOMADOR'] == st.session_state.cliente].copy()
         
         if not df_cliente.empty:
-            # 📸 Tradutor de Fotos
             if 'FOTO' in df_cliente.columns:
                 df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
 
-            # 🛠️ GERAÇÃO DA COLUNA "DETALHES"
+            # 🛠️ GERAÇÃO DA COLUNA "DETALHES" (COM EMOJIS INTELIGENTES)
             def formatar_detalhes(row):
                 status = str(row.get('STATUS', '')).upper()
                 if 'FRUSTRADA' in status:
@@ -157,9 +146,21 @@ else:
                     if resp.upper() in ['NAN', 'NONE']: resp = ""
                     if obs.upper() in ['NAN', 'NONE']: obs = ""
                     
-                    if resp and obs: return f"🗣️ {resp} / 📝 {obs}"
-                    if resp: return f"🗣️ {resp}"
-                    if obs: return f"📝 Motivo: {obs}"
+                    # 🎯 Escolhendo o emoji certo para o motivo
+                    emoji_obs = "📝" # Padrão
+                    obs_upper = obs.upper()
+                    if "FECHADO" in obs_upper: emoji_obs = "🔒"
+                    elif "SEM MATERIAL" in obs_upper: emoji_obs = "📭"
+                    elif "AUSENTE" in obs_upper: emoji_obs = "🚷"
+                    elif "ENDERE" in obs_upper or "INCORRETO" in obs_upper: emoji_obs = "🗺️"
+                    elif "RECUS" in obs_upper: emoji_obs = "🛑"
+
+                    texto_resp = f"🗣️ {resp}" if resp else ""
+                    texto_obs = f"{emoji_obs} {obs}" if obs else ""
+                    
+                    if texto_resp and texto_obs: return f"{texto_resp} / {texto_obs}"
+                    if texto_resp: return texto_resp
+                    if texto_obs: return texto_obs
                 return ""
 
             df_cliente['DETALHES'] = df_cliente.apply(formatar_detalhes, axis=1)
