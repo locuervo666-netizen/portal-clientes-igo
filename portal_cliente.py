@@ -103,7 +103,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V19 (COM FOTO FUNCIONANDO)
+# 🚀 4. DASHBOARD ENTERPRISE V20
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -223,34 +223,22 @@ else:
                 if not df_final.empty:
                     gb = GridOptionsBuilder.from_dataframe(df_final)
                     
-                    gb.configure_default_column(
-                        resizable=True,
-                        sortable=True,
-                        minWidth=110 
-                    )
-                    
+                    gb.configure_default_column(resizable=True, sortable=True, minWidth=110)
                     gb.configure_selection('single', use_checkbox=False)
                     
-                    # 🎯 A MÁGICA ESTÁ AQUI: Criando um elemento DOM de verdade para o Ag-Grid respeitar!
+                    # 🎯 A MÁGICA DA CLASSE AG-GRID (Evita o erro do React!)
                     if 'FOTO_URL' in df_final.columns:
                         link_jscode = JsCode("""
-                        function(params) {
-                            if (params.value != null && params.value !== '' && params.value !== 'nan') {
-                                let a = document.createElement('a');
-                                a.href = params.value;
-                                a.target = '_blank';
-                                a.innerText = '🔗 Ver Foto';
-                                a.style.color = '#2980B9';
-                                a.style.textDecoration = 'none';
-                                a.style.fontWeight = 'bold';
-                                a.style.padding = '4px 10px';
-                                a.style.backgroundColor = '#EBF5FB';
-                                a.style.borderRadius = '4px';
-                                a.style.display = 'inline-block';
-                                a.style.textAlign = 'center';
-                                return a;
+                        class LinkCellRenderer {
+                            init(params) {
+                                this.eGui = document.createElement('div');
+                                if (params.value && params.value !== '' && params.value !== 'nan') {
+                                    this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="color: #2980B9; text-decoration: none; font-weight: bold; padding: 4px 10px; background-color: #EBF5FB; border-radius: 4px; display: inline-block; margin-top: 4px;">🔗 Ver Foto</a>';
+                                }
                             }
-                            return '';
+                            getGui() {
+                                return this.eGui;
+                            }
                         }
                         """)
                         gb.configure_column("FOTO_URL", headerName="Comprovante", cellRenderer=link_jscode, width=130)
