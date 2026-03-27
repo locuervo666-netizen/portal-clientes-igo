@@ -3,8 +3,13 @@ import pandas as pd
 import gspread
 import os
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 from streamlit_autorefresh import st_autorefresh
+
+# =======================================================
+# 🌐 CONFIGURAÇÃO DE FUSO HORÁRIO (BRASÍLIA UTC-3)
+# =======================================================
+FUSO_BR = timezone(timedelta(hours=-3))
 
 # =======================================================
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS ELITE
@@ -42,7 +47,6 @@ st.markdown("""
 # 🖼️ DICIONÁRIO DE LOGOS DOS CLIENTES (WHITE-LABEL)
 # =======================================================
 LOGOS_CLIENTES = {
-    # Logo Oficial do GRALAB inserida aqui!
     "GRALAB": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png", 
     "SYNVIA": "https://cdn-icons-png.flaticon.com/512/3004/3004415.png",
     "DEFAULT": "https://cdn-icons-png.flaticon.com/512/1532/1532692.png" 
@@ -106,7 +110,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V11
+# 🚀 4. DASHBOARD ENTERPRISE V12 (FUSO HORÁRIO BR)
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -118,17 +122,19 @@ else:
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
 
+            # Pegando a data de HOJE no fuso do Brasil, e não do servidor
+            hoje_br = datetime.now(FUSO_BR).date()
+
             # --- BARRA LATERAL FININHA (FILTROS) ---
             with st.sidebar:
-                # O sistema puxa a logo do Gralab automaticamente aqui!
                 logo_atual = LOGOS_CLIENTES.get(st.session_state.cliente, LOGOS_CLIENTES["DEFAULT"])
-                st.image(logo_atual, width=160) # Ajustado para 160px para a logo horizontal ficar perfeita
+                st.image(logo_atual, width=160)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.divider()
                 
-                min_date = df_cliente['DATA_OBJ'].dropna().min() if 'DATA_OBJ' in df_cliente.columns else date.today()
-                max_date = df_cliente['DATA_OBJ'].dropna().max() if 'DATA_OBJ' in df_cliente.columns else date.today()
+                min_date = df_cliente['DATA_OBJ'].dropna().min() if 'DATA_OBJ' in df_cliente.columns else hoje_br
+                max_date = df_cliente['DATA_OBJ'].dropna().max() if 'DATA_OBJ' in df_cliente.columns else hoje_br
                 
                 datas_selecionadas = st.date_input("🗓️ Período:", value=(min_date, max_date), min_value=min_date, max_value=max_date, format="DD/MM/YYYY")
                 
@@ -158,8 +164,7 @@ else:
                 cond_numero = df_filtrado['NUMERO'].astype(str).str.upper().str.contains(busca) if 'NUMERO' in df_filtrado.columns else False
                 df_filtrado = df_filtrado[cond_pedido | cond_numero]
 
-            # --- 🛠️ LÓGICA DE STATUS COM ALERTA DE ATRASO ---
-            hoje = date.today()
+            # --- 🛠️ LÓGICA DE STATUS COM ALERTA DE ATRASO (FUSO BR) ---
             def tratar_status_e_atrasos(row):
                 status = str(row.get('STATUS', '')).strip().upper()
                 previsao_str = str(row.get('DATA_LIMITE', '')).strip()
@@ -173,7 +178,7 @@ else:
                 if status not in ['✅ Entregue', '❌ Cancelado'] and previsao_str:
                     try:
                         data_previsao = datetime.strptime(previsao_str, "%d/%m/%Y").date()
-                        if data_previsao < hoje:
+                        if data_previsao < hoje_br:  # Usa o fuso do Brasil aqui também!
                             status = f"🚨 ATRASADO ({status})"
                     except: pass
                 return status
@@ -181,11 +186,11 @@ else:
             if 'STATUS' in df_filtrado.columns:
                 df_filtrado['STATUS'] = df_filtrado.apply(tratar_status_e_atrasos, axis=1)
 
-            # --- 📊 CÁLCULO DOS KPIs ---
+            # --- 📊 CÁLCULO DOS KPIs (FUSO BR) ---
             vol_total = len(df_filtrado)
             vol_atrasados = len(df_filtrado[df_filtrado['STATUS'].str.contains('ATRASADO', na=False)]) if 'STATUS' in df_filtrado.columns else 0
             vol_pendentes = len(df_filtrado[df_filtrado['STATUS'].str.contains('Pendente|Coletado|Em Rota', case=False, na=False)]) if 'STATUS' in df_filtrado.columns else 0
-            vol_hoje = len(df_filtrado[df_filtrado['DATA_OBJ'] == hoje]) if 'DATA_OBJ' in df_filtrado.columns else 0
+            vol_hoje = len(df_filtrado[df_filtrado['DATA_OBJ'] == hoje_br]) if 'DATA_OBJ' in df_filtrado.columns else 0 # Usa o fuso do Brasil aqui também!
 
             # --- ÁREA PRINCIPAL ---
             c_titulo, c_botao = st.columns([4, 1])
@@ -194,7 +199,10 @@ else:
             with c_botao:
                 csv_data = df_filtrado[colunas_selecionadas].to_csv(index=False, sep=";").encode('utf-8-sig')
                 st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Cargas_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
-                st.markdown(f"<div class='sync-status'>🟢 Sincronizado {datetime.now().strftime('%H:%M')}</div>", unsafe_allow_html=True)
+                
+                # 🟢 HORA EXATA DE BRASÍLIA EXIBIDA AQUI
+                hora_brasilia = datetime.now(FUSO_BR).strftime('%H:%M')
+                st.markdown(f"<div class='sync-status'>🟢 Sincronizado {hora_brasilia}</div>", unsafe_allow_html=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
 
