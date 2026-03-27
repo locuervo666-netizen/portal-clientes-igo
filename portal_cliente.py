@@ -5,10 +5,9 @@ import os
 import json
 from datetime import datetime, date, timezone, timedelta
 from streamlit_autorefresh import st_autorefresh
+# 🚀 IMPORTANDO O NOVO MOTOR DE TABELAS DE ELITE
+from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
 
-# =======================================================
-# 🌐 CONFIGURAÇÃO DE FUSO HORÁRIO (BRASÍLIA UTC-3)
-# =======================================================
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =======================================================
@@ -36,19 +35,13 @@ st.markdown("""
     .bg-red { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%); }
     .bg-green { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%); }
 
-    .stDataFrame { border-radius: 8px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     h1 { color: #0f172a; font-weight: 900; font-size: 24px; letter-spacing: -0.5px; margin-bottom: 0px; }
-    .subtitle { color: #64748b; font-size: 13px; margin-bottom: 0px; }
     .sync-status { text-align: right; font-size: 12px; color: #10B981; font-weight: 600; margin-top: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# =======================================================
-# 🖼️ DICIONÁRIO DE LOGOS DOS CLIENTES (WHITE-LABEL)
-# =======================================================
 LOGOS_CLIENTES = {
     "GRALAB": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png", 
-    "SYNVIA": "https://cdn-icons-png.flaticon.com/512/3004/3004415.png",
     "DEFAULT": "https://cdn-icons-png.flaticon.com/512/1532/1532692.png" 
 }
 
@@ -110,7 +103,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V12 (FUSO HORÁRIO BR)
+# 🚀 4. DASHBOARD ENTERPRISE V13 (AG-GRID)
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -121,11 +114,8 @@ else:
         if not df_cliente.empty:
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
-
-            # Pegando a data de HOJE no fuso do Brasil, e não do servidor
             hoje_br = datetime.now(FUSO_BR).date()
 
-            # --- BARRA LATERAL FININHA (FILTROS) ---
             with st.sidebar:
                 logo_atual = LOGOS_CLIENTES.get(st.session_state.cliente, LOGOS_CLIENTES["DEFAULT"])
                 st.image(logo_atual, width=160)
@@ -147,12 +137,11 @@ else:
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True):
                     colunas_selecionadas = st.multiselect("Selecione o que deseja ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 
-                st.markdown("<br><br><br>", unsafe_allow_html=True)
+                st.markdown("<br><br>", unsafe_allow_html=True)
                 if st.button("🚪 Sair", use_container_width=True):
                     st.session_state.logado = False
                     st.rerun()
 
-            # --- APLICANDO FILTROS ---
             df_filtrado = df_cliente.copy()
             if len(datas_selecionadas) == 2 and 'DATA_OBJ' in df_filtrado.columns:
                 df_filtrado = df_filtrado[(df_filtrado['DATA_OBJ'] >= datas_selecionadas[0]) & (df_filtrado['DATA_OBJ'] <= datas_selecionadas[1])]
@@ -164,7 +153,6 @@ else:
                 cond_numero = df_filtrado['NUMERO'].astype(str).str.upper().str.contains(busca) if 'NUMERO' in df_filtrado.columns else False
                 df_filtrado = df_filtrado[cond_pedido | cond_numero]
 
-            # --- 🛠️ LÓGICA DE STATUS COM ALERTA DE ATRASO (FUSO BR) ---
             def tratar_status_e_atrasos(row):
                 status = str(row.get('STATUS', '')).strip().upper()
                 previsao_str = str(row.get('DATA_LIMITE', '')).strip()
@@ -178,7 +166,7 @@ else:
                 if status not in ['✅ Entregue', '❌ Cancelado'] and previsao_str:
                     try:
                         data_previsao = datetime.strptime(previsao_str, "%d/%m/%Y").date()
-                        if data_previsao < hoje_br:  # Usa o fuso do Brasil aqui também!
+                        if data_previsao < hoje_br: 
                             status = f"🚨 ATRASADO ({status})"
                     except: pass
                 return status
@@ -186,34 +174,28 @@ else:
             if 'STATUS' in df_filtrado.columns:
                 df_filtrado['STATUS'] = df_filtrado.apply(tratar_status_e_atrasos, axis=1)
 
-            # --- 📊 CÁLCULO DOS KPIs (FUSO BR) ---
             vol_total = len(df_filtrado)
             vol_atrasados = len(df_filtrado[df_filtrado['STATUS'].str.contains('ATRASADO', na=False)]) if 'STATUS' in df_filtrado.columns else 0
             vol_pendentes = len(df_filtrado[df_filtrado['STATUS'].str.contains('Pendente|Coletado|Em Rota', case=False, na=False)]) if 'STATUS' in df_filtrado.columns else 0
-            vol_hoje = len(df_filtrado[df_filtrado['DATA_OBJ'] == hoje_br]) if 'DATA_OBJ' in df_filtrado.columns else 0 # Usa o fuso do Brasil aqui também!
+            vol_hoje = len(df_filtrado[df_filtrado['DATA_OBJ'] == hoje_br]) if 'DATA_OBJ' in df_filtrado.columns else 0 
 
-            # --- ÁREA PRINCIPAL ---
             c_titulo, c_botao = st.columns([4, 1])
             with c_titulo:
                 st.markdown(f"<h1>Painel de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
             with c_botao:
                 csv_data = df_filtrado[colunas_selecionadas].to_csv(index=False, sep=";").encode('utf-8-sig')
                 st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Cargas_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
-                
-                # 🟢 HORA EXATA DE BRASÍLIA EXIBIDA AQUI
                 hora_brasilia = datetime.now(FUSO_BR).strftime('%H:%M')
                 st.markdown(f"<div class='sync-status'>🟢 Sincronizado {hora_brasilia}</div>", unsafe_allow_html=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # --- 💎 RENDERIZAÇÃO DOS CARDS HTML COMPACTOS ---
             c1, c2, c3, c4 = st.columns(4)
             c1.markdown(f"""<div class="kpi-card bg-blue"><div class="kpi-title">📦 Total Filtrado</div><div class="kpi-value">{vol_total}</div></div>""", unsafe_allow_html=True)
             c2.markdown(f"""<div class="kpi-card bg-orange"><div class="kpi-title">⏳ Em Operação</div><div class="kpi-value">{vol_pendentes}</div></div>""", unsafe_allow_html=True)
             c3.markdown(f"""<div class="kpi-card bg-red"><div class="kpi-title">🚨 Atrasados</div><div class="kpi-value">{vol_atrasados}</div></div>""", unsafe_allow_html=True)
             c4.markdown(f"""<div class="kpi-card bg-green"><div class="kpi-title">📅 Para Hoje</div><div class="kpi-value">{vol_hoje}</div></div>""", unsafe_allow_html=True)
 
-            # --- EXIBIÇÃO DA TABELA DINÂMICA ---
             if 'CIDADE' in df_filtrado.columns:
                 df_filtrado = df_filtrado.sort_values(by=['CIDADE', 'DATA'], ascending=[True, False])
 
@@ -223,22 +205,42 @@ else:
                 df_final = df_filtrado[colunas_selecionadas].copy()
                 
                 if not df_final.empty:
-                    config_colunas = {}
+                    # =========================================================
+                    # 💎 O NOVO MOTOR DE TABELA: AG-GRID
+                    # =========================================================
+                    # Constrói as opções da tabela
+                    gb = GridOptionsBuilder.from_dataframe(df_final)
+                    
+                    # Habilita a seleção de LINHA INTEIRA igual ao Desktop
+                    gb.configure_selection('single', use_checkbox=False)
+                    
+                    # Código JavaScript para transformar a URL da foto num botão clicável
                     if 'FOTO_URL' in df_final.columns:
-                        config_colunas['FOTO_URL'] = st.column_config.LinkColumn("Comprovante", display_text="🔗 Ver Foto")
-                    if 'DATA_LIMITE' in df_final.columns:
-                        config_colunas['DATA_LIMITE'] = "Previsão"
-                    if 'DATA_ENTREGA' in df_final.columns:
-                        config_colunas['DATA_ENTREGA'] = "Entregue Em"
+                        link_jscode = JsCode("""
+                        function(params) {
+                            if (params.value && params.value !== '' && params.value !== 'nan') {
+                                return '<a href="' + params.value + '" target="_blank" style="color: #2980B9; text-decoration: none; font-weight: bold; padding: 2px 8px; background-color: #EBF5FB; border-radius: 4px;">🔗 Ver Foto</a>';
+                            }
+                            return '';
+                        }
+                        """)
+                        gb.configure_column("FOTO_URL", headerName="Comprovante", cellRenderer=link_jscode)
+                    
+                    # Renomeando cabeçalhos para ficar amigável
+                    if 'DATA_LIMITE' in df_final.columns: gb.configure_column("DATA_LIMITE", headerName="Previsão")
+                    if 'DATA_ENTREGA' in df_final.columns: gb.configure_column("DATA_ENTREGA", headerName="Entregue Em")
 
-                    st.dataframe(
-                        df_final, 
-                        use_container_width=True, 
-                        hide_index=True, 
-                        height=600, 
-                        column_config=config_colunas,
-                        on_select="ignore",
-                        selection_mode="single_row"
+                    gridOptions = gb.build()
+
+                    # Renderiza a Tabela Elite
+                    AgGrid(
+                        df_final,
+                        gridOptions=gridOptions,
+                        enable_enterprise_modules=False,
+                        allow_unsafe_jscode=True,       # Permite o botão da foto funcionar
+                        theme='alpine',                 # Tema moderno, com linhas zebradas e hover!
+                        columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS, # Ajusta a largura sozinho
+                        height=600
                     )
                 else:
                     st.info("Nenhum pedido encontrado para os filtros selecionados.")
