@@ -11,19 +11,13 @@ from streamlit_autorefresh import st_autorefresh
 # =======================================================
 st.set_page_config(page_title="Portal IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
-# ⏱️ MOTOR DE ATUALIZAÇÃO AUTOMÁTICA (Painel de Aeroporto)
-# Atualiza a tela inteira sozinho a cada 60.000 milissegundos (60 segundos)
+# ⏱️ Atualização Automática (60 segundos)
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #f8f9fa; font-family: 'Inter', sans-serif; }
-    
-    /* 🛠️ CORREÇÃO DO BOTÃO: Mantém o botão de fechar/abrir a barra lateral visível */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {background-color: transparent !important;}
-    
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
     .stTextInput>div>div>input, .stSelectbox>div>div>div, .stDateInput>div>div>input, .stMultiSelect>div>div>div { border-radius: 8px; border: 1px solid #ced4da; }
     [data-testid="stMetric"] { background-color: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border-top: 4px solid #002e5d; }
     [data-testid="stMetricLabel"] { font-size: 14px; font-weight: 600; text-transform: uppercase; color: #6c757d; }
@@ -37,7 +31,7 @@ st.markdown("""
 # =======================================================
 # 🔗 2. MOTOR DE DADOS
 # =======================================================
-@st.cache_data(ttl=60) # O cofre vai no Google a cada 60 segundos
+@st.cache_data(ttl=60)
 def carregar_dados_nuvem():
     try:
         if "google_credentials" in st.secrets:
@@ -92,7 +86,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE
+# 🚀 4. DASHBOARD ENTERPRISE V7
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -102,7 +96,6 @@ else:
         
         if not df_cliente.empty:
             
-            # 🛠️ ORDEM PADRÃO DAS COLUNAS (Usada para alimentar o filtro flexível)
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
 
@@ -112,7 +105,6 @@ else:
                 st.markdown(f"### Olá, **{st.session_state.cliente}**")
                 st.markdown("---")
                 
-                # 1. Filtros de Busca
                 st.markdown("### 🔍 Filtros de Busca")
                 min_date = df_cliente['DATA_OBJ'].dropna().min() if 'DATA_OBJ' in df_cliente.columns else date.today()
                 max_date = df_cliente['DATA_OBJ'].dropna().max() if 'DATA_OBJ' in df_cliente.columns else date.today()
@@ -123,19 +115,16 @@ else:
                 cidades_selecionadas = st.multiselect("Cidades:", options=lista_cidades, default=lista_cidades)
                 
                 busca_pedido = st.text_input("Buscar Pedido ou Nº:")
-                
                 st.markdown("---")
                 
-                # 2. Construtor de Tabela (Colunas Flexíveis)
                 st.markdown("### ⚙️ Personalizar Tabela")
-                st.caption("Arraste para reordenar ou clique no X para ocultar.")
-                colunas_selecionadas = st.multiselect(
-                    "Colunas visíveis:",
-                    options=colunas_disponiveis,
-                    default=colunas_disponiveis
-                )
-                
+                colunas_selecionadas = st.multiselect("Colunas visíveis:", options=colunas_disponiveis, default=colunas_disponiveis)
                 st.markdown("---")
+                
+                # --- BOTÃO DE EXPORTAÇÃO NATIVO ---
+                # Cria um arquivo CSV com os dados filtrados
+                st.markdown("### 📥 Download dos Dados")
+                
                 if st.button("🚪 Sair do Sistema", use_container_width=True):
                     st.session_state.logado = False
                     st.rerun()
@@ -160,24 +149,45 @@ else:
             kpi1.metric("📦 Volume no Período", f"{len(df_filtrado)} Cargas")
             kpi2.metric("📍 Cobertura Filtrada", f"{df_filtrado['CIDADE'].nunique() if 'CIDADE' in df_filtrado.columns else 0} Cidades")
             
-            # --- INJEÇÃO DE EMOJIS NO STATUS ---
+            # Colocamos o botão de download bem elegante acima da tabela
+            csv_data = df_filtrado[colunas_selecionadas].to_csv(index=False, sep=";").encode('utf-8-sig')
+            kpi3.download_button(
+                label="📥 Baixar Relatório em Excel (CSV)",
+                data=csv_data,
+                file_name=f"Relatorio_Cargas_{st.session_state.cliente}.csv",
+                mime="text/csv",
+            )
+            
+            # --- 🛠️ LÓGICA DE STATUS COM ALERTA DE ATRASO (FAROL) ---
+            hoje = date.today()
+            def tratar_status_e_atrasos(row):
+                status = str(row.get('STATUS', '')).strip().upper()
+                previsao_str = str(row.get('DATA_LIMITE', '')).strip()
+                
+                # Regra de emojis base
+                if status == 'ENTREGUE': status = '✅ Entregue'
+                elif status in ['EM ROTA', 'EM ROTA DE ENTREGA']: status = '🚚 Em Rota'
+                elif status == 'COLETADO': status = '📦 Coletado'
+                elif status == 'CANCELADO': status = '❌ Cancelado'
+                else: status = f'⏳ {status}' # Pendentes
+                
+                # Farol de Atraso (Só aplica se não tiver sido entregue/cancelado)
+                if status not in ['✅ Entregue', '❌ Cancelado'] and previsao_str:
+                    try:
+                        data_previsao = datetime.strptime(previsao_str, "%d/%m/%Y").date()
+                        if data_previsao < hoje:
+                            status = f"🚨 ATRASADO ({status})" # Adiciona o alerta vermelho
+                    except:
+                        pass
+                return status
+                
             if 'STATUS' in df_filtrado.columns:
-                def colocar_emoji(status):
-                    s = str(status).strip().upper()
-                    if s == 'ENTREGUE': return '✅ Entregue'
-                    if s == 'EM ROTA': return '🚚 Em Rota'
-                    if s == 'COLETADO': return '📦 Coletado'
-                    if s == 'PENDENTE': return '⏳ Pendente'
-                    if s == 'ATRASADO': return '🚨 Atrasado'
-                    if s == 'CANCELADO': return '❌ Cancelado'
-                    return status 
-                df_filtrado['STATUS'] = df_filtrado['STATUS'].apply(colocar_emoji)
+                df_filtrado['STATUS'] = df_filtrado.apply(tratar_status_e_atrasos, axis=1)
 
             # --- EXIBIÇÃO DA TABELA DINÂMICA ---
             if 'CIDADE' in df_filtrado.columns:
                 df_filtrado = df_filtrado.sort_values(by=['CIDADE', 'DATA'], ascending=[True, False])
 
-            # Aplica EXATAMENTE as colunas e a ordem que o cliente escolheu no menu lateral
             if not colunas_selecionadas:
                 st.warning("Selecione pelo menos uma coluna no menu lateral para visualizar os dados.")
             else:
@@ -192,9 +202,25 @@ else:
                     if 'DATA_ENTREGA' in df_final.columns:
                         config_colunas['DATA_ENTREGA'] = "Entregue Em"
 
-                    st.dataframe(df_final, use_container_width=True, hide_index=True, height=550, column_config=config_colunas)
+                    # 🦓 A MÁGICA DO EFEITO ZEBRA ACONTECE AQUI!
+                    df_final = df_final.reset_index(drop=True) # Reseta o index para garantir as linhas pares/ímpares
+                    
+                    def aplicar_zebra(x):
+                        return ['background-color: #F8FAFC' if i % 2 == 0 else 'background-color: #FFFFFF' for i in range(len(x))]
+                        
+                    df_estilizado = df_final.style.apply(aplicar_zebra, axis=0)
+
+                    # 🎯 A MÁGICA DA SELEÇÃO DA LINHA INTEIRA ESTÁ AQUI NO "selection_mode"!
+                    st.dataframe(
+                        df_estilizado, 
+                        use_container_width=True, 
+                        hide_index=True, 
+                        height=550, 
+                        column_config=config_colunas,
+                        selection_mode="single_row" # <-- Transforma o clique de Célula em clique de Linha
+                    )
                 else:
-                    st.warning("Nenhum pedido encontrado para os filtros e datas selecionados.")
+                    st.warning("Nenhum pedido encontrado para os filtros selecionados.")
                 
         else:
             st.info(f"Base de dados limpa. Nenhuma carga alocada para {st.session_state.cliente}.")
