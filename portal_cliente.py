@@ -125,7 +125,7 @@ if not st.session_state.logado:
                 else: st.error("Usuário ou senha incorretos.")
 
 # =======================================================
-# 🚀 4. DASHBOARD V26 (FRUSTRADAS INTELIGENTES)
+# 🚀 4. DASHBOARD V27 (DETALHES NO FINAL)
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -136,7 +136,6 @@ else:
             if 'FOTO' in df_cliente.columns:
                 df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
 
-            # 🛠️ GERAÇÃO DA COLUNA "DETALHES" (COM EMOJIS INTELIGENTES)
             def formatar_detalhes(row):
                 status = str(row.get('STATUS', '')).upper()
                 if 'FRUSTRADA' in status:
@@ -146,8 +145,7 @@ else:
                     if resp.upper() in ['NAN', 'NONE']: resp = ""
                     if obs.upper() in ['NAN', 'NONE']: obs = ""
                     
-                    # 🎯 Escolhendo o emoji certo para o motivo
-                    emoji_obs = "📝" # Padrão
+                    emoji_obs = "📝" 
                     obs_upper = obs.upper()
                     if "FECHADO" in obs_upper: emoji_obs = "🔒"
                     elif "SEM MATERIAL" in obs_upper: emoji_obs = "📭"
@@ -165,8 +163,8 @@ else:
 
             df_cliente['DETALHES'] = df_cliente.apply(formatar_detalhes, axis=1)
 
-            # --- CONFIGURAÇÃO ---
-            ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'DETALHES', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
+            # 🎯 MUDANÇA AQUI: 'DETALHES' movido para depois de 'FOTO_URL'
+            ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
             colunas_ocultas = ['ENDERECO', 'Nº', 'CEP']
             colunas_iniciais = [col for col in colunas_disponiveis if col not in colunas_ocultas]
@@ -254,6 +252,7 @@ else:
                 """)
                 gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=link_jscode, width=80)
             
+            # Detalhes agora configurado para ficar mais à direita e mostrar balão no hover
             if 'DETALHES' in df_final.columns:
                 gb.configure_column("DETALHES", width=250, tooltipField="DETALHES")
 
