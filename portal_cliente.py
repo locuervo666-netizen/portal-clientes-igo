@@ -41,16 +41,12 @@ CLIENTES_CONFIG = {
 LOGO_PADRAO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
 
 # =======================================================
-# 🔗 2. MOTOR DE DADOS (COM CRUZAMENTO INTELIGENTE)
+# 🔗 2. MOTOR DE DADOS (CÃO FAREJADOR ATIVADO)
 # =======================================================
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=30)
 def carregar_dados_nuvem():
     try:
         if "google_credentials" in st.secrets:
-            cred_dict = json.loads(st.secrets["google_credentials"])
-            token_dict = json.loads(st.secrets["google_token"])
-            with open("cred_temp.json", "w") as f: json.dump(cred_dict, f)
-            with open("token_temp.json", "w") as f: json.dump(token_dict, f)
             gc = gspread.oauth(credentials_filename="cred_temp.json", authorized_user_filename="token_temp.json")
         else:
             gc = gspread.oauth(credentials_filename="credentials.json", authorized_user_filename="token.json")
@@ -63,20 +59,31 @@ def carregar_dados_nuvem():
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
             
-            # 🎯 MÁGICA: O Portal vai "espionar" a aba do AppSheet para pegar os detalhes!
+            # 🎯 MÁGICA DE CRUZAMENTO BLINDADA
             try:
                 aba_app = planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
                 if len(dados_app) > 1:
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
-                    df_app.columns = df_app.columns.str.strip().str.upper()
                     
-                    col_quem = next((c for c in df_app.columns if 'QUEM' in c or 'ATENDEU' in c), None)
-                    col_obs = next((c for c in df_app.columns if 'OBS' in c), None)
+                    # Limpa todos os espaços e pontuações para não errar o nome da coluna
+                    cols_limpas = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
+                    df_app.columns = cols_limpas
+                    
+                    col_quem, col_obs = None, None
+                    
+                    # 1. Tenta achar pelo nome
+                    for c in cols_limpas:
+                        if 'QUEM' in c or 'ATEND' in c or 'RESP' in c: col_quem = c
+                        if 'OBS' in c or 'MOTIV' in c: col_obs = c
+                    
+                    # 2. Se não achar pelo nome, pega a Maria na força bruta pela posição (K e O)
+                    if not col_quem and len(cols_limpas) > 14: col_quem = cols_limpas[14]
+                    if not col_obs and len(cols_limpas) > 10: col_obs = cols_limpas[10]
                     
                     if col_quem or col_obs:
                         cols_merge = ['PEDIDO']
-                        renames = {}
+                        renames = {'PEDIDO': 'PEDIDO'}
                         if col_quem: 
                             cols_merge.append(col_quem)
                             renames[col_quem] = 'APP_QUEM'
@@ -84,14 +91,20 @@ def carregar_dados_nuvem():
                             cols_merge.append(col_obs)
                             renames[col_obs] = 'APP_OBS'
                             
+                        # Evita erro caso as colunas tenham o mesmo nome sem querer
+                        cols_merge = list(dict.fromkeys(cols_merge))
+                        
                         df_app_clean = df_app[cols_merge].copy()
                         df_app_clean.rename(columns=renames, inplace=True)
-                        df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                         
+                        # Blinda as chaves de cruzamento para ter certeza que são idênticas
+                        df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
+                        df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
+                        
+                        df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                         df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
             except Exception as e:
-                pass # Se falhar, segue a vida sem travar
-            # ---------------------------------------------------------
+                pass # Se der ruim no cruzamento, o painel segue funcionando sem travar
             
             if 'DATA' in df.columns:
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
@@ -117,14 +130,12 @@ if not st.session_state.logado:
             senha = st.text_input("Senha", type="password")
             if st.button("Entrar", type="primary", use_container_width=True):
                 if usuario in CLIENTES_CONFIG and senha == CLIENTES_CONFIG[usuario]["senha"]:
-                    st.session_state.logado = True
-                    st.session_state.cliente = usuario
+                    st.session_state.logado, st.session_state.cliente = True, usuario
                     st.rerun()
-                else:
-                    st.error("Usuário ou senha incorretos.")
+                else: st.error("Usuário ou senha incorretos.")
 
 # =======================================================
-# 🚀 4. DASHBOARD V25 (DETALHES ATIVOS E FOTO GRANDE)
+# 🚀 4. DASHBOARD V25.1 (A VOLTA DA MARIA!)
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -140,22 +151,20 @@ else:
             def formatar_detalhes(row):
                 status = str(row.get('STATUS', '')).upper()
                 if 'FRUSTRADA' in status:
-                    # Agora ele pega as informações fresquinhas cruzadas do AppSheet!
                     resp = str(row.get('APP_QUEM', '')).strip()
                     obs = str(row.get('APP_OBS', '')).strip()
                     
-                    # Limpa se vier com erro do Pandas
                     if resp.upper() in ['NAN', 'NONE']: resp = ""
                     if obs.upper() in ['NAN', 'NONE']: obs = ""
                     
                     if resp and obs: return f"🗣️ {resp} / 📝 {obs}"
-                    if resp: return f"🗣️ Resp: {resp}"
+                    if resp: return f"🗣️ {resp}"
                     if obs: return f"📝 Motivo: {obs}"
                 return ""
 
             df_cliente['DETALHES'] = df_cliente.apply(formatar_detalhes, axis=1)
 
-            # 🎯 CORREÇÃO CRÍTICA AQUI: A coluna DETALHES foi adicionada na ordem padrão!
+            # --- CONFIGURAÇÃO ---
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'DETALHES', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
             colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
             colunas_ocultas = ['ENDERECO', 'Nº', 'CEP']
@@ -204,7 +213,8 @@ else:
             df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
 
             # --- DASHBOARD ---
-            v_total, v_atrasados = len(df_f), len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)])
+            v_total = len(df_f)
+            v_atrasados = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)])
             v_frustradas = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', na=False)])
             v_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br])
 
