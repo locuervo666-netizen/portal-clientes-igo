@@ -5,7 +5,6 @@ import os
 import json
 from datetime import datetime, date, timezone, timedelta
 from streamlit_autorefresh import st_autorefresh
-# 🚀 IMPORTANDO O NOVO MOTOR DE TABELAS DE ELITE
 from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
@@ -40,6 +39,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# 🖼️ DICIONÁRIO DE LOGOS
 LOGOS_CLIENTES = {
     "GRALAB": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png", 
     "DEFAULT": "https://cdn-icons-png.flaticon.com/512/1532/1532692.png" 
@@ -77,7 +77,7 @@ def carregar_dados_nuvem():
     return pd.DataFrame()
 
 # =======================================================
-# 🔐 3. TELA DE LOGIN 
+# 🔐 3. TELA DE LOGIN (COM A LOGO DO GRALAB NA PORTA!)
 # =======================================================
 if 'logado' not in st.session_state:
     st.session_state.logado = False
@@ -87,9 +87,11 @@ if not st.session_state.logado:
     with col2:
         st.markdown("<br><br><br><br>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.image(LOGOS_CLIENTES["DEFAULT"], width=60)
-            st.markdown("<h2 style='font-size: 24px; color: #0f172a;'>Acesso ao Portal</h2>", unsafe_allow_html=True)
-            st.markdown("<p style='color: #64748b; font-size: 15px;'>IGO Logística - Área do Cliente</p>", unsafe_allow_html=True)
+            # 🎯 MUDANÇA AQUI: Logo do Gralab direto na tela de login
+            st.image(LOGOS_CLIENTES["GRALAB"], width=160)
+            
+            st.markdown("<h2 style='font-size: 24px; color: #0f172a; margin-top: 10px;'>Acesso ao Portal</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='color: #64748b; font-size: 15px;'>Área exclusiva de rastreamento</p>", unsafe_allow_html=True)
             
             usuario = st.text_input("Usuário (Ex: GRALAB)")
             senha = st.text_input("Senha", type="password")
@@ -103,7 +105,7 @@ if not st.session_state.logado:
                     st.error("Credenciais inválidas.")
 
 # =======================================================
-# 🚀 4. DASHBOARD ENTERPRISE V13 (AG-GRID)
+# 🚀 4. DASHBOARD ENTERPRISE V14
 # =======================================================
 else:
     df_sistema = carregar_dados_nuvem()
@@ -206,15 +208,19 @@ else:
                 
                 if not df_final.empty:
                     # =========================================================
-                    # 💎 O NOVO MOTOR DE TABELA: AG-GRID
+                    # 💎 AJUSTES FINOS DO AG-GRID
                     # =========================================================
-                    # Constrói as opções da tabela
                     gb = GridOptionsBuilder.from_dataframe(df_final)
                     
-                    # Habilita a seleção de LINHA INTEIRA igual ao Desktop
+                    # 🎯 SOLUÇÃO DO ACHATAMENTO: Define um tamanho mínimo e permite o scroll lateral
+                    gb.configure_default_column(
+                        resizable=True,
+                        sortable=True,
+                        minWidth=110 # A coluna nunca vai ficar menor que 110 pixels
+                    )
+                    
                     gb.configure_selection('single', use_checkbox=False)
                     
-                    # Código JavaScript para transformar a URL da foto num botão clicável
                     if 'FOTO_URL' in df_final.columns:
                         link_jscode = JsCode("""
                         function(params) {
@@ -224,23 +230,31 @@ else:
                             return '';
                         }
                         """)
-                        gb.configure_column("FOTO_URL", headerName="Comprovante", cellRenderer=link_jscode)
+                        gb.configure_column("FOTO_URL", headerName="Comprovante", cellRenderer=link_jscode, width=120)
                     
-                    # Renomeando cabeçalhos para ficar amigável
                     if 'DATA_LIMITE' in df_final.columns: gb.configure_column("DATA_LIMITE", headerName="Previsão")
                     if 'DATA_ENTREGA' in df_final.columns: gb.configure_column("DATA_ENTREGA", headerName="Entregue Em")
+                    if 'STATUS' in df_final.columns: gb.configure_column("STATUS", width=160)
+                    if 'LABORATORIO' in df_final.columns: gb.configure_column("LABORATORIO", width=180)
+                    if 'ENDERECO' in df_final.columns: gb.configure_column("ENDERECO", width=200)
 
                     gridOptions = gb.build()
 
-                    # Renderiza a Tabela Elite
+                    # 🎯 INJEÇÃO DE CSS PARA DIMINUIR A FONTE DA TABELA (Deixando mais elegante)
+                    grid_css = {
+                        ".ag-header-cell-text": {"font-size": "12px !important", "color": "#475569 !important", "font-family": "Inter, sans-serif !important"},
+                        ".ag-cell": {"font-size": "12px !important", "font-family": "Inter, sans-serif !important"}
+                    }
+
                     AgGrid(
                         df_final,
                         gridOptions=gridOptions,
                         enable_enterprise_modules=False,
-                        allow_unsafe_jscode=True,       # Permite o botão da foto funcionar
-                        theme='alpine',                 # Tema moderno, com linhas zebradas e hover!
-                        columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS, # Ajusta a largura sozinho
-                        height=600
+                        allow_unsafe_jscode=True,
+                        theme='alpine',
+                        custom_css=grid_css, # Aplica a fonte menor
+                        # Removemos o "FIT_CONTENTS" para ele usar a barra de rolagem se precisar!
+                        height=550
                     )
                 else:
                     st.info("Nenhum pedido encontrado para os filtros selecionados.")
