@@ -4,17 +4,27 @@ import gspread
 import os
 import json
 from datetime import datetime, date
+from streamlit_autorefresh import st_autorefresh
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS AVANÇADO
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA
 # =======================================================
 st.set_page_config(page_title="Portal IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
+
+# ⏱️ MOTOR DE ATUALIZAÇÃO AUTOMÁTICA (Painel de Aeroporto)
+# Atualiza a tela inteira sozinho a cada 60.000 milissegundos (60 segundos)
+st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #f8f9fa; font-family: 'Inter', sans-serif; }
-    #MainMenu, footer, header {visibility: hidden;}
-    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stDateInput>div>div>input { border-radius: 8px; border: 1px solid #ced4da; }
+    
+    /* 🛠️ CORREÇÃO DO BOTÃO: Mantém o botão de fechar/abrir a barra lateral visível */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {background-color: transparent !important;}
+    
+    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stDateInput>div>div>input, .stMultiSelect>div>div>div { border-radius: 8px; border: 1px solid #ced4da; }
     [data-testid="stMetric"] { background-color: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border-top: 4px solid #002e5d; }
     [data-testid="stMetricLabel"] { font-size: 14px; font-weight: 600; text-transform: uppercase; color: #6c757d; }
     [data-testid="stMetricValue"] { font-size: 32px; font-weight: 800; color: #111827; }
@@ -27,7 +37,7 @@ st.markdown("""
 # =======================================================
 # 🔗 2. MOTOR DE DADOS
 # =======================================================
-@st.cache_data(ttl=60) 
+@st.cache_data(ttl=60) # O cofre vai no Google a cada 60 segundos
 def carregar_dados_nuvem():
     try:
         if "google_credentials" in st.secrets:
@@ -92,28 +102,41 @@ else:
         
         if not df_cliente.empty:
             
+            # 🛠️ ORDEM PADRÃO DAS COLUNAS (Usada para alimentar o filtro flexível)
+            ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'ENDERECO', 'Nº', 'CEP', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
+            colunas_disponiveis = [col for col in ordem_padrao if col in df_cliente.columns]
+
             # --- BARRA LATERAL (FILTROS) ---
             with st.sidebar:
                 st.image("https://cdn-icons-png.flaticon.com/512/1532/1532692.png", width=60)
                 st.markdown(f"### Olá, **{st.session_state.cliente}**")
                 st.markdown("---")
                 
+                # 1. Filtros de Busca
                 st.markdown("### 🔍 Filtros de Busca")
                 min_date = df_cliente['DATA_OBJ'].dropna().min() if 'DATA_OBJ' in df_cliente.columns else date.today()
                 max_date = df_cliente['DATA_OBJ'].dropna().max() if 'DATA_OBJ' in df_cliente.columns else date.today()
                 
-                datas_selecionadas = st.date_input("Período da Coleta/Entrega:", value=(min_date, max_date), min_value=min_date, max_value=max_date, format="DD/MM/YYYY")
+                datas_selecionadas = st.date_input("Período:", value=(min_date, max_date), min_value=min_date, max_value=max_date, format="DD/MM/YYYY")
                 
                 lista_cidades = sorted(df_cliente['CIDADE'].dropna().unique().tolist()) if 'CIDADE' in df_cliente.columns else []
-                cidades_selecionadas = st.multiselect("Filtrar por Cidades:", options=lista_cidades, default=lista_cidades)
+                cidades_selecionadas = st.multiselect("Cidades:", options=lista_cidades, default=lista_cidades)
                 
                 busca_pedido = st.text_input("Buscar Pedido ou Nº:")
                 
                 st.markdown("---")
-                if st.button("🔄 Atualizar Dados da Nuvem", use_container_width=True):
-                    st.cache_data.clear()
-                    st.rerun()
-                if st.button("🚪 Sair com Segurança", use_container_width=True):
+                
+                # 2. Construtor de Tabela (Colunas Flexíveis)
+                st.markdown("### ⚙️ Personalizar Tabela")
+                st.caption("Arraste para reordenar ou clique no X para ocultar.")
+                colunas_selecionadas = st.multiselect(
+                    "Colunas visíveis:",
+                    options=colunas_disponiveis,
+                    default=colunas_disponiveis
+                )
+                
+                st.markdown("---")
+                if st.button("🚪 Sair do Sistema", use_container_width=True):
                     st.session_state.logado = False
                     st.rerun()
 
@@ -131,15 +154,13 @@ else:
 
             # --- ÁREA PRINCIPAL ---
             st.markdown(f"<h1>Espelho de Cargas | {st.session_state.cliente}</h1>", unsafe_allow_html=True)
-            st.markdown("<p class='subtitle'>Acompanhamento operacional em tempo real protegido pela IGO Logística.</p>", unsafe_allow_html=True)
+            st.markdown(f"<p class='subtitle'>Acompanhamento operacional atualizado a cada 60s.</p>", unsafe_allow_html=True)
             
             kpi1, kpi2, kpi3 = st.columns([1, 1, 2])
             kpi1.metric("📦 Volume no Período", f"{len(df_filtrado)} Cargas")
             kpi2.metric("📍 Cobertura Filtrada", f"{df_filtrado['CIDADE'].nunique() if 'CIDADE' in df_filtrado.columns else 0} Cidades")
-            st.markdown("<br>", unsafe_allow_html=True)
             
-            # --- 🛠️ INJEÇÃO DE EMOJIS NO STATUS ---
-            # Dicionário mágico: Mapeia a palavra da planilha para a versão com Emoji
+            # --- INJEÇÃO DE EMOJIS NO STATUS ---
             if 'STATUS' in df_filtrado.columns:
                 def colocar_emoji(status):
                     s = str(status).strip().upper()
@@ -149,48 +170,31 @@ else:
                     if s == 'PENDENTE': return '⏳ Pendente'
                     if s == 'ATRASADO': return '🚨 Atrasado'
                     if s == 'CANCELADO': return '❌ Cancelado'
-                    return status # Se for uma palavra nova, exibe sem emoji
-                
+                    return status 
                 df_filtrado['STATUS'] = df_filtrado['STATUS'].apply(colocar_emoji)
 
-            # --- 🛠️ ORDEM EXATA DAS COLUNAS ---
-            # Aqui você define o que aparece primeiro e o que aparece por último
-            ordem_desejada = [
-                'PEDIDO', 
-                'DATA', 
-                'STATUS', 
-                'LABORATORIO', 
-                'CIDADE', 
-                'UF', 
-                'BAIRRO', 
-                'ENDERECO', 
-                'Nº', 
-                'CEP', 
-                'DATA_LIMITE', 
-                'DATA_ENTREGA', 
-                'FOTO_URL'
-            ]
-            
-            # Ordena as linhas por Cidade (ordem alfabética)
+            # --- EXIBIÇÃO DA TABELA DINÂMICA ---
             if 'CIDADE' in df_filtrado.columns:
                 df_filtrado = df_filtrado.sort_values(by=['CIDADE', 'DATA'], ascending=[True, False])
 
-            # Aplica a ordem das colunas garantindo que elas existem na planilha
-            colunas_exibicao = [col for col in ordem_desejada if col in df_filtrado.columns]
-            df_final = df_filtrado[colunas_exibicao].copy()
-            
-            if not df_final.empty:
-                config_colunas = {}
-                if 'FOTO_URL' in df_final.columns:
-                    config_colunas['FOTO_URL'] = st.column_config.LinkColumn("Comprovante", display_text="🔗 Ver Foto")
-                if 'DATA_LIMITE' in df_final.columns:
-                    config_colunas['DATA_LIMITE'] = "Previsão"
-                if 'DATA_ENTREGA' in df_final.columns:
-                    config_colunas['DATA_ENTREGA'] = "Entregue Em"
-
-                st.dataframe(df_final, use_container_width=True, hide_index=True, height=550, column_config=config_colunas)
+            # Aplica EXATAMENTE as colunas e a ordem que o cliente escolheu no menu lateral
+            if not colunas_selecionadas:
+                st.warning("Selecione pelo menos uma coluna no menu lateral para visualizar os dados.")
             else:
-                st.warning("Nenhum pedido encontrado para os filtros e datas selecionados.")
+                df_final = df_filtrado[colunas_selecionadas].copy()
+                
+                if not df_final.empty:
+                    config_colunas = {}
+                    if 'FOTO_URL' in df_final.columns:
+                        config_colunas['FOTO_URL'] = st.column_config.LinkColumn("Comprovante", display_text="🔗 Ver Foto")
+                    if 'DATA_LIMITE' in df_final.columns:
+                        config_colunas['DATA_LIMITE'] = "Previsão"
+                    if 'DATA_ENTREGA' in df_final.columns:
+                        config_colunas['DATA_ENTREGA'] = "Entregue Em"
+
+                    st.dataframe(df_final, use_container_width=True, hide_index=True, height=550, column_config=config_colunas)
+                else:
+                    st.warning("Nenhum pedido encontrado para os filtros e datas selecionados.")
                 
         else:
             st.info(f"Base de dados limpa. Nenhuma carga alocada para {st.session_state.cliente}.")
