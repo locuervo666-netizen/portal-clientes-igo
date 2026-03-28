@@ -10,7 +10,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS (SUPER COMPACTO)
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS ELITE
 # =======================================================
 st.set_page_config(page_title="Monitoramento IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
@@ -20,33 +20,19 @@ st.markdown("""
     [data-testid="stAppViewContainer"] { background-color: #f0f2f6; font-family: 'Inter', sans-serif; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
     
-    /* Redução de espaços mortos nas laterais e no topo */
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    /* 🗜️ Botões-Cards Super Compactos e Elegantes */
-    .st-key-kpi_total > button, .st-key-kpi_frus > button, .st-key-kpi_atra > button, .st-key-kpi_hoje > button {
-        height: 55px !important;
-        border-radius: 8px !important;
-        border: none !important;
-        color: white !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
-        transition: all 0.2s ease !important;
-    }
+    /* 🎯 BOTÕES COLORIDOS E CLICÁVEIS (BLINDADOS) */
+    div[data-testid="column"]:nth-of-type(1) button { background-color: #3B82F6 !important; color: white !important; height: 85px !important; border-radius: 10px !important; border: none !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important; }
+    div[data-testid="column"]:nth-of-type(2) button { background-color: #F59E0B !important; color: white !important; height: 85px !important; border-radius: 10px !important; border: none !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important; }
+    div[data-testid="column"]:nth-of-type(3) button { background-color: #EF4444 !important; color: white !important; height: 85px !important; border-radius: 10px !important; border: none !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important; }
+    div[data-testid="column"]:nth-of-type(4) button { background-color: #10B981 !important; color: white !important; height: 85px !important; border-radius: 10px !important; border: none !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important; }
     
-    .st-key-kpi_total > button:hover, .st-key-kpi_frus > button:hover, .st-key-kpi_atra > button:hover, .st-key-kpi_hoje > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important;
-        opacity: 0.95;
-    }
-
-    /* Cores das 4 Caixas */
-    .st-key-kpi_total > button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; }
-    .st-key-kpi_frus > button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; }
-    .st-key-kpi_atra > button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; }
-    .st-key-kpi_hoje > button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; }
-
-    /* Texto dentro do botão */
+    div[data-testid="column"] button:hover { opacity: 0.9 !important; transform: translateY(-2px) !important; transition: all 0.2s !important; box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important; }
     .stButton p { font-weight: 800 !important; font-size: 15px !important; font-family: 'Inter', sans-serif !important; letter-spacing: 0.5px; }
+    
+    .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
+    .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -140,7 +126,7 @@ if not st.session_state.logado:
                 else: st.error("Usuário ou senha incorretos.")
 else:
     # =======================================================
-    # 🚀 4. PAINEL PRINCIPAL (DESIGN BLINDADO E LIMPO)
+    # 🚀 4. PAINEL PRINCIPAL (CORES E ZEBRA DE VOLTA!)
     # =======================================================
     df_raw = carregar_dados_nuvem()
     if not df_raw.empty:
@@ -178,7 +164,7 @@ else:
         ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
         colunas_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
         
-        # --- SIDEBAR LIMPA COM BOTÃO DE EXPORTAÇÃO ---
+        # --- SIDEBAR E EXPORTAÇÃO ---
         with st.sidebar:
             st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
             st.divider()
@@ -201,7 +187,7 @@ else:
                 st.session_state.logado = False
                 st.rerun()
 
-        # Filtros
+        # --- FILTROS ---
         df_f = df_cliente.copy()
         if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
         if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
@@ -225,7 +211,7 @@ else:
         
         df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
 
-        # 🛡️ CABEÇALHO BLINDADO (FLEXBOX PURO, SEM ENCAVALAR)
+        # --- TÍTULO E RELÓGIO ALINHADOS ---
         st.markdown(f"""
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px; margin-top: -15px;">
             <h2 style="margin: 0; color: #0f172a; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
@@ -240,15 +226,16 @@ else:
         n_atra = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)])
         n_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br])
 
+        # --- BOTÕES-CARDS COLORIDOS ---
         c1, c2, c3, c4 = st.columns(4)
         def click_kpi(valor): st.session_state.filtro_kpi = valor
 
-        # BOTÕES REDUZIDOS PARA 1 LINHA
-        with c1: st.button(f"📦 TOTAL : {n_tot}", key="kpi_total", use_container_width=True, on_click=click_kpi, args=("TODOS",))
-        with c2: st.button(f"❌ FRUSTRADAS : {n_frus}", key="kpi_frus", use_container_width=True, on_click=click_kpi, args=("FRUSTRADA",))
-        with c3: st.button(f"🚨 ATRASADOS : {n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
-        with c4: st.button(f"📅 HOJE : {n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
+        with c1: st.button(f"📦 TOTAL\n\n{n_tot}", key="kpi_total", use_container_width=True, on_click=click_kpi, args=("TODOS",))
+        with c2: st.button(f"❌ FRUSTRADAS\n\n{n_frus}", key="kpi_frus", use_container_width=True, on_click=click_kpi, args=("FRUSTRADA",))
+        with c3: st.button(f"🚨 ATRASADOS\n\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
+        with c4: st.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
 
+        # --- LÓGICA DE FILTRO ---
         df_grid = df_f.copy()
         if st.session_state.filtro_kpi == "FRUSTRADA":
             df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]
@@ -263,12 +250,11 @@ else:
         df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
         df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
 
-        # --- AG-GRID OTIMIZADO COM CABEÇALHOS EM MAIÚSCULO ---
+        # --- AG-GRID OTIMIZADO COM EFEITO ZEBRA E MAIÚSCULAS ---
         gb = GridOptionsBuilder.from_dataframe(df_final)
         gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
         gb.configure_selection('single', use_checkbox=False)
         
-        # 🔤 Força TODAS as colunas para MAIÚSCULAS e Renomeia as específicas
         for col in df_final.columns:
             header_name = col.upper()
             if col == 'DATA_LIMITE': header_name = "PREVISÃO ENTREGA"
@@ -285,9 +271,13 @@ else:
             elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95)
             else: gb.configure_column(col, headerName=header_name)
 
+        # 🦓 EFEITO ZEBRA (Escala Cinza) APLICADO NA GRID
         grid_css = {
-            ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold"},
-            ".ag-cell": {"font-size": "11px !important"}
+            ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#334155"},
+            ".ag-cell": {"font-size": "11px !important", "color": "#475569"},
+            ".ag-row-even": {"background-color": "#f8fafc !important"}, /* Linha Par: Cinza bem claro */
+            ".ag-row-odd": {"background-color": "#ffffff !important"},  /* Linha Ímpar: Branco */
+            ".ag-row-hover": {"background-color": "#e2e8f0 !important"} /* Fica mais escuro ao passar o mouse */
         }
 
         AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=False, height=520)
