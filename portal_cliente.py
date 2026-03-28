@@ -236,20 +236,79 @@ else:
             if isinstance(min_data, pd.Timestamp): min_data = min_data.date()
             if isinstance(max_data, pd.Timestamp): max_data = max_data.date()
             
-            # --- SIDEBAR ---
+            # --- ⚙️ SIDEBAR (PRIMEIRA PARTE: INPUTS) ---
             with st.sidebar:
                 st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
                 st.divider()
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v53")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v54")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 busca_ped = st.text_input("🔍 Pedido / Nº:")
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True): col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 st.divider()
+
+            # --- FILTROS BASE ---
+            df_f = df_cliente.copy()
+            if isinstance(datas_sel, tuple):
+                if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
+                elif len(datas_sel) == 1: df_f = df_f[df_f['DATA_OBJ'] == datas_sel[0]]
+            else: df_f = df_f[df_f['DATA_OBJ'] == datas_sel]
+            if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
+            if busca_ped:
+                b = str(busca_ped).upper()
+                df_f = df_f[df_f['PEDIDO'].astype(str).str.contains(b) | df_f['NUMERO'].astype(str).str.contains(b)]
+
+            if not df_f.empty:
+                def calcular_prioridade(row):
+                    score = 0
+                    if row.get('DATA_OBJ') != hoje_br: score += 1000 
+                    status_str = str(row.get('STATUS_DISPLAY', ''))
+                    if 'Pendente' not in status_str and '⏳' not in status_str: score += 100
+                    return score
+                df_f['PRIORIDADE_TELA'] = df_f.apply(calcular_prioridade, axis=1)
+                df_f['INDEX_ORIGINAL'] = df_f.index
+                df_f = df_f.sort_values(by=['PRIORIDADE_TELA', 'INDEX_ORIGINAL'])
+
+            # --- CÁLCULO DOS KPIs ---
+            n_tot = len(df_f)
+            n_ent = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', na=False)]) if not df_f.empty else 0
+            n_frus = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]) if not df_f.empty else 0
+            n_atra = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)]) if not df_f.empty else 0
+            n_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br]) if not df_f.empty else 0
+
+            # --- ⚙️ SIDEBAR (SEGUNDA PARTE: BOTÕES DE AÇÃO) ---
+            with st.sidebar:
+                # Botão do WhatsApp (Dinâmico)
+                taxa_conclusao = int(((n_ent + n_frus) / n_tot) * 100) if n_tot > 0 else 0
+                texto_whatsapp = f"""*Resumo da Operação - {st.session_state.cliente}* 🚚
+🗓️ Data: {hoje_br.strftime('%d/%m/%Y')}
+
+📦 *Total de Cargas:* {n_tot}
+✅ *Entregues:* {n_ent}
+❌ *Frustradas:* {n_frus}
+🚨 *Atrasos/Pendências:* {n_atra}
+
+📊 *Status do Dia:* {taxa_conclusao}% Concluído.
+
+Acesse o painel para ver fotos e detalhes.
+Atendimento IGO Logística."""
+                texto_codificado = urllib.parse.quote(texto_whatsapp)
+                link_whatsapp = f"https://api.whatsapp.com/send?text={texto_codificado}"
+                
+                st.markdown(f"""
+                <a href="{link_whatsapp}" target="_blank" style="text-decoration: none;">
+                    <div style="background-color: #25D366; color: white; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 14px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s; margin-bottom: 15px;">
+                        📲 Enviar Resumo (WhatsApp)
+                    </div>
+                </a>
+                """, unsafe_allow_html=True)
+                
+                # Exportar e Sair
                 df_f_export = df_cliente.copy()
                 csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
                 st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
+                
                 if st.button("🚪 Sair", use_container_width=True): st.session_state.logado = False; st.rerun()
 
             # --- CSS DINÂMICO ---
@@ -272,28 +331,7 @@ else:
             </style>
             """, unsafe_allow_html=True)
 
-            # --- FILTROS ---
-            df_f = df_cliente.copy()
-            if isinstance(datas_sel, tuple):
-                if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
-                elif len(datas_sel) == 1: df_f = df_f[df_f['DATA_OBJ'] == datas_sel[0]]
-            else: df_f = df_f[df_f['DATA_OBJ'] == datas_sel]
-            if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
-            if busca_ped:
-                b = str(busca_ped).upper()
-                df_f = df_f[df_f['PEDIDO'].astype(str).str.contains(b) | df_f['NUMERO'].astype(str).str.contains(b)]
-
-            if not df_f.empty:
-                def calcular_prioridade(row):
-                    score = 0
-                    if row.get('DATA_OBJ') != hoje_br: score += 1000 
-                    status_str = str(row.get('STATUS_DISPLAY', ''))
-                    if 'Pendente' not in status_str and '⏳' not in status_str: score += 100
-                    return score
-                df_f['PRIORIDADE_TELA'] = df_f.apply(calcular_prioridade, axis=1)
-                df_f['INDEX_ORIGINAL'] = df_f.index
-                df_f = df_f.sort_values(by=['PRIORIDADE_TELA', 'INDEX_ORIGINAL'])
-
+            # --- HEADER ---
             st.markdown(f"""
             <div class="header-container dinamic-border" style="padding-bottom: 10px; margin-top: -15px;">
                 <h2 class="dinamic-text" style="margin: 0; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
@@ -301,12 +339,7 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-            n_tot = len(df_f)
-            n_ent = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', na=False)]) if not df_f.empty else 0
-            n_frus = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]) if not df_f.empty else 0
-            n_atra = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)]) if not df_f.empty else 0
-            n_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br]) if not df_f.empty else 0
-
+            # --- BLOCOS KPIs ---
             c1, c2, c3, c4, c5 = st.columns(5)
             def click_kpi(valor): st.session_state.filtro_kpi = valor
 
@@ -316,59 +349,19 @@ else:
             with c4: st.button(f"🚨 ATRASADOS\n\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
             with c5: st.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
 
-            # 📊 GRÁFICOS GERENCIAIS RÁPIDOS
+            # 📊 GRÁFICO GERENCIAL (APENAS BARRA DE PROGRESSO LIMPA E CENTRALIZADA)
             st.markdown("<br>", unsafe_allow_html=True)
-            col_bi1, col_bi2 = st.columns([1, 2])
-            with col_bi1:
-                st.markdown(f"<div class='dinamic-text' style='font-size:14px; font-weight:800; margin-bottom:10px;'>🎯 Progresso de Hoje</div>", unsafe_allow_html=True)
-                df_hoje_bi = df_cliente[df_cliente['DATA_OBJ'] == hoje_br]
-                if not df_hoje_bi.empty:
-                    t_hoje = len(df_hoje_bi)
-                    c_hoje = len(df_hoje_bi[df_hoje_bi['STATUS_DISPLAY'].str.contains('Entregue|Frustrada', na=False)])
-                    taxa = c_hoje / t_hoje
-                    st.progress(taxa)
-                    st.markdown(f"<div class='dinamic-text' style='font-size:12px; margin-top:-10px; text-align:right;'>{c_hoje} de {t_hoje} finalizados ({int(taxa*100)}%)</div>", unsafe_allow_html=True)
-                else: st.info("Nenhum pedido para hoje.")
-            with col_bi2:
-                st.markdown(f"<div class='dinamic-text' style='font-size:14px; font-weight:800; margin-bottom:10px;'>📊 Volume (Últimos 7 Dias)</div>", unsafe_allow_html=True)
-                limite_dias = hoje_br - timedelta(days=6)
-                df_7d = df_cliente[df_cliente['DATA_OBJ'] >= limite_dias].copy()
-                if not df_7d.empty:
-                    df_vol = df_7d.groupby('DATA_OBJ')['PEDIDO'].count().reset_index()
-                    df_vol['DATA_OBJ'] = df_vol['DATA_OBJ'].apply(lambda x: x.strftime('%d/%m'))
-                    df_vol.rename(columns={'DATA_OBJ': 'Data', 'PEDIDO': 'Cargas'}, inplace=True)
-                    st.bar_chart(df_vol.set_index('Data'), height=130)
-                else: st.info("Sem dados recentes.")
-                
-            # =======================================================
-            # 📲 MÁGICA: INTEGRAÇÃO WHATSAPP (BOTÃO)
-            # =======================================================
-            taxa_conclusao = int(((n_ent + n_frus) / n_tot) * 100) if n_tot > 0 else 0
-            texto_whatsapp = f"""*Resumo da Operação - {st.session_state.cliente}* 🚚
-🗓️ Data: {hoje_br.strftime('%d/%m/%Y')}
-
-📦 *Total de Cargas:* {n_tot}
-✅ *Entregues:* {n_ent}
-❌ *Frustradas:* {n_frus}
-🚨 *Atrasos/Pendências:* {n_atra}
-
-📊 *Status do Dia:* {taxa_conclusao}% Concluído.
-
-Acesse o painel para ver fotos e detalhes.
-Atendimento IGO Logística."""
-            texto_codificado = urllib.parse.quote(texto_whatsapp)
-            link_whatsapp = f"https://api.whatsapp.com/send?text={texto_codificado}"
+            st.markdown(f"<div class='dinamic-text' style='font-size:14px; font-weight:800; margin-bottom:10px;'>🎯 Progresso de Hoje</div>", unsafe_allow_html=True)
+            df_hoje_bi = df_cliente[df_cliente['DATA_OBJ'] == hoje_br]
+            if not df_hoje_bi.empty:
+                t_hoje = len(df_hoje_bi)
+                c_hoje = len(df_hoje_bi[df_hoje_bi['STATUS_DISPLAY'].str.contains('Entregue|Frustrada', na=False)])
+                taxa = c_hoje / t_hoje if t_hoje > 0 else 0
+                st.progress(taxa)
+                st.markdown(f"<div class='dinamic-text' style='font-size:12px; margin-top:-10px; text-align:right;'>{c_hoje} de {t_hoje} finalizados ({int(taxa*100)}%)</div>", unsafe_allow_html=True)
+            else: st.info("Nenhum pedido para hoje.")
             
-            st.markdown(f"""
-            <div style="display: flex; justify-content: flex-end; margin-top: -15px; margin-bottom: 20px;">
-                <a href="{link_whatsapp}" target="_blank" style="text-decoration: none;">
-                    <div style="background-color: #25D366; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s;">
-                        📲 Enviar Resumo pelo WhatsApp
-                    </div>
-                </a>
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown(f"<div class='dinamic-border' style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='dinamic-border' style='margin-bottom: 15px; margin-top: 15px;'></div>", unsafe_allow_html=True)
 
             # =======================================================
             # 📁 INTERFACE EM ABAS (Tabela vs Mapa)
