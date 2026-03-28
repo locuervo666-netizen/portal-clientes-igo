@@ -40,13 +40,11 @@ st.markdown("""
         opacity: 0.95 !important; 
     }
 
-    /* Cores das 4 Caixas com Important para forçar a pintura */
     div.st-key-kpi_total button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; }
     div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; }
     div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; }
     div.st-key-kpi_hoje button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; }
     
-    /* Forçando o texto interno a ficar branco e gordinho */
     div.st-key-kpi_total button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
         font-weight: 800 !important; 
         font-size: 15px !important; 
@@ -218,14 +216,19 @@ else:
             b = str(busca_ped).upper()
             df_f = df_f[df_f['PEDIDO'].astype(str).str.contains(b) | df_f['NUMERO'].astype(str).str.contains(b)]
 
+        # 🎯 MÁGICA: A TABELA AGORA RECONHECE "CONFERIDO" E "TRIAGEM"
         def tratar_status(row):
             s, previsao = str(row.get('STATUS', '')).strip().upper(), str(row.get('DATA_LIMITE', '')).strip()
+            
             if 'ENTREGUE' in s: res = '✅ Entregue'
             elif any(x in s for x in ['ROTA', 'ENTREGA']): res = '🚚 Em Rota'
+            elif 'CONFERIDO' in s: res = '☑️ Conferido'
+            elif 'TRIAGEM' in s: res = '⚙️ Triagem'
             elif 'COLETADO' in s: res = '📦 Coletado'
             elif 'FRUSTRADA' in s: res = '❌ Frustrada'
             elif 'CANCELADO' in s: res = '🚫 Cancelado'
             else: res = '⏳ Pendente'
+            
             if res not in ['✅ Entregue', '🚫 Cancelado', '❌ Frustrada'] and previsao:
                 try:
                     if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: res = f"🚨 ATRASADO ({res})"
@@ -287,7 +290,7 @@ else:
             elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60)
             elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90)
             elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95)
-            elif col == 'LABORATORIO': gb.configure_column(col, headerName=header_name, width=300) # 🎯 AQUI O LABORATÓRIO GANHOU ESPAÇO VIP!
+            elif col == 'LABORATORIO': gb.configure_column(col, headerName=header_name, width=300)
             else: gb.configure_column(col, headerName=header_name)
 
         # 🦓 ZEBRA BLINDADA
