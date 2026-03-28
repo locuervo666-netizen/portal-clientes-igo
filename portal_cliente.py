@@ -255,10 +255,9 @@ else:
         df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
 
         # Ordenação Inteligente
-        df_f['SORT_HOJE'] = df_f['DATA_OBJ'] != hoje_br
-        df_f['SORT_PENDENTE'] = df_f['STATUS_DISPLAY'] != '⏳ Pendente'
-        df_f['SORT_INDEX'] = df_f.index
-        df_f = df_f.sort_values(by=['SORT_HOJE', 'SORT_PENDENTE', 'SORT_INDEX'])
+        df_f['PRIORIDADE_TELA'] = df_f.apply(calcular_prioridade, axis=1)
+        df_f['INDEX_ORIGINAL'] = df_f.index
+        df_f = df_f.sort_values(by=['PRIORIDADE_TELA', 'INDEX_ORIGINAL'])
 
         st.markdown(f"""
         <div class="header-container" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: -15px;">
