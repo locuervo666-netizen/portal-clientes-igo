@@ -126,7 +126,7 @@ if not st.session_state.logado:
                 else: st.error("Usuário ou senha incorretos.")
 else:
     # =======================================================
-    # 🚀 4. PAINEL PRINCIPAL (CORES E ZEBRA DE VOLTA!)
+    # 🚀 4. PAINEL PRINCIPAL
     # =======================================================
     df_raw = carregar_dados_nuvem()
     if not df_raw.empty:
@@ -271,13 +271,13 @@ else:
             elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95)
             else: gb.configure_column(col, headerName=header_name)
 
-        # 🦓 EFEITO ZEBRA (Escala Cinza) APLICADO NA GRID
+        # 🦓 EFEITO ZEBRA (CORRIGIDO: Apenas o hashtag do Python)
         grid_css = {
             ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#334155"},
             ".ag-cell": {"font-size": "11px !important", "color": "#475569"},
-            ".ag-row-even": {"background-color": "#f8fafc !important"}, /* Linha Par: Cinza bem claro */
-            ".ag-row-odd": {"background-color": "#ffffff !important"},  /* Linha Ímpar: Branco */
-            ".ag-row-hover": {"background-color": "#e2e8f0 !important"} /* Fica mais escuro ao passar o mouse */
+            ".ag-row-even": {"background-color": "#f8fafc !important"}, # Linha Par: Cinza bem claro
+            ".ag-row-odd": {"background-color": "#ffffff !important"},  # Linha Ímpar: Branco
+            ".ag-row-hover": {"background-color": "#e2e8f0 !important"} # Hover: Fica mais escuro ao passar o mouse
         }
 
         AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=False, height=520)
