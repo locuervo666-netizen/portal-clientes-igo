@@ -22,7 +22,7 @@ st.markdown("""
     
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    /* 🎯 BOTÕES COLORIDOS E CLICÁVEIS (BLINDADOS PELA KEY) */
+    /* 🎯 BOTÕES COLORIDOS E CLICÁVEIS */
     div.st-key-kpi_total button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {
         height: 75px !important;
         border-radius: 10px !important;
@@ -65,7 +65,7 @@ CLIENTES_CONFIG = {
 LOGO_PADRAO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
 
 # =======================================================
-# 🔗 2. MOTOR DE DADOS
+# 🔗 2. MOTOR DE DADOS (AGORA COM BYPASS DE ROMANEIO!)
 # =======================================================
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
@@ -91,32 +91,48 @@ def carregar_dados_nuvem():
                     cols_limpas = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
                     df_app.columns = cols_limpas
                     
-                    col_quem, col_obs = None, None
+                    col_quem, col_obs, col_status_app = None, None, None
                     for c in cols_limpas:
                         if 'QUEM' in c or 'ATEND' in c or 'RESP' in c: col_quem = c
                         if 'OBS' in c or 'MOTIV' in c: col_obs = c
+                        if 'STATUS' == c: col_status_app = c
+                        
                     if not col_quem and len(cols_limpas) > 14: col_quem = cols_limpas[14]
                     if not col_obs and len(cols_limpas) > 10: col_obs = cols_limpas[10]
+                    if not col_status_app and len(cols_limpas) > 3: col_status_app = cols_limpas[3]
                     
-                    if col_quem or col_obs:
-                        cols_merge = ['PEDIDO']
+                    if col_quem or col_obs or col_status_app:
+                        cols_extract = ['PEDIDO']
                         renames = {'PEDIDO': 'PEDIDO'}
-                        if col_quem: 
-                            cols_merge.append(col_quem)
-                            renames[col_quem] = 'APP_QUEM'
-                        if col_obs: 
-                            cols_merge.append(col_obs)
-                            renames[col_obs] = 'APP_OBS'
-                            
-                        cols_merge = list(dict.fromkeys(cols_merge))
-                        df_app_clean = df_app[cols_merge].copy()
+                        if col_status_app: cols_extract.append(col_status_app); renames[col_status_app] = 'APP_STATUS'
+                        if col_quem: cols_extract.append(col_quem); renames[col_quem] = 'APP_QUEM'
+                        if col_obs: cols_extract.append(col_obs); renames[col_obs] = 'APP_OBS'
+                        
+                        cols_extract = list(dict.fromkeys(cols_extract))
+                        df_app_clean = df_app[cols_extract].copy()
                         df_app_clean.rename(columns=renames, inplace=True)
+                        df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
+                        df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
+                        
+                        # 🚀 A MÁGICA: Separa o que é Pedido Individual do que é Lote (Romaneio)
+                        df_app_ind = df_app_clean[~df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)]
+                        df_app_rom = df_app_clean[df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)].copy()
+                        df_app_rom.rename(columns={'PEDIDO': 'ROMANEIO'}, inplace=True)
                         
                         df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
-                        df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
+                        if 'ROMANEIO' not in df.columns: df['ROMANEIO'] = ""
+                        df['ROMANEIO'] = df['ROMANEIO'].astype(str).str.strip()
                         
-                        df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
-                        df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
+                        # Cola os dados individuais
+                        df = pd.merge(df, df_app_ind, on='PEDIDO', how='left')
+                        
+                        # Cola os dados de Romaneio e SOBREPÕE os individuais se existirem!
+                        if not df_app_rom.empty:
+                            df = pd.merge(df, df_app_rom, on='ROMANEIO', how='left', suffixes=('', '_R'))
+                            for c in ['APP_STATUS', 'APP_QUEM', 'APP_OBS']:
+                                if c in df.columns and f"{c}_R" in df.columns:
+                                    # O Romaneio é Soberano!
+                                    df[c] = df[f"{c}_R"].replace("", pd.NA).combine_first(df[c].replace("", pd.NA)).fillna("")
             except: pass
             
             if 'DATA' in df.columns:
@@ -159,7 +175,10 @@ else:
             df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
 
         def processar_detalhes(row):
-            s = str(row.get('STATUS', '')).upper()
+            s_db = str(row.get('STATUS', '')).strip().upper()
+            s_app = str(row.get('APP_STATUS', '')).strip().upper()
+            s = s_app if s_app in ['ENTREGUE', 'FRUSTRADA', 'COLETADO', 'CANCELADO'] else s_db
+            
             if 'FRUSTRADA' in s:
                 resp = str(row.get('APP_QUEM', '')).strip()
                 obs = str(row.get('APP_OBS', '')).strip()
@@ -216,9 +235,13 @@ else:
             b = str(busca_ped).upper()
             df_f = df_f[df_f['PEDIDO'].astype(str).str.contains(b) | df_f['NUMERO'].astype(str).str.contains(b)]
 
-        # 🎯 MÁGICA: A TABELA AGORA RECONHECE "CONFERIDO" E "TRIAGEM"
         def tratar_status(row):
-            s, previsao = str(row.get('STATUS', '')).strip().upper(), str(row.get('DATA_LIMITE', '')).strip()
+            # 🎯 MÁGICA: Se o AppSheet tiver 'ENTREGUE', o Portal obedece o AppSheet, não a Memória!
+            s_db = str(row.get('STATUS', '')).strip().upper()
+            s_app = str(row.get('APP_STATUS', '')).strip().upper()
+            
+            s = s_app if s_app in ['ENTREGUE', 'FRUSTRADA', 'COLETADO', 'CANCELADO'] else s_db
+            previsao = str(row.get('DATA_LIMITE', '')).strip()
             
             if 'ENTREGUE' in s: res = '✅ Entregue'
             elif any(x in s for x in ['ROTA', 'ENTREGA']): res = '🚚 Em Rota'
