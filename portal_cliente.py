@@ -10,7 +10,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS ELITE
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS ELITE (5 BLOCOS)
 # =======================================================
 st.set_page_config(page_title="Monitoramento IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
@@ -22,7 +22,8 @@ st.markdown("""
     
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    div.st-key-kpi_total button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {
+    /* 🎯 BOTÕES COLORIDOS E CLICÁVEIS (AGORA SÃO 5) */
+    div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {
         height: 75px !important;
         border-radius: 10px !important;
         border: none !important;
@@ -33,16 +34,17 @@ st.markdown("""
         align-items: center !important;
     }
     
-    div.st-key-kpi_total button:hover, div.st-key-kpi_frus button:hover, div.st-key-kpi_atra button:hover, div.st-key-kpi_hoje button:hover { 
+    div.st-key-kpi_total button:hover, div.st-key-kpi_entregue button:hover, div.st-key-kpi_frus button:hover, div.st-key-kpi_atra button:hover, div.st-key-kpi_hoje button:hover { 
         transform: translateY(-2px) !important; box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important; opacity: 0.95 !important; 
     }
 
     div.st-key-kpi_total button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; }
+    div.st-key-kpi_entregue button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; }
     div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; }
     div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; }
-    div.st-key-kpi_hoje button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; }
+    div.st-key-kpi_hoje button { background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; }
     
-    div.st-key-kpi_total button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
+    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
         font-weight: 800 !important; font-size: 15px !important; font-family: 'Inter', sans-serif !important; margin: 0 !important; color: #ffffff !important;
     }
     
@@ -254,10 +256,26 @@ else:
         
         df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
 
-        # Ordenação Inteligente
+        # =======================================================
+        # 🗂️ MÁGICA: ORDENAÇÃO DE ELITE (Calculadora de Prioridade)
+        # =======================================================
+        def calcular_prioridade(row):
+            score = 0
+            # Regra 1: Se NÃO for de hoje, vai lá pro final da fila (+1000 pontos)
+            if row.get('DATA_OBJ') != hoje_br: 
+                score += 1000 
+            
+            # Regra 2: Se NÃO for Pendente, vai pro final da fila do dia (+100 pontos)
+            status_str = str(row.get('STATUS_DISPLAY', ''))
+            if 'Pendente' not in status_str and '⏳' not in status_str: 
+                score += 100
+                
+            return score
+
         df_f['PRIORIDADE_TELA'] = df_f.apply(calcular_prioridade, axis=1)
         df_f['INDEX_ORIGINAL'] = df_f.index
         df_f = df_f.sort_values(by=['PRIORIDADE_TELA', 'INDEX_ORIGINAL'])
+        # =======================================================
 
         st.markdown(f"""
         <div class="header-container" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: -15px;">
@@ -267,20 +285,26 @@ else:
         """, unsafe_allow_html=True)
 
         n_tot = len(df_f)
+        n_ent = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', na=False)])
         n_frus = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', na=False)])
         n_atra = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)])
         n_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br])
 
-        c1, c2, c3, c4 = st.columns(4)
+        # 🚀 AGORA SÃO 5 COLUNAS PARA OS KPIS
+        c1, c2, c3, c4, c5 = st.columns(5)
         def click_kpi(valor): st.session_state.filtro_kpi = valor
 
         with c1: st.button(f"📦 TOTAL\n\n{n_tot}", key="kpi_total", use_container_width=True, on_click=click_kpi, args=("TODOS",))
-        with c2: st.button(f"❌ FRUSTRADAS\n\n{n_frus}", key="kpi_frus", use_container_width=True, on_click=click_kpi, args=("FRUSTRADA",))
-        with c3: st.button(f"🚨 ATRASADOS\n\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
-        with c4: st.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
+        with c2: st.button(f"✅ ENTREGUES\n\n{n_ent}", key="kpi_entregue", use_container_width=True, on_click=click_kpi, args=("ENTREGUE",))
+        with c3: st.button(f"❌ FRUSTRADAS\n\n{n_frus}", key="kpi_frus", use_container_width=True, on_click=click_kpi, args=("FRUSTRADA",))
+        with c4: st.button(f"🚨 ATRASADOS\n\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
+        with c5: st.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
 
         df_grid = df_f.copy()
-        if st.session_state.filtro_kpi == "FRUSTRADA":
+        if st.session_state.filtro_kpi == "ENTREGUE":
+            df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue', na=False)]
+            st.info("🎯 Exibindo apenas **Pedidos Entregues**. Clique no botão azul (TOTAL) para limpar.")
+        elif st.session_state.filtro_kpi == "FRUSTRADA":
             df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]
             st.info("🎯 Exibindo apenas **Coletas Frustradas**. Clique no botão azul (TOTAL) para limpar.")
         elif st.session_state.filtro_kpi == "ATRASADO":
@@ -293,7 +317,6 @@ else:
         df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
         df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
 
-        # --- AG-GRID (COM AJUSTE DE LARGURAS) ---
         gb = GridOptionsBuilder.from_dataframe(df_final)
         gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
         gb.configure_selection('single', use_checkbox=False)
@@ -308,19 +331,16 @@ else:
                 link_jscode = JsCode("""class LinkCellRenderer { init(params) { this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; if (params.value && params.value !== '' && params.value !== 'nan') { this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 2px;">📸</a>'; } } getGui() { return this.eGui; } }""")
                 gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70)
             elif col == 'DETALHES':
-                gb.configure_column(col, headerName=header_name, width=300, tooltipField="DETALHES")
+                gb.configure_column(col, headerName=header_name, width=250, tooltipField="DETALHES")
             elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60)
             elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90)
             elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95)
-            elif col == 'LABORATORIO': 
-                gb.configure_column(col, headerName=header_name, width=450, tooltipField="LABORATORIO") # 🚀 GIGANTE COM BALÃO!
-            elif col == 'BAIRRO': 
-                gb.configure_column(col, headerName=header_name, width=250, tooltipField="BAIRRO")
-            elif col == 'CIDADE': 
-                gb.configure_column(col, headerName=header_name, width=180)
-            else: 
-                gb.configure_column(col, headerName=header_name)
+            elif col == 'LABORATORIO': gb.configure_column(col, headerName=header_name, width=450, tooltipField="LABORATORIO")
+            elif col == 'BAIRRO': gb.configure_column(col, headerName=header_name, width=250, tooltipField="BAIRRO")
+            elif col == 'CIDADE': gb.configure_column(col, headerName=header_name, width=180)
+            else: gb.configure_column(col, headerName=header_name)
 
+        # 🦓 ZEBRA BLINDADA
         grid_css = {
             ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#334155"},
             ".ag-cell": {"font-size": "11px !important", "color": "#475569"},
