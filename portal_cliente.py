@@ -22,14 +22,38 @@ st.markdown("""
     
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    /* 🎯 BOTÕES COLORIDOS E CLICÁVEIS (BLINDADOS) */
-    div[data-testid="column"]:nth-of-type(1) button { background-color: #3B82F6 !important; color: white !important; height: 85px !important; border-radius: 10px !important; border: none !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important; }
-    div[data-testid="column"]:nth-of-type(2) button { background-color: #F59E0B !important; color: white !important; height: 85px !important; border-radius: 10px !important; border: none !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important; }
-    div[data-testid="column"]:nth-of-type(3) button { background-color: #EF4444 !important; color: white !important; height: 85px !important; border-radius: 10px !important; border: none !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important; }
-    div[data-testid="column"]:nth-of-type(4) button { background-color: #10B981 !important; color: white !important; height: 85px !important; border-radius: 10px !important; border: none !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important; }
+    /* 🎯 BOTÕES COLORIDOS E CLICÁVEIS (BLINDADOS PELA KEY) */
+    div.st-key-kpi_total button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {
+        height: 75px !important;
+        border-radius: 10px !important;
+        border: none !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+        transition: all 0.2s ease !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
     
-    div[data-testid="column"] button:hover { opacity: 0.9 !important; transform: translateY(-2px) !important; transition: all 0.2s !important; box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important; }
-    .stButton p { font-weight: 800 !important; font-size: 15px !important; font-family: 'Inter', sans-serif !important; letter-spacing: 0.5px; }
+    div.st-key-kpi_total button:hover, div.st-key-kpi_frus button:hover, div.st-key-kpi_atra button:hover, div.st-key-kpi_hoje button:hover { 
+        transform: translateY(-2px) !important; 
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important; 
+        opacity: 0.95 !important; 
+    }
+
+    /* Cores das 4 Caixas com Important para forçar a pintura */
+    div.st-key-kpi_total button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; }
+    div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; }
+    div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; }
+    div.st-key-kpi_hoje button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; }
+    
+    /* Forçando o texto interno a ficar branco e gordinho */
+    div.st-key-kpi_total button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
+        font-weight: 800 !important; 
+        font-size: 15px !important; 
+        font-family: 'Inter', sans-serif !important; 
+        margin: 0 !important;
+        color: #ffffff !important;
+    }
     
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
     .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
@@ -164,7 +188,6 @@ else:
         ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
         colunas_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
         
-        # --- SIDEBAR E EXPORTAÇÃO ---
         with st.sidebar:
             st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
             st.divider()
@@ -187,7 +210,7 @@ else:
                 st.session_state.logado = False
                 st.rerun()
 
-        # --- FILTROS ---
+        # Filtros
         df_f = df_cliente.copy()
         if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
         if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
@@ -211,13 +234,11 @@ else:
         
         df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
 
-        # --- TÍTULO E RELÓGIO ALINHADOS ---
+        # Cabeçalho Limpo
         st.markdown(f"""
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px; margin-top: -15px;">
+        <div class="header-container" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: -15px;">
             <h2 style="margin: 0; color: #0f172a; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
-            <div style="font-size: 13px; color: #10B981; font-weight: 700; display: flex; align-items: center;">
-                <span style="margin-right: 5px;">🟢</span> Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}
-            </div>
+            <div class='sync-status'>🟢 Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -226,16 +247,14 @@ else:
         n_atra = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)])
         n_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br])
 
-        # --- BOTÕES-CARDS COLORIDOS ---
         c1, c2, c3, c4 = st.columns(4)
         def click_kpi(valor): st.session_state.filtro_kpi = valor
 
-        with c1: st.button(f"📦 TOTAL\n\n{n_tot}", key="kpi_total", use_container_width=True, on_click=click_kpi, args=("TODOS",))
-        with c2: st.button(f"❌ FRUSTRADAS\n\n{n_frus}", key="kpi_frus", use_container_width=True, on_click=click_kpi, args=("FRUSTRADA",))
-        with c3: st.button(f"🚨 ATRASADOS\n\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
-        with c4: st.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
+        with c1: st.button(f"📦 TOTAL : {n_tot}", key="kpi_total", use_container_width=True, on_click=click_kpi, args=("TODOS",))
+        with c2: st.button(f"❌ FRUSTRADAS : {n_frus}", key="kpi_frus", use_container_width=True, on_click=click_kpi, args=("FRUSTRADA",))
+        with c3: st.button(f"🚨 ATRASADOS : {n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
+        with c4: st.button(f"📅 HOJE : {n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
 
-        # --- LÓGICA DE FILTRO ---
         df_grid = df_f.copy()
         if st.session_state.filtro_kpi == "FRUSTRADA":
             df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]
@@ -250,7 +269,6 @@ else:
         df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
         df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
 
-        # --- AG-GRID OTIMIZADO COM EFEITO ZEBRA E MAIÚSCULAS ---
         gb = GridOptionsBuilder.from_dataframe(df_final)
         gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
         gb.configure_selection('single', use_checkbox=False)
@@ -271,13 +289,13 @@ else:
             elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95)
             else: gb.configure_column(col, headerName=header_name)
 
-        # 🦓 EFEITO ZEBRA (CORRIGIDO: Apenas o hashtag do Python)
+        # 🦓 ZEBRA BLINDADA
         grid_css = {
             ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#334155"},
             ".ag-cell": {"font-size": "11px !important", "color": "#475569"},
-            ".ag-row-even": {"background-color": "#f8fafc !important"}, # Linha Par: Cinza bem claro
-            ".ag-row-odd": {"background-color": "#ffffff !important"},  # Linha Ímpar: Branco
-            ".ag-row-hover": {"background-color": "#e2e8f0 !important"} # Hover: Fica mais escuro ao passar o mouse
+            ".ag-row-even": {"background-color": "#f8fafc !important"}, 
+            ".ag-row-odd": {"background-color": "#ffffff !important"},  
+            ".ag-row-hover": {"background-color": "#e2e8f0 !important"} 
         }
 
         AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=False, height=520)
