@@ -22,7 +22,7 @@ st.markdown("""
     
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    /* 🎯 BOTÕES COLORIDOS E CLICÁVEIS */
+    /* 🎯 BOTÕES COLORIDOS E CLICÁVEIS (AGORA SÃO 5) */
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {
         height: 75px !important;
         border-radius: 10px !important;
@@ -320,7 +320,57 @@ else:
             elif col == 'FOTO_URL': header_name = "FOTO"
             
             if col == 'FOTO_URL':
-                link_jscode = JsCode("""class LinkCellRenderer { init(params) { this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; if (params.value && params.value !== '' && params.value !== 'nan') { this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 2px;">📸</a>'; } } getGui() { return this.eGui; } }""")
+                # =======================================================
+                # 📸 MÁGICA: EFEITO POP-UP (MODAL) PARA AS FOTOS
+                # =======================================================
+                link_jscode = JsCode("""
+                class LinkCellRenderer { 
+                    init(params) { 
+                        this.eGui = document.createElement('div'); 
+                        this.eGui.style.textAlign = 'center'; 
+                        if (params.value && params.value !== '' && params.value !== 'nan') { 
+                            this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 18px; display: block; margin-top: 2px;" title="Clique para ver a foto">📸</span>'; 
+                            this.eGui.onclick = () => {
+                                let modal = document.createElement('div');
+                                modal.style.position = 'fixed';
+                                modal.style.zIndex = '999999';
+                                modal.style.left = '0';
+                                modal.style.top = '0';
+                                modal.style.width = '100vw';
+                                modal.style.height = '100vh';
+                                modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
+                                modal.style.display = 'flex';
+                                modal.style.flexDirection = 'column';
+                                modal.style.justifyContent = 'center';
+                                modal.style.alignItems = 'center';
+                                modal.style.cursor = 'zoom-out';
+                                
+                                let img = document.createElement('img');
+                                img.src = params.value;
+                                img.style.maxWidth = '90%';
+                                img.style.maxHeight = '85%';
+                                img.style.borderRadius = '8px';
+                                img.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
+                                
+                                let txt = document.createElement('div');
+                                txt.innerText = '✖ Clique em qualquer lugar para fechar';
+                                txt.style.color = '#ffffff';
+                                txt.style.marginTop = '15px';
+                                txt.style.fontFamily = 'sans-serif';
+                                txt.style.fontSize = '14px';
+                                txt.style.fontWeight = 'bold';
+                                
+                                modal.appendChild(img);
+                                modal.appendChild(txt);
+                                
+                                modal.onclick = () => { document.body.removeChild(modal); };
+                                document.body.appendChild(modal);
+                            };
+                        } 
+                    } 
+                    getGui() { return this.eGui; } 
+                }
+                """)
                 gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70, minWidth=70)
             elif col == 'DETALHES':
                 gb.configure_column(col, headerName=header_name, width=300, minWidth=250, tooltipField="DETALHES")
@@ -331,7 +381,6 @@ else:
             elif col == 'PEDIDO': 
                 gb.configure_column(col, headerName=header_name, width=95, minWidth=95)
             elif col == 'LABORATORIO': 
-                # 🎯 TRAVA DE SEGURANÇA (minWidth): OBRIGA o sistema a não amassar o nome!
                 gb.configure_column(col, headerName=header_name, width=400, minWidth=350, tooltipField="LABORATORIO")
             elif col == 'BAIRRO': 
                 gb.configure_column(col, headerName=header_name, width=250, minWidth=200, tooltipField="BAIRRO")
