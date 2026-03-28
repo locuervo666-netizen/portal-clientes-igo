@@ -10,7 +10,9 @@ from streamlit_autorefresh import st_autorefresh
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
-WHATSAPP_IGO = "5511947996371"  # 🎯 Telefone Oficial para abertura de chamados
+
+# 🎯 SUA LOGO AQUI: Substitua o link abaixo pela URL da logo oficial da IGO Logística
+LOGO_IGO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png" 
 
 # =======================================================
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
@@ -50,9 +52,8 @@ st.markdown("""
 
 CLIENTES_CONFIG = {
     "GRALAB": {"senha": "123", "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png"},
-    "IGO_LOGISTICA": {"senha": "admin", "logo": "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"}
+    "IGO_LOGISTICA": {"senha": "admin", "logo": LOGO_IGO}
 }
-LOGO_PADRAO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
 
 # =======================================================
 # 📍 GEOLOCALIZADOR NATIVO (MAPA)
@@ -154,22 +155,45 @@ if 'logado' not in st.session_state: st.session_state.logado = False
 if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 
 # =======================================================
-# 🔐 3. LOGIN E APP PRINCIPAL
+# 🔐 3. LOGIN PREMIUM (SaaS)
 # =======================================================
 if not st.session_state.logado:
+    # Fundo Premium (Padrão de Pontos)
+    st.markdown("""
+    <style>
+    [data-testid="stAppViewContainer"] { 
+        background-color: #f8fafc !important; 
+        background-image: radial-gradient(#cbd5e1 1px, transparent 1px); 
+        background-size: 24px 24px; 
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     c1, c2, c3 = st.columns([1, 1.2, 1])
     with c2:
-        st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.image(LOGO_PADRAO, width=60)
-            st.markdown("<h2 style='font-size: 24px; color: #0f172a;'>Portal IGO Logística</h2>", unsafe_allow_html=True)
-            u = st.text_input("Usuário").upper().strip()
-            s = st.text_input("Senha", type="password")
-            if st.button("Entrar", type="primary", use_container_width=True):
+            st.markdown(f"""
+            <div style="text-align: center; padding-top: 15px;">
+                <img src="{LOGO_IGO}" width="110" style="margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                <h2 style="margin: 0; color: #0f172a; font-weight: 900; font-size: 28px;">Central de Comando</h2>
+                <p style="color: #64748b; font-size: 15px; margin-bottom: 25px;">Portal de Monitoramento IGO Logística</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            u = st.text_input("👤 Usuário").upper().strip()
+            s = st.text_input("🔒 Senha", type="password")
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            if st.button("🚀 Acessar Sistema", type="primary", use_container_width=True):
                 if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
                     st.session_state.logado, st.session_state.cliente = True, u; st.rerun()
-                else: st.error("Usuário ou senha incorretos.")
+                else: 
+                    st.error("Usuário ou senha incorretos.")
 else:
+    # =======================================================
+    # 🚀 4. PAINEL PRINCIPAL
+    # =======================================================
     df_raw = carregar_dados_nuvem()
     if not df_raw.empty:
         df_cliente = df_raw if st.session_state.cliente == "IGO_LOGISTICA" else df_raw[df_raw['TOMADOR'] == st.session_state.cliente].copy()
@@ -243,7 +267,7 @@ else:
                 st.divider()
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v59")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v60")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True): col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 st.divider()
@@ -288,7 +312,7 @@ else:
 
 📊 *Status do Dia:* {taxa_conclusao}% Concluído.
 
-Aceda ao painel para ver detalhes.
+Acesse o painel para ver detalhes.
 Atendimento IGO Logística."""
                 texto_codificado = urllib.parse.quote(texto_whatsapp)
                 link_whatsapp = f"https://api.whatsapp.com/send?text={texto_codificado}"
@@ -308,7 +332,7 @@ Atendimento IGO Logística."""
                 
                 # MAPA RADAR NA SIDEBAR
                 st.markdown("<div class='dinamic-text' style='font-size:15px; font-weight:800; margin-bottom:5px;'>🗺️ Radar de Operação</div>", unsafe_allow_html=True)
-                st.markdown("<p style='font-size:11px; color:#888; margin-top:-5px; line-height:1.2;'>As bolhas mostram os focos de procura no período.</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size:11px; color:#888; margin-top:-5px; line-height:1.2;'>As bolhas mostram os focos de demanda no período.</p>", unsafe_allow_html=True)
                 if not df_f.empty and 'CIDADE' in df_f.columns and 'UF' in df_f.columns:
                     def cor_status(s):
                         if 'Entregue' in s: return '#10B981'
@@ -321,7 +345,7 @@ Atendimento IGO Logística."""
                     df_g = df_g.nlargest(15, 'count')
                     df_g['size'] = df_g['count'] * 150 
                     
-                    with st.spinner("A sincronizar satélites... 🛰️"):
+                    with st.spinner("Sincronizando satélites... 🛰️"):
                         lats, lons = [], []
                         for _, row in df_g.iterrows():
                             lat, lon = buscar_lat_lon(row['CIDADE'], row['UF'])
@@ -420,7 +444,6 @@ Atendimento IGO Logística."""
                     gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
                     gb.configure_selection('single', use_checkbox=False)
                     
-                    # 📲 MÁGICA DO WHATSAPP LINHA A LINHA (AGORA COM CIDADE E UF)
                     wpp_jscode = JsCode(f"""
                     class WppCellRenderer {{ 
                         init(params) {{ 
@@ -430,8 +453,8 @@ Atendimento IGO Logística."""
                                 let lab = params.data.LABORATORIO || 'N/A';
                                 let cidade = params.data.CIDADE || 'N/A';
                                 let uf = params.data.UF || 'N/A';
-                                let fone = '{WHATSAPP_IGO}';
-                                let msg = `🚨 *CHAMADO DE ATRASO* 🚨%0A%0AOlá equipa IGO Logística!%0APrecisamos de verificar este pedido que consta como atrasado no painel:%0A%0A📦 *Pedido:* ${{pedido}}%0A🏥 *Laboratório:* ${{lab}}%0A📍 *Local:* ${{cidade}} - ${{uf}}%0A%0APoderiam dar um retorno de urgência?`;
+                                let fone = '5511947996371';
+                                let msg = `🚨 *CHAMADO DE ATRASO* 🚨%0A%0AOlá equipe IGO Logística!%0APrecisamos verificar este pedido que consta como atrasado no painel:%0A%0A📦 *Pedido:* ${{pedido}}%0A🏥 *Laboratório:* ${{lab}}%0A📍 *Local:* ${{cidade}} - ${{uf}}%0A%0APoderiam dar um retorno de urgência?`;
                                 let link = `https://api.whatsapp.com/send?phone=${{fone}}&text=${{msg}}`;
                                 this.eGui.innerHTML = `<a href="${{link}}" target="_blank" style="text-decoration: none; font-size: 16px; cursor: pointer; display: block; margin-top: 2px;" title="Abrir Chamado no WhatsApp">🆘</a>`;
                             }} 
