@@ -236,28 +236,25 @@ else:
             if isinstance(min_data, pd.Timestamp): min_data = min_data.date()
             if isinstance(max_data, pd.Timestamp): max_data = max_data.date()
             
-            # --- ⚙️ SIDEBAR (PRIMEIRA PARTE: INPUTS) ---
+            # --- ⚙️ SIDEBAR (INPUTS) ---
             with st.sidebar:
                 st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
                 st.divider()
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v54")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v55")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
-                busca_ped = st.text_input("🔍 Pedido / Nº:")
+                
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True): col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 st.divider()
 
-            # --- FILTROS BASE ---
+            # --- FILTROS DE DATA E CIDADE ---
             df_f = df_cliente.copy()
             if isinstance(datas_sel, tuple):
                 if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
                 elif len(datas_sel) == 1: df_f = df_f[df_f['DATA_OBJ'] == datas_sel[0]]
             else: df_f = df_f[df_f['DATA_OBJ'] == datas_sel]
             if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
-            if busca_ped:
-                b = str(busca_ped).upper()
-                df_f = df_f[df_f['PEDIDO'].astype(str).str.contains(b) | df_f['NUMERO'].astype(str).str.contains(b)]
 
             if not df_f.empty:
                 def calcular_prioridade(row):
@@ -277,9 +274,8 @@ else:
             n_atra = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)]) if not df_f.empty else 0
             n_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br]) if not df_f.empty else 0
 
-            # --- ⚙️ SIDEBAR (SEGUNDA PARTE: BOTÕES DE AÇÃO) ---
+            # --- ⚙️ SIDEBAR (BOTÕES DE AÇÃO) ---
             with st.sidebar:
-                # Botão do WhatsApp (Dinâmico)
                 taxa_conclusao = int(((n_ent + n_frus) / n_tot) * 100) if n_tot > 0 else 0
                 texto_whatsapp = f"""*Resumo da Operação - {st.session_state.cliente}* 🚚
 🗓️ Data: {hoje_br.strftime('%d/%m/%Y')}
@@ -291,7 +287,7 @@ else:
 
 📊 *Status do Dia:* {taxa_conclusao}% Concluído.
 
-Acesse o painel para ver fotos e detalhes.
+Acesse o painel para ver detalhes.
 Atendimento IGO Logística."""
                 texto_codificado = urllib.parse.quote(texto_whatsapp)
                 link_whatsapp = f"https://api.whatsapp.com/send?text={texto_codificado}"
@@ -304,11 +300,9 @@ Atendimento IGO Logística."""
                 </a>
                 """, unsafe_allow_html=True)
                 
-                # Exportar e Sair
                 df_f_export = df_cliente.copy()
                 csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
                 st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
-                
                 if st.button("🚪 Sair", use_container_width=True): st.session_state.logado = False; st.rerun()
 
             # --- CSS DINÂMICO ---
@@ -328,10 +322,12 @@ Atendimento IGO Logística."""
             .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
             [data-testid="stSidebar"] div[data-baseweb="select"] > div {{ background-color: {bg_app} !important; border-color: {border_c} !important; }}
             [data-testid="stSidebar"] input {{ background-color: {bg_app} !important; color: {input_txt} !important; }}
+            /* Estilo para a nova Barra de Busca Inteligente */
+            .stTextInput > div > div > input {{ font-size: 16px !important; padding: 10px !important; border-radius: 8px !important; }}
             </style>
             """, unsafe_allow_html=True)
 
-            # --- HEADER ---
+            # --- HEADER E KPIs ---
             st.markdown(f"""
             <div class="header-container dinamic-border" style="padding-bottom: 10px; margin-top: -15px;">
                 <h2 class="dinamic-text" style="margin: 0; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
@@ -339,7 +335,6 @@ Atendimento IGO Logística."""
             </div>
             """, unsafe_allow_html=True)
 
-            # --- BLOCOS KPIs ---
             c1, c2, c3, c4, c5 = st.columns(5)
             def click_kpi(valor): st.session_state.filtro_kpi = valor
 
@@ -349,7 +344,7 @@ Atendimento IGO Logística."""
             with c4: st.button(f"🚨 ATRASADOS\n\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
             with c5: st.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
 
-            # 📊 GRÁFICO GERENCIAL (APENAS BARRA DE PROGRESSO LIMPA E CENTRALIZADA)
+            # 📊 GRÁFICO GERENCIAL (PROGRESSO)
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(f"<div class='dinamic-text' style='font-size:14px; font-weight:800; margin-bottom:10px;'>🎯 Progresso de Hoje</div>", unsafe_allow_html=True)
             df_hoje_bi = df_cliente[df_cliente['DATA_OBJ'] == hoje_br]
@@ -369,6 +364,12 @@ Atendimento IGO Logística."""
             tab_grid, tab_map = st.tabs(["📋 Tabela de Monitoramento", "🗺️ Mapa de Operações (Top 15 Cidades)"])
             
             with tab_grid:
+                # 🔥 BARRA DE BUSCA INTELIGENTE
+                st.markdown("<br>", unsafe_allow_html=True)
+                col_busca, _ = st.columns([2, 1]) # Ocupa 2/3 da tela para não ficar esticadona
+                with col_busca:
+                    busca_inteligente = st.text_input("🔎 Busca Rápida:", placeholder="Ex: Melo Labs, Centro, Maria, Frustrada, 102938...", key="busca_inteligente")
+                
                 df_grid = df_f.copy()
                 if not df_grid.empty:
                     if st.session_state.filtro_kpi == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue', na=False)]
@@ -378,78 +379,89 @@ Atendimento IGO Logística."""
 
                     df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
                     df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
-                    gb = GridOptionsBuilder.from_dataframe(df_final)
-                    gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
-                    gb.configure_selection('single', use_checkbox=False)
                     
-                    status_jscode = JsCode("""
-                    function(params) {
-                        let val = params.value || '';
-                        if (val.includes('Entregue')) { return {'backgroundColor': 'rgba(16, 185, 129, 0.15)', 'color': '#10B981', 'fontWeight': '900'}; } 
-                        else if (val.includes('Frustrada') || val.includes('ATRASADO')) { return {'backgroundColor': 'rgba(239, 68, 68, 0.15)', 'color': '#EF4444', 'fontWeight': '900'}; } 
-                        else if (val.includes('Em Rota')) { return {'backgroundColor': 'rgba(245, 158, 11, 0.15)', 'color': '#F59E0B', 'fontWeight': '900'}; } 
-                        else if (val.includes('Coletado') || val.includes('Conferido') || val.includes('Triagem')) { return {'backgroundColor': 'rgba(59, 130, 246, 0.15)', 'color': '#3B82F6', 'fontWeight': '900'}; }
-                        return {'fontWeight': 'bold'};
-                    }
-                    """)
-                    
-                    for col in df_final.columns:
-                        header_name = col.upper()
-                        if col == 'DATA_LIMITE': header_name = "PREVISÃO ENTREGA"
-                        elif col == 'DATA_ENTREGA': header_name = "DATA ENTREGA"
-                        elif col == 'FOTO_URL': header_name = "FOTO"
-                        
-                        if col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
-                        elif col == 'FOTO_URL':
-                            link_jscode = JsCode("""
-                            class LinkCellRenderer { 
-                                init(params) { 
-                                    this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; 
-                                    if (params.value && params.value !== '' && params.value !== 'nan') { 
-                                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 18px; display: block; margin-top: 2px;" title="Clique para ver a foto">📸</span>'; 
-                                        this.eGui.onclick = () => {
-                                            let modal = document.createElement('div');
-                                            modal.style.position = 'fixed'; modal.style.zIndex = '999999';
-                                            modal.style.left = '0'; modal.style.top = '0'; modal.style.width = '100vw'; modal.style.height = '100vh';
-                                            modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
-                                            modal.style.display = 'flex'; modal.style.flexDirection = 'column'; modal.style.justifyContent = 'center'; modal.style.alignItems = 'center'; modal.style.cursor = 'zoom-out';
-                                            let img = document.createElement('img');
-                                            img.src = params.value; img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '8px'; img.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
-                                            let txt = document.createElement('div');
-                                            txt.innerText = '✖ Clique em qualquer lugar para fechar'; txt.style.color = '#ffffff'; txt.style.marginTop = '15px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontSize = '14px'; txt.style.fontWeight = 'bold';
-                                            modal.appendChild(img); modal.appendChild(txt);
-                                            modal.onclick = () => { document.body.removeChild(modal); }; document.body.appendChild(modal);
-                                        };
-                                    } 
-                                } getGui() { return this.eGui; } 
-                            }
-                            """)
-                            gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70, minWidth=70)
-                        elif col == 'DETALHES': gb.configure_column(col, headerName=header_name, width=300, minWidth=250, tooltipField="DETALHES")
-                        elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60, minWidth=60)
-                        elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90, minWidth=90)
-                        elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95, minWidth=95)
-                        elif col == 'LABORATORIO': gb.configure_column(col, headerName=header_name, width=400, minWidth=350, tooltipField="LABORATORIO")
-                        elif col == 'BAIRRO': gb.configure_column(col, headerName=header_name, width=250, minWidth=200, tooltipField="BAIRRO")
-                        elif col == 'CIDADE': gb.configure_column(col, headerName=header_name, width=180, minWidth=150)
-                        else: gb.configure_column(col, headerName=header_name)
+                    # 🔥 APLICAÇÃO DA BUSCA GLOBAL
+                    if busca_inteligente:
+                        busca_lower = str(busca_inteligente).lower()
+                        # Transforma todas as colunas visíveis em texto e procura a palavra-chave em qualquer lugar
+                        mask = df_final.astype(str).apply(lambda x: x.str.lower().str.contains(busca_lower)).any(axis=1)
+                        df_final = df_final[mask]
 
-                    if modo_escuro:
-                        grid_css = {
-                            ".ag-root-wrapper": {"background-color": "#0e1117 !important", "border": "none !important"},
-                            ".ag-header": {"background-color": "#1e293b !important", "border-bottom": "1px solid #334155 !important"},
-                            ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#f8fafc !important"},
-                            ".ag-cell": {"font-size": "11px !important", "color": "#cbd5e1 !important", "border-bottom": "1px solid #1e293b !important"},
-                            ".ag-row-even": {"background-color": "#0f172a !important"}, ".ag-row-odd": {"background-color": "#1e293b !important"}, ".ag-row-hover": {"background-color": "#334155 !important"} 
+                    if not df_final.empty:
+                        gb = GridOptionsBuilder.from_dataframe(df_final)
+                        gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
+                        gb.configure_selection('single', use_checkbox=False)
+                        
+                        status_jscode = JsCode("""
+                        function(params) {
+                            let val = params.value || '';
+                            if (val.includes('Entregue')) { return {'backgroundColor': 'rgba(16, 185, 129, 0.15)', 'color': '#10B981', 'fontWeight': '900'}; } 
+                            else if (val.includes('Frustrada') || val.includes('ATRASADO')) { return {'backgroundColor': 'rgba(239, 68, 68, 0.15)', 'color': '#EF4444', 'fontWeight': '900'}; } 
+                            else if (val.includes('Em Rota')) { return {'backgroundColor': 'rgba(245, 158, 11, 0.15)', 'color': '#F59E0B', 'fontWeight': '900'}; } 
+                            else if (val.includes('Coletado') || val.includes('Conferido') || val.includes('Triagem')) { return {'backgroundColor': 'rgba(59, 130, 246, 0.15)', 'color': '#3B82F6', 'fontWeight': '900'}; }
+                            return {'fontWeight': 'bold'};
                         }
+                        """)
+                        
+                        for col in df_final.columns:
+                            header_name = col.upper()
+                            if col == 'DATA_LIMITE': header_name = "PREVISÃO ENTREGA"
+                            elif col == 'DATA_ENTREGA': header_name = "DATA ENTREGA"
+                            elif col == 'FOTO_URL': header_name = "FOTO"
+                            
+                            if col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
+                            elif col == 'FOTO_URL':
+                                link_jscode = JsCode("""
+                                class LinkCellRenderer { 
+                                    init(params) { 
+                                        this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; 
+                                        if (params.value && params.value !== '' && params.value !== 'nan') { 
+                                            this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 18px; display: block; margin-top: 2px;" title="Clique para ver a foto">📸</span>'; 
+                                            this.eGui.onclick = () => {
+                                                let modal = document.createElement('div');
+                                                modal.style.position = 'fixed'; modal.style.zIndex = '999999';
+                                                modal.style.left = '0'; modal.style.top = '0'; modal.style.width = '100vw'; modal.style.height = '100vh';
+                                                modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
+                                                modal.style.display = 'flex'; modal.style.flexDirection = 'column'; modal.style.justifyContent = 'center'; modal.style.alignItems = 'center'; modal.style.cursor = 'zoom-out';
+                                                let img = document.createElement('img');
+                                                img.src = params.value; img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '8px'; img.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
+                                                let txt = document.createElement('div');
+                                                txt.innerText = '✖ Clique em qualquer lugar para fechar'; txt.style.color = '#ffffff'; txt.style.marginTop = '15px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontSize = '14px'; txt.style.fontWeight = 'bold';
+                                                modal.appendChild(img); modal.appendChild(txt);
+                                                modal.onclick = () => { document.body.removeChild(modal); }; document.body.appendChild(modal);
+                                            };
+                                        } 
+                                    } getGui() { return this.eGui; } 
+                                }
+                                """)
+                                gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70, minWidth=70)
+                            elif col == 'DETALHES': gb.configure_column(col, headerName=header_name, width=300, minWidth=250, tooltipField="DETALHES")
+                            elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60, minWidth=60)
+                            elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90, minWidth=90)
+                            elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95, minWidth=95)
+                            elif col == 'LABORATORIO': gb.configure_column(col, headerName=header_name, width=400, minWidth=350, tooltipField="LABORATORIO")
+                            elif col == 'BAIRRO': gb.configure_column(col, headerName=header_name, width=250, minWidth=200, tooltipField="BAIRRO")
+                            elif col == 'CIDADE': gb.configure_column(col, headerName=header_name, width=180, minWidth=150)
+                            else: gb.configure_column(col, headerName=header_name)
+
+                        if modo_escuro:
+                            grid_css = {
+                                ".ag-root-wrapper": {"background-color": "#0e1117 !important", "border": "none !important"},
+                                ".ag-header": {"background-color": "#1e293b !important", "border-bottom": "1px solid #334155 !important"},
+                                ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#f8fafc !important"},
+                                ".ag-cell": {"font-size": "11px !important", "color": "#cbd5e1 !important", "border-bottom": "1px solid #1e293b !important"},
+                                ".ag-row-even": {"background-color": "#0f172a !important"}, ".ag-row-odd": {"background-color": "#1e293b !important"}, ".ag-row-hover": {"background-color": "#334155 !important"} 
+                            }
+                        else:
+                            grid_css = {
+                                ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#334155"},
+                                ".ag-cell": {"font-size": "11px !important", "color": "#475569"},
+                                ".ag-row-even": {"background-color": "#f8fafc !important"}, ".ag-row-odd": {"background-color": "#ffffff !important"}, ".ag-row-hover": {"background-color": "#e2e8f0 !important"} 
+                            }
+                        AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=False, height=520)
                     else:
-                        grid_css = {
-                            ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#334155"},
-                            ".ag-cell": {"font-size": "11px !important", "color": "#475569"},
-                            ".ag-row-even": {"background-color": "#f8fafc !important"}, ".ag-row-odd": {"background-color": "#ffffff !important"}, ".ag-row-hover": {"background-color": "#e2e8f0 !important"} 
-                        }
-                    AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=False, height=520)
-                else: st.warning("Nenhum pedido encontrado.")
+                        st.info("Nenhum resultado encontrado para essa busca inteligente.")
+                else: st.warning("Nenhum pedido encontrado nos filtros principais.")
 
             # --- MAPA INTELIGENTE ---
             with tab_map:
