@@ -61,7 +61,7 @@ CLIENTES_CONFIG = {
 LOGO_PADRAO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
 
 # =======================================================
-# 🔗 2. MOTOR DE DADOS
+# 🔗 2. MOTOR DE DADOS (COM PESCADOR DUPLO INFALÍVEL)
 # =======================================================
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
@@ -87,40 +87,57 @@ def carregar_dados_nuvem():
                     cols_limpas = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
                     df_app.columns = cols_limpas
                     
-                    col_quem, col_obs, col_status_app = None, None, None
-                    for c in cols_limpas:
-                        if 'QUEM' in c or 'ATEND' in c or 'RESP' in c or 'RECEB' in c: col_quem = c
-                        if 'OBS' in c or 'MOTIV' in c: col_obs = c
-                        if 'STATUS' == c: col_status_app = c
+                    # Identifica as colunas chaves (se existirem)
+                    col_status = 'STATUS' if 'STATUS' in cols_limpas else None
+                    col_obs = 'OBSERVACOES' if 'OBSERVACOES' in cols_limpas else (cols_limpas[10] if len(cols_limpas) > 10 else None)
+                    col_detalhes = 'DETALHES' if 'DETALHES' in cols_limpas else (cols_limpas[14] if len(cols_limpas) > 14 else None)
+                    col_receb = 'RECEBEDOR' if 'RECEBEDOR' in cols_limpas else (cols_limpas[16] if len(cols_limpas) > 16 else None)
+                    
+                    cols_ext = ['PEDIDO']
+                    if col_status and col_status not in cols_ext: cols_ext.append(col_status)
+                    if col_obs and col_obs not in cols_ext: cols_ext.append(col_obs)
+                    if col_detalhes and col_detalhes not in cols_ext: cols_ext.append(col_detalhes)
+                    if col_receb and col_receb not in cols_ext: cols_ext.append(col_receb)
+                    
+                    df_app_clean = df_app[cols_ext].copy()
+                    
+                    # 🧠 O Pescador Duplo: Garante que "QUEM" seja preenchido de qualquer jeito!
+                    def extrair_dados_app(r):
+                        s = str(r.get(col_status, '')) if col_status else ''
+                        o = str(r.get(col_obs, '')) if col_obs else ''
+                        d = str(r.get(col_detalhes, '')) if col_detalhes else ''
+                        rec = str(r.get(col_receb, '')) if col_receb else ''
                         
-                    if col_quem or col_obs or col_status_app:
-                        cols_extract = ['PEDIDO']
-                        renames = {'PEDIDO': 'PEDIDO'}
-                        if col_status_app: cols_extract.append(col_status_app); renames[col_status_app] = 'APP_STATUS'
-                        if col_quem: cols_extract.append(col_quem); renames[col_quem] = 'APP_QUEM'
-                        if col_obs: cols_extract.append(col_obs); renames[col_obs] = 'APP_OBS'
+                        s = s.strip() if s.upper() != 'NAN' else ''
+                        o = o.strip() if o.upper() != 'NAN' else ''
+                        d = d.strip() if d.upper() != 'NAN' else ''
+                        rec = rec.strip() if rec.upper() != 'NAN' else ''
                         
-                        cols_extract = list(dict.fromkeys(cols_extract))
-                        df_app_clean = df_app[cols_extract].copy()
-                        df_app_clean.rename(columns=renames, inplace=True)
-                        df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
-                        df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
+                        # Se não achar no detalhe, busca no recebedor!
+                        q = d if d else rec
+                        return pd.Series([s, o, q])
                         
-                        df_app_ind = df_app_clean[~df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)]
-                        df_app_rom = df_app_clean[df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)].copy()
-                        df_app_rom.rename(columns={'PEDIDO': 'ROMANEIO'}, inplace=True)
-                        
-                        df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
-                        if 'ROMANEIO' not in df.columns: df['ROMANEIO'] = ""
-                        df['ROMANEIO'] = df['ROMANEIO'].astype(str).str.strip()
-                        
-                        df = pd.merge(df, df_app_ind, on='PEDIDO', how='left')
-                        
-                        if not df_app_rom.empty:
-                            df = pd.merge(df, df_app_rom, on='ROMANEIO', how='left', suffixes=('', '_R'))
-                            for c in ['APP_STATUS', 'APP_QUEM', 'APP_OBS']:
-                                if c in df.columns and f"{c}_R" in df.columns:
-                                    df[c] = df[f"{c}_R"].replace("", pd.NA).combine_first(df[c].replace("", pd.NA)).fillna("")
+                    df_app_clean[['APP_STATUS', 'APP_OBS', 'APP_QUEM']] = df_app_clean.apply(extrair_dados_app, axis=1)
+                    df_app_clean = df_app_clean[['PEDIDO', 'APP_STATUS', 'APP_OBS', 'APP_QUEM']]
+                    
+                    df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
+                    df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
+                    
+                    df_app_ind = df_app_clean[~df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)]
+                    df_app_rom = df_app_clean[df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)].copy()
+                    df_app_rom.rename(columns={'PEDIDO': 'ROMANEIO'}, inplace=True)
+                    
+                    df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
+                    if 'ROMANEIO' not in df.columns: df['ROMANEIO'] = ""
+                    df['ROMANEIO'] = df['ROMANEIO'].astype(str).str.strip()
+                    
+                    df = pd.merge(df, df_app_ind, on='PEDIDO', how='left')
+                    
+                    if not df_app_rom.empty:
+                        df = pd.merge(df, df_app_rom, on='ROMANEIO', how='left', suffixes=('', '_R'))
+                        for c in ['APP_STATUS', 'APP_QUEM', 'APP_OBS']:
+                            if c in df.columns and f"{c}_R" in df.columns:
+                                df[c] = df[f"{c}_R"].replace("", pd.NA).combine_first(df[c].replace("", pd.NA)).fillna("")
             except: pass
             
             if 'DATA' in df.columns:
@@ -232,7 +249,7 @@ else:
             if isinstance(min_data, pd.Timestamp): min_data = min_data.date()
             if isinstance(max_data, pd.Timestamp): max_data = max_data.date()
             
-            # --- ⚙️ SIDEBAR COM MODO ESCURO E CONTRASTE CORRIGIDO ---
+            # --- ⚙️ SIDEBAR COM MODO ESCURO ---
             with st.sidebar:
                 st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
                 st.divider()
@@ -240,7 +257,7 @@ else:
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
                 
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v48")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v50")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 busca_ped = st.text_input("🔍 Pedido / Nº:")
                 
@@ -256,13 +273,13 @@ else:
                     st.session_state.logado = False
                     st.rerun()
 
-            # --- CSS DINÂMICO (CORREÇÃO DA FONTE DOS INPUTS) ---
+            # --- CSS DINÂMICO ---
             bg_app = "#0e1117" if modo_escuro else "#f0f2f6"
             bg_side = "#161b22" if modo_escuro else "#ffffff"
             txt_main = "#f8fafc" if modo_escuro else "#0f172a"
             txt_side = "#cbd5e1" if modo_escuro else "#334155"
             border_c = "#334155" if modo_escuro else "#e2e8f0"
-            input_txt = "#ffffff" if modo_escuro else "#0f172a" # 🎯 A CORREÇÃO ESTÁ AQUI
+            input_txt = "#ffffff" if modo_escuro else "#0f172a" 
             
             st.markdown(f"""
             <style>
@@ -271,8 +288,6 @@ else:
             [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] label {{ color: {txt_side} !important; }}
             .dinamic-text {{ color: {txt_main} !important; }}
             .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
-            
-            /* Ajuste blindado para inputs no modo escuro E claro */
             [data-testid="stSidebar"] div[data-baseweb="select"] > div {{ background-color: {bg_app} !important; border-color: {border_c} !important; }}
             [data-testid="stSidebar"] input {{ background-color: {bg_app} !important; color: {input_txt} !important; }}
             </style>
