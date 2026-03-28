@@ -61,7 +61,7 @@ CLIENTES_CONFIG = {
 LOGO_PADRAO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
 
 # =======================================================
-# 🔗 2. MOTOR DE DADOS (COM PESCADOR DUPLO INFALÍVEL)
+# 🔗 2. MOTOR DE DADOS
 # =======================================================
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
@@ -87,7 +87,6 @@ def carregar_dados_nuvem():
                     cols_limpas = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
                     df_app.columns = cols_limpas
                     
-                    # Identifica as colunas chaves (se existirem)
                     col_status = 'STATUS' if 'STATUS' in cols_limpas else None
                     col_obs = 'OBSERVACOES' if 'OBSERVACOES' in cols_limpas else (cols_limpas[10] if len(cols_limpas) > 10 else None)
                     col_detalhes = 'DETALHES' if 'DETALHES' in cols_limpas else (cols_limpas[14] if len(cols_limpas) > 14 else None)
@@ -101,7 +100,6 @@ def carregar_dados_nuvem():
                     
                     df_app_clean = df_app[cols_ext].copy()
                     
-                    # 🧠 O Pescador Duplo: Garante que "QUEM" seja preenchido de qualquer jeito!
                     def extrair_dados_app(r):
                         s = str(r.get(col_status, '')) if col_status else ''
                         o = str(r.get(col_obs, '')) if col_obs else ''
@@ -113,7 +111,6 @@ def carregar_dados_nuvem():
                         d = d.strip() if d.upper() != 'NAN' else ''
                         rec = rec.strip() if rec.upper() != 'NAN' else ''
                         
-                        # Se não achar no detalhe, busca no recebedor!
                         q = d if d else rec
                         return pd.Series([s, o, q])
                         
@@ -245,19 +242,17 @@ else:
             
             min_data = df_cliente['DATA_OBJ'].dropna().min() if ('DATA_OBJ' in df_cliente.columns and not df_cliente['DATA_OBJ'].dropna().empty) else hoje_br
             max_data = df_cliente['DATA_OBJ'].dropna().max() if ('DATA_OBJ' in df_cliente.columns and not df_cliente['DATA_OBJ'].dropna().empty) else hoje_br
-            
             if isinstance(min_data, pd.Timestamp): min_data = min_data.date()
             if isinstance(max_data, pd.Timestamp): max_data = max_data.date()
             
-            # --- ⚙️ SIDEBAR COM MODO ESCURO ---
+            # --- ⚙️ SIDEBAR ---
             with st.sidebar:
                 st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
                 st.divider()
-                
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
                 
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v50")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v51")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 busca_ped = st.text_input("🔍 Pedido / Nº:")
                 
@@ -339,6 +334,38 @@ else:
             with c4: st.button(f"🚨 ATRASADOS\n\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
             with c5: st.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
 
+            # =======================================================
+            # 📊 MÁGICA BI: GRÁFICOS GERENCIAIS RÁPIDOS
+            # =======================================================
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_bi1, col_bi2 = st.columns([1, 2])
+            
+            with col_bi1:
+                st.markdown(f"<div class='dinamic-text' style='font-size:14px; font-weight:800; margin-bottom:10px;'>🎯 Progresso de Hoje</div>", unsafe_allow_html=True)
+                df_hoje_bi = df_cliente[df_cliente['DATA_OBJ'] == hoje_br]
+                if not df_hoje_bi.empty:
+                    t_hoje = len(df_hoje_bi)
+                    c_hoje = len(df_hoje_bi[df_hoje_bi['STATUS_DISPLAY'].str.contains('Entregue|Frustrada', na=False)])
+                    taxa = c_hoje / t_hoje
+                    st.progress(taxa)
+                    st.markdown(f"<div class='dinamic-text' style='font-size:12px; margin-top:-10px; text-align:right;'>{c_hoje} de {t_hoje} finalizados ({int(taxa*100)}%)</div>", unsafe_allow_html=True)
+                else:
+                    st.info("Nenhum pedido para hoje.")
+                    
+            with col_bi2:
+                st.markdown(f"<div class='dinamic-text' style='font-size:14px; font-weight:800; margin-bottom:10px;'>📊 Volume (Últimos 7 Dias)</div>", unsafe_allow_html=True)
+                limite_dias = hoje_br - timedelta(days=6)
+                df_7d = df_cliente[df_cliente['DATA_OBJ'] >= limite_dias].copy()
+                if not df_7d.empty:
+                    df_vol = df_7d.groupby('DATA_OBJ')['PEDIDO'].count().reset_index()
+                    df_vol['DATA_OBJ'] = df_vol['DATA_OBJ'].apply(lambda x: x.strftime('%d/%m'))
+                    df_vol.rename(columns={'DATA_OBJ': 'Data', 'PEDIDO': 'Cargas'}, inplace=True)
+                    st.bar_chart(df_vol.set_index('Data'), height=130)
+                else:
+                    st.info("Sem dados recentes.")
+            st.markdown(f"<div class='dinamic-border' style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
+            # =======================================================
+
             df_grid = df_f.copy()
             if not df_grid.empty:
                 if st.session_state.filtro_kpi == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue', na=False)]
@@ -348,6 +375,27 @@ else:
 
                 df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
                 df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
+                
+                # =======================================================
+                # 🌡️ MÁGICA: TERMÔMETRO DE SLA (CORES NAS CÉLULAS)
+                # =======================================================
+                status_jscode = JsCode("""
+                function(params) {
+                    let val = params.value || '';
+                    if (val.includes('Entregue')) {
+                        return {'backgroundColor': 'rgba(16, 185, 129, 0.15)', 'color': '#10B981', 'fontWeight': '900'};
+                    } else if (val.includes('Frustrada') || val.includes('ATRASADO')) {
+                        return {'backgroundColor': 'rgba(239, 68, 68, 0.15)', 'color': '#EF4444', 'fontWeight': '900'};
+                    } else if (val.includes('Em Rota')) {
+                        return {'backgroundColor': 'rgba(245, 158, 11, 0.15)', 'color': '#F59E0B', 'fontWeight': '900'};
+                    } else if (val.includes('Coletado') || val.includes('Conferido') || val.includes('Triagem')) {
+                        return {'backgroundColor': 'rgba(59, 130, 246, 0.15)', 'color': '#3B82F6', 'fontWeight': '900'};
+                    }
+                    return {'fontWeight': 'bold'};
+                }
+                """)
+                # =======================================================
+
                 gb = GridOptionsBuilder.from_dataframe(df_final)
                 gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
                 gb.configure_selection('single', use_checkbox=False)
@@ -358,7 +406,9 @@ else:
                     elif col == 'DATA_ENTREGA': header_name = "DATA ENTREGA"
                     elif col == 'FOTO_URL': header_name = "FOTO"
                     
-                    if col == 'FOTO_URL':
+                    if col == 'STATUS':
+                        gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
+                    elif col == 'FOTO_URL':
                         link_jscode = JsCode("""
                         class LinkCellRenderer { 
                             init(params) { 
