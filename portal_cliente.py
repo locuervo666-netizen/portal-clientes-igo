@@ -232,7 +232,7 @@ else:
             if isinstance(min_data, pd.Timestamp): min_data = min_data.date()
             if isinstance(max_data, pd.Timestamp): max_data = max_data.date()
             
-            # --- ⚙️ SIDEBAR COM MODO ESCURO IMERSIVO ---
+            # --- ⚙️ SIDEBAR COM MODO ESCURO E CONTRASTE CORRIGIDO ---
             with st.sidebar:
                 st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
                 st.divider()
@@ -240,7 +240,7 @@ else:
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
                 
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v47")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v48")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 busca_ped = st.text_input("🔍 Pedido / Nº:")
                 
@@ -256,12 +256,13 @@ else:
                     st.session_state.logado = False
                     st.rerun()
 
-            # --- CSS DINÂMICO (CONTEMPLANDO SIDEBAR) ---
+            # --- CSS DINÂMICO (CORREÇÃO DA FONTE DOS INPUTS) ---
             bg_app = "#0e1117" if modo_escuro else "#f0f2f6"
             bg_side = "#161b22" if modo_escuro else "#ffffff"
             txt_main = "#f8fafc" if modo_escuro else "#0f172a"
             txt_side = "#cbd5e1" if modo_escuro else "#334155"
             border_c = "#334155" if modo_escuro else "#e2e8f0"
+            input_txt = "#ffffff" if modo_escuro else "#0f172a" # 🎯 A CORREÇÃO ESTÁ AQUI
             
             st.markdown(f"""
             <style>
@@ -271,9 +272,9 @@ else:
             .dinamic-text {{ color: {txt_main} !important; }}
             .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
             
-            /* Ajuste para inputs no modo escuro */
+            /* Ajuste blindado para inputs no modo escuro E claro */
             [data-testid="stSidebar"] div[data-baseweb="select"] > div {{ background-color: {bg_app} !important; border-color: {border_c} !important; }}
-            [data-testid="stSidebar"] input {{ background-color: {bg_app} !important; color: white !important; }}
+            [data-testid="stSidebar"] input {{ background-color: {bg_app} !important; color: {input_txt} !important; }}
             </style>
             """, unsafe_allow_html=True)
 
