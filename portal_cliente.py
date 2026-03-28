@@ -43,6 +43,7 @@ st.markdown("""
     }
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
     .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
+    button[data-baseweb="tab"] { font-size: 16px !important; font-weight: 700 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -65,7 +66,8 @@ def buscar_lat_lon(cidade, uf):
         with urllib.request.urlopen(req, timeout=3) as response:
             if response.getcode() == 200:
                 dados = json.loads(response.read().decode('utf-8'))
-                if dados: return float(dados[0]['lat']), float(dados[0]['lon'])
+                if dados:
+                    return float(dados[0]['lat']), float(dados[0]['lon'])
     except: pass
     return None, None
 
@@ -75,14 +77,19 @@ def buscar_lat_lon(cidade, uf):
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
     try:
-        if "google_credentials" in st.secrets: gc = gspread.oauth(credentials_filename="cred_temp.json", authorized_user_filename="token_temp.json")
-        else: gc = gspread.oauth(credentials_filename="credentials.json", authorized_user_filename="token.json")
+        if "google_credentials" in st.secrets:
+            gc = gspread.oauth(credentials_filename="cred_temp.json", authorized_user_filename="token_temp.json")
+        else:
+            gc = gspread.oauth(credentials_filename="credentials.json", authorized_user_filename="token.json")
+            
         planilha = gc.open("DB_IGO_Logistica")
         aba_m = planilha.worksheet("Memoria_Sistema")
         dados_m = aba_m.get_all_values()
+        
         if len(dados_m) > 1:
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
+            
             try:
                 aba_app = planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
@@ -130,6 +137,7 @@ def carregar_dados_nuvem():
                     df['ROMANEIO'] = df['ROMANEIO'].astype(str).str.strip()
                     
                     df = pd.merge(df, df_app_ind, on='PEDIDO', how='left')
+                    
                     if not df_app_rom.empty:
                         df = pd.merge(df, df_app_rom, on='ROMANEIO', how='left', suffixes=('', '_R'))
                         for c in ['APP_STATUS', 'APP_QUEM', 'APP_OBS']:
@@ -220,7 +228,8 @@ else:
                 return res
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(tratar_status, axis=1)
 
-            ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
+            # 🎯 ORDEM PADRÃO ALTERADA: DATA AGORA VEM PRIMEIRO
+            ordem_padrao = ['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
             colunas_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
             
             min_data = df_cliente['DATA_OBJ'].dropna().min() if ('DATA_OBJ' in df_cliente.columns and not df_cliente['DATA_OBJ'].dropna().empty) else hoje_br
@@ -234,7 +243,7 @@ else:
                 st.divider()
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v56")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v57")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True): col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 st.divider()
@@ -479,4 +488,4 @@ Atendimento IGO Logística."""
                     AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=False, height=520)
                 else:
                     st.info("Nenhum resultado encontrado na busca inteligente.")
-            else: st.warning("Nenhum pedido encontrado com os filtros da barra lateral.")
+            else: st.warning("Nenhum pedido encontrado nos filtros principais.")
