@@ -10,18 +10,19 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS ELITE (5 BLOCOS)
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
 # =======================================================
 st.set_page_config(page_title="Monitoramento IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
 st.markdown("""
     <style>
-    [data-testid="stAppViewContainer"] { background-color: #f0f2f6; font-family: 'Inter', sans-serif; }
+    [data-testid="stAppViewContainer"] { transition: background-color 0.3s ease; font-family: 'Inter', sans-serif; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
     
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
+    /* 🎯 BOTÕES COLORIDOS DOS KPIs */
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {
         height: 75px !important;
         border-radius: 10px !important;
@@ -196,11 +197,10 @@ else:
                     if t_resp and t_obs: return f"{t_resp} / {t_obs}"
                     if t_resp: return t_resp
                     if t_obs: return t_obs
-                return ""
+            return ""
 
             df_cliente['DETALHES'] = df_cliente.apply(processar_detalhes, axis=1)
 
-            # 🎯 MÁGICA ANTES DO FILTRO: Isso impede o erro de "dataframe vazio"
             def tratar_status(row):
                 s = str(row.get('STATUS_REAL', '')).strip().upper()
                 previsao = str(row.get('DATA_LIMITE', '')).strip()
@@ -225,23 +225,18 @@ else:
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
             colunas_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
             
-            # --- 🛡️ CALENDÁRIO BLINDADO ---
             min_data = df_cliente['DATA_OBJ'].dropna().min() if ('DATA_OBJ' in df_cliente.columns and not df_cliente['DATA_OBJ'].dropna().empty) else hoje_br
             max_data = df_cliente['DATA_OBJ'].dropna().max() if ('DATA_OBJ' in df_cliente.columns and not df_cliente['DATA_OBJ'].dropna().empty) else hoje_br
             
+            # --- ⚙️ SIDEBAR COM TOGGLE DE DARK MODE ---
             with st.sidebar:
                 st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
                 st.divider()
                 
-                # O usuário só pode selecionar os dias entre o mínimo e o máximo!
-                datas_sel = st.date_input(
-                    "🗓️ Período:", 
-                    value=(min_data, max_data), 
-                    min_value=min_data, 
-                    max_value=max_data, 
-                    format="DD/MM/YYYY"
-                )
+                modo_escuro = st.toggle("🌙 Modo Escuro", value=False)
+                st.divider()
                 
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 busca_ped = st.text_input("🔍 Pedido / Nº:")
                 
@@ -258,14 +253,24 @@ else:
                     st.session_state.logado = False
                     st.rerun()
 
+            # --- INJEÇÃO DE CSS DINÂMICO (DARK MODE) ---
+            bg_app = "#0e1117" if modo_escuro else "#f0f2f6"
+            txt_main = "#f8fafc" if modo_escuro else "#0f172a"
+            border_c = "#334155" if modo_escuro else "#e2e8f0"
+            
+            st.markdown(f"""
+            <style>
+            [data-testid="stAppViewContainer"] {{ background-color: {bg_app} !important; }}
+            .dinamic-text {{ color: {txt_main} !important; }}
+            .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
+            </style>
+            """, unsafe_allow_html=True)
+
             # --- FILTROS BASE ---
             df_f = df_cliente.copy()
-            
             if isinstance(datas_sel, tuple):
-                if len(datas_sel) == 2:
-                    df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
-                elif len(datas_sel) == 1:
-                    df_f = df_f[df_f['DATA_OBJ'] == datas_sel[0]]
+                if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
+                elif len(datas_sel) == 1: df_f = df_f[df_f['DATA_OBJ'] == datas_sel[0]]
             else:
                 df_f = df_f[df_f['DATA_OBJ'] == datas_sel]
 
@@ -274,9 +279,7 @@ else:
                 b = str(busca_ped).upper()
                 df_f = df_f[df_f['PEDIDO'].astype(str).str.contains(b) | df_f['NUMERO'].astype(str).str.contains(b)]
 
-            # =======================================================
-            # 🗂️ MÁGICA: ORDENAÇÃO DE ELITE
-            # =======================================================
+            # --- ORDENAÇÃO DE PRIORIDADE ---
             if not df_f.empty:
                 def calcular_prioridade(row):
                     score = 0
@@ -290,8 +293,8 @@ else:
                 df_f = df_f.sort_values(by=['PRIORIDADE_TELA', 'INDEX_ORIGINAL'])
 
             st.markdown(f"""
-            <div class="header-container" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: -15px;">
-                <h2 style="margin: 0; color: #0f172a; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
+            <div class="header-container dinamic-border" style="padding-bottom: 10px; margin-top: -15px;">
+                <h2 class="dinamic-text" style="margin: 0; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
                 <div class='sync-status'>🟢 Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -406,13 +409,27 @@ else:
                     else: 
                         gb.configure_column(col, headerName=header_name)
 
-                grid_css = {
-                    ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#334155"},
-                    ".ag-cell": {"font-size": "11px !important", "color": "#475569"},
-                    ".ag-row-even": {"background-color": "#f8fafc !important"}, 
-                    ".ag-row-odd": {"background-color": "#ffffff !important"},  
-                    ".ag-row-hover": {"background-color": "#e2e8f0 !important"} 
-                }
+                # =======================================================
+                # 🦇 CSS DINÂMICO PARA A GRID (MODO CLARO vs ESCURO)
+                # =======================================================
+                if modo_escuro:
+                    grid_css = {
+                        ".ag-root-wrapper": {"background-color": "#0e1117 !important", "border": "none !important"},
+                        ".ag-header": {"background-color": "#1e293b !important", "border-bottom": "1px solid #334155 !important"},
+                        ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#f8fafc !important"},
+                        ".ag-cell": {"font-size": "11px !important", "color": "#cbd5e1 !important", "border-bottom": "1px solid #1e293b !important"},
+                        ".ag-row-even": {"background-color": "#0f172a !important"}, 
+                        ".ag-row-odd": {"background-color": "#1e293b !important"},  
+                        ".ag-row-hover": {"background-color": "#334155 !important"} 
+                    }
+                else:
+                    grid_css = {
+                        ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#334155"},
+                        ".ag-cell": {"font-size": "11px !important", "color": "#475569"},
+                        ".ag-row-even": {"background-color": "#f8fafc !important"}, 
+                        ".ag-row-odd": {"background-color": "#ffffff !important"},  
+                        ".ag-row-hover": {"background-color": "#e2e8f0 !important"} 
+                    }
 
                 AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=False, height=520)
             else:
