@@ -86,7 +86,6 @@ def carregar_dados_nuvem():
                     
                     col_quem, col_obs, col_status_app = None, None, None
                     for c in cols_limpas:
-                        # 🎯 AGORA ELE BUSCA A PALAVRA 'RECEBEDOR' TAMBÉM!
                         if 'QUEM' in c or 'ATEND' in c or 'RESP' in c or 'RECEB' in c: col_quem = c
                         if 'OBS' in c or 'MOTIV' in c: col_obs = c
                         if 'STATUS' == c: col_status_app = c
@@ -160,12 +159,10 @@ else:
         if 'FOTO' in df_cliente.columns:
             df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
 
-        # 🧠 A MÁGICA: O FUNIL MATEMÁTICO
         def definir_status_real(row):
             s_db = str(row.get('STATUS', '')).strip().upper()
             s_app = str(row.get('APP_STATUS', '')).strip().upper()
             
-            # Dá nota para o quão avançado está o pedido
             def peso(st):
                 if any(x in st for x in ['ENTREGUE', 'FRUSTRAD', 'CANCELAD']): return 5
                 if any(x in st for x in ['ROTA', 'ENTREGA']): return 4
@@ -174,7 +171,6 @@ else:
                 if 'PENDENTE' in st: return 1
                 return 0
                 
-            # O sistema sempre escolhe o status que andou mais pra frente!
             return s_app if peso(s_app) >= peso(s_db) else s_db
             
         df_cliente['STATUS_REAL'] = df_cliente.apply(definir_status_real, axis=1)
@@ -220,16 +216,12 @@ else:
                 col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
             
             st.divider()
-            df_f_export = df_cliente.copy()
-            csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
-            st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
-            
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🚪 Sair", use_container_width=True):
                 st.session_state.logado = False
                 st.rerun()
 
-        # Filtros
+        # Filtros Base
         df_f = df_cliente.copy()
         if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
         if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
@@ -257,6 +249,21 @@ else:
             return res
         
         df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
+
+        # =======================================================
+        # 🗂️ MÁGICA: ORDENAÇÃO DE ELITE (Hoje > Pendentes > Importação)
+        # =======================================================
+        df_f['SORT_HOJE'] = df_f['DATA_OBJ'] != hoje_br # False (Hoje) vem antes de True (Outros dias)
+        df_f['SORT_PENDENTE'] = df_f['STATUS_DISPLAY'] != '⏳ Pendente' # False (Pendentes) vem antes de True
+        df_f['SORT_INDEX'] = df_f.index # Mantém a ordem original do Excel (chegada)
+        
+        df_f = df_f.sort_values(by=['SORT_HOJE', 'SORT_PENDENTE', 'SORT_INDEX'])
+        # =======================================================
+
+        with st.sidebar:
+            df_f_export = df_f.copy()
+            csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
+            st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
 
         # Cabeçalho Limpo
         st.markdown(f"""
