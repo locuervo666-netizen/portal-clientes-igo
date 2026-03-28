@@ -3,6 +3,8 @@ import pandas as pd
 import gspread
 import os
 import json
+import urllib.request
+import urllib.parse
 from datetime import datetime, date, timezone, timedelta
 from streamlit_autorefresh import st_autorefresh
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
@@ -25,32 +27,26 @@ st.markdown("""
     
     /* 🎯 BOTÕES COLORIDOS DOS KPIs */
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {
-        height: 75px !important;
-        border-radius: 10px !important;
-        border: none !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
-        transition: all 0.2s ease !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
+        height: 75px !important; border-radius: 10px !important; border: none !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important; transition: all 0.2s ease !important;
+        display: flex !important; justify-content: center !important; align-items: center !important;
     }
-    
     div.st-key-kpi_total button:hover, div.st-key-kpi_entregue button:hover, div.st-key-kpi_frus button:hover, div.st-key-kpi_atra button:hover, div.st-key-kpi_hoje button:hover { 
         transform: translateY(-2px) !important; box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important; opacity: 0.95 !important; 
     }
-
     div.st-key-kpi_total button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; }
     div.st-key-kpi_entregue button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; }
     div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; }
     div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; }
     div.st-key-kpi_hoje button { background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; }
-    
     div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
         font-weight: 800 !important; font-size: 15px !important; font-family: 'Inter', sans-serif !important; margin: 0 !important; color: #ffffff !important;
     }
-    
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
     .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
+    
+    /* Tabs Customization */
+    button[data-baseweb="tab"] { font-size: 16px !important; font-weight: 700 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -61,7 +57,25 @@ CLIENTES_CONFIG = {
 LOGO_PADRAO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
 
 # =======================================================
-# 🔗 2. MOTOR DE DADOS
+# 📍 GEOLOCALIZADOR NATIVO (MAPA)
+# =======================================================
+@st.cache_data(ttl=86400) # Guarda a cidade na memória por 24h para não travar
+def buscar_lat_lon(cidade, uf):
+    try:
+        city_enc = urllib.parse.quote(cidade)
+        uf_enc = urllib.parse.quote(uf)
+        url = f"https://nominatim.openstreetmap.org/search?city={city_enc}&state={uf_enc}&country=Brazil&format=json"
+        req = urllib.request.Request(url, headers={'User-Agent': 'IGOLogistica/1.0'})
+        with urllib.request.urlopen(req, timeout=3) as response:
+            if response.getcode() == 200:
+                dados = json.loads(response.read().decode('utf-8'))
+                if dados:
+                    return float(dados[0]['lat']), float(dados[0]['lon'])
+    except: pass
+    return None, None
+
+# =======================================================
+# 🔗 MOTOR DE DADOS PRINCIPAL
 # =======================================================
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
@@ -105,18 +119,15 @@ def carregar_dados_nuvem():
                         o = str(r.get(col_obs, '')) if col_obs else ''
                         d = str(r.get(col_detalhes, '')) if col_detalhes else ''
                         rec = str(r.get(col_receb, '')) if col_receb else ''
-                        
                         s = s.strip() if s.upper() != 'NAN' else ''
                         o = o.strip() if o.upper() != 'NAN' else ''
                         d = d.strip() if d.upper() != 'NAN' else ''
                         rec = rec.strip() if rec.upper() != 'NAN' else ''
-                        
                         q = d if d else rec
                         return pd.Series([s, o, q])
                         
                     df_app_clean[['APP_STATUS', 'APP_OBS', 'APP_QUEM']] = df_app_clean.apply(extrair_dados_app, axis=1)
                     df_app_clean = df_app_clean[['PEDIDO', 'APP_STATUS', 'APP_OBS', 'APP_QUEM']]
-                    
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                     
@@ -136,19 +147,16 @@ def carregar_dados_nuvem():
                             if c in df.columns and f"{c}_R" in df.columns:
                                 df[c] = df[f"{c}_R"].replace("", pd.NA).combine_first(df[c].replace("", pd.NA)).fillna("")
             except: pass
-            
-            if 'DATA' in df.columns:
-                df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+            if 'DATA' in df.columns: df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
-    except Exception as e:
-        st.error(f"Sincronização offline: {e}")
+    except Exception as e: st.error(f"Sincronização offline: {e}")
     return pd.DataFrame()
 
 if 'logado' not in st.session_state: st.session_state.logado = False
 if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 
 # =======================================================
-# 🔐 3. LOGIN
+# 🔐 3. LOGIN E APP PRINCIPAL
 # =======================================================
 if not st.session_state.logado:
     c1, c2, c3 = st.columns([1, 1.2, 1])
@@ -161,13 +169,9 @@ if not st.session_state.logado:
             s = st.text_input("Senha", type="password")
             if st.button("Entrar", type="primary", use_container_width=True):
                 if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
-                    st.session_state.logado, st.session_state.cliente = True, u
-                    st.rerun()
+                    st.session_state.logado, st.session_state.cliente = True, u; st.rerun()
                 else: st.error("Usuário ou senha incorretos.")
 else:
-    # =======================================================
-    # 🚀 4. PAINEL PRINCIPAL
-    # =======================================================
     df_raw = carregar_dados_nuvem()
     if not df_raw.empty:
         df_cliente = df_raw if st.session_state.cliente == "IGO_LOGISTICA" else df_raw[df_raw['TOMADOR'] == st.session_state.cliente].copy()
@@ -178,8 +182,7 @@ else:
                 df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
 
             def definir_status_real(row):
-                s_db = str(row.get('STATUS', '')).strip().upper()
-                s_app = str(row.get('APP_STATUS', '')).strip().upper()
+                s_db, s_app = str(row.get('STATUS', '')).strip().upper(), str(row.get('APP_STATUS', '')).strip().upper()
                 def peso(st):
                     if any(x in st for x in ['ENTREGUE', 'FRUSTRAD', 'CANCELAD']): return 5
                     if any(x in st for x in ['ROTA', 'ENTREGA']): return 4
@@ -188,17 +191,14 @@ else:
                     if 'PENDENTE' in st: return 1
                     return 0
                 return s_app if peso(s_app) >= peso(s_db) else s_db
-                
             df_cliente['STATUS_REAL'] = df_cliente.apply(definir_status_real, axis=1)
 
             def processar_detalhes(row):
                 s = str(row.get('STATUS_REAL', '')).upper()
                 if 'FRUSTRADA' in s:
-                    resp = str(row.get('APP_QUEM', '')).strip()
-                    obs = str(row.get('APP_OBS', '')).strip()
+                    resp, obs = str(row.get('APP_QUEM', '')).strip(), str(row.get('APP_OBS', '')).strip()
                     if resp.upper() in ['NAN', 'NONE']: resp = ""
                     if obs.upper() in ['NAN', 'NONE']: obs = ""
-                    
                     emoji = "📝"
                     obs_up = obs.upper()
                     if "FECHADO" in obs_up: emoji = "🔒"
@@ -206,20 +206,16 @@ else:
                     elif "AUSENTE" in obs_up: emoji = "🚷"
                     elif "ENDERE" in obs_up or "INCORRETO" in obs_up: emoji = "🗺️"
                     elif "RECUS" in obs_up: emoji = "🛑"
-
                     t_resp = f"🗣️ {resp}" if resp else ""
                     t_obs = f"{emoji} {obs}" if obs else ""
                     if t_resp and t_obs: return f"{t_resp} / {t_obs}"
                     if t_resp: return t_resp
                     if t_obs: return t_obs
                 return ""
-
             df_cliente['DETALHES'] = df_cliente.apply(processar_detalhes, axis=1)
 
             def tratar_status(row):
-                s = str(row.get('STATUS_REAL', '')).strip().upper()
-                previsao = str(row.get('DATA_LIMITE', '')).strip()
-                
+                s, previsao = str(row.get('STATUS_REAL', '')).strip().upper(), str(row.get('DATA_LIMITE', '')).strip()
                 if 'ENTREGUE' in s: res = '✅ Entregue'
                 elif any(x in s for x in ['ROTA', 'ENTREGA']): res = '🚚 Em Rota'
                 elif 'CONFERIDO' in s: res = '☑️ Conferido'
@@ -228,13 +224,11 @@ else:
                 elif 'FRUSTRADA' in s: res = '❌ Frustrada'
                 elif 'CANCELADO' in s: res = '🚫 Cancelado'
                 else: res = '⏳ Pendente'
-                
                 if res not in ['✅ Entregue', '🚫 Cancelado', '❌ Frustrada'] and previsao:
                     try:
                         if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: res = f"🚨 ATRASADO ({res})"
                     except: pass
                 return res
-            
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(tratar_status, axis=1)
 
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
@@ -245,28 +239,21 @@ else:
             if isinstance(min_data, pd.Timestamp): min_data = min_data.date()
             if isinstance(max_data, pd.Timestamp): max_data = max_data.date()
             
-            # --- ⚙️ SIDEBAR ---
+            # --- SIDEBAR ---
             with st.sidebar:
                 st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
                 st.divider()
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
-                
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v51")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v52")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 busca_ped = st.text_input("🔍 Pedido / Nº:")
-                
-                with st.popover("⚙️ Personalizar Colunas", use_container_width=True):
-                    col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
-                
+                with st.popover("⚙️ Personalizar Colunas", use_container_width=True): col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 st.divider()
                 df_f_export = df_cliente.copy()
                 csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
                 st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
-                
-                if st.button("🚪 Sair", use_container_width=True):
-                    st.session_state.logado = False
-                    st.rerun()
+                if st.button("🚪 Sair", use_container_width=True): st.session_state.logado = False; st.rerun()
 
             # --- CSS DINÂMICO ---
             bg_app = "#0e1117" if modo_escuro else "#f0f2f6"
@@ -288,19 +275,17 @@ else:
             </style>
             """, unsafe_allow_html=True)
 
-            # --- FILTROS BASE ---
+            # --- FILTROS ---
             df_f = df_cliente.copy()
             if isinstance(datas_sel, tuple):
                 if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
                 elif len(datas_sel) == 1: df_f = df_f[df_f['DATA_OBJ'] == datas_sel[0]]
             else: df_f = df_f[df_f['DATA_OBJ'] == datas_sel]
-
             if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
             if busca_ped:
                 b = str(busca_ped).upper()
                 df_f = df_f[df_f['PEDIDO'].astype(str).str.contains(b) | df_f['NUMERO'].astype(str).str.contains(b)]
 
-            # --- ORDENAÇÃO DE PRIORIDADE ---
             if not df_f.empty:
                 def calcular_prioridade(row):
                     score = 0
@@ -334,12 +319,9 @@ else:
             with c4: st.button(f"🚨 ATRASADOS\n\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
             with c5: st.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
 
-            # =======================================================
-            # 📊 MÁGICA BI: GRÁFICOS GERENCIAIS RÁPIDOS
-            # =======================================================
+            # 📊 GRÁFICOS GERENCIAIS RÁPIDOS
             st.markdown("<br>", unsafe_allow_html=True)
             col_bi1, col_bi2 = st.columns([1, 2])
-            
             with col_bi1:
                 st.markdown(f"<div class='dinamic-text' style='font-size:14px; font-weight:800; margin-bottom:10px;'>🎯 Progresso de Hoje</div>", unsafe_allow_html=True)
                 df_hoje_bi = df_cliente[df_cliente['DATA_OBJ'] == hoje_br]
@@ -349,9 +331,7 @@ else:
                     taxa = c_hoje / t_hoje
                     st.progress(taxa)
                     st.markdown(f"<div class='dinamic-text' style='font-size:12px; margin-top:-10px; text-align:right;'>{c_hoje} de {t_hoje} finalizados ({int(taxa*100)}%)</div>", unsafe_allow_html=True)
-                else:
-                    st.info("Nenhum pedido para hoje.")
-                    
+                else: st.info("Nenhum pedido para hoje.")
             with col_bi2:
                 st.markdown(f"<div class='dinamic-text' style='font-size:14px; font-weight:800; margin-bottom:10px;'>📊 Volume (Últimos 7 Dias)</div>", unsafe_allow_html=True)
                 limite_dias = hoje_br - timedelta(days=6)
@@ -361,114 +341,132 @@ else:
                     df_vol['DATA_OBJ'] = df_vol['DATA_OBJ'].apply(lambda x: x.strftime('%d/%m'))
                     df_vol.rename(columns={'DATA_OBJ': 'Data', 'PEDIDO': 'Cargas'}, inplace=True)
                     st.bar_chart(df_vol.set_index('Data'), height=130)
-                else:
-                    st.info("Sem dados recentes.")
+                else: st.info("Sem dados recentes.")
             st.markdown(f"<div class='dinamic-border' style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
+
             # =======================================================
+            # 📁 INTERFACE EM ABAS (Tabela vs Mapa)
+            # =======================================================
+            tab_grid, tab_map = st.tabs(["📋 Tabela de Monitoramento", "🗺️ Mapa de Operações (Top 15 Cidades)"])
+            
+            with tab_grid:
+                df_grid = df_f.copy()
+                if not df_grid.empty:
+                    if st.session_state.filtro_kpi == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue', na=False)]
+                    elif st.session_state.filtro_kpi == "FRUSTRADA": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]
+                    elif st.session_state.filtro_kpi == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)]
+                    elif st.session_state.filtro_kpi == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
 
-            df_grid = df_f.copy()
-            if not df_grid.empty:
-                if st.session_state.filtro_kpi == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue', na=False)]
-                elif st.session_state.filtro_kpi == "FRUSTRADA": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]
-                elif st.session_state.filtro_kpi == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)]
-                elif st.session_state.filtro_kpi == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
-
-                df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
-                df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
-                
-                # =======================================================
-                # 🌡️ MÁGICA: TERMÔMETRO DE SLA (CORES NAS CÉLULAS)
-                # =======================================================
-                status_jscode = JsCode("""
-                function(params) {
-                    let val = params.value || '';
-                    if (val.includes('Entregue')) {
-                        return {'backgroundColor': 'rgba(16, 185, 129, 0.15)', 'color': '#10B981', 'fontWeight': '900'};
-                    } else if (val.includes('Frustrada') || val.includes('ATRASADO')) {
-                        return {'backgroundColor': 'rgba(239, 68, 68, 0.15)', 'color': '#EF4444', 'fontWeight': '900'};
-                    } else if (val.includes('Em Rota')) {
-                        return {'backgroundColor': 'rgba(245, 158, 11, 0.15)', 'color': '#F59E0B', 'fontWeight': '900'};
-                    } else if (val.includes('Coletado') || val.includes('Conferido') || val.includes('Triagem')) {
-                        return {'backgroundColor': 'rgba(59, 130, 246, 0.15)', 'color': '#3B82F6', 'fontWeight': '900'};
-                    }
-                    return {'fontWeight': 'bold'};
-                }
-                """)
-                # =======================================================
-
-                gb = GridOptionsBuilder.from_dataframe(df_final)
-                gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
-                gb.configure_selection('single', use_checkbox=False)
-                
-                for col in df_final.columns:
-                    header_name = col.upper()
-                    if col == 'DATA_LIMITE': header_name = "PREVISÃO ENTREGA"
-                    elif col == 'DATA_ENTREGA': header_name = "DATA ENTREGA"
-                    elif col == 'FOTO_URL': header_name = "FOTO"
+                    df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
+                    df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
+                    gb = GridOptionsBuilder.from_dataframe(df_final)
+                    gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
+                    gb.configure_selection('single', use_checkbox=False)
                     
-                    if col == 'STATUS':
-                        gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
-                    elif col == 'FOTO_URL':
-                        link_jscode = JsCode("""
-                        class LinkCellRenderer { 
-                            init(params) { 
-                                this.eGui = document.createElement('div'); 
-                                this.eGui.style.textAlign = 'center'; 
-                                if (params.value && params.value !== '' && params.value !== 'nan') { 
-                                    this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 18px; display: block; margin-top: 2px;" title="Clique para ver a foto">📸</span>'; 
-                                    this.eGui.onclick = () => {
-                                        let modal = document.createElement('div');
-                                        modal.style.position = 'fixed';
-                                        modal.style.zIndex = '999999';
-                                        modal.style.left = '0'; modal.style.top = '0';
-                                        modal.style.width = '100vw'; modal.style.height = '100vh';
-                                        modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
-                                        modal.style.display = 'flex'; modal.style.flexDirection = 'column';
-                                        modal.style.justifyContent = 'center'; modal.style.alignItems = 'center';
-                                        modal.style.cursor = 'zoom-out';
-                                        let img = document.createElement('img');
-                                        img.src = params.value; img.style.maxWidth = '90%'; img.style.maxHeight = '85%';
-                                        img.style.borderRadius = '8px'; img.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
-                                        let txt = document.createElement('div');
-                                        txt.innerText = '✖ Clique em qualquer lugar para fechar';
-                                        txt.style.color = '#ffffff'; txt.style.marginTop = '15px';
-                                        txt.style.fontFamily = 'sans-serif'; txt.style.fontSize = '14px'; txt.style.fontWeight = 'bold';
-                                        modal.appendChild(img); modal.appendChild(txt);
-                                        modal.onclick = () => { document.body.removeChild(modal); };
-                                        document.body.appendChild(modal);
-                                    };
-                                } 
-                            } 
-                            getGui() { return this.eGui; } 
-                        }
-                        """)
-                        gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70, minWidth=70)
-                    elif col == 'DETALHES': gb.configure_column(col, headerName=header_name, width=300, minWidth=250, tooltipField="DETALHES")
-                    elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60, minWidth=60)
-                    elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90, minWidth=90)
-                    elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95, minWidth=95)
-                    elif col == 'LABORATORIO': gb.configure_column(col, headerName=header_name, width=400, minWidth=350, tooltipField="LABORATORIO")
-                    elif col == 'BAIRRO': gb.configure_column(col, headerName=header_name, width=250, minWidth=200, tooltipField="BAIRRO")
-                    elif col == 'CIDADE': gb.configure_column(col, headerName=header_name, width=180, minWidth=150)
-                    else: gb.configure_column(col, headerName=header_name)
+                    status_jscode = JsCode("""
+                    function(params) {
+                        let val = params.value || '';
+                        if (val.includes('Entregue')) { return {'backgroundColor': 'rgba(16, 185, 129, 0.15)', 'color': '#10B981', 'fontWeight': '900'}; } 
+                        else if (val.includes('Frustrada') || val.includes('ATRASADO')) { return {'backgroundColor': 'rgba(239, 68, 68, 0.15)', 'color': '#EF4444', 'fontWeight': '900'}; } 
+                        else if (val.includes('Em Rota')) { return {'backgroundColor': 'rgba(245, 158, 11, 0.15)', 'color': '#F59E0B', 'fontWeight': '900'}; } 
+                        else if (val.includes('Coletado') || val.includes('Conferido') || val.includes('Triagem')) { return {'backgroundColor': 'rgba(59, 130, 246, 0.15)', 'color': '#3B82F6', 'fontWeight': '900'}; }
+                        return {'fontWeight': 'bold'};
+                    }
+                    """)
+                    
+                    for col in df_final.columns:
+                        header_name = col.upper()
+                        if col == 'DATA_LIMITE': header_name = "PREVISÃO ENTREGA"
+                        elif col == 'DATA_ENTREGA': header_name = "DATA ENTREGA"
+                        elif col == 'FOTO_URL': header_name = "FOTO"
+                        
+                        if col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
+                        elif col == 'FOTO_URL':
+                            link_jscode = JsCode("""
+                            class LinkCellRenderer { 
+                                init(params) { 
+                                    this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; 
+                                    if (params.value && params.value !== '' && params.value !== 'nan') { 
+                                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 18px; display: block; margin-top: 2px;" title="Clique para ver a foto">📸</span>'; 
+                                        this.eGui.onclick = () => {
+                                            let modal = document.createElement('div');
+                                            modal.style.position = 'fixed'; modal.style.zIndex = '999999';
+                                            modal.style.left = '0'; modal.style.top = '0'; modal.style.width = '100vw'; modal.style.height = '100vh';
+                                            modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
+                                            modal.style.display = 'flex'; modal.style.flexDirection = 'column'; modal.style.justifyContent = 'center'; modal.style.alignItems = 'center'; modal.style.cursor = 'zoom-out';
+                                            let img = document.createElement('img');
+                                            img.src = params.value; img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '8px'; img.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
+                                            let txt = document.createElement('div');
+                                            txt.innerText = '✖ Clique em qualquer lugar para fechar'; txt.style.color = '#ffffff'; txt.style.marginTop = '15px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontSize = '14px'; txt.style.fontWeight = 'bold';
+                                            modal.appendChild(img); modal.appendChild(txt);
+                                            modal.onclick = () => { document.body.removeChild(modal); }; document.body.appendChild(modal);
+                                        };
+                                    } 
+                                } getGui() { return this.eGui; } 
+                            }
+                            """)
+                            gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70, minWidth=70)
+                        elif col == 'DETALHES': gb.configure_column(col, headerName=header_name, width=300, minWidth=250, tooltipField="DETALHES")
+                        elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60, minWidth=60)
+                        elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90, minWidth=90)
+                        elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95, minWidth=95)
+                        elif col == 'LABORATORIO': gb.configure_column(col, headerName=header_name, width=400, minWidth=350, tooltipField="LABORATORIO")
+                        elif col == 'BAIRRO': gb.configure_column(col, headerName=header_name, width=250, minWidth=200, tooltipField="BAIRRO")
+                        elif col == 'CIDADE': gb.configure_column(col, headerName=header_name, width=180, minWidth=150)
+                        else: gb.configure_column(col, headerName=header_name)
 
-                if modo_escuro:
-                    grid_css = {
-                        ".ag-root-wrapper": {"background-color": "#0e1117 !important", "border": "none !important"},
-                        ".ag-header": {"background-color": "#1e293b !important", "border-bottom": "1px solid #334155 !important"},
-                        ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#f8fafc !important"},
-                        ".ag-cell": {"font-size": "11px !important", "color": "#cbd5e1 !important", "border-bottom": "1px solid #1e293b !important"},
-                        ".ag-row-even": {"background-color": "#0f172a !important"}, 
-                        ".ag-row-odd": {"background-color": "#1e293b !important"},  
-                        ".ag-row-hover": {"background-color": "#334155 !important"} 
-                    }
+                    if modo_escuro:
+                        grid_css = {
+                            ".ag-root-wrapper": {"background-color": "#0e1117 !important", "border": "none !important"},
+                            ".ag-header": {"background-color": "#1e293b !important", "border-bottom": "1px solid #334155 !important"},
+                            ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#f8fafc !important"},
+                            ".ag-cell": {"font-size": "11px !important", "color": "#cbd5e1 !important", "border-bottom": "1px solid #1e293b !important"},
+                            ".ag-row-even": {"background-color": "#0f172a !important"}, ".ag-row-odd": {"background-color": "#1e293b !important"}, ".ag-row-hover": {"background-color": "#334155 !important"} 
+                        }
+                    else:
+                        grid_css = {
+                            ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#334155"},
+                            ".ag-cell": {"font-size": "11px !important", "color": "#475569"},
+                            ".ag-row-even": {"background-color": "#f8fafc !important"}, ".ag-row-odd": {"background-color": "#ffffff !important"}, ".ag-row-hover": {"background-color": "#e2e8f0 !important"} 
+                        }
+                    AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=False, height=520)
+                else: st.warning("Nenhum pedido encontrado.")
+
+            # --- MAPA INTELIGENTE ---
+            with tab_map:
+                if not df_f.empty and 'CIDADE' in df_f.columns and 'UF' in df_f.columns:
+                    st.markdown("<br><p class='dinamic-text'>📍 <i>As bolhas representam as 15 cidades com maior volume de pedidos no período selecionado.</i></p>", unsafe_allow_html=True)
+                    
+                    def cor_status(s):
+                        if 'Entregue' in s: return '#10B981' # Verde
+                        if 'Frustrada' in s or 'ATRASADO' in s: return '#EF4444' # Vermelho
+                        if 'Rota' in s: return '#F59E0B' # Laranja
+                        return '#3B82F6' # Azul
+                    
+                    df_map_base = df_f.copy()
+                    df_map_base['color'] = df_map_base['STATUS_DISPLAY'].apply(cor_status)
+                    
+                    df_g = df_map_base.groupby(['CIDADE', 'UF', 'color']).size().reset_index(name='count')
+                    df_g = df_g.nlargest(15, 'count') # Trava em 15 para não engasgar a pesquisa
+                    df_g['size'] = df_g['count'] * 150 
+                    
+                    with st.spinner("Sincronizando satélites... 🛰️"):
+                        lats, lons = [], []
+                        for _, row in df_g.iterrows():
+                            lat, lon = buscar_lat_lon(row['CIDADE'], row['UF'])
+                            lats.append(lat)
+                            lons.append(lon)
+                            
+                        df_g['lat'] = lats
+                        df_g['lon'] = lons
+                        df_plot = df_g.dropna(subset=['lat', 'lon'])
+                        
+                        if not df_plot.empty:
+                            try:
+                                st.map(df_plot, latitude='lat', longitude='lon', color='color', size='size', use_container_width=True)
+                            except:
+                                st.map(df_plot) # Fallback para versões mais antigas do Streamlit
+                        else:
+                            st.info("Não foi possível geolocalizar as cidades desta seleção.")
                 else:
-                    grid_css = {
-                        ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#334155"},
-                        ".ag-cell": {"font-size": "11px !important", "color": "#475569"},
-                        ".ag-row-even": {"background-color": "#f8fafc !important"}, 
-                        ".ag-row-odd": {"background-color": "#ffffff !important"},  
-                        ".ag-row-hover": {"background-color": "#e2e8f0 !important"} 
-                    }
-                AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=False, height=520)
-            else: st.warning("Nenhum pedido encontrado.")
+                    st.info("Nenhuma cidade disponível para mapeamento.")
