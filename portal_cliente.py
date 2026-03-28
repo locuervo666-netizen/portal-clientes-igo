@@ -10,7 +10,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS (COMPACTO)
+# 🎨 1. CONFIGURAÇÃO E CSS (BLINDAGEM ANTI-BRANCO)
 # =======================================================
 st.set_page_config(page_title="Monitoramento IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
@@ -19,37 +19,29 @@ st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #f0f2f6; font-family: 'Inter', sans-serif; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
-    
-    /* ✂️ Redução agressiva de espaços vazios no topo */
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    /* 🗜️ Diminuição dos Cards Coloridos */
-    div.stButton > button {
-        height: 85px !important;
+    /* 🎯 BLINDAGEM DOS BOTÕES-CARDS (Não usa mais nomes sujeitos a falhas) */
+    .main div[data-testid="column"] .stButton > button {
+        height: 90px !important;
         border-radius: 12px !important;
         border: none !important;
         color: white !important;
-        padding: 10px !important;
         box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important;
         transition: all 0.2s ease !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        justify-content: center !important;
     }
-    div.stButton > button:hover { transform: translateY(-3px) !important; box-shadow: 0 6px 15px rgba(0,0,0,0.15) !important; opacity: 0.95; }
+    .main div[data-testid="column"] .stButton > button:hover { transform: translateY(-3px) !important; box-shadow: 0 6px 15px rgba(0,0,0,0.15) !important; opacity: 0.95; }
 
-    .st-key-kpi_total > button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; }
-    .st-key-kpi_frus > button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; }
-    .st-key-kpi_atra > button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; }
-    .st-key-kpi_hoje > button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; }
+    /* Cores das 4 Caixas pintadas por posição */
+    .main div[data-testid="column"]:nth-of-type(1) .stButton > button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; }
+    .main div[data-testid="column"]:nth-of-type(2) .stButton > button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; }
+    .main div[data-testid="column"]:nth-of-type(3) .stButton > button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; }
+    .main div[data-testid="column"]:nth-of-type(4) .stButton > button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; }
 
-    .stButton p { font-weight: 900 !important; font-size: 13px !important; font-family: 'Inter', sans-serif !important; margin: 0 !important; line-height: 1.2 !important; }
+    /* Força o texto dentro do botão a ficar correto */
+    .main div[data-testid="column"] .stButton p { font-weight: 900 !important; font-size: 15px !important; font-family: 'Inter', sans-serif !important; line-height: 1.3 !important; }
     
-    /* 🔤 Título menor e limpo */
     h2 { color: #0f172a; font-weight: 900; font-size: 24px !important; margin-bottom: -15px !important; padding-bottom: 0px !important; }
-    
-    /* 🟢 Status de sincronização flutuando à direita do título */
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
     .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
     </style>
@@ -119,8 +111,7 @@ def carregar_dados_nuvem():
             if 'DATA' in df.columns:
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
-    except Exception as e:
-        st.error(f"Sincronização offline: {e}")
+    except: pass
     return pd.DataFrame()
 
 if 'logado' not in st.session_state: st.session_state.logado = False
@@ -145,7 +136,7 @@ if not st.session_state.logado:
                 else: st.error("Usuário ou senha incorretos.")
 else:
     # =======================================================
-    # 🚀 4. PAINEL PRINCIPAL (DESIGN COMPACTO)
+    # 🚀 4. PAINEL PRINCIPAL
     # =======================================================
     df_raw = carregar_dados_nuvem()
     if not df_raw.empty:
@@ -183,7 +174,6 @@ else:
         ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
         colunas_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
         
-        # --- SIDEBAR LIMPA COM BOTÃO DE EXPORTAÇÃO ---
         with st.sidebar:
             st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
             st.divider()
@@ -197,9 +187,7 @@ else:
                 col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
             
             st.divider()
-            # 📥 MUDANÇA AQUI: Botão de exportar foi para a barra lateral!
-            df_f_export = df_cliente.copy()
-            csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
+            csv_data = df_cliente[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
             st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
@@ -207,7 +195,6 @@ else:
                 st.session_state.logado = False
                 st.rerun()
 
-        # Filtros
         df_f = df_cliente.copy()
         if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
         if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
@@ -231,7 +218,6 @@ else:
         
         df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
 
-        # 🔤 MUDANÇA AQUI: Título menor e sincronização lado a lado
         st.markdown(f"""
         <div class="header-container">
             <h2>Monitoramento {st.session_state.cliente}</h2>
@@ -266,32 +252,24 @@ else:
         df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
         df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
 
-        # --- AG-GRID OTIMIZADO COM CABEÇALHOS EM MAIÚSCULO ---
         gb = GridOptionsBuilder.from_dataframe(df_final)
         gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
         gb.configure_selection('single', use_checkbox=False)
         
-        # 🔤 Força TODAS as colunas para MAIÚSCULAS e Renomeia as específicas
         for col in df_final.columns:
             header_name = col.upper()
             if col == 'DATA_LIMITE': header_name = "PREVISÃO ENTREGA"
             elif col == 'DATA_ENTREGA': header_name = "DATA ENTREGA"
             elif col == 'FOTO_URL': header_name = "FOTO"
             
-            # Se for foto, aplica o renderizador do botão, senão, apenas formata o nome
             if col == 'FOTO_URL':
                 link_jscode = JsCode("""class LinkCellRenderer { init(params) { this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; if (params.value && params.value !== '' && params.value !== 'nan') { this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 2px;">📸</a>'; } } getGui() { return this.eGui; } }""")
                 gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70)
-            elif col == 'DETALHES':
-                gb.configure_column(col, headerName=header_name, width=250, tooltipField="DETALHES")
-            elif col == 'UF':
-                gb.configure_column(col, headerName=header_name, width=60)
-            elif col == 'DATA':
-                gb.configure_column(col, headerName=header_name, width=90)
-            elif col == 'PEDIDO':
-                gb.configure_column(col, headerName=header_name, width=95)
-            else:
-                gb.configure_column(col, headerName=header_name)
+            elif col == 'DETALHES': gb.configure_column(col, headerName=header_name, width=250, tooltipField="DETALHES")
+            elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60)
+            elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90)
+            elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95)
+            else: gb.configure_column(col, headerName=header_name)
 
         grid_css = {
             ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold"},
