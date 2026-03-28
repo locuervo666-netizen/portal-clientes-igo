@@ -22,7 +22,7 @@ st.markdown("""
     
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    /* 🎯 BOTÕES COLORIDOS E CLICÁVEIS (AGORA SÃO 5) */
+    /* 🎯 BOTÕES COLORIDOS E CLICÁVEIS */
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {
         height: 75px !important;
         border-radius: 10px !important;
@@ -261,21 +261,14 @@ else:
         # =======================================================
         def calcular_prioridade(row):
             score = 0
-            # Regra 1: Se NÃO for de hoje, vai lá pro final da fila (+1000 pontos)
-            if row.get('DATA_OBJ') != hoje_br: 
-                score += 1000 
-            
-            # Regra 2: Se NÃO for Pendente, vai pro final da fila do dia (+100 pontos)
+            if row.get('DATA_OBJ') != hoje_br: score += 1000 
             status_str = str(row.get('STATUS_DISPLAY', ''))
-            if 'Pendente' not in status_str and '⏳' not in status_str: 
-                score += 100
-                
+            if 'Pendente' not in status_str and '⏳' not in status_str: score += 100
             return score
 
         df_f['PRIORIDADE_TELA'] = df_f.apply(calcular_prioridade, axis=1)
         df_f['INDEX_ORIGINAL'] = df_f.index
         df_f = df_f.sort_values(by=['PRIORIDADE_TELA', 'INDEX_ORIGINAL'])
-        # =======================================================
 
         st.markdown(f"""
         <div class="header-container" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: -15px;">
@@ -290,7 +283,6 @@ else:
         n_atra = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)])
         n_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br])
 
-        # 🚀 AGORA SÃO 5 COLUNAS PARA OS KPIS
         c1, c2, c3, c4, c5 = st.columns(5)
         def click_kpi(valor): st.session_state.filtro_kpi = valor
 
@@ -329,16 +321,24 @@ else:
             
             if col == 'FOTO_URL':
                 link_jscode = JsCode("""class LinkCellRenderer { init(params) { this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; if (params.value && params.value !== '' && params.value !== 'nan') { this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 2px;">📸</a>'; } } getGui() { return this.eGui; } }""")
-                gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70)
+                gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70, minWidth=70)
             elif col == 'DETALHES':
-                gb.configure_column(col, headerName=header_name, width=250, tooltipField="DETALHES")
-            elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60)
-            elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90)
-            elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95)
-            elif col == 'LABORATORIO': gb.configure_column(col, headerName=header_name, width=450, tooltipField="LABORATORIO")
-            elif col == 'BAIRRO': gb.configure_column(col, headerName=header_name, width=250, tooltipField="BAIRRO")
-            elif col == 'CIDADE': gb.configure_column(col, headerName=header_name, width=180)
-            else: gb.configure_column(col, headerName=header_name)
+                gb.configure_column(col, headerName=header_name, width=300, minWidth=250, tooltipField="DETALHES")
+            elif col == 'UF': 
+                gb.configure_column(col, headerName=header_name, width=60, minWidth=60)
+            elif col == 'DATA': 
+                gb.configure_column(col, headerName=header_name, width=90, minWidth=90)
+            elif col == 'PEDIDO': 
+                gb.configure_column(col, headerName=header_name, width=95, minWidth=95)
+            elif col == 'LABORATORIO': 
+                # 🎯 TRAVA DE SEGURANÇA (minWidth): OBRIGA o sistema a não amassar o nome!
+                gb.configure_column(col, headerName=header_name, width=400, minWidth=350, tooltipField="LABORATORIO")
+            elif col == 'BAIRRO': 
+                gb.configure_column(col, headerName=header_name, width=250, minWidth=200, tooltipField="BAIRRO")
+            elif col == 'CIDADE': 
+                gb.configure_column(col, headerName=header_name, width=180, minWidth=150)
+            else: 
+                gb.configure_column(col, headerName=header_name)
 
         # 🦓 ZEBRA BLINDADA
         grid_css = {
