@@ -10,7 +10,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS ELITE (5 BLOCOS)
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
 # =======================================================
 st.set_page_config(page_title="Monitoramento IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
@@ -18,6 +18,7 @@ st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { transition: background-color 0.3s ease; font-family: 'Inter', sans-serif; }
+    [data-testid="stSidebar"] { transition: background-color 0.3s ease; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
     
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
@@ -225,31 +226,21 @@ else:
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
             colunas_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
             
-            # --- 🛡️ CALENDÁRIO BLINDADO (V46) ---
             min_data = df_cliente['DATA_OBJ'].dropna().min() if ('DATA_OBJ' in df_cliente.columns and not df_cliente['DATA_OBJ'].dropna().empty) else hoje_br
             max_data = df_cliente['DATA_OBJ'].dropna().max() if ('DATA_OBJ' in df_cliente.columns and not df_cliente['DATA_OBJ'].dropna().empty) else hoje_br
             
-            # Garante que as variáveis são datas puras para não bugar o Streamlit
             if isinstance(min_data, pd.Timestamp): min_data = min_data.date()
             if isinstance(max_data, pd.Timestamp): max_data = max_data.date()
             
+            # --- ⚙️ SIDEBAR COM MODO ESCURO IMERSIVO ---
             with st.sidebar:
                 st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
                 st.divider()
                 
-                modo_escuro = st.toggle("🌙 Modo Escuro", value=False)
+                modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
                 
-                # A chave "key" é o que limpa o cache e resolve o erro!
-                datas_sel = st.date_input(
-                    "🗓️ Período:", 
-                    value=(min_data, max_data), 
-                    min_value=min_data, 
-                    max_value=max_data, 
-                    format="DD/MM/YYYY",
-                    key="reset_calendario_v46" 
-                )
-                
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v47")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 busca_ped = st.text_input("🔍 Pedido / Nº:")
                 
@@ -261,21 +252,28 @@ else:
                 csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
                 st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
                 
-                st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("🚪 Sair", use_container_width=True):
                     st.session_state.logado = False
                     st.rerun()
 
-            # --- CSS DINÂMICO (MODO ESCURO) ---
+            # --- CSS DINÂMICO (CONTEMPLANDO SIDEBAR) ---
             bg_app = "#0e1117" if modo_escuro else "#f0f2f6"
+            bg_side = "#161b22" if modo_escuro else "#ffffff"
             txt_main = "#f8fafc" if modo_escuro else "#0f172a"
+            txt_side = "#cbd5e1" if modo_escuro else "#334155"
             border_c = "#334155" if modo_escuro else "#e2e8f0"
             
             st.markdown(f"""
             <style>
             [data-testid="stAppViewContainer"] {{ background-color: {bg_app} !important; }}
+            [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c}; }}
+            [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] label {{ color: {txt_side} !important; }}
             .dinamic-text {{ color: {txt_main} !important; }}
             .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
+            
+            /* Ajuste para inputs no modo escuro */
+            [data-testid="stSidebar"] div[data-baseweb="select"] > div {{ background-color: {bg_app} !important; border-color: {border_c} !important; }}
+            [data-testid="stSidebar"] input {{ background-color: {bg_app} !important; color: white !important; }}
             </style>
             """, unsafe_allow_html=True)
 
@@ -284,8 +282,7 @@ else:
             if isinstance(datas_sel, tuple):
                 if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
                 elif len(datas_sel) == 1: df_f = df_f[df_f['DATA_OBJ'] == datas_sel[0]]
-            else:
-                df_f = df_f[df_f['DATA_OBJ'] == datas_sel]
+            else: df_f = df_f[df_f['DATA_OBJ'] == datas_sel]
 
             if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
             if busca_ped:
@@ -300,7 +297,6 @@ else:
                     status_str = str(row.get('STATUS_DISPLAY', ''))
                     if 'Pendente' not in status_str and '⏳' not in status_str: score += 100
                     return score
-
                 df_f['PRIORIDADE_TELA'] = df_f.apply(calcular_prioridade, axis=1)
                 df_f['INDEX_ORIGINAL'] = df_f.index
                 df_f = df_f.sort_values(by=['PRIORIDADE_TELA', 'INDEX_ORIGINAL'])
@@ -329,22 +325,13 @@ else:
 
             df_grid = df_f.copy()
             if not df_grid.empty:
-                if st.session_state.filtro_kpi == "ENTREGUE":
-                    df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue', na=False)]
-                    st.info("🎯 Exibindo apenas **Pedidos Entregues**. Clique no botão azul (TOTAL) para limpar.")
-                elif st.session_state.filtro_kpi == "FRUSTRADA":
-                    df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]
-                    st.info("🎯 Exibindo apenas **Coletas Frustradas**. Clique no botão azul (TOTAL) para limpar.")
-                elif st.session_state.filtro_kpi == "ATRASADO":
-                    df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)]
-                    st.warning("🚨 Exibindo apenas **Pedidos Atrasados**. Clique no botão azul (TOTAL) para limpar.")
-                elif st.session_state.filtro_kpi == "HOJE":
-                    df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
-                    st.success("📅 Exibindo apenas **Pedidos de Hoje**. Clique no botão azul (TOTAL) para limpar.")
+                if st.session_state.filtro_kpi == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue', na=False)]
+                elif st.session_state.filtro_kpi == "FRUSTRADA": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]
+                elif st.session_state.filtro_kpi == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)]
+                elif st.session_state.filtro_kpi == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
 
                 df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
                 df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
-
                 gb = GridOptionsBuilder.from_dataframe(df_final)
                 gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
                 gb.configure_selection('single', use_checkbox=False)
@@ -367,35 +354,20 @@ else:
                                         let modal = document.createElement('div');
                                         modal.style.position = 'fixed';
                                         modal.style.zIndex = '999999';
-                                        modal.style.left = '0';
-                                        modal.style.top = '0';
-                                        modal.style.width = '100vw';
-                                        modal.style.height = '100vh';
+                                        modal.style.left = '0'; modal.style.top = '0';
+                                        modal.style.width = '100vw'; modal.style.height = '100vh';
                                         modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
-                                        modal.style.display = 'flex';
-                                        modal.style.flexDirection = 'column';
-                                        modal.style.justifyContent = 'center';
-                                        modal.style.alignItems = 'center';
+                                        modal.style.display = 'flex'; modal.style.flexDirection = 'column';
+                                        modal.style.justifyContent = 'center'; modal.style.alignItems = 'center';
                                         modal.style.cursor = 'zoom-out';
-                                        
                                         let img = document.createElement('img');
-                                        img.src = params.value;
-                                        img.style.maxWidth = '90%';
-                                        img.style.maxHeight = '85%';
-                                        img.style.borderRadius = '8px';
-                                        img.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
-                                        
+                                        img.src = params.value; img.style.maxWidth = '90%'; img.style.maxHeight = '85%';
+                                        img.style.borderRadius = '8px'; img.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
                                         let txt = document.createElement('div');
                                         txt.innerText = '✖ Clique em qualquer lugar para fechar';
-                                        txt.style.color = '#ffffff';
-                                        txt.style.marginTop = '15px';
-                                        txt.style.fontFamily = 'sans-serif';
-                                        txt.style.fontSize = '14px';
-                                        txt.style.fontWeight = 'bold';
-                                        
-                                        modal.appendChild(img);
-                                        modal.appendChild(txt);
-                                        
+                                        txt.style.color = '#ffffff'; txt.style.marginTop = '15px';
+                                        txt.style.fontFamily = 'sans-serif'; txt.style.fontSize = '14px'; txt.style.fontWeight = 'bold';
+                                        modal.appendChild(img); modal.appendChild(txt);
                                         modal.onclick = () => { document.body.removeChild(modal); };
                                         document.body.appendChild(modal);
                                     };
@@ -432,7 +404,5 @@ else:
                         ".ag-row-odd": {"background-color": "#ffffff !important"},  
                         ".ag-row-hover": {"background-color": "#e2e8f0 !important"} 
                     }
-
                 AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, fit_columns_on_grid_load=False, height=520)
-            else:
-                st.warning("Nenhum pedido encontrado com esses filtros.")
+            else: st.warning("Nenhum pedido encontrado.")
