@@ -11,8 +11,8 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
 
-# 🎯 SUA LOGO AQUI: Substitua o link abaixo pela URL da logo oficial da IGO Logística
-LOGO_IGO = "https://drive.google.com/file/d/10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY/view?usp=drivesdk" 
+# 🎯 AQUI ESTÁ A CORREÇÃO: O link agora é o de download direto do Google Drive!
+LOGO_IGO = "https://drive.google.com/uc?export=view&id=10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY"
 
 # =======================================================
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
@@ -267,7 +267,7 @@ else:
                 st.divider()
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v60")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v61")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True): col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 st.divider()
