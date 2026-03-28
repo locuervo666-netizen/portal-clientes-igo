@@ -10,6 +10,7 @@ from streamlit_autorefresh import st_autorefresh
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
+WHATSAPP_IGO = "5511947996371"  # 🎯 Telefone Oficial para abertura de chamados
 
 # =======================================================
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
@@ -228,7 +229,6 @@ else:
                 return res
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(tratar_status, axis=1)
 
-            # 🎯 ORDEM PADRÃO ALTERADA: DATA AGORA VEM PRIMEIRO
             ordem_padrao = ['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
             colunas_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
             
@@ -243,7 +243,7 @@ else:
                 st.divider()
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v57")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v58")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True): col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 st.divider()
@@ -276,7 +276,7 @@ else:
 
             # --- ⚙️ SIDEBAR (AÇÕES E MAPA RADAR) ---
             with st.sidebar:
-                # Botão WhatsApp
+                # Botão WhatsApp Geral
                 taxa_conclusao = int(((n_ent + n_frus) / n_tot) * 100) if n_tot > 0 else 0
                 texto_whatsapp = f"""*Resumo da Operação - {st.session_state.cliente}* 🚚
 🗓️ Data: {hoje_br.strftime('%d/%m/%Y')}
@@ -300,14 +300,13 @@ Atendimento IGO Logística."""
                 </a>
                 """, unsafe_allow_html=True)
                 
-                # Exportar Excel
                 df_f_export = df_cliente.copy()
                 csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
                 st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
                 
                 st.divider()
                 
-                # 🔥 MAPA COMO "RADAR" NA SIDEBAR
+                # MAPA RADAR NA SIDEBAR
                 st.markdown("<div class='dinamic-text' style='font-size:15px; font-weight:800; margin-bottom:5px;'>🗺️ Radar de Operação</div>", unsafe_allow_html=True)
                 st.markdown("<p style='font-size:11px; color:#888; margin-top:-5px; line-height:1.2;'>As bolhas mostram os focos de demanda no período.</p>", unsafe_allow_html=True)
                 if not df_f.empty and 'CIDADE' in df_f.columns and 'UF' in df_f.columns:
@@ -360,7 +359,7 @@ Atendimento IGO Logística."""
             </style>
             """, unsafe_allow_html=True)
 
-            # --- HEADER E KPIs DA TELA PRINCIPAL ---
+            # --- HEADER E KPIs ---
             st.markdown(f"""
             <div class="header-container dinamic-border" style="padding-bottom: 10px; margin-top: -15px;">
                 <h2 class="dinamic-text" style="margin: 0; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
@@ -392,7 +391,7 @@ Atendimento IGO Logística."""
             st.markdown(f"<div class='dinamic-border' style='margin-bottom: 15px; margin-top: 15px;'></div>", unsafe_allow_html=True)
 
             # =======================================================
-            # 📋 GRID PRINCIPAL (BUSCA + TABELA)
+            # 📋 GRID PRINCIPAL E BOTÕES DE CHAMADO (AÇÃO)
             # =======================================================
             col_busca, _ = st.columns([2, 1])
             with col_busca:
@@ -406,9 +405,12 @@ Atendimento IGO Logística."""
                 elif st.session_state.filtro_kpi == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
 
                 df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
-                df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
                 
-                # APLICA A BUSCA INTELIGENTE
+                # 🎯 Adiciona a Coluna de Chamado (Ação) vazia no começo da tabela
+                df_grid['CHAMADO'] = ''
+                colunas_grid = ['CHAMADO'] + [c for c in col_vis if c in df_grid.columns]
+                df_final = df_grid[colunas_grid]
+                
                 if busca_inteligente:
                     busca_lower = str(busca_inteligente).lower()
                     mask = df_final.astype(str).apply(lambda x: x.str.lower().str.contains(busca_lower)).any(axis=1)
@@ -418,6 +420,24 @@ Atendimento IGO Logística."""
                     gb = GridOptionsBuilder.from_dataframe(df_final)
                     gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
                     gb.configure_selection('single', use_checkbox=False)
+                    
+                    # 📲 MÁGICA DO WHATSAPP LINHA A LINHA
+                    wpp_jscode = JsCode(f"""
+                    class WppCellRenderer {{ 
+                        init(params) {{ 
+                            this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; 
+                            if (params.data && params.data.STATUS && params.data.STATUS.includes('ATRASADO')) {{ 
+                                let pedido = params.data.PEDIDO || 'N/A';
+                                let lab = params.data.LABORATORIO || 'N/A';
+                                let fone = '{WHATSAPP_IGO}';
+                                let msg = `🚨 *CHAMADO DE ATRASO* 🚨%0A%0AOlá equipe IGO Logística!%0APrecisamos verificar este pedido que consta como atrasado no painel:%0A%0A📦 *Pedido:* ${{pedido}}%0A🏥 *Laboratório:* ${{lab}}%0A%0APoderiam dar um retorno de urgência?`;
+                                let link = `https://api.whatsapp.com/send?phone=${{fone}}&text=${{msg}}`;
+                                this.eGui.innerHTML = `<a href="${{link}}" target="_blank" style="text-decoration: none; font-size: 16px; cursor: pointer; display: block; margin-top: 2px;" title="Abrir Chamado no WhatsApp">🆘</a>`;
+                            }} 
+                        }} 
+                        getGui() {{ return this.eGui; }} 
+                    }}
+                    """)
                     
                     status_jscode = JsCode("""
                     function(params) {
@@ -436,7 +456,9 @@ Atendimento IGO Logística."""
                         elif col == 'DATA_ENTREGA': header_name = "DATA ENTREGA"
                         elif col == 'FOTO_URL': header_name = "FOTO"
                         
-                        if col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
+                        # Fixa a coluna de Ação do lado esquerdo para não sumir na rolagem
+                        if col == 'CHAMADO': gb.configure_column(col, headerName="AÇÃO", cellRenderer=wpp_jscode, width=70, minWidth=70, pinned='left')
+                        elif col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
                         elif col == 'FOTO_URL':
                             link_jscode = JsCode("""
                             class LinkCellRenderer { 
