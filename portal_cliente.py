@@ -243,7 +243,7 @@ else:
                 st.divider()
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v58")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v59")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True): col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 st.divider()
@@ -288,7 +288,7 @@ else:
 
 📊 *Status do Dia:* {taxa_conclusao}% Concluído.
 
-Acesse o painel para ver detalhes.
+Aceda ao painel para ver detalhes.
 Atendimento IGO Logística."""
                 texto_codificado = urllib.parse.quote(texto_whatsapp)
                 link_whatsapp = f"https://api.whatsapp.com/send?text={texto_codificado}"
@@ -308,7 +308,7 @@ Atendimento IGO Logística."""
                 
                 # MAPA RADAR NA SIDEBAR
                 st.markdown("<div class='dinamic-text' style='font-size:15px; font-weight:800; margin-bottom:5px;'>🗺️ Radar de Operação</div>", unsafe_allow_html=True)
-                st.markdown("<p style='font-size:11px; color:#888; margin-top:-5px; line-height:1.2;'>As bolhas mostram os focos de demanda no período.</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size:11px; color:#888; margin-top:-5px; line-height:1.2;'>As bolhas mostram os focos de procura no período.</p>", unsafe_allow_html=True)
                 if not df_f.empty and 'CIDADE' in df_f.columns and 'UF' in df_f.columns:
                     def cor_status(s):
                         if 'Entregue' in s: return '#10B981'
@@ -321,7 +321,7 @@ Atendimento IGO Logística."""
                     df_g = df_g.nlargest(15, 'count')
                     df_g['size'] = df_g['count'] * 150 
                     
-                    with st.spinner("Sincronizando satélites... 🛰️"):
+                    with st.spinner("A sincronizar satélites... 🛰️"):
                         lats, lons = [], []
                         for _, row in df_g.iterrows():
                             lat, lon = buscar_lat_lon(row['CIDADE'], row['UF'])
@@ -391,7 +391,7 @@ Atendimento IGO Logística."""
             st.markdown(f"<div class='dinamic-border' style='margin-bottom: 15px; margin-top: 15px;'></div>", unsafe_allow_html=True)
 
             # =======================================================
-            # 📋 GRID PRINCIPAL E BOTÕES DE CHAMADO (AÇÃO)
+            # 📋 GRID PRINCIPAL E BOTÕES DE CHAMADO (AÇÃO COM CIDADE/UF)
             # =======================================================
             col_busca, _ = st.columns([2, 1])
             with col_busca:
@@ -406,7 +406,6 @@ Atendimento IGO Logística."""
 
                 df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
                 
-                # 🎯 Adiciona a Coluna de Chamado (Ação) vazia no começo da tabela
                 df_grid['CHAMADO'] = ''
                 colunas_grid = ['CHAMADO'] + [c for c in col_vis if c in df_grid.columns]
                 df_final = df_grid[colunas_grid]
@@ -421,7 +420,7 @@ Atendimento IGO Logística."""
                     gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
                     gb.configure_selection('single', use_checkbox=False)
                     
-                    # 📲 MÁGICA DO WHATSAPP LINHA A LINHA
+                    # 📲 MÁGICA DO WHATSAPP LINHA A LINHA (AGORA COM CIDADE E UF)
                     wpp_jscode = JsCode(f"""
                     class WppCellRenderer {{ 
                         init(params) {{ 
@@ -429,8 +428,10 @@ Atendimento IGO Logística."""
                             if (params.data && params.data.STATUS && params.data.STATUS.includes('ATRASADO')) {{ 
                                 let pedido = params.data.PEDIDO || 'N/A';
                                 let lab = params.data.LABORATORIO || 'N/A';
+                                let cidade = params.data.CIDADE || 'N/A';
+                                let uf = params.data.UF || 'N/A';
                                 let fone = '{WHATSAPP_IGO}';
-                                let msg = `🚨 *CHAMADO DE ATRASO* 🚨%0A%0AOlá equipe IGO Logística!%0APrecisamos verificar este pedido que consta como atrasado no painel:%0A%0A📦 *Pedido:* ${{pedido}}%0A🏥 *Laboratório:* ${{lab}}%0A%0APoderiam dar um retorno de urgência?`;
+                                let msg = `🚨 *CHAMADO DE ATRASO* 🚨%0A%0AOlá equipa IGO Logística!%0APrecisamos de verificar este pedido que consta como atrasado no painel:%0A%0A📦 *Pedido:* ${{pedido}}%0A🏥 *Laboratório:* ${{lab}}%0A📍 *Local:* ${{cidade}} - ${{uf}}%0A%0APoderiam dar um retorno de urgência?`;
                                 let link = `https://api.whatsapp.com/send?phone=${{fone}}&text=${{msg}}`;
                                 this.eGui.innerHTML = `<a href="${{link}}" target="_blank" style="text-decoration: none; font-size: 16px; cursor: pointer; display: block; margin-top: 2px;" title="Abrir Chamado no WhatsApp">🆘</a>`;
                             }} 
@@ -456,7 +457,6 @@ Atendimento IGO Logística."""
                         elif col == 'DATA_ENTREGA': header_name = "DATA ENTREGA"
                         elif col == 'FOTO_URL': header_name = "FOTO"
                         
-                        # Fixa a coluna de Ação do lado esquerdo para não sumir na rolagem
                         if col == 'CHAMADO': gb.configure_column(col, headerName="AÇÃO", cellRenderer=wpp_jscode, width=70, minWidth=70, pinned='left')
                         elif col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
                         elif col == 'FOTO_URL':
