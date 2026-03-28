@@ -12,7 +12,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # 🎯 SUA LOGO AQUI: Substitua o link abaixo pela URL da logo oficial da IGO Logística
-LOGO_IGO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png" 
+LOGO_IGO = "https://drive.google.com/file/d/10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY/view?usp=drivesdk" 
 
 # =======================================================
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
