@@ -22,7 +22,6 @@ st.markdown("""
     
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    /* 🎯 BOTÕES COLORIDOS E CLICÁVEIS */
     div.st-key-kpi_total button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {
         height: 75px !important;
         border-radius: 10px !important;
@@ -35,9 +34,7 @@ st.markdown("""
     }
     
     div.st-key-kpi_total button:hover, div.st-key-kpi_frus button:hover, div.st-key-kpi_atra button:hover, div.st-key-kpi_hoje button:hover { 
-        transform: translateY(-2px) !important; 
-        box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important; 
-        opacity: 0.95 !important; 
+        transform: translateY(-2px) !important; box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important; opacity: 0.95 !important; 
     }
 
     div.st-key-kpi_total button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; }
@@ -46,11 +43,7 @@ st.markdown("""
     div.st-key-kpi_hoje button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; }
     
     div.st-key-kpi_total button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
-        font-weight: 800 !important; 
-        font-size: 15px !important; 
-        font-family: 'Inter', sans-serif !important; 
-        margin: 0 !important;
-        color: #ffffff !important;
+        font-weight: 800 !important; font-size: 15px !important; font-family: 'Inter', sans-serif !important; margin: 0 !important; color: #ffffff !important;
     }
     
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
@@ -65,7 +58,7 @@ CLIENTES_CONFIG = {
 LOGO_PADRAO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
 
 # =======================================================
-# 🔗 2. MOTOR DE DADOS (AGORA COM BYPASS DE ROMANEIO!)
+# 🔗 2. MOTOR DE DADOS
 # =======================================================
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
@@ -93,14 +86,11 @@ def carregar_dados_nuvem():
                     
                     col_quem, col_obs, col_status_app = None, None, None
                     for c in cols_limpas:
-                        if 'QUEM' in c or 'ATEND' in c or 'RESP' in c: col_quem = c
+                        # 🎯 AGORA ELE BUSCA A PALAVRA 'RECEBEDOR' TAMBÉM!
+                        if 'QUEM' in c or 'ATEND' in c or 'RESP' in c or 'RECEB' in c: col_quem = c
                         if 'OBS' in c or 'MOTIV' in c: col_obs = c
                         if 'STATUS' == c: col_status_app = c
                         
-                    if not col_quem and len(cols_limpas) > 14: col_quem = cols_limpas[14]
-                    if not col_obs and len(cols_limpas) > 10: col_obs = cols_limpas[10]
-                    if not col_status_app and len(cols_limpas) > 3: col_status_app = cols_limpas[3]
-                    
                     if col_quem or col_obs or col_status_app:
                         cols_extract = ['PEDIDO']
                         renames = {'PEDIDO': 'PEDIDO'}
@@ -114,7 +104,6 @@ def carregar_dados_nuvem():
                         df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                         df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                         
-                        # 🚀 A MÁGICA: Separa o que é Pedido Individual do que é Lote (Romaneio)
                         df_app_ind = df_app_clean[~df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)]
                         df_app_rom = df_app_clean[df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)].copy()
                         df_app_rom.rename(columns={'PEDIDO': 'ROMANEIO'}, inplace=True)
@@ -123,15 +112,12 @@ def carregar_dados_nuvem():
                         if 'ROMANEIO' not in df.columns: df['ROMANEIO'] = ""
                         df['ROMANEIO'] = df['ROMANEIO'].astype(str).str.strip()
                         
-                        # Cola os dados individuais
                         df = pd.merge(df, df_app_ind, on='PEDIDO', how='left')
                         
-                        # Cola os dados de Romaneio e SOBREPÕE os individuais se existirem!
                         if not df_app_rom.empty:
                             df = pd.merge(df, df_app_rom, on='ROMANEIO', how='left', suffixes=('', '_R'))
                             for c in ['APP_STATUS', 'APP_QUEM', 'APP_OBS']:
                                 if c in df.columns and f"{c}_R" in df.columns:
-                                    # O Romaneio é Soberano!
                                     df[c] = df[f"{c}_R"].replace("", pd.NA).combine_first(df[c].replace("", pd.NA)).fillna("")
             except: pass
             
@@ -174,11 +160,27 @@ else:
         if 'FOTO' in df_cliente.columns:
             df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
 
-        def processar_detalhes(row):
+        # 🧠 A MÁGICA: O FUNIL MATEMÁTICO
+        def definir_status_real(row):
             s_db = str(row.get('STATUS', '')).strip().upper()
             s_app = str(row.get('APP_STATUS', '')).strip().upper()
-            s = s_app if s_app in ['ENTREGUE', 'FRUSTRADA', 'COLETADO', 'CANCELADO'] else s_db
             
+            # Dá nota para o quão avançado está o pedido
+            def peso(st):
+                if any(x in st for x in ['ENTREGUE', 'FRUSTRAD', 'CANCELAD']): return 5
+                if any(x in st for x in ['ROTA', 'ENTREGA']): return 4
+                if any(x in st for x in ['CONFERIDO', 'TRIAGEM']): return 3
+                if 'COLETADO' in st: return 2
+                if 'PENDENTE' in st: return 1
+                return 0
+                
+            # O sistema sempre escolhe o status que andou mais pra frente!
+            return s_app if peso(s_app) >= peso(s_db) else s_db
+            
+        df_cliente['STATUS_REAL'] = df_cliente.apply(definir_status_real, axis=1)
+
+        def processar_detalhes(row):
+            s = str(row.get('STATUS_REAL', '')).upper()
             if 'FRUSTRADA' in s:
                 resp = str(row.get('APP_QUEM', '')).strip()
                 obs = str(row.get('APP_OBS', '')).strip()
@@ -236,11 +238,7 @@ else:
             df_f = df_f[df_f['PEDIDO'].astype(str).str.contains(b) | df_f['NUMERO'].astype(str).str.contains(b)]
 
         def tratar_status(row):
-            # 🎯 MÁGICA: Se o AppSheet tiver 'ENTREGUE', o Portal obedece o AppSheet, não a Memória!
-            s_db = str(row.get('STATUS', '')).strip().upper()
-            s_app = str(row.get('APP_STATUS', '')).strip().upper()
-            
-            s = s_app if s_app in ['ENTREGUE', 'FRUSTRADA', 'COLETADO', 'CANCELADO'] else s_db
+            s = str(row.get('STATUS_REAL', '')).strip().upper()
             previsao = str(row.get('DATA_LIMITE', '')).strip()
             
             if 'ENTREGUE' in s: res = '✅ Entregue'
