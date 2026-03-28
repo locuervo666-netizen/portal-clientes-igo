@@ -25,7 +25,6 @@ st.markdown("""
     
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    /* 🎯 BOTÕES COLORIDOS DOS KPIs */
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {
         height: 75px !important; border-radius: 10px !important; border: none !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important; transition: all 0.2s ease !important;
@@ -44,8 +43,6 @@ st.markdown("""
     }
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
     .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
-    
-    /* Tabs Customization */
     button[data-baseweb="tab"] { font-size: 16px !important; font-weight: 700 !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -59,7 +56,7 @@ LOGO_PADRAO = "https://cdn-icons-png.flaticon.com/512/1532/1532692.png"
 # =======================================================
 # 📍 GEOLOCALIZADOR NATIVO (MAPA)
 # =======================================================
-@st.cache_data(ttl=86400) # Guarda a cidade na memória por 24h para não travar
+@st.cache_data(ttl=86400)
 def buscar_lat_lon(cidade, uf):
     try:
         city_enc = urllib.parse.quote(cidade)
@@ -245,7 +242,7 @@ else:
                 st.divider()
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v52")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY", key="reset_calendario_v53")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 busca_ped = st.text_input("🔍 Pedido / Nº:")
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True): col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
@@ -342,6 +339,35 @@ else:
                     df_vol.rename(columns={'DATA_OBJ': 'Data', 'PEDIDO': 'Cargas'}, inplace=True)
                     st.bar_chart(df_vol.set_index('Data'), height=130)
                 else: st.info("Sem dados recentes.")
+                
+            # =======================================================
+            # 📲 MÁGICA: INTEGRAÇÃO WHATSAPP (BOTÃO)
+            # =======================================================
+            taxa_conclusao = int(((n_ent + n_frus) / n_tot) * 100) if n_tot > 0 else 0
+            texto_whatsapp = f"""*Resumo da Operação - {st.session_state.cliente}* 🚚
+🗓️ Data: {hoje_br.strftime('%d/%m/%Y')}
+
+📦 *Total de Cargas:* {n_tot}
+✅ *Entregues:* {n_ent}
+❌ *Frustradas:* {n_frus}
+🚨 *Atrasos/Pendências:* {n_atra}
+
+📊 *Status do Dia:* {taxa_conclusao}% Concluído.
+
+Acesse o painel para ver fotos e detalhes.
+Atendimento IGO Logística."""
+            texto_codificado = urllib.parse.quote(texto_whatsapp)
+            link_whatsapp = f"https://api.whatsapp.com/send?text={texto_codificado}"
+            
+            st.markdown(f"""
+            <div style="display: flex; justify-content: flex-end; margin-top: -15px; margin-bottom: 20px;">
+                <a href="{link_whatsapp}" target="_blank" style="text-decoration: none;">
+                    <div style="background-color: #25D366; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s;">
+                        📲 Enviar Resumo pelo WhatsApp
+                    </div>
+                </a>
+            </div>
+            """, unsafe_allow_html=True)
             st.markdown(f"<div class='dinamic-border' style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
             # =======================================================
@@ -436,18 +462,16 @@ else:
             with tab_map:
                 if not df_f.empty and 'CIDADE' in df_f.columns and 'UF' in df_f.columns:
                     st.markdown("<br><p class='dinamic-text'>📍 <i>As bolhas representam as 15 cidades com maior volume de pedidos no período selecionado.</i></p>", unsafe_allow_html=True)
-                    
                     def cor_status(s):
-                        if 'Entregue' in s: return '#10B981' # Verde
-                        if 'Frustrada' in s or 'ATRASADO' in s: return '#EF4444' # Vermelho
-                        if 'Rota' in s: return '#F59E0B' # Laranja
-                        return '#3B82F6' # Azul
+                        if 'Entregue' in s: return '#10B981'
+                        if 'Frustrada' in s or 'ATRASADO' in s: return '#EF4444'
+                        if 'Rota' in s: return '#F59E0B'
+                        return '#3B82F6'
                     
                     df_map_base = df_f.copy()
                     df_map_base['color'] = df_map_base['STATUS_DISPLAY'].apply(cor_status)
-                    
                     df_g = df_map_base.groupby(['CIDADE', 'UF', 'color']).size().reset_index(name='count')
-                    df_g = df_g.nlargest(15, 'count') # Trava em 15 para não engasgar a pesquisa
+                    df_g = df_g.nlargest(15, 'count')
                     df_g['size'] = df_g['count'] * 150 
                     
                     with st.spinner("Sincronizando satélites... 🛰️"):
@@ -456,17 +480,10 @@ else:
                             lat, lon = buscar_lat_lon(row['CIDADE'], row['UF'])
                             lats.append(lat)
                             lons.append(lon)
-                            
-                        df_g['lat'] = lats
-                        df_g['lon'] = lons
+                        df_g['lat'], df_g['lon'] = lats, lons
                         df_plot = df_g.dropna(subset=['lat', 'lon'])
-                        
                         if not df_plot.empty:
-                            try:
-                                st.map(df_plot, latitude='lat', longitude='lon', color='color', size='size', use_container_width=True)
-                            except:
-                                st.map(df_plot) # Fallback para versões mais antigas do Streamlit
-                        else:
-                            st.info("Não foi possível geolocalizar as cidades desta seleção.")
-                else:
-                    st.info("Nenhuma cidade disponível para mapeamento.")
+                            try: st.map(df_plot, latitude='lat', longitude='lon', color='color', size='size', use_container_width=True)
+                            except: st.map(df_plot)
+                        else: st.info("Não foi possível geolocalizar as cidades desta seleção.")
+                else: st.info("Nenhuma cidade disponível para mapeamento.")
