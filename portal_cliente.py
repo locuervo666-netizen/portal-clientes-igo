@@ -10,7 +10,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO E CSS (BLINDAGEM ANTI-BRANCO)
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS (SUPER COMPACTO)
 # =======================================================
 st.set_page_config(page_title="Monitoramento IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
@@ -19,31 +19,34 @@ st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #f0f2f6; font-family: 'Inter', sans-serif; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
+    
+    /* Redução de espaços mortos nas laterais e no topo */
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    /* 🎯 BLINDAGEM DOS BOTÕES-CARDS (Não usa mais nomes sujeitos a falhas) */
-    .main div[data-testid="column"] .stButton > button {
-        height: 90px !important;
-        border-radius: 12px !important;
+    /* 🗜️ Botões-Cards Super Compactos e Elegantes */
+    .st-key-kpi_total > button, .st-key-kpi_frus > button, .st-key-kpi_atra > button, .st-key-kpi_hoje > button {
+        height: 55px !important;
+        border-radius: 8px !important;
         border: none !important;
         color: white !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
         transition: all 0.2s ease !important;
     }
-    .main div[data-testid="column"] .stButton > button:hover { transform: translateY(-3px) !important; box-shadow: 0 6px 15px rgba(0,0,0,0.15) !important; opacity: 0.95; }
-
-    /* Cores das 4 Caixas pintadas por posição */
-    .main div[data-testid="column"]:nth-of-type(1) .stButton > button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; }
-    .main div[data-testid="column"]:nth-of-type(2) .stButton > button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; }
-    .main div[data-testid="column"]:nth-of-type(3) .stButton > button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; }
-    .main div[data-testid="column"]:nth-of-type(4) .stButton > button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; }
-
-    /* Força o texto dentro do botão a ficar correto */
-    .main div[data-testid="column"] .stButton p { font-weight: 900 !important; font-size: 15px !important; font-family: 'Inter', sans-serif !important; line-height: 1.3 !important; }
     
-    h2 { color: #0f172a; font-weight: 900; font-size: 24px !important; margin-bottom: -15px !important; padding-bottom: 0px !important; }
-    .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
-    .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
+    .st-key-kpi_total > button:hover, .st-key-kpi_frus > button:hover, .st-key-kpi_atra > button:hover, .st-key-kpi_hoje > button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important;
+        opacity: 0.95;
+    }
+
+    /* Cores das 4 Caixas */
+    .st-key-kpi_total > button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; }
+    .st-key-kpi_frus > button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; }
+    .st-key-kpi_atra > button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; }
+    .st-key-kpi_hoje > button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; }
+
+    /* Texto dentro do botão */
+    .stButton p { font-weight: 800 !important; font-size: 15px !important; font-family: 'Inter', sans-serif !important; letter-spacing: 0.5px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -111,7 +114,8 @@ def carregar_dados_nuvem():
             if 'DATA' in df.columns:
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
-    except: pass
+    except Exception as e:
+        st.error(f"Sincronização offline: {e}")
     return pd.DataFrame()
 
 if 'logado' not in st.session_state: st.session_state.logado = False
@@ -136,7 +140,7 @@ if not st.session_state.logado:
                 else: st.error("Usuário ou senha incorretos.")
 else:
     # =======================================================
-    # 🚀 4. PAINEL PRINCIPAL
+    # 🚀 4. PAINEL PRINCIPAL (DESIGN BLINDADO E LIMPO)
     # =======================================================
     df_raw = carregar_dados_nuvem()
     if not df_raw.empty:
@@ -174,6 +178,7 @@ else:
         ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
         colunas_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
         
+        # --- SIDEBAR LIMPA COM BOTÃO DE EXPORTAÇÃO ---
         with st.sidebar:
             st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
             st.divider()
@@ -187,7 +192,8 @@ else:
                 col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
             
             st.divider()
-            csv_data = df_cliente[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
+            df_f_export = df_cliente.copy()
+            csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
             st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
@@ -195,6 +201,7 @@ else:
                 st.session_state.logado = False
                 st.rerun()
 
+        # Filtros
         df_f = df_cliente.copy()
         if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
         if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
@@ -218,10 +225,13 @@ else:
         
         df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
 
+        # 🛡️ CABEÇALHO BLINDADO (FLEXBOX PURO, SEM ENCAVALAR)
         st.markdown(f"""
-        <div class="header-container">
-            <h2>Monitoramento {st.session_state.cliente}</h2>
-            <div class='sync-status'>🟢 Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px; margin-top: -15px;">
+            <h2 style="margin: 0; color: #0f172a; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
+            <div style="font-size: 13px; color: #10B981; font-weight: 700; display: flex; align-items: center;">
+                <span style="margin-right: 5px;">🟢</span> Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -233,29 +243,32 @@ else:
         c1, c2, c3, c4 = st.columns(4)
         def click_kpi(valor): st.session_state.filtro_kpi = valor
 
-        with c1: st.button(f"TOTAL FILTRADO\n\n{n_tot}", key="kpi_total", on_click=click_kpi, args=("TODOS",))
-        with c2: st.button(f"COLETAS FRUSTRADAS\n\n{n_frus}", key="kpi_frus", on_click=click_kpi, args=("FRUSTRADA",))
-        with c3: st.button(f"PEDIDOS ATRASADOS\n\n{n_atra}", key="kpi_atra", on_click=click_kpi, args=("ATRASADO",))
-        with c4: st.button(f"PARA HOJE\n\n{n_hoje}", key="kpi_hoje", on_click=click_kpi, args=("HOJE",))
+        # BOTÕES REDUZIDOS PARA 1 LINHA
+        with c1: st.button(f"📦 TOTAL : {n_tot}", key="kpi_total", use_container_width=True, on_click=click_kpi, args=("TODOS",))
+        with c2: st.button(f"❌ FRUSTRADAS : {n_frus}", key="kpi_frus", use_container_width=True, on_click=click_kpi, args=("FRUSTRADA",))
+        with c3: st.button(f"🚨 ATRASADOS : {n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
+        with c4: st.button(f"📅 HOJE : {n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
 
         df_grid = df_f.copy()
         if st.session_state.filtro_kpi == "FRUSTRADA":
             df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]
-            st.info("🎯 Exibindo apenas **Coletas Frustradas**. Clique no card azul para limpar.")
+            st.info("🎯 Exibindo apenas **Coletas Frustradas**. Clique no botão azul (TOTAL) para limpar.")
         elif st.session_state.filtro_kpi == "ATRASADO":
             df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)]
-            st.warning("🚨 Exibindo apenas **Pedidos Atrasados**. Clique no card azul para limpar.")
+            st.warning("🚨 Exibindo apenas **Pedidos Atrasados**. Clique no botão azul (TOTAL) para limpar.")
         elif st.session_state.filtro_kpi == "HOJE":
             df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
-            st.success("📅 Exibindo apenas **Pedidos de Hoje**. Clique no card azul para limpar.")
+            st.success("📅 Exibindo apenas **Pedidos de Hoje**. Clique no botão azul (TOTAL) para limpar.")
 
         df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
         df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
 
+        # --- AG-GRID OTIMIZADO COM CABEÇALHOS EM MAIÚSCULO ---
         gb = GridOptionsBuilder.from_dataframe(df_final)
         gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
         gb.configure_selection('single', use_checkbox=False)
         
+        # 🔤 Força TODAS as colunas para MAIÚSCULAS e Renomeia as específicas
         for col in df_final.columns:
             header_name = col.upper()
             if col == 'DATA_LIMITE': header_name = "PREVISÃO ENTREGA"
@@ -265,7 +278,8 @@ else:
             if col == 'FOTO_URL':
                 link_jscode = JsCode("""class LinkCellRenderer { init(params) { this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; if (params.value && params.value !== '' && params.value !== 'nan') { this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 2px;">📸</a>'; } } getGui() { return this.eGui; } }""")
                 gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70)
-            elif col == 'DETALHES': gb.configure_column(col, headerName=header_name, width=250, tooltipField="DETALHES")
+            elif col == 'DETALHES':
+                gb.configure_column(col, headerName=header_name, width=250, tooltipField="DETALHES")
             elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60)
             elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90)
             elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95)
