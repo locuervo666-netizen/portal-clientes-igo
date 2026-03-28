@@ -10,7 +10,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS ELITE (5 BLOCOS)
 # =======================================================
 st.set_page_config(page_title="Monitoramento IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
@@ -197,7 +197,7 @@ else:
                     if t_resp and t_obs: return f"{t_resp} / {t_obs}"
                     if t_resp: return t_resp
                     if t_obs: return t_obs
-            return ""
+                return ""
 
             df_cliente['DETALHES'] = df_cliente.apply(processar_detalhes, axis=1)
 
@@ -225,10 +225,14 @@ else:
             ordem_padrao = ['PEDIDO', 'DATA', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
             colunas_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
             
+            # --- 🛡️ CALENDÁRIO BLINDADO (V46) ---
             min_data = df_cliente['DATA_OBJ'].dropna().min() if ('DATA_OBJ' in df_cliente.columns and not df_cliente['DATA_OBJ'].dropna().empty) else hoje_br
             max_data = df_cliente['DATA_OBJ'].dropna().max() if ('DATA_OBJ' in df_cliente.columns and not df_cliente['DATA_OBJ'].dropna().empty) else hoje_br
             
-            # --- ⚙️ SIDEBAR COM TOGGLE DE DARK MODE ---
+            # Garante que as variáveis são datas puras para não bugar o Streamlit
+            if isinstance(min_data, pd.Timestamp): min_data = min_data.date()
+            if isinstance(max_data, pd.Timestamp): max_data = max_data.date()
+            
             with st.sidebar:
                 st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
                 st.divider()
@@ -236,7 +240,16 @@ else:
                 modo_escuro = st.toggle("🌙 Modo Escuro", value=False)
                 st.divider()
                 
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY")
+                # A chave "key" é o que limpa o cache e resolve o erro!
+                datas_sel = st.date_input(
+                    "🗓️ Período:", 
+                    value=(min_data, max_data), 
+                    min_value=min_data, 
+                    max_value=max_data, 
+                    format="DD/MM/YYYY",
+                    key="reset_calendario_v46" 
+                )
+                
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 busca_ped = st.text_input("🔍 Pedido / Nº:")
                 
@@ -253,7 +266,7 @@ else:
                     st.session_state.logado = False
                     st.rerun()
 
-            # --- INJEÇÃO DE CSS DINÂMICO (DARK MODE) ---
+            # --- CSS DINÂMICO (MODO ESCURO) ---
             bg_app = "#0e1117" if modo_escuro else "#f0f2f6"
             txt_main = "#f8fafc" if modo_escuro else "#0f172a"
             border_c = "#334155" if modo_escuro else "#e2e8f0"
@@ -392,26 +405,15 @@ else:
                         }
                         """)
                         gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70, minWidth=70)
-                    elif col == 'DETALHES':
-                        gb.configure_column(col, headerName=header_name, width=300, minWidth=250, tooltipField="DETALHES")
-                    elif col == 'UF': 
-                        gb.configure_column(col, headerName=header_name, width=60, minWidth=60)
-                    elif col == 'DATA': 
-                        gb.configure_column(col, headerName=header_name, width=90, minWidth=90)
-                    elif col == 'PEDIDO': 
-                        gb.configure_column(col, headerName=header_name, width=95, minWidth=95)
-                    elif col == 'LABORATORIO': 
-                        gb.configure_column(col, headerName=header_name, width=400, minWidth=350, tooltipField="LABORATORIO")
-                    elif col == 'BAIRRO': 
-                        gb.configure_column(col, headerName=header_name, width=250, minWidth=200, tooltipField="BAIRRO")
-                    elif col == 'CIDADE': 
-                        gb.configure_column(col, headerName=header_name, width=180, minWidth=150)
-                    else: 
-                        gb.configure_column(col, headerName=header_name)
+                    elif col == 'DETALHES': gb.configure_column(col, headerName=header_name, width=300, minWidth=250, tooltipField="DETALHES")
+                    elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60, minWidth=60)
+                    elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90, minWidth=90)
+                    elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95, minWidth=95)
+                    elif col == 'LABORATORIO': gb.configure_column(col, headerName=header_name, width=400, minWidth=350, tooltipField="LABORATORIO")
+                    elif col == 'BAIRRO': gb.configure_column(col, headerName=header_name, width=250, minWidth=200, tooltipField="BAIRRO")
+                    elif col == 'CIDADE': gb.configure_column(col, headerName=header_name, width=180, minWidth=150)
+                    else: gb.configure_column(col, headerName=header_name)
 
-                # =======================================================
-                # 🦇 CSS DINÂMICO PARA A GRID (MODO CLARO vs ESCURO)
-                # =======================================================
                 if modo_escuro:
                     grid_css = {
                         ".ag-root-wrapper": {"background-color": "#0e1117 !important", "border": "none !important"},
