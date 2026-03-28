@@ -216,6 +216,10 @@ else:
                 col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
             
             st.divider()
+            df_f_export = df_cliente.copy()
+            csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
+            st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
+            
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🚪 Sair", use_container_width=True):
                 st.session_state.logado = False
@@ -250,22 +254,12 @@ else:
         
         df_f['STATUS_DISPLAY'] = df_f.apply(tratar_status, axis=1)
 
-        # =======================================================
-        # 🗂️ MÁGICA: ORDENAÇÃO DE ELITE (Hoje > Pendentes > Importação)
-        # =======================================================
-        df_f['SORT_HOJE'] = df_f['DATA_OBJ'] != hoje_br # False (Hoje) vem antes de True (Outros dias)
-        df_f['SORT_PENDENTE'] = df_f['STATUS_DISPLAY'] != '⏳ Pendente' # False (Pendentes) vem antes de True
-        df_f['SORT_INDEX'] = df_f.index # Mantém a ordem original do Excel (chegada)
-        
+        # Ordenação Inteligente
+        df_f['SORT_HOJE'] = df_f['DATA_OBJ'] != hoje_br
+        df_f['SORT_PENDENTE'] = df_f['STATUS_DISPLAY'] != '⏳ Pendente'
+        df_f['SORT_INDEX'] = df_f.index
         df_f = df_f.sort_values(by=['SORT_HOJE', 'SORT_PENDENTE', 'SORT_INDEX'])
-        # =======================================================
 
-        with st.sidebar:
-            df_f_export = df_f.copy()
-            csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
-            st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
-
-        # Cabeçalho Limpo
         st.markdown(f"""
         <div class="header-container" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: -15px;">
             <h2 style="margin: 0; color: #0f172a; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
@@ -300,6 +294,7 @@ else:
         df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
         df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
 
+        # --- AG-GRID (COM AJUSTE DE LARGURAS) ---
         gb = GridOptionsBuilder.from_dataframe(df_final)
         gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
         gb.configure_selection('single', use_checkbox=False)
@@ -314,14 +309,19 @@ else:
                 link_jscode = JsCode("""class LinkCellRenderer { init(params) { this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; if (params.value && params.value !== '' && params.value !== 'nan') { this.eGui.innerHTML = '<a href="' + params.value + '" target="_blank" style="text-decoration: none; font-size: 18px; display: block; margin-top: 2px;">📸</a>'; } } getGui() { return this.eGui; } }""")
                 gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70)
             elif col == 'DETALHES':
-                gb.configure_column(col, headerName=header_name, width=250, tooltipField="DETALHES")
+                gb.configure_column(col, headerName=header_name, width=300, tooltipField="DETALHES")
             elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60)
             elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90)
             elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95)
-            elif col == 'LABORATORIO': gb.configure_column(col, headerName=header_name, width=300)
-            else: gb.configure_column(col, headerName=header_name)
+            elif col == 'LABORATORIO': 
+                gb.configure_column(col, headerName=header_name, width=450, tooltipField="LABORATORIO") # 🚀 GIGANTE COM BALÃO!
+            elif col == 'BAIRRO': 
+                gb.configure_column(col, headerName=header_name, width=250, tooltipField="BAIRRO")
+            elif col == 'CIDADE': 
+                gb.configure_column(col, headerName=header_name, width=180)
+            else: 
+                gb.configure_column(col, headerName=header_name)
 
-        # 🦓 ZEBRA BLINDADA
         grid_css = {
             ".ag-header-cell-text": {"font-size": "11px !important", "font-weight": "bold", "color": "#334155"},
             ".ag-cell": {"font-size": "11px !important", "color": "#475569"},
