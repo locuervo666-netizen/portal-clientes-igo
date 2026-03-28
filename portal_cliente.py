@@ -250,10 +250,10 @@ else:
         c1, c2, c3, c4 = st.columns(4)
         def click_kpi(valor): st.session_state.filtro_kpi = valor
 
-        with c1: st.button(f"📦 TOTAL : {n_tot}", key="kpi_total", use_container_width=True, on_click=click_kpi, args=("TODOS",))
-        with c2: st.button(f"❌ FRUSTRADAS : {n_frus}", key="kpi_frus", use_container_width=True, on_click=click_kpi, args=("FRUSTRADA",))
-        with c3: st.button(f"🚨 ATRASADOS : {n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
-        with c4: st.button(f"📅 HOJE : {n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
+        with c1: st.button(f"📦 TOTAL\n\n{n_tot}", key="kpi_total", use_container_width=True, on_click=click_kpi, args=("TODOS",))
+        with c2: st.button(f"❌ FRUSTRADAS\n\n{n_frus}", key="kpi_frus", use_container_width=True, on_click=click_kpi, args=("FRUSTRADA",))
+        with c3: st.button(f"🚨 ATRASADOS\n\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
+        with c4: st.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
 
         df_grid = df_f.copy()
         if st.session_state.filtro_kpi == "FRUSTRADA":
@@ -287,6 +287,7 @@ else:
             elif col == 'UF': gb.configure_column(col, headerName=header_name, width=60)
             elif col == 'DATA': gb.configure_column(col, headerName=header_name, width=90)
             elif col == 'PEDIDO': gb.configure_column(col, headerName=header_name, width=95)
+            elif col == 'LABORATORIO': gb.configure_column(col, headerName=header_name, width=300) # 🎯 AQUI O LABORATÓRIO GANHOU ESPAÇO VIP!
             else: gb.configure_column(col, headerName=header_name)
 
         # 🦓 ZEBRA BLINDADA
