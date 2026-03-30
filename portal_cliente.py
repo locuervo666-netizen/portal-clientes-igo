@@ -8,7 +8,7 @@ from streamlit_autorefresh import st_autorefresh
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
-LOGO_IGO = "https://drive.google.com/uc?export=view&id=10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY"
+LOGO_IGO = "https://postimg.cc/gallery/CdTVkY9"
 
 # =======================================================
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
