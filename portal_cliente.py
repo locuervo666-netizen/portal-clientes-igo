@@ -2,17 +2,12 @@ import streamlit as st
 import pandas as pd
 import gspread
 import os
-import json
-import urllib.request
 import urllib.parse
-from datetime import datetime, date, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
-from google.oauth2.service_account import Credentials
 
 FUSO_BR = timezone(timedelta(hours=-3))
-
-# 🎯 AQUI ESTÁ A CORREÇÃO: O link agora é o de download direto do Google Drive!
 LOGO_IGO = "https://drive.google.com/uc?export=view&id=10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY"
 
 # =======================================================
@@ -57,25 +52,7 @@ CLIENTES_CONFIG = {
 }
 
 # =======================================================
-# 📍 GEOLOCALIZADOR NATIVO (MAPA)
-# =======================================================
-@st.cache_data(ttl=86400)
-def buscar_lat_lon(cidade, uf):
-    try:
-        city_enc = urllib.parse.quote(cidade)
-        uf_enc = urllib.parse.quote(uf)
-        url = f"https://nominatim.openstreetmap.org/search?city={city_enc}&state={uf_enc}&country=Brazil&format=json"
-        req = urllib.request.Request(url, headers={'User-Agent': 'IGOLogistica/1.0'})
-        with urllib.request.urlopen(req, timeout=3) as response:
-            if response.getcode() == 200:
-                dados = json.loads(response.read().decode('utf-8'))
-                if dados:
-                    return float(dados[0]['lat']), float(dados[0]['lon'])
-    except: pass
-    return None, None
-
-# =======================================================
-# 🔗 MOTOR DE DADOS PRINCIPAL (CORRIGIDO PARA OAUTH DUPLO)
+# 🔗 MOTOR DE DADOS PRINCIPAL (CORRIGIDO PARA A NUVEM)
 # =======================================================
 @st.cache_resource
 def conectar_banco_seguro():
@@ -100,7 +77,7 @@ def conectar_banco_seguro():
             return gspread.oauth(credentials_filename="cred_temp.json", authorized_user_filename="token_temp.json")
             
         else:
-            st.error("❌ Cofre do Streamlit vazio. Preencha google_cred_json e google_token_json.")
+            st.error("❌ Cofre do Streamlit vazio. Cole as variáveis google_cred_json e google_token_json no Secrets.")
             return None
             
     except Exception as e:
@@ -327,9 +304,8 @@ else:
             n_atra = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)]) if not df_f.empty else 0
             n_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br]) if not df_f.empty else 0
 
-            # --- ⚙️ SIDEBAR (AÇÕES E MAPA RADAR) ---
+            # --- ⚙️ SIDEBAR ---
             with st.sidebar:
-                # Botão WhatsApp Geral
                 taxa_conclusao = int(((n_ent + n_frus) / n_tot) * 100) if n_tot > 0 else 0
                 texto_whatsapp = f"""*Resumo da Operação - {st.session_state.cliente}* 🚚
 🗓️ Data: {hoje_br.strftime('%d/%m/%Y')}
@@ -356,37 +332,6 @@ Atendimento IGO Logística."""
                 df_f_export = df_cliente.copy()
                 csv_data = df_f_export[col_vis].to_csv(index=False, sep=";").encode('utf-8-sig')
                 st.download_button(label="📥 Exportar Excel", data=csv_data, file_name=f"Monitoramento_{st.session_state.cliente}.csv", mime="text/csv", use_container_width=True)
-                
-                st.divider()
-                
-                # MAPA RADAR NA SIDEBAR
-                st.markdown("<div class='dinamic-text' style='font-size:15px; font-weight:800; margin-bottom:5px;'>🗺️ Radar de Operação</div>", unsafe_allow_html=True)
-                st.markdown("<p style='font-size:11px; color:#888; margin-top:-5px; line-height:1.2;'>As bolhas mostram os focos de demanda no período.</p>", unsafe_allow_html=True)
-                if not df_f.empty and 'CIDADE' in df_f.columns and 'UF' in df_f.columns:
-                    def cor_status(s):
-                        if 'Entregue' in s: return '#10B981'
-                        if 'Frustrada' in s or 'ATRASADO' in s: return '#EF4444'
-                        if 'Rota' in s: return '#F59E0B'
-                        return '#3B82F6'
-                    df_map_base = df_f.copy()
-                    df_map_base['color'] = df_map_base['STATUS_DISPLAY'].apply(cor_status)
-                    df_g = df_map_base.groupby(['CIDADE', 'UF', 'color']).size().reset_index(name='count')
-                    df_g = df_g.nlargest(15, 'count')
-                    df_g['size'] = df_g['count'] * 150 
-                    
-                    with st.spinner("Sincronizando satélites... 🛰️"):
-                        lats, lons = [], []
-                        for _, row in df_g.iterrows():
-                            lat, lon = buscar_lat_lon(row['CIDADE'], row['UF'])
-                            lats.append(lat)
-                            lons.append(lon)
-                        df_g['lat'], df_g['lon'] = lats, lons
-                        df_plot = df_g.dropna(subset=['lat', 'lon'])
-                        if not df_plot.empty:
-                            try: st.map(df_plot, latitude='lat', longitude='lon', color='color', size='size', use_container_width=True)
-                            except: st.map(df_plot)
-                else:
-                    st.info("Sem dados de localização.")
                 
                 st.divider()
                 if st.button("🚪 Sair do Sistema", use_container_width=True): st.session_state.logado = False; st.rerun()
@@ -444,7 +389,7 @@ Atendimento IGO Logística."""
             st.markdown(f"<div class='dinamic-border' style='margin-bottom: 15px; margin-top: 15px;'></div>", unsafe_allow_html=True)
 
             # =======================================================
-            # 📋 GRID PRINCIPAL E BOTÕES DE CHAMADO (AÇÃO COM CIDADE/UF)
+            # 📋 GRID PRINCIPAL LIMPÍSSIMA
             # =======================================================
             col_busca, _ = st.columns([2, 1])
             with col_busca:
@@ -459,9 +404,8 @@ Atendimento IGO Logística."""
 
                 df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
                 
-                df_grid['CHAMADO'] = ''
-                colunas_grid = ['CHAMADO'] + [c for c in col_vis if c in df_grid.columns]
-                df_final = df_grid[colunas_grid]
+                # Puxa apenas as colunas que o usuário quer ver (sem criar colunas falsas de Ação)
+                df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
                 
                 if busca_inteligente:
                     busca_lower = str(busca_inteligente).lower()
@@ -472,25 +416,6 @@ Atendimento IGO Logística."""
                     gb = GridOptionsBuilder.from_dataframe(df_final)
                     gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
                     gb.configure_selection('single', use_checkbox=False)
-                    
-                    wpp_jscode = JsCode(f"""
-                    class WppCellRenderer {{ 
-                        init(params) {{ 
-                            this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; 
-                            if (params.data && params.data.STATUS && params.data.STATUS.includes('ATRASADO')) {{ 
-                                let pedido = params.data.PEDIDO || 'N/A';
-                                let lab = params.data.LABORATORIO || 'N/A';
-                                let cidade = params.data.CIDADE || 'N/A';
-                                let uf = params.data.UF || 'N/A';
-                                let fone = '5511947996371';
-                                let msg = `🚨 *CHAMADO DE ATRASO* 🚨%0A%0AOlá equipe IGO Logística!%0APrecisamos verificar este pedido que consta como atrasado no painel:%0A%0A📦 *Pedido:* ${{pedido}}%0A🏥 *Laboratório:* ${{lab}}%0A📍 *Local:* ${{cidade}} - ${{uf}}%0A%0APoderiam dar um retorno de urgência?`;
-                                let link = `https://api.whatsapp.com/send?phone=${{fone}}&text=${{msg}}`;
-                                this.eGui.innerHTML = `<a href="${{link}}" target="_blank" style="text-decoration: none; font-size: 16px; cursor: pointer; display: block; margin-top: 2px;" title="Abrir Chamado no WhatsApp">🆘</a>`;
-                            }} 
-                        }} 
-                        getGui() {{ return this.eGui; }} 
-                    }}
-                    """)
                     
                     status_jscode = JsCode("""
                     function(params) {
@@ -509,14 +434,13 @@ Atendimento IGO Logística."""
                         elif col == 'DATA_ENTREGA': header_name = "DATA ENTREGA"
                         elif col == 'FOTO_URL': header_name = "FOTO"
                         
-                        if col == 'CHAMADO': gb.configure_column(col, headerName="AÇÃO", cellRenderer=wpp_jscode, width=70, minWidth=70, pinned='left')
-                        elif col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
+                        if col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
                         elif col == 'FOTO_URL':
                             link_jscode = JsCode("""
                             class LinkCellRenderer { 
                                 init(params) { 
                                     this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; 
-                                    if (params.value && params.value !== '' && params.value !== 'nan') { 
+                                    if (params.value && params.value !== '' && params.value !== 'nan' && params.value.includes('http')) { 
                                         this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 18px; display: block; margin-top: 2px;" title="Clique para ver a foto">📸</span>'; 
                                         this.eGui.onclick = () => {
                                             let modal = document.createElement('div');
