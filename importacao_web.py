@@ -178,75 +178,136 @@ def gerar_excel_memoria(df):
     return output.getvalue()
 
 # =============================================================================
-# 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM
+# 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM (SAAS LEVEL)
 # =============================================================================
+
+# Define a cor de fundo com base no toggle (que leremos via session_state para injetar antes)
+if 'modo_escuro' not in st.session_state: st.session_state.modo_escuro = False
+
 st.markdown("""
     <style>
-    [data-testid="stAppViewContainer"] { transition: background-color 0.3s ease; }
-    [data-testid="stSidebar"] { transition: background-color 0.3s ease; }
+    /* Esconde elementos nativos do Streamlit que poluem a tela */
     #MainMenu {visibility: hidden;} footer {visibility: hidden;}
+    [data-testid="stSidebarNav"] {display: none;}
     
-    div[role="radiogroup"] > label {
-        background-color: #1E293B !important; padding: 12px 15px !important; border-radius: 8px !important;
-        margin-bottom: 8px !important; cursor: pointer !important; transition: 0.3s !important; border: 1px solid #334155;
+    /* Estilo Ultra Premium para o Menu Lateral (Radio Buttons) */
+    div.stRadio > div[role="radiogroup"] {
+        display: flex; flex-direction: column; gap: 8px; width: 100% !important;
     }
-    div[role="radiogroup"] > label:hover { background-color: #334155 !important; }
-    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p { font-size: 15px !important; font-weight: 700 !important; color: #F8FAFC !important; }
-    div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; }
-    div[role="radiogroup"] > label[data-checked="true"] { background-color: #2563EB !important; border-left: 5px solid #60A5FA !important; border-color: #2563EB; }
-    div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p { color: #FFFFFF !important; }
+    div[role="radiogroup"] > label {
+        width: 100% !important;
+        padding: 12px 16px !important;
+        border-radius: 8px !important;
+        margin: 0 !important;
+        border: none !important;
+        background-color: transparent !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease-in-out !important;
+        box-sizing: border-box !important;
+    }
+    div[role="radiogroup"] > label:hover {
+        background-color: rgba(56, 189, 248, 0.08) !important;
+    }
+    /* Esconde a "bolinha" do radio */
+    div[role="radiogroup"] label div[data-testid="stRadio-radio"] { 
+        display: none !important; 
+    }
+    /* Estilo do Texto Padrão do Menu */
+    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p { 
+        font-size: 15px !important; 
+        font-weight: 500 !important; 
+        margin: 0 !important;
+        color: #64748b !important; /* Cor suave (ajustada depois no modo escuro) */
+        transition: color 0.2s ease !important;
+    }
+    /* Estilo do Menu ATIVO */
+    div[role="radiogroup"] > label[data-checked="true"] { 
+        background-color: rgba(56, 189, 248, 0.12) !important; 
+        border-left: 4px solid #38BDF8 !important; 
+        border-radius: 0 8px 8px 0 !important;
+    }
+    div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p { 
+        color: #0284c7 !important; 
+        font-weight: 700 !important; 
+    }
 
+    /* Estilo dos Botões de KPI Superiores */
     div.st-key-kpi_total button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; height: 75px !important; border-radius: 10px !important; border: none !important; color: white !important;}
     div.st-key-kpi_entregue button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; height: 75px !important; border-radius: 10px !important; border: none !important; color: white !important;}
     div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; height: 75px !important; border-radius: 10px !important; border: none !important; color: white !important;}
     div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; height: 75px !important; border-radius: 10px !important; border: none !important; color: white !important;}
     div.st-key-kpi_hoje button { background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; height: 75px !important; border-radius: 10px !important; border: none !important; color: white !important;}
     div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { font-weight: 800 !important; font-size: 15px !important; margin: 0 !important; color: white !important;}
+    
+    /* Toggle de Modo Escuro disfarçado */
+    label[data-testid="stWidgetLabel"] {display: none;}
     </style>
 """, unsafe_allow_html=True)
 
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
 with st.sidebar:
-    st.markdown("<h1 style='text-align:center; color:#38BDF8; margin-bottom: 25px;'>IGO ADMIN</h1>", unsafe_allow_html=True)
+    # Header Premium Simétrico (Logo e Toggle na mesma linha)
+    col_logo, col_tema = st.columns([3, 1], vertical_alignment="center")
+    with col_logo:
+        st.markdown("<h2 style='color:#38BDF8; margin: 0; padding-bottom: 5px; font-weight: 800;'>IGO ADMIN</h2>", unsafe_allow_html=True)
+    with col_tema:
+        st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
+    
+    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True) # Espaçamento elegante
+    
+    # Menu Ultra Premium
     menu = st.radio("Navegação:", ["📊 Dashboard de Controle", "➕ Importação de Lotes", "📋 Triagem e Romaneio", "📥 Exportar Relatórios", "⚙️ Configurar Rotas"], label_visibility="collapsed")
+    
+    # Espaçador Flexível para jogar o botão de Sair pro final (Truque de UI)
+    st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
+    
     st.divider()
-    modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
-    st.divider()
+    # Botão de Sair Minimalista e Funcional
+    if st.button("🚪 Sair do Sistema", use_container_width=True, type="secondary"):
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        st.rerun()
 
-bg_app = "#0e1117" if modo_escuro else "#f0f2f6"
-bg_side = "#161b22" if modo_escuro else "#ffffff"
-txt_main = "#f8fafc" if modo_escuro else "#0f172a"
-border_c = "#334155" if modo_escuro else "#e2e8f0"
+# Cores Dinâmicas Baseadas no Toggle
+bg_app = "#0e1117" if st.session_state.modo_escuro else "#f8fafc"
+bg_side = "#161b22" if st.session_state.modo_escuro else "#ffffff"
+txt_main = "#f8fafc" if st.session_state.modo_escuro else "#0f172a"
+txt_menu = "#cbd5e1" if st.session_state.modo_escuro else "#64748b"
+txt_menu_ativo = "#38bdf8" if st.session_state.modo_escuro else "#0284c7"
+border_c = "#334155" if st.session_state.modo_escuro else "#e2e8f0"
 
 st.markdown(f"""<style>
 [data-testid="stAppViewContainer"] {{ background-color: {bg_app} !important; }}
-[data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c}; }}
+[data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c}; padding-top: 2rem !important; }}
 .dinamic-text {{ color: {txt_main} !important; }}
 .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
+/* Injeta cores escuras no menu caso o toggle esteja ativado */
+div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu} !important; }}
+div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu_ativo} !important; }}
 </style>""", unsafe_allow_html=True)
 
 def obter_css_grid():
     base_css = {
-        ".ag-root-wrapper": {"border": "1px solid #e2e8f0 !important", "border-radius": "8px"},
+        ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "8px"},
         ".ag-header": {"background-color": "#1e293b !important"},
         ".ag-header-cell-text": {"color": "#f8fafc !important", "font-weight": "bold"},
-        ".ag-cell": {"font-size": "12px !important"},
+        ".ag-cell": {"font-size": "13px !important", "font-family": "Inter, sans-serif !important"},
         ".ag-row-selected": {"background-color": "#3B82F6 !important", "color": "#ffffff !important"},
         ".ag-row-selected .ag-cell": {"color": "#ffffff !important"}
     }
-    if modo_escuro:
+    if st.session_state.modo_escuro:
         base_css.update({
             ".ag-root-wrapper": {"background-color": "#0e1117 !important", "border-color": "#334155 !important"},
-            ".ag-cell": {"color": "#cbd5e1 !important", "border-bottom": "1px solid #1e293b !important"},
-            ".ag-row-even": {"background-color": "#0f172a !important"}, ".ag-row-odd": {"background-color": "#1e293b !important"}, 
+            ".ag-cell": {"color": "#e2e8f0 !important", "border-bottom": "1px solid #1e293b !important"},
+            ".ag-row-even": {"background-color": "#0f172a !important"}, ".ag-row-odd": {"background-color": "#161b22 !important"}, 
             ".ag-row-hover": {"background-color": "#334155 !important"}
         })
     else:
         base_css.update({
-            ".ag-cell": {"color": "#334155 !important", "border-bottom": "1px solid #e2e8f0 !important"},
-            ".ag-row-even": {"background-color": "#f8fafc !important"}, ".ag-row-odd": {"background-color": "#ffffff !important"}, 
-            ".ag-row-hover": {"background-color": "#e2e8f0 !important"}
+            ".ag-cell": {"color": "#334155 !important", "border-bottom": "1px solid #f1f5f9 !important"},
+            ".ag-row-even": {"background-color": "#ffffff !important"}, ".ag-row-odd": {"background-color": "#f8fafc !important"}, 
+            ".ag-row-hover": {"background-color": "#f1f5f9 !important"}
         })
     return base_css
 
@@ -282,10 +343,11 @@ if menu == "📊 Dashboard de Controle":
         if 'DATA_LIMITE' in df_raw.columns: df_raw['DATA_LIMITE'] = df_raw['DATA_LIMITE'].fillna("").astype(str)
         if 'DATA_ENTREGA' in df_raw.columns: df_raw['DATA_ENTREGA'] = df_raw['DATA_ENTREGA'].fillna("").astype(str)
 
-        with st.sidebar:
-            st.markdown("<p class='dinamic-text' style='font-weight:bold; margin-top:15px; margin-bottom:5px;'>🔍 Filtros de Operação</p>", unsafe_allow_html=True)
-            f_cli = st.selectbox("Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
-            f_data = st.date_input("Período:", value=(df_raw['DATA_OBJ'].min(), hoje_br))
+        st.markdown("<div class='dinamic-border' style='padding-bottom: 10px; margin-bottom: 20px;'><h2 class='dinamic-text' style='margin:0;'>📊 Painel de Controle Operacional</h2></div>", unsafe_allow_html=True)
+
+        col_f1, col_f2 = st.columns(2)
+        f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
+        f_data = col_f2.date_input("📅 Período de Análise:", value=(df_raw['DATA_OBJ'].min(), hoje_br))
         
         df_f = df_raw.copy()
         if f_cli != "Todos": df_f = df_f[df_f['TOMADOR'] == f_cli]
@@ -304,7 +366,7 @@ if menu == "📊 Dashboard de Controle":
         c5.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
         st.markdown("<br>", unsafe_allow_html=True)
-        busca = st.text_input("🔎 Busca Rápida (Qualquer campo):", placeholder="Ex: Nome do Lab, Cidade, Pedido...")
+        busca = st.text_input("🔎 Busca Rápida na Tabela (Qualquer campo):", placeholder="Ex: Nome do Lab, Cidade, Pedido...")
 
         df_grid = df_f.copy()
         if st.session_state.filtro_kpi_admin == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue')]
@@ -319,18 +381,18 @@ if menu == "📊 Dashboard de Controle":
             mask = df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)
             df_grid = df_grid[mask]
 
-        st.markdown(f"<div class='dinamic-border' style='padding-bottom: 10px;'><h2 class='dinamic-text' style='margin:0;'>📋 Monitoramento de Cargas</h2><p class='dinamic-text' style='color:#10B981 !important; font-weight:bold; font-size:12px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M')}</p></div>", unsafe_allow_html=True)
+        st.markdown(f"<p class='dinamic-text' style='color:#10B981 !important; font-weight:bold; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M')}</p>", unsafe_allow_html=True)
         
         container_botoes = st.container()
         container_grid = st.container()
 
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
-            gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
+            gb.configure_default_column(resizable=True, sortable=True, minWidth=120)
             gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
             
             st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'900'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'900'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'900'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'900'};} return {'fontWeight':'bold'};}")
-            gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, width=150)
+            gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, width=160)
             
             img_js = JsCode("""
             class FotoRenderer {
@@ -361,9 +423,9 @@ if menu == "📊 Dashboard de Controle":
                 getGui() { return this.eGui; }
             }
             """)
-            gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=80, minWidth=80)
+            gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90)
             
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500)
+            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=450)
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -496,7 +558,7 @@ if menu == "📊 Dashboard de Controle":
                                 st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
 
-            if col_b5.button("🔄 Atualizar Grid", use_container_width=True):
+            if col_b5.button("🔄 Atualizar", use_container_width=True):
                 st.cache_data.clear()
                 st.rerun()
                 
@@ -505,12 +567,11 @@ if menu == "📊 Dashboard de Controle":
     else: st.info("Carregando base de dados...")
 
 # =============================================================================
-# ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES (REFEITO E COM AGGRID)
+# ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
 elif menu == "➕ Importação de Lotes":
     st.markdown("<h2 class='dinamic-text'>➕ Central de Importação</h2>", unsafe_allow_html=True)
     
-    # Aviso de Segurança Claro para o Usuário
     st.success("🛡️ **SEGURANÇA DO HISTÓRICO:** O sistema de importação sempre **ADICIONA** os novos pedidos na base. O seu histórico do dia (como os lotes de RJ e Juiz de Fora) estão seguros e não serão apagados ao importar uma nova planilha.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
@@ -565,7 +626,6 @@ elif menu == "➕ Importação de Lotes":
                                 pts = e.split(',')
                                 df_limpo.at[idx, 'ENDERECO'], df_limpo.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
 
-                    # Limpeza forçada para garantir o filtro de UF e Cidade nos relatórios
                     df_limpo['UF'] = df_limpo['UF'].astype(str).str.upper().str.strip()
                     df_limpo['CIDADE'] = df_limpo['CIDADE'].astype(str).str.upper().str.strip()
 
@@ -582,11 +642,8 @@ elif menu == "➕ Importação de Lotes":
         if (st.session_state.df_preview['AGENTE_RAW'] == "").any(): 
             st.error("⚠️ Atenção: Há pedidos SEM MOTORISTA atribuído! Eles estão marcados com fundo vermelho na tabela.")
         
-        # Substituíndo st.dataframe por AgGrid para não "espremer" as colunas
         gb_prev = GridOptionsBuilder.from_dataframe(st.session_state.df_preview)
         gb_prev.configure_default_column(resizable=True, sortable=True, minWidth=130)
-        
-        # Colorir linhas com problema de roteirização
         js_err = JsCode("function(p){if(p.data.AGENTE_RAW == ''){return {'backgroundColor': '#FDEDEC', 'color': '#B03A2E', 'fontWeight': 'bold'};} return {};}")
         gb_prev.configure_grid_options(getRowStyle=js_err)
         
@@ -608,7 +665,6 @@ elif menu == "➕ Importação de Lotes":
                     aba = planilha_db.worksheet("Memoria_Sistema")
                     atuais = aba.get_all_values()
                     
-                    # Esta é a linha mágica que preserva o histórico de RJ/JF e todos os outros
                     df_up = pd.concat([pd.DataFrame(atuais[1:], columns=atuais[0]), df_final], ignore_index=True) if len(atuais) > 1 else df_final
                     
                     aba.clear()
@@ -627,7 +683,7 @@ elif menu == "➕ Importação de Lotes":
                     st.success("🎉 Lote adicionado com sucesso à base principal e despachado aos motoristas!")
                     st.session_state.texto_importacao = ""
                     st.session_state.df_preview = pd.DataFrame()
-                    st.cache_data.clear() # Limpa o cache para o painel principal atualizar na hora
+                    st.cache_data.clear()
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
