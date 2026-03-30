@@ -110,10 +110,15 @@ def carregar_dados_completos(_planilha):
     except Exception: pass
     return pd.DataFrame()
 
+# ======== VARIÁVEIS GLOBAIS BLINDADAS ========
 planilha_db = conectar_banco()
 DF_AGENTES = carregar_dados_agentes(planilha_db)
 FERIADOS_BR = holidays.Brazil()
 CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "MB_CAEP"]
+
+# CORREÇÃO: "hoje_br" AGORA É GLOBAL E DISPONÍVEL PARA TODAS AS ABAS
+hoje_br = datetime.now(FUSO_BR).date() 
+# ==============================================
 
 def carregar_dicionario_rotas(df_agentes):
     base_agentes = {}
@@ -263,6 +268,8 @@ st.markdown(f"""<style>
 [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c}; padding-top: 2rem !important; }}
 .dinamic-text {{ color: {txt_main} !important; }}
 .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
+div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu} !important; }}
+div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu_ativo} !important; }}
 </style>""", unsafe_allow_html=True)
 
 def obter_css_grid():
@@ -294,7 +301,6 @@ def obter_css_grid():
 # =============================================================================
 if menu == "📊 Dashboard de Controle":
     df_raw = carregar_dados_completos(planilha_db)
-    hoje_br = datetime.now(FUSO_BR).date()
     
     if not df_raw.empty:
         df_raw['FOTO_URL'] = df_raw['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
@@ -878,8 +884,6 @@ elif menu == "📋 Triagem e Romaneio":
                     else: tem_sel_pdf = len(selecionados) > 0
                 
                 st.markdown("---")
-                
-                # CORREÇÃO FATORIAL AQUI: c_data está perfeitamente definido agora.
                 c_mot, c_data, c_btn = st.columns([2, 1, 2])
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                 motorista_escolhido = c_mot.selectbox("👤 Motorista (Buscar):", ["Selecione..."] + logins_disp)
