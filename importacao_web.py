@@ -687,7 +687,7 @@ elif menu == "➕ Importação de Lotes":
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO ANTI-LIMITE DO GOOGLE)
 # =============================================================================
 elif menu == "📋 Triagem e Romaneio":
     st.markdown("<h2 class='dinamic-text'>📋 Triagem e Despacho</h2>", unsafe_allow_html=True)
@@ -741,15 +741,21 @@ elif menu == "📋 Triagem e Romaneio":
                 if st.button("✅ Enviar Selecionados para Despacho", type="primary"):
                     if not tem_selecao: st.warning("⚠️ Selecione os pedidos na tabela acima primeiro!")
                     else:
-                        with st.spinner("Atualizando pedidos selecionados..."):
+                        with st.spinner("Atualizando pedidos selecionados em lote (Anti-Bloqueio)..."):
                             if isinstance(selecionados_manuais, pd.DataFrame): p_ids = selecionados_manuais['PEDIDO'].astype(str).tolist()
                             else: p_ids = [str(r['PEDIDO']) for r in selecionados_manuais]
                             try:
+                                # OTIMIZAÇÃO: Atualização em Lote com 1 requisição
                                 aba = planilha_db.worksheet("Memoria_Sistema")
-                                todos_dados = aba.get_all_records()
-                                for i, row in enumerate(todos_dados):
-                                    if str(row.get('PEDIDO', '')).strip() in p_ids:
-                                        aba.update_cell(i + 2, df_raw.columns.get_loc('STATUS') + 1, 'CONFERIDO')
+                                dados_aba = aba.get_all_values()
+                                df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                
+                                mascara_pedidos = df_nuvem['PEDIDO'].isin(p_ids)
+                                df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'CONFERIDO'
+                                
+                                aba.clear()
+                                aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                
                                 st.success(f"🎉 {len(p_ids)} pedidos enviados para o Despacho!")
                                 st.cache_data.clear()
                                 st.rerun()
@@ -778,21 +784,28 @@ elif menu == "📋 Triagem e Romaneio":
                 if c_btn.button("🚚 Gerar Romaneio PDF e Despachar", type="primary", use_container_width=True):
                     if not tem_sel_pdf or motorista_escolhido == "Selecione...": st.warning("⚠️ Selecione os pedidos e um motorista!")
                     else:
-                        with st.spinner("Gerando PDF e atualizando..."):
+                        with st.spinner("Gerando PDF e atualizando em lote (Anti-Bloqueio)..."):
                             if isinstance(selecionados, pd.DataFrame): sel_lista = selecionados.to_dict('records')
                             else: sel_lista = selecionados
                             id_romaneio = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
                             pedidos_ids = [str(r['PEDIDO']) for r in sel_lista]
+                            
                             try:
+                                # OTIMIZAÇÃO: Atualização em Lote com 1 requisição
                                 aba = planilha_db.worksheet("Memoria_Sistema")
-                                todos_dados = aba.get_all_records()
-                                for i, row in enumerate(todos_dados):
-                                    if str(row.get('PEDIDO', '')).strip() in pedidos_ids:
-                                        aba.update_cell(i + 2, df_raw.columns.get_loc('STATUS') + 1, 'EM ROTA DE ENTREGA')
-                                        aba.update_cell(i + 2, df_raw.columns.get_loc('ROMANEIO') + 1, id_romaneio)
-                                        try: aba.update_cell(i + 2, df_raw.columns.get_loc('AGENTE_RAW') + 1, motorista_escolhido)
-                                        except: pass
+                                dados_aba = aba.get_all_values()
+                                df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
                                 
+                                mascara_pedidos = df_nuvem['PEDIDO'].isin(pedidos_ids)
+                                df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'EM ROTA DE ENTREGA'
+                                df_nuvem.loc[mascara_pedidos, 'ROMANEIO'] = id_romaneio
+                                if 'AGENTE_RAW' in df_nuvem.columns:
+                                    df_nuvem.loc[mascara_pedidos, 'AGENTE_RAW'] = motorista_escolhido
+                                
+                                aba.clear()
+                                aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                
+                                # Envio para o AppSheet (Já é feito em lote nativamente)
                                 base_tomador = sel_lista[0].get('TOMADOR', 'CLIENTE')
                                 base_cidade = sel_lista[0].get('CIDADE', '')
                                 lote_app = [{
@@ -804,6 +817,7 @@ elif menu == "📋 Triagem e Romaneio":
                                 despachar_para_appsheet(lote_app)
                                 st.cache_data.clear()
                                 
+                                # Geração do PDF
                                 pdf = FPDF()
                                 pdf.add_page()
                                 pdf.set_draw_color(44, 62, 80); pdf.set_line_width(1); pdf.rect(5, 5, 200, 287)
@@ -830,12 +844,11 @@ elif menu == "📋 Triagem e Romaneio":
                                     pdf.output(tmp_pdf.name)
                                     with open(tmp_pdf.name, "rb") as f: pdf_bytes = f.read()
                                 
-                                st.success(f"🎉 Lote {id_romaneio} despachado!")
+                                st.success(f"🎉 Lote {id_romaneio} com {len(sel_lista)} pedidos despachado com sucesso!")
                                 st.download_button(label="📥 BAIXAR ROMANEIO EM PDF", data=pdf_bytes, file_name=f"Romaneio_{id_romaneio}.pdf", mime="application/pdf", type="primary")
                             except Exception as e: st.error(f"Erro ao processar despacho: {e}")
             else: st.info("Nenhum pedido com status 'CONFERIDO' no momento.")
     else: st.info("O banco de dados está vazio no momento.")
-
 # =============================================================================
 # 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
 # =============================================================================
