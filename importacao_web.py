@@ -25,19 +25,36 @@ st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
 @st.cache_resource
 def conectar_banco():
+    """Conecta ao Google Sheets (Local ou Nuvem)"""
+    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    
     try:
-        caminho_windows = os.path.join(os.path.expanduser("~"), "IGO_Logistica_Sistema")
+        # 1. TENTA MODO LOCAL (Seu computador)
+        caminho_windows = r"C:\Users\elcic\IGO_Logistica_Sistema"
         cred_win = os.path.join(caminho_windows, "credentials.json")
         token_win = os.path.join(caminho_windows, "token.json")
+        
         if os.path.exists(cred_win):
+            # Se o arquivo existe no PC, usa o login normal
             gc = gspread.oauth(credentials_filename=cred_win, authorized_user_filename=token_win)
             return gc.open("DB_IGO_Logistica")
-        try:
-            _ = st.secrets 
-            gc = gspread.oauth(credentials_filename="cred_temp.json", authorized_user_filename="token_temp.json")
+
+        # 2. TENTA MODO NUVEM (Streamlit Secrets)
+        elif "google_token_json" in st.secrets:
+            import json
+            from google.oauth2.credentials import Credentials
+            
+            # Transforma o texto do segredo de volta em informação de login
+            token_info = json.loads(st.secrets["google_token_json"])
+            creds = Credentials.from_authorized_user_info(token_info, scopes)
+            
+            gc = gspread.authorize(creds)
             return gc.open("DB_IGO_Logistica")
-        except:
+            
+        else:
+            st.error("❌ Credenciais não encontradas (Local ou Secrets).")
             return None
+            
     except Exception as e:
         st.error(f"Erro na conexão: {e}")
         return None
