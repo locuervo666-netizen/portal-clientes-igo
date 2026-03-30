@@ -464,7 +464,6 @@ if menu == "📊 Dashboard de Controle":
                                     novo_ped = pd.DataFrame([{'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 'LABORATORIO': m_lab.upper(), 'ENDERECO': m_rua.upper(), 'NUMERO': "", 'BAIRRO': m_bai.upper(), 'CIDADE': m_cid.upper(), 'UF': "SP", 'CEP': "", 'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""}])
                                     df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
                                     
-                                    aba_memoria.clear()
                                     aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
                                     
                                     if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
@@ -501,7 +500,7 @@ if menu == "📊 Dashboard de Controle":
                                         df_nuvem.loc[mask, 'STATUS'] = status_limpo
                                         if status_limpo == "ENTREGUE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                         elif status_limpo == "PENDENTE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
-                                    aba.clear()
+                                    
                                     aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     
                                     try:
@@ -512,7 +511,6 @@ if menu == "📊 Dashboard de Controle":
                                             if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
                                                 mascara_app = df_app['PEDIDO'].isin(p_ids)
                                                 df_app.loc[mascara_app, 'STATUS'] = status_limpo
-                                                aba_app.clear()
                                                 aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
                                     except: pass 
 
@@ -569,7 +567,6 @@ if menu == "📊 Dashboard de Controle":
                                                 'TOMADOR': l_orig.get('TOMADOR','')
                                             })
 
-                                aba.clear()
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 
                                 if clones_para_app: despachar_para_appsheet(clones_para_app)
@@ -608,7 +605,6 @@ if menu == "📊 Dashboard de Controle":
                                             l_app = df_nuvem[mask].iloc[0]
                                             lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
                                     
-                                    aba.clear()
                                     aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     despachar_para_appsheet(lista_app_troca)
                                     st.success("Trocado!")
@@ -656,7 +652,7 @@ if menu == "📊 Dashboard de Controle":
                                 
                                 novo_ped = pd.DataFrame([{'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 'LABORATORIO': m_lab.upper(), 'ENDERECO': m_rua.upper(), 'NUMERO': "", 'BAIRRO': m_bai.upper(), 'CIDADE': m_cid.upper(), 'UF': "SP", 'CEP': "", 'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""}])
                                 df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
-                                aba_memoria.clear()
+                                
                                 aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
                                 if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
                                 st.success(f"Pedido {m_pedido} criado!")
@@ -768,7 +764,6 @@ elif menu == "➕ Importação de Lotes":
                     
                     df_up = pd.concat([df_up, df_final], ignore_index=True) if not df_up.empty else df_final
                     
-                    aba.clear()
                     aba.update("A1", [df_up.columns.tolist()] + df_up.fillna("").astype(str).values.tolist())
                     
                     lista_app = []
@@ -789,7 +784,7 @@ elif menu == "➕ Importação de Lotes":
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO E COM FOTOS/DADOS COMPLETO)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO)
 # =============================================================================
 elif menu == "📋 Triagem e Romaneio":
     st.markdown("<h2 class='dinamic-text'>📋 Triagem e Despacho</h2>", unsafe_allow_html=True)
@@ -855,7 +850,6 @@ elif menu == "📋 Triagem e Romaneio":
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(p_ids)
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'CONFERIDO'
-                                aba.clear()
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 st.success(f"🎉 {len(p_ids)} pedidos enviados para o Despacho!")
                                 carregar_dados_completos.clear()
@@ -909,10 +903,8 @@ elif menu == "📋 Triagem e Romaneio":
                                 if 'AGENTE_RAW' in df_nuvem.columns:
                                     df_nuvem.loc[mascara_pedidos, 'AGENTE_RAW'] = motorista_escolhido
                                 
-                                aba.clear()
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 
-                                # AQUI FOI ONDE A MÁGICA FOI CORRIGIDA (Envia individual para o APP)
                                 lote_app = []
                                 for _, row in df_nuvem[mascara_pedidos].iterrows():
                                     lote_app.append({
@@ -1044,7 +1036,6 @@ elif menu == "⚙️ Configurar Rotas":
                     df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
                     try:
                         aba = planilha_db.worksheet("Agentes")
-                        aba.clear()
                         aba.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                         st.success(f"✅ Agente salvo!")
                         carregar_dados_agentes.clear()
@@ -1070,7 +1061,6 @@ elif menu == "⚙️ Configurar Rotas":
                     df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
                     try:
                         aba = planilha_db.worksheet("Agentes")
-                        aba.clear()
                         aba.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                         st.success(f"✅ Rota '{rota_str}' atrelada!")
                         carregar_dados_agentes.clear()
@@ -1101,7 +1091,6 @@ elif menu == "⚙️ Configurar Rotas":
                         nova_linha = pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": agente_filtro, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])
                         df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
                         try:
-                            planilha_db.worksheet("Agentes").clear()
                             planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                             st.success("Rota adicionada!")
                             carregar_dados_agentes.clear()
@@ -1121,7 +1110,6 @@ elif menu == "⚙️ Configurar Rotas":
                             df_novo = DF_AGENTES.drop(idx)
                             try:
                                 aba = planilha_db.worksheet("Agentes")
-                                aba.clear()
                                 aba.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                                 carregar_dados_agentes.clear()
                                 st.rerun()
