@@ -29,7 +29,6 @@ def conectar_banco():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     
     try:
-        # 1. TENTA MODO LOCAL (Seu computador)
         caminho_windows = r"C:\Users\elcic\IGO_Logistica_Sistema"
         cred_win = os.path.join(caminho_windows, "credentials.json")
         token_win = os.path.join(caminho_windows, "token.json")
@@ -38,7 +37,6 @@ def conectar_banco():
             gc = gspread.oauth(credentials_filename=cred_win, authorized_user_filename=token_win)
             return gc.open("DB_IGO_Logistica")
 
-        # 2. TENTA MODO NUVEM (Streamlit Secrets)
         elif "google_token_json" in st.secrets:
             import json
             from google.oauth2.credentials import Credentials
@@ -123,9 +121,6 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         return True
     except Exception: return False
 
-# =============================================================================
-# 🧠 2. CÉREBRO LOGÍSTICO E EXPORTAÇÃO
-# =============================================================================
 def tratar_texto_global(texto):
     if pd.isna(texto): return ""
     t = unicodedata.normalize('NFKD', str(texto).replace('"', '').replace("'", "").replace('\n', ' ')).encode('ASCII', 'ignore').decode('utf-8').upper().strip()
@@ -181,65 +176,36 @@ def gerar_excel_memoria(df):
 # 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM (SAAS LEVEL)
 # =============================================================================
 
-# Define a cor de fundo com base no toggle (que leremos via session_state para injetar antes)
 if 'modo_escuro' not in st.session_state: st.session_state.modo_escuro = False
 
 st.markdown("""
     <style>
-    /* Esconde elementos nativos do Streamlit que poluem a tela */
     #MainMenu {visibility: hidden;} footer {visibility: hidden;}
     [data-testid="stSidebarNav"] {display: none;}
     
-    /* Estilo Ultra Premium para o Menu Lateral (Radio Buttons) */
-    div.stRadio > div[role="radiogroup"] {
-        display: flex; flex-direction: column; gap: 8px; width: 100% !important;
-    }
+    div.stRadio > div[role="radiogroup"] { display: flex; flex-direction: column; gap: 8px; width: 100% !important; }
     div[role="radiogroup"] > label {
-        width: 100% !important;
-        padding: 12px 16px !important;
-        border-radius: 8px !important;
-        margin: 0 !important;
-        border: none !important;
-        background-color: transparent !important;
-        cursor: pointer !important;
-        transition: all 0.2s ease-in-out !important;
-        box-sizing: border-box !important;
+        width: 100% !important; padding: 12px 16px !important; border-radius: 8px !important;
+        margin: 0 !important; border: none !important; background-color: transparent !important;
+        cursor: pointer !important; transition: all 0.2s ease-in-out !important; box-sizing: border-box !important;
     }
-    div[role="radiogroup"] > label:hover {
-        background-color: rgba(56, 189, 248, 0.08) !important;
-    }
-    /* Esconde a "bolinha" do radio */
-    div[role="radiogroup"] label div[data-testid="stRadio-radio"] { 
-        display: none !important; 
-    }
-    /* Estilo do Texto Padrão do Menu */
+    div[role="radiogroup"] > label:hover { background-color: rgba(56, 189, 248, 0.08) !important; }
+    div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; }
     div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p { 
-        font-size: 15px !important; 
-        font-weight: 500 !important; 
-        margin: 0 !important;
-        color: #64748b !important; /* Cor suave (ajustada depois no modo escuro) */
-        transition: color 0.2s ease !important;
+        font-size: 14px !important; font-weight: 600 !important; margin: 0 !important;
+        color: #64748b !important; transition: color 0.2s ease !important;
     }
-    /* Estilo do Menu ATIVO */
     div[role="radiogroup"] > label[data-checked="true"] { 
-        background-color: rgba(56, 189, 248, 0.12) !important; 
-        border-left: 4px solid #38BDF8 !important; 
-        border-radius: 0 8px 8px 0 !important;
+        background-color: rgba(56, 189, 248, 0.12) !important; border-left: 4px solid #38BDF8 !important; border-radius: 0 8px 8px 0 !important;
     }
-    div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p { 
-        color: #0284c7 !important; 
-        font-weight: 700 !important; 
-    }
+    div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p { color: #0284c7 !important; font-weight: 700 !important; }
 
-    /* Estilo dos Botões de KPI Superiores */
-    div.st-key-kpi_total button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; height: 75px !important; border-radius: 10px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_entregue button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; height: 75px !important; border-radius: 10px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; height: 75px !important; border-radius: 10px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; height: 75px !important; border-radius: 10px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_hoje button { background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; height: 75px !important; border-radius: 10px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { font-weight: 800 !important; font-size: 15px !important; margin: 0 !important; color: white !important;}
-    
-    /* Toggle de Modo Escuro disfarçado */
+    div.st-key-kpi_total button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; height: 70px !important; border-radius: 8px !important; border: none !important; color: white !important;}
+    div.st-key-kpi_entregue button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; height: 70px !important; border-radius: 8px !important; border: none !important; color: white !important;}
+    div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; height: 70px !important; border-radius: 8px !important; border: none !important; color: white !important;}
+    div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; height: 70px !important; border-radius: 8px !important; border: none !important; color: white !important;}
+    div.st-key-kpi_hoje button { background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; height: 70px !important; border-radius: 8px !important; border: none !important; color: white !important;}
+    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { font-weight: 800 !important; font-size: 14px !important; margin: 0 !important; color: white !important;}
     label[data-testid="stWidgetLabel"] {display: none;}
     </style>
 """, unsafe_allow_html=True)
@@ -247,29 +213,17 @@ st.markdown("""
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
 with st.sidebar:
-    # Header Premium Simétrico (Logo e Toggle na mesma linha)
     col_logo, col_tema = st.columns([3, 1], vertical_alignment="center")
-    with col_logo:
-        st.markdown("<h2 style='color:#38BDF8; margin: 0; padding-bottom: 5px; font-weight: 800;'>IGO ADMIN</h2>", unsafe_allow_html=True)
-    with col_tema:
-        st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
+    with col_logo: st.markdown("<h2 style='color:#38BDF8; margin: 0; padding-bottom: 5px; font-weight: 800;'>IGO ADMIN</h2>", unsafe_allow_html=True)
+    with col_tema: st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
     
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True) # Espaçamento elegante
-    
-    # Menu Ultra Premium
+    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
     menu = st.radio("Navegação:", ["📊 Dashboard de Controle", "➕ Importação de Lotes", "📋 Triagem e Romaneio", "📥 Exportar Relatórios", "⚙️ Configurar Rotas"], label_visibility="collapsed")
-    
-    # Espaçador Flexível para jogar o botão de Sair pro final (Truque de UI)
     st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
-    
     st.divider()
-    # Botão de Sair Minimalista e Funcional
     if st.button("🚪 Sair do Sistema", use_container_width=True, type="secondary"):
-        st.cache_data.clear()
-        st.cache_resource.clear()
-        st.rerun()
+        st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
 
-# Cores Dinâmicas Baseadas no Toggle
 bg_app = "#0e1117" if st.session_state.modo_escuro else "#f8fafc"
 bg_side = "#161b22" if st.session_state.modo_escuro else "#ffffff"
 txt_main = "#f8fafc" if st.session_state.modo_escuro else "#0f172a"
@@ -282,17 +236,18 @@ st.markdown(f"""<style>
 [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c}; padding-top: 2rem !important; }}
 .dinamic-text {{ color: {txt_main} !important; }}
 .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
-/* Injeta cores escuras no menu caso o toggle esteja ativado */
 div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu} !important; }}
 div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu_ativo} !important; }}
 </style>""", unsafe_allow_html=True)
 
+# CSS DA GRID - OTIMIZADO PARA ALTA DENSIDADE (FONTE 11PX)
 def obter_css_grid():
     base_css = {
-        ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "8px"},
-        ".ag-header": {"background-color": "#1e293b !important"},
-        ".ag-header-cell-text": {"color": "#f8fafc !important", "font-weight": "bold"},
-        ".ag-cell": {"font-size": "13px !important", "font-family": "Inter, sans-serif !important"},
+        ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "6px"},
+        ".ag-header": {"background-color": "#1e293b !important", "min-height": "35px !important", "height": "35px !important"},
+        ".ag-header-cell-text": {"color": "#f8fafc !important", "font-weight": "700 !important", "font-size": "11px !important"},
+        ".ag-cell": {"font-size": "11px !important", "font-family": "Inter, sans-serif !important", "display": "flex", "align-items": "center", "padding-left": "8px !important"},
+        ".ag-row": {"min-height": "32px !important", "height": "32px !important"},
         ".ag-row-selected": {"background-color": "#3B82F6 !important", "color": "#ffffff !important"},
         ".ag-row-selected .ag-cell": {"color": "#ffffff !important"}
     }
@@ -307,9 +262,30 @@ def obter_css_grid():
         base_css.update({
             ".ag-cell": {"color": "#334155 !important", "border-bottom": "1px solid #f1f5f9 !important"},
             ".ag-row-even": {"background-color": "#ffffff !important"}, ".ag-row-odd": {"background-color": "#f8fafc !important"}, 
-            ".ag-row-hover": {"background-color": "#f1f5f9 !important"}
+            ".ag-row-hover": {"background-color": "#e2e8f0 !important"}
         })
     return base_css
+
+# FUNÇÃO ARQUITETA DE COLUNAS (FIM DA TABELA ESPREMIDA)
+def aplicar_layout_colunas(gb, df):
+    gb.configure_default_column(resizable=True, sortable=True, wrapText=False, autoHeight=False)
+    # Define os tamanhos fixos para as colunas que são "curtas" e conhecidas
+    larguras = {
+        'DATA': 80, 'PEDIDO': 85, 'TOMADOR': 90, 'UF': 50, 'CEP': 85, 
+        'NUMERO': 70, 'DATA_LIMITE': 95, 'DATA_ENTREGA': 95, 
+        'STATUS': 110, 'STATUS_DISPLAY': 130, 'AGENTE_RAW': 110, 'MOTORISTA': 110
+    }
+    for col in df.columns:
+        if col in larguras:
+            gb.configure_column(col, width=larguras[col], minWidth=larguras[col])
+        elif col in ['LABORATORIO', 'ENDERECO', 'CIDADE', 'BAIRRO']:
+            # Colunas de texto grande ganham "flex" para esticar, mas nunca ficam menores que 140px
+            gb.configure_column(col, minWidth=140, flex=1, tooltipField=col)
+        elif col == 'FOTO_URL':
+            pass 
+        else:
+            gb.configure_column(col, minWidth=100)
+    return gb
 
 # =============================================================================
 # 🚀 MÓDULO 1: DASHBOARD DE CONTROLE
@@ -388,11 +364,11 @@ if menu == "📊 Dashboard de Controle":
 
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
-            gb.configure_default_column(resizable=True, sortable=True, minWidth=120)
+            gb = aplicar_layout_colunas(gb, df_grid) # Aplica o visual Premium
             gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
             
-            st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'900'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'900'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'900'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'900'};} return {'fontWeight':'bold'};}")
-            gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, width=160)
+            st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'800'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'800'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'800'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'800'};} return {'fontWeight':'bold'};}")
+            gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js)
             
             img_js = JsCode("""
             class FotoRenderer {
@@ -401,7 +377,7 @@ if menu == "📊 Dashboard de Controle":
                     this.eGui.style.textAlign = 'center';
                     let val = params.value;
                     if (val && val !== '' && val !== 'nan' && val !== 'None' && val.includes('http')) {
-                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 20px;" title="Ver Comprovante">📸</span>';
+                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 16px;" title="Ver Comprovante">📸</span>';
                         this.eGui.onclick = () => {
                             let modal = document.createElement('div');
                             modal.style.position = 'fixed'; modal.style.zIndex = '999999';
@@ -423,9 +399,9 @@ if menu == "📊 Dashboard de Controle":
                 getGui() { return this.eGui; }
             }
             """)
-            gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90)
+            gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=70, minWidth=70)
             
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=450)
+            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500)
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -442,7 +418,7 @@ if menu == "📊 Dashboard de Controle":
             st.markdown("""
                 <style>
                 div[data-testid="stPopover"] > button, button[kind="secondary"] {
-                    white-space: nowrap !important; overflow: hidden !important; font-weight: bold !important;
+                    white-space: nowrap !important; overflow: hidden !important; font-weight: bold !important; font-size: 13px !important;
                 }
                 </style>
             """, unsafe_allow_html=True)
@@ -531,7 +507,7 @@ if menu == "📊 Dashboard de Controle":
                                 st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
 
-            with col_b4.popover("🔄 Trocar Motorista", use_container_width=True):
+            with col_b4.popover("🔄 Motorista", use_container_width=True):
                 if not tem_sel: st.warning("Selecione na Grid primeiro!")
                 else:
                     logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
@@ -562,7 +538,7 @@ if menu == "📊 Dashboard de Controle":
                 st.cache_data.clear()
                 st.rerun()
                 
-            col_b6.button("⚙️ Colunas", disabled=True, use_container_width=True, help="Use o menu no canto direito da tabela.")
+            col_b6.button("⚙️ Configs", disabled=True, use_container_width=True, help="Use o menu no canto direito da tabela.")
 
     else:
         st.warning("📭 O banco de dados está totalmente vazio no momento.")
@@ -680,7 +656,8 @@ elif menu == "➕ Importação de Lotes":
             st.error("⚠️ Atenção: Há pedidos SEM MOTORISTA atribuído! Eles estão marcados com fundo vermelho na tabela.")
         
         gb_prev = GridOptionsBuilder.from_dataframe(st.session_state.df_preview)
-        gb_prev.configure_default_column(resizable=True, sortable=True, minWidth=130)
+        gb_prev = aplicar_layout_colunas(gb_prev, st.session_state.df_preview) # Aplica o visual Premium
+        
         js_err = JsCode("function(p){if(p.data.AGENTE_RAW == ''){return {'backgroundColor': '#FDEDEC', 'color': '#B03A2E', 'fontWeight': 'bold'};} return {};}")
         gb_prev.configure_grid_options(getRowStyle=js_err)
         
@@ -724,7 +701,7 @@ elif menu == "➕ Importação de Lotes":
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO ANTI-LIMITE DO GOOGLE)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO)
 # =============================================================================
 elif menu == "📋 Triagem e Romaneio":
     st.markdown("<h2 class='dinamic-text'>📋 Triagem e Despacho</h2>", unsafe_allow_html=True)
@@ -766,6 +743,7 @@ elif menu == "📋 Triagem e Romaneio":
             if not df_fila.empty:
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
+                gb_fila = aplicar_layout_colunas(gb_fila, df_fila) # Aplica o visual Premium
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual')
                 
@@ -782,17 +760,13 @@ elif menu == "📋 Triagem e Romaneio":
                             if isinstance(selecionados_manuais, pd.DataFrame): p_ids = selecionados_manuais['PEDIDO'].astype(str).tolist()
                             else: p_ids = [str(r['PEDIDO']) for r in selecionados_manuais]
                             try:
-                                # OTIMIZAÇÃO: Atualização em Lote com 1 requisição
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(p_ids)
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'CONFERIDO'
-                                
                                 aba.clear()
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                
                                 st.success(f"🎉 {len(p_ids)} pedidos enviados para o Despacho!")
                                 st.cache_data.clear()
                                 st.rerun()
@@ -804,6 +778,7 @@ elif menu == "📋 Triagem e Romaneio":
             df_conf = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
             if not df_conf.empty:
                 gb = GridOptionsBuilder.from_dataframe(df_conf[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']])
+                gb = aplicar_layout_colunas(gb, df_conf[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']]) # Aplica visual Premium
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300)
                 
@@ -828,21 +803,17 @@ elif menu == "📋 Triagem e Romaneio":
                             pedidos_ids = [str(r['PEDIDO']) for r in sel_lista]
                             
                             try:
-                                # OTIMIZAÇÃO: Atualização em Lote com 1 requisição
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(pedidos_ids)
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'EM ROTA DE ENTREGA'
                                 df_nuvem.loc[mascara_pedidos, 'ROMANEIO'] = id_romaneio
                                 if 'AGENTE_RAW' in df_nuvem.columns:
                                     df_nuvem.loc[mascara_pedidos, 'AGENTE_RAW'] = motorista_escolhido
-                                
                                 aba.clear()
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 
-                                # Envio para o AppSheet (Já é feito em lote nativamente)
                                 base_tomador = sel_lista[0].get('TOMADOR', 'CLIENTE')
                                 base_cidade = sel_lista[0].get('CIDADE', '')
                                 lote_app = [{
@@ -854,7 +825,6 @@ elif menu == "📋 Triagem e Romaneio":
                                 despachar_para_appsheet(lote_app)
                                 st.cache_data.clear()
                                 
-                                # Geração do PDF
                                 pdf = FPDF()
                                 pdf.add_page()
                                 pdf.set_draw_color(44, 62, 80); pdf.set_line_width(1); pdf.rect(5, 5, 200, 287)
@@ -886,6 +856,7 @@ elif menu == "📋 Triagem e Romaneio":
                             except Exception as e: st.error(f"Erro ao processar despacho: {e}")
             else: st.info("Nenhum pedido com status 'CONFERIDO' no momento.")
     else: st.info("O banco de dados está vazio no momento.")
+
 # =============================================================================
 # 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
 # =============================================================================
