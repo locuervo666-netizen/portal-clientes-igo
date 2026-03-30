@@ -94,14 +94,17 @@ def conectar_banco_seguro():
     # 2. TENTA MODO NUVEM (Streamlit Secrets)
     else:
         try:
-            # Puxa o dicionário JSON que você colou no cofre do Streamlit
-            if "gcp_service_account" in st.secrets:
-                cred_dict = dict(st.secrets["gcp_service_account"])
+            if "google_json" in st.secrets:
+                import json
+                cred_dict = json.loads(st.secrets["google_json"])
                 creds = Credentials.from_service_account_info(cred_dict, scopes=scopes)
                 return gspread.authorize(creds)
             else:
-                st.error("❌ Cofre do Streamlit vazio. Crie o 'gcp_service_account' no painel Secrets.")
+                st.error("❌ Cofre do Streamlit vazio. Siga o passo a passo para colar o JSON.")
                 return None
+        except Exception as e:
+            st.error(f"Erro na leitura da chave: Certifique-se de ter usado três aspas simples (''') no cofre.")
+            return None
         except Exception as e:
             st.error(f"Erro ao ler cofre da nuvem: {e}")
             return None
