@@ -25,9 +25,7 @@ st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
 @st.cache_resource
 def conectar_banco():
-    """Conecta ao Google Sheets (Local ou Nuvem)"""
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    
     try:
         caminho_windows = r"C:\Users\elcic\IGO_Logistica_Sistema"
         cred_win = os.path.join(caminho_windows, "credentials.json")
@@ -44,11 +42,9 @@ def conectar_banco():
             creds = Credentials.from_authorized_user_info(token_info, scopes)
             gc = gspread.authorize(creds)
             return gc.open("DB_IGO_Logistica")
-            
         else:
             st.error("❌ Credenciais não encontradas (Local ou Secrets).")
             return None
-            
     except Exception as e:
         st.error(f"Erro na conexão: {e}")
         return None
@@ -173,7 +169,7 @@ def gerar_excel_memoria(df):
     return output.getvalue()
 
 # =============================================================================
-# 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM (SAAS LEVEL)
+# 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM
 # =============================================================================
 
 if 'modo_escuro' not in st.session_state: st.session_state.modo_escuro = False
@@ -192,7 +188,7 @@ st.markdown("""
     div[role="radiogroup"] > label:hover { background-color: rgba(56, 189, 248, 0.08) !important; }
     div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; }
     div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p { 
-        font-size: 14px !important; font-weight: 600 !important; margin: 0 !important;
+        font-size: 15px !important; font-weight: 600 !important; margin: 0 !important;
         color: #64748b !important; transition: color 0.2s ease !important;
     }
     div[role="radiogroup"] > label[data-checked="true"] { 
@@ -200,12 +196,12 @@ st.markdown("""
     }
     div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p { color: #0284c7 !important; font-weight: 700 !important; }
 
-    div.st-key-kpi_total button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; height: 70px !important; border-radius: 8px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_entregue button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; height: 70px !important; border-radius: 8px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; height: 70px !important; border-radius: 8px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; height: 70px !important; border-radius: 8px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_hoje button { background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; height: 70px !important; border-radius: 8px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { font-weight: 800 !important; font-size: 14px !important; margin: 0 !important; color: white !important;}
+    div.st-key-kpi_total button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}
+    div.st-key-kpi_entregue button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}
+    div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}
+    div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}
+    div.st-key-kpi_hoje button { background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}
+    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { font-weight: 800 !important; font-size: 15px !important; margin: 0 !important; color: white !important;}
     label[data-testid="stWidgetLabel"] {display: none;}
     </style>
 """, unsafe_allow_html=True)
@@ -240,14 +236,13 @@ div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ color: 
 div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu_ativo} !important; }}
 </style>""", unsafe_allow_html=True)
 
-# CSS DA GRID - OTIMIZADO PARA ALTA DENSIDADE (FONTE 11PX)
+# CSS DA GRID - VOLTOU AO TAMANHO NORMAL (13px)
 def obter_css_grid():
     base_css = {
         ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "6px"},
-        ".ag-header": {"background-color": "#1e293b !important", "min-height": "35px !important", "height": "35px !important"},
-        ".ag-header-cell-text": {"color": "#f8fafc !important", "font-weight": "700 !important", "font-size": "11px !important"},
-        ".ag-cell": {"font-size": "11px !important", "font-family": "Inter, sans-serif !important", "display": "flex", "align-items": "center", "padding-left": "8px !important"},
-        ".ag-row": {"min-height": "32px !important", "height": "32px !important"},
+        ".ag-header": {"background-color": "#1e293b !important"},
+        ".ag-header-cell-text": {"color": "#f8fafc !important", "font-weight": "bold", "font-size": "13px !important"},
+        ".ag-cell": {"font-size": "13px !important", "display": "flex", "align-items": "center"},
         ".ag-row-selected": {"background-color": "#3B82F6 !important", "color": "#ffffff !important"},
         ".ag-row-selected .ag-cell": {"color": "#ffffff !important"}
     }
@@ -265,27 +260,6 @@ def obter_css_grid():
             ".ag-row-hover": {"background-color": "#e2e8f0 !important"}
         })
     return base_css
-
-# FUNÇÃO ARQUITETA DE COLUNAS (FIM DA TABELA ESPREMIDA)
-def aplicar_layout_colunas(gb, df):
-    gb.configure_default_column(resizable=True, sortable=True, wrapText=False, autoHeight=False)
-    # Define os tamanhos fixos para as colunas que são "curtas" e conhecidas
-    larguras = {
-        'DATA': 80, 'PEDIDO': 85, 'TOMADOR': 90, 'UF': 50, 'CEP': 85, 
-        'NUMERO': 70, 'DATA_LIMITE': 95, 'DATA_ENTREGA': 95, 
-        'STATUS': 110, 'STATUS_DISPLAY': 130, 'AGENTE_RAW': 110, 'MOTORISTA': 110
-    }
-    for col in df.columns:
-        if col in larguras:
-            gb.configure_column(col, width=larguras[col], minWidth=larguras[col])
-        elif col in ['LABORATORIO', 'ENDERECO', 'CIDADE', 'BAIRRO']:
-            # Colunas de texto grande ganham "flex" para esticar, mas nunca ficam menores que 140px
-            gb.configure_column(col, minWidth=140, flex=1, tooltipField=col)
-        elif col == 'FOTO_URL':
-            pass 
-        else:
-            gb.configure_column(col, minWidth=100)
-    return gb
 
 # =============================================================================
 # 🚀 MÓDULO 1: DASHBOARD DE CONTROLE
@@ -364,11 +338,14 @@ if menu == "📊 Dashboard de Controle":
 
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
-            gb = aplicar_layout_colunas(gb, df_grid) # Aplica o visual Premium
+            # COLOQUEI UM TAMANHO MÍNIMO BOM (150) E RETIREI O CORTE AUTOMÁTICO
+            gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
+            # A MÁGICA DA SELEÇÃO DE LINHA INTEIRA VOLTOU
             gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+            gb.configure_grid_options(rowMultiSelectWithClick=True, suppressRowClickSelection=False)
             
             st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'800'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'800'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'800'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'800'};} return {'fontWeight':'bold'};}")
-            gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js)
+            gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, minWidth=170)
             
             img_js = JsCode("""
             class FotoRenderer {
@@ -377,7 +354,7 @@ if menu == "📊 Dashboard de Controle":
                     this.eGui.style.textAlign = 'center';
                     let val = params.value;
                     if (val && val !== '' && val !== 'nan' && val !== 'None' && val.includes('http')) {
-                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 16px;" title="Ver Comprovante">📸</span>';
+                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 18px;" title="Ver Comprovante">📸</span>';
                         this.eGui.onclick = () => {
                             let modal = document.createElement('div');
                             modal.style.position = 'fixed'; modal.style.zIndex = '999999';
@@ -399,9 +376,10 @@ if menu == "📊 Dashboard de Controle":
                 getGui() { return this.eGui; }
             }
             """)
-            gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=70, minWidth=70)
+            gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90)
             
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500)
+            # FIT_COLUMNS FALSE EVITA QUE O SISTEMA ESMAGUE AS COLUNAS
+            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500, fit_columns_on_grid_load=False)
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -418,7 +396,7 @@ if menu == "📊 Dashboard de Controle":
             st.markdown("""
                 <style>
                 div[data-testid="stPopover"] > button, button[kind="secondary"] {
-                    white-space: nowrap !important; overflow: hidden !important; font-weight: bold !important; font-size: 13px !important;
+                    white-space: nowrap !important; overflow: hidden !important; font-weight: bold !important; font-size: 14px !important;
                 }
                 </style>
             """, unsafe_allow_html=True)
@@ -426,7 +404,7 @@ if menu == "📊 Dashboard de Controle":
             col_b1, col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns([1.3, 1, 1, 1.4, 1.2, 0.9])
             
             with col_b1.popover("➕ Novo Pedido", use_container_width=True):
-                st.markdown("Inserir Pedido Manual (Urgências e Testes)")
+                st.markdown("Inserir Pedido Manual")
                 with st.form("form_manual", clear_on_submit=True):
                     m_tomador = st.selectbox("Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
                     m_data = st.date_input("Data:", format="DD/MM/YYYY")
@@ -538,15 +516,14 @@ if menu == "📊 Dashboard de Controle":
                 st.cache_data.clear()
                 st.rerun()
                 
-            col_b6.button("⚙️ Configs", disabled=True, use_container_width=True, help="Use o menu no canto direito da tabela.")
+            col_b6.button("⚙️ Configs", disabled=True, use_container_width=True)
 
     else:
-        st.warning("📭 O banco de dados está totalmente vazio no momento.")
+        st.warning("📭 O banco de dados está vazio no momento.")
         st.markdown("### 🚀 Dê a partida no sistema:")
         col_vazia, _ = st.columns([1, 3])
         
-        with col_vazia.popover("➕ Criar Primeiro Pedido Manual", use_container_width=True):
-            st.markdown("Inserir Pedido Inicial (Urgências e Testes)")
+        with col_vazia.popover("➕ Criar Primeiro Pedido", use_container_width=True):
             with st.form("form_manual_vazio", clear_on_submit=True):
                 m_tomador = st.selectbox("Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
                 m_data = st.date_input("Data:", format="DD/MM/YYYY")
@@ -584,8 +561,7 @@ if menu == "📊 Dashboard de Controle":
 # =============================================================================
 elif menu == "➕ Importação de Lotes":
     st.markdown("<h2 class='dinamic-text'>➕ Central de Importação</h2>", unsafe_allow_html=True)
-    
-    st.success("🛡️ **SEGURANÇA DO HISTÓRICO:** O sistema de importação sempre **ADICIONA** os novos pedidos na base. O seu histórico do dia (como os lotes de RJ e Juiz de Fora) estão seguros e não serão apagados ao importar uma nova planilha.")
+    st.success("🛡️ **SEGURANÇA DO HISTÓRICO:** O sistema de importação sempre **ADICIONA** os novos pedidos na base. O seu histórico do dia estão seguros.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
     if "texto_importacao" not in st.session_state: st.session_state.texto_importacao = ""
@@ -593,10 +569,8 @@ elif menu == "➕ Importação de Lotes":
     with st.container(border=True):
         st.markdown("#### 1. Dados do Lote e Colagem")
         c1, c2, c3 = st.columns([1, 1, 2])
-        with c1:
-            tom = st.selectbox("🏢 Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-        with c2:
-            dt_c = st.date_input("📅 Data da Coleta:", format="DD/MM/YYYY")
+        with c1: tom = st.selectbox("🏢 Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+        with c2: dt_c = st.date_input("📅 Data da Coleta:", format="DD/MM/YYYY")
 
         txt = st.text_area("📋 Cole os dados do Excel aqui (Ctrl+V):", height=150, key="texto_importacao", help="Apenas copie as células do Excel e cole direto aqui.")
 
@@ -641,7 +615,6 @@ elif menu == "➕ Importação de Lotes":
 
                     df_limpo['UF'] = df_limpo['UF'].astype(str).str.upper().str.strip()
                     df_limpo['CIDADE'] = df_limpo['CIDADE'].astype(str).str.upper().str.strip()
-
                     df_limpo['TOMADOR'], df_limpo['DATA'] = tom, dt_c.strftime("%d/%m/%Y")
                     df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
                     st.session_state.df_preview = df_limpo[['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
@@ -650,18 +623,18 @@ elif menu == "➕ Importação de Lotes":
 
     if not st.session_state.df_preview.empty:
         st.markdown("---")
-        st.markdown("### 👀 2. Preview dos Dados (Verifique antes de salvar)")
+        st.markdown("### 👀 2. Preview dos Dados")
         
         if (st.session_state.df_preview['AGENTE_RAW'] == "").any(): 
-            st.error("⚠️ Atenção: Há pedidos SEM MOTORISTA atribuído! Eles estão marcados com fundo vermelho na tabela.")
+            st.error("⚠️ Atenção: Há pedidos SEM MOTORISTA atribuído! Estão marcados em vermelho.")
         
         gb_prev = GridOptionsBuilder.from_dataframe(st.session_state.df_preview)
-        gb_prev = aplicar_layout_colunas(gb_prev, st.session_state.df_preview) # Aplica o visual Premium
+        gb_prev.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
         
         js_err = JsCode("function(p){if(p.data.AGENTE_RAW == ''){return {'backgroundColor': '#FDEDEC', 'color': '#B03A2E', 'fontWeight': 'bold'};} return {};}")
         gb_prev.configure_grid_options(getRowStyle=js_err)
         
-        AgGrid(st.session_state.df_preview, gridOptions=gb_prev.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400)
+        AgGrid(st.session_state.df_preview, gridOptions=gb_prev.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
         
         st.markdown("<br>", unsafe_allow_html=True)
         col_btn2, _ = st.columns([1, 2])
@@ -743,9 +716,11 @@ elif menu == "📋 Triagem e Romaneio":
             if not df_fila.empty:
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
-                gb_fila = aplicar_layout_colunas(gb_fila, df_fila) # Aplica o visual Premium
+                gb_fila.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
-                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual')
+                gb_fila.configure_grid_options(rowMultiSelectWithClick=True, suppressRowClickSelection=False)
+                
+                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False)
                 
                 selecionados_manuais = grid_fila_resp['selected_rows']
                 tem_selecao = False
@@ -778,9 +753,11 @@ elif menu == "📋 Triagem e Romaneio":
             df_conf = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
             if not df_conf.empty:
                 gb = GridOptionsBuilder.from_dataframe(df_conf[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']])
-                gb = aplicar_layout_colunas(gb, df_conf[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']]) # Aplica visual Premium
+                gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
-                grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300)
+                gb.configure_grid_options(rowMultiSelectWithClick=True, suppressRowClickSelection=False)
+                
+                grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False)
                 
                 selecionados = grid_resp['selected_rows']
                 tem_sel_pdf = False
@@ -811,6 +788,7 @@ elif menu == "📋 Triagem e Romaneio":
                                 df_nuvem.loc[mascara_pedidos, 'ROMANEIO'] = id_romaneio
                                 if 'AGENTE_RAW' in df_nuvem.columns:
                                     df_nuvem.loc[mascara_pedidos, 'AGENTE_RAW'] = motorista_escolhido
+                                
                                 aba.clear()
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 
