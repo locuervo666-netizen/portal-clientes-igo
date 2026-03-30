@@ -85,12 +85,24 @@ def carregar_dados_completos(_planilha):
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                     
+                    # === DICIONÁRIO DE ROMANEIOS PARA APLICAR STATUS EM MASSA ===
+                    rom_mask = df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)
+                    rom_dict = df_app_clean[rom_mask].set_index('PEDIDO').to_dict('index')
+                    
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
                     
                     def get_true_status(row):
                         s_db = str(row.get('STATUS', '')).strip().upper()
                         s_app = str(row.get('APP_STATUS', '')).strip().upper()
+                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        
+                        # Se o Romaneio foi baixado no app, todo o lote ganha o status!
+                        if rom_id in rom_dict:
+                            s_rom = str(rom_dict[rom_id].get('APP_STATUS', '')).strip().upper()
+                            if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']:
+                                return s_rom
+                                
                         if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_db
                         if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_app
                         if s_db in ['EM ROTA DE ENTREGA', 'CONFERIDO']: return s_db
@@ -99,9 +111,22 @@ def carregar_dados_completos(_planilha):
                     
                     df['STATUS'] = df.apply(get_true_status, axis=1)
                     
-                    if 'APP_FOTO' in df.columns:
-                        df['APP_FOTO'] = df['APP_FOTO'].fillna('')
-                        df['FOTO'] = df.apply(lambda r: r['APP_FOTO'] if str(r.get('APP_FOTO','')).strip() and str(r.get('APP_FOTO','')).upper() != 'NAN' else r.get('FOTO', ''), axis=1)
+                    def get_true_foto(row):
+                        f_db = str(row.get('FOTO', '')).strip()
+                        f_app = str(row.get('APP_FOTO', '')).strip()
+                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        
+                        # Se o Romaneio tem foto, todo o lote recebe a foto!
+                        if rom_id in rom_dict:
+                            f_rom = str(rom_dict[rom_id].get('APP_FOTO', '')).strip()
+                            if f_rom and f_rom.upper() != 'NAN':
+                                return f_rom
+                                
+                        if f_app and f_app.upper() != 'NAN': return f_app
+                        return f_db
+                        
+                    if 'APP_FOTO' in df.columns or len(rom_dict) > 0:
+                        df['FOTO'] = df.apply(get_true_foto, axis=1)
                         
             except Exception: pass
             
@@ -652,7 +677,6 @@ if menu == "📊 Dashboard de Controle":
                                 
                                 novo_ped = pd.DataFrame([{'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 'LABORATORIO': m_lab.upper(), 'ENDERECO': m_rua.upper(), 'NUMERO': "", 'BAIRRO': m_bai.upper(), 'CIDADE': m_cid.upper(), 'UF': "SP", 'CEP': "", 'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""}])
                                 df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
-                                
                                 aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
                                 if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
                                 st.success(f"Pedido {m_pedido} criado!")
@@ -875,7 +899,6 @@ elif menu == "📋 Triagem e Romaneio":
                     else: tem_sel_pdf = len(selecionados) > 0
                 
                 st.markdown("---")
-                
                 c_mot, c_data, c_btn = st.columns([2, 1, 2])
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                 motorista_escolhido = c_mot.selectbox("👤 Motorista (Buscar):", ["Selecione..."] + logins_disp)
@@ -884,7 +907,7 @@ elif menu == "📋 Triagem e Romaneio":
                 if c_btn.button("🚚 Gerar Romaneio PDF e Despachar", type="primary", use_container_width=True):
                     if not tem_sel_pdf or motorista_escolhido == "Selecione...": st.warning("⚠️ Selecione os pedidos e um motorista!")
                     else:
-                        with st.spinner("Gerando PDF e enviando um por um ao AppSheet..."):
+                        with st.spinner("Gerando PDF e enviando o Lote ao AppSheet (Anti-Bloqueio)..."):
                             if isinstance(selecionados, pd.DataFrame): sel_lista = selecionados.to_dict('records')
                             else: sel_lista = selecionados
                             id_romaneio = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
@@ -905,20 +928,15 @@ elif menu == "📋 Triagem e Romaneio":
                                 
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 
-                                lote_app = []
-                                for _, row in df_nuvem[mascara_pedidos].iterrows():
-                                    lote_app.append({
-                                        'PEDIDO': str(row.get('PEDIDO', '')),
-                                        'MOTORISTA': motorista_escolhido,
-                                        'ENDERECO': str(row.get('ENDERECO', '')),
-                                        'NUMERO': str(row.get('NUMERO', '')),
-                                        'BAIRRO': str(row.get('BAIRRO', '')),
-                                        'CIDADE': str(row.get('CIDADE', '')),
-                                        'CEP': str(row.get('CEP', '')),
-                                        'LABORATORIO': str(row.get('LABORATORIO', '')),
-                                        'TOMADOR': str(row.get('TOMADOR', '')),
-                                        'ROMANEIO': id_romaneio
-                                    })
+                                # AQUI ESTÁ O SEU DESEJO ATENDIDO: ENVIA 1 LOTE INTEIRO PARA O MOTORISTA
+                                base_tomador = sel_lista[0].get('TOMADOR', 'CLIENTE')
+                                base_cidade = sel_lista[0].get('CIDADE', '')
+                                lote_app = [{
+                                    'PEDIDO': id_romaneio, 'MOTORISTA': motorista_escolhido,
+                                    'ENDERECO': "ENTREGA DE LOTE NO TOMADOR", 'NUMERO': f"{len(sel_lista)} VOLUMES",
+                                    'BAIRRO': base_tomador, 'CIDADE': base_cidade, 'CEP': "---",
+                                    'LABORATORIO': f"CONJUNTO DE {len(sel_lista)} PEDIDOS", 'TOMADOR': base_tomador, 'ROMANEIO': id_romaneio
+                                }]
                                 despachar_para_appsheet(lote_app)
                                 carregar_dados_completos.clear()
                                 
