@@ -236,7 +236,6 @@ div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ color: 
 div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu_ativo} !important; }}
 </style>""", unsafe_allow_html=True)
 
-# CSS DA GRID - VOLTOU AO TAMANHO NORMAL (13px)
 def obter_css_grid():
     base_css = {
         ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "6px"},
@@ -271,17 +270,25 @@ if menu == "📊 Dashboard de Controle":
     if not df_raw.empty:
         df_raw['FOTO_URL'] = df_raw['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
         
+        # REGRA CORRIGIDA: A Palavra do Admin (Banco) sobrepõe o AppSheet se for status final.
         def calc_status(row):
             s_db, s_app = str(row.get('STATUS', '')).strip().upper(), str(row.get('APP_STATUS', '')).strip().upper()
-            status_final = s_app if s_app and s_app != 'NAN' else s_db
+            
+            if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA']:
+                status_final = s_db
+            else:
+                status_final = s_app if s_app and s_app != 'NAN' else s_db
+                
             previsao = str(row.get('DATA_LIMITE', '')).strip()
             res = '⏳ Pendente'
+            
             if 'ENTREGUE' in status_final: res = '✅ Entregue'
             elif 'COLETADO' in status_final: res = '📦 Coletado'
             elif 'ROTA' in status_final: res = '🚚 Em Rota'
             elif 'CONFERIDO' in status_final: res = '☑️ Conferido'
             elif 'FRUSTRADA' in status_final: res = '❌ Frustrada'
             elif 'CANCELADO' in status_final: res = '🚫 Cancelado'
+            
             if '✅' not in res and '🚫' not in res and '❌' not in res and previsao:
                 try:
                     if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: res = f"🚨 ATRASADO ({res})"
@@ -338,9 +345,8 @@ if menu == "📊 Dashboard de Controle":
 
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
-            # COLOQUEI UM TAMANHO MÍNIMO BOM (150) E RETIREI O CORTE AUTOMÁTICO
             gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
-            # A MÁGICA DA SELEÇÃO DE LINHA INTEIRA VOLTOU
+            # SELEÇÃO COM CLIQUE NA LINHA INTEIRA (RESTAURADA)
             gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
             gb.configure_grid_options(rowMultiSelectWithClick=True, suppressRowClickSelection=False)
             
@@ -378,7 +384,6 @@ if menu == "📊 Dashboard de Controle":
             """)
             gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90)
             
-            # FIT_COLUMNS FALSE EVITA QUE O SISTEMA ESMAGUE AS COLUNAS
             grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500, fit_columns_on_grid_load=False)
             
             selecionados = grid_response['selected_rows']
@@ -406,17 +411,19 @@ if menu == "📊 Dashboard de Controle":
             with col_b1.popover("➕ Novo Pedido", use_container_width=True):
                 st.markdown("Inserir Pedido Manual")
                 with st.form("form_manual", clear_on_submit=True):
-                    m_tomador = st.selectbox("Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-                    m_data = st.date_input("Data:", format="DD/MM/YYYY")
-                    m_lab = st.text_input("Lab/Clínica:")
-                    m_rua = st.text_input("Endereço:")
-                    m_bai = st.text_input("Bairro:")
-                    m_cid = st.text_input("Cidade:")
+                    m_tomador = st.selectbox("Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+                    m_data = st.date_input("Data *", format="DD/MM/YYYY")
+                    m_lab = st.text_input("Lab/Clínica *")
+                    m_rua = st.text_input("Endereço *")
+                    m_bai = st.text_input("Bairro *")
+                    m_cid = st.text_input("Cidade *")
                     logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                     m_agente_escolha = st.selectbox("Motorista:", ["Automático (Por Rota)"] + logins_disp)
                     
                     if st.form_submit_button("💾 Salvar Pedido", type="primary"):
-                        if m_tomador == "Selecione..." or not m_cid: st.error("Tomador e Cidade são obrigatórios!")
+                        # VALIDAÇÃO FORTE: Não deixa ir em branco pro App
+                        if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
+                            st.error("⚠️ Preencha Tomador, Laboratório, Endereço, Bairro e Cidade!")
                         else:
                             with st.spinner("Salvando..."):
                                 m_agente = obter_login_agente(m_cid, m_bai, m_lab, m_rua, DF_AGENTES) if m_agente_escolha == "Automático (Por Rota)" else m_agente_escolha
@@ -433,14 +440,15 @@ if menu == "📊 Dashboard de Controle":
                                     aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
                                     if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
                                     st.success(f"Pedido {m_pedido} criado!")
-                                    st.cache_data.clear()
+                                    carregar_dados_completos.clear() # Limpa Cache
                                     st.rerun()
                                 except Exception as e: st.error(f"Erro: {e}")
 
             with col_b2.popover("📲 Dar Baixa", use_container_width=True):
                 if not tem_sel: st.warning("Selecione na Grid primeiro!")
                 else:
-                    status_baixa = st.selectbox("Novo Status:", ["ENTREGUE ✅", "COLETADO 📦", "PROBLEMA 🚨", "CANCELADO ❌"])
+                    status_baixa = st.selectbox("Novo Status:", ["ENTREGUE ✅", "PROBLEMA 🚨", "CANCELADO ❌"])
+                    data_baixa = st.date_input("Data da Ocorrência:", format="DD/MM/YYYY", value=hoje_br) # CORREÇÃO: Pede a data!
                     if st.button("Confirmar Baixa", type="primary", use_container_width=True):
                         with st.spinner("Atualizando Banco..."):
                             status_limpo = status_baixa.split(" ")[0].upper()
@@ -451,11 +459,25 @@ if menu == "📊 Dashboard de Controle":
                                 for pid in p_ids:
                                     mask = df_nuvem['PEDIDO'] == pid
                                     df_nuvem.loc[mask, 'STATUS'] = status_limpo
-                                    if status_limpo == "ENTREGUE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = hoje_br.strftime("%d/%m/%Y")
+                                    if status_limpo == "ENTREGUE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                 aba.clear()
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                
+                                # ATUALIZA O APPSHEET PARA SUMIR DA TELA DO MOTORISTA NA HORA
+                                try:
+                                    aba_app = planilha_db.worksheet("App_Tarefas")
+                                    dados_app = aba_app.get_all_values()
+                                    if len(dados_app) > 1:
+                                        df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
+                                        if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
+                                            mascara_app = df_app['PEDIDO'].isin(p_ids)
+                                            df_app.loc[mascara_app, 'STATUS'] = status_limpo
+                                            aba_app.clear()
+                                            aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
+                                except: pass # Não para o fluxo se o AppSheet já estiver limpo
+
                                 st.success("Atualizado!")
-                                st.cache_data.clear()
+                                carregar_dados_completos.clear() # Limpa Cache Total
                                 st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
 
@@ -469,19 +491,36 @@ if menu == "📊 Dashboard de Controle":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                novas_linhas = []
+                                
+                                clones_para_app = [] # CORREÇÃO: Guarda os clones para mandar pro AppSheet
+                                
                                 for pid in p_ids:
                                     if pid in df_nuvem['PEDIDO'].values:
                                         l_orig = df_nuvem[df_nuvem['PEDIDO'] == pid].iloc[0].copy()
-                                        l_orig['PEDIDO'] = f"{random.randint(100000, 999999)}-C"
+                                        novo_id = f"{random.randint(100000, 999999)}-C"
+                                        l_orig['PEDIDO'] = novo_id
                                         l_orig['DATA'] = hoje_br.strftime("%d/%m/%Y")
                                         l_orig['STATUS'] = "PENDENTE"
                                         l_orig['DATA_ENTREGA'] = ""; l_orig['FOTO'] = ""; l_orig['ROMANEIO'] = ""
                                         df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
+                                        
+                                        if str(l_orig.get('AGENTE_RAW','')).strip():
+                                            clones_para_app.append({
+                                                'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'],
+                                                'ENDERECO': l_orig.get('ENDERECO',''), 'NUMERO': l_orig.get('NUMERO',''),
+                                                'BAIRRO': l_orig.get('BAIRRO',''), 'CIDADE': l_orig.get('CIDADE',''),
+                                                'CEP': l_orig.get('CEP',''), 'LABORATORIO': l_orig.get('LABORATORIO',''),
+                                                'TOMADOR': l_orig.get('TOMADOR','')
+                                            })
+
                                 aba.clear()
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                
+                                # DISPARA PRO APPSHEET
+                                if clones_para_app: despachar_para_appsheet(clones_para_app)
+                                
                                 st.success("Clonado!")
-                                st.cache_data.clear()
+                                carregar_dados_completos.clear() # Limpa Cache Total
                                 st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
 
@@ -508,12 +547,12 @@ if menu == "📊 Dashboard de Controle":
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 despachar_para_appsheet(lista_app_troca)
                                 st.success("Trocado!")
-                                st.cache_data.clear()
+                                carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
 
             if col_b5.button("🔄 Atualizar", use_container_width=True):
-                st.cache_data.clear()
+                carregar_dados_completos.clear()
                 st.rerun()
                 
             col_b6.button("⚙️ Configs", disabled=True, use_container_width=True)
@@ -525,17 +564,18 @@ if menu == "📊 Dashboard de Controle":
         
         with col_vazia.popover("➕ Criar Primeiro Pedido", use_container_width=True):
             with st.form("form_manual_vazio", clear_on_submit=True):
-                m_tomador = st.selectbox("Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-                m_data = st.date_input("Data:", format="DD/MM/YYYY")
-                m_lab = st.text_input("Lab/Clínica:")
-                m_rua = st.text_input("Endereço:")
-                m_bai = st.text_input("Bairro:")
-                m_cid = st.text_input("Cidade:")
+                m_tomador = st.selectbox("Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+                m_data = st.date_input("Data *", format="DD/MM/YYYY")
+                m_lab = st.text_input("Lab/Clínica *")
+                m_rua = st.text_input("Endereço *")
+                m_bai = st.text_input("Bairro *")
+                m_cid = st.text_input("Cidade *")
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                 m_agente_escolha = st.selectbox("Motorista:", ["Automático (Por Rota)"] + logins_disp)
                 
                 if st.form_submit_button("💾 Salvar Pedido", type="primary"):
-                    if m_tomador == "Selecione..." or not m_cid: st.error("Tomador e Cidade são obrigatórios!")
+                    if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
+                        st.error("⚠️ Preencha Tomador, Laboratório, Endereço, Bairro e Cidade!")
                     else:
                         with st.spinner("Salvando..."):
                             m_agente = obter_login_agente(m_cid, m_bai, m_lab, m_rua, DF_AGENTES) if m_agente_escolha == "Automático (Por Rota)" else m_agente_escolha
@@ -552,7 +592,7 @@ if menu == "📊 Dashboard de Controle":
                                 aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
                                 if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
                                 st.success(f"Pedido {m_pedido} criado!")
-                                st.cache_data.clear()
+                                carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
 
@@ -670,7 +710,8 @@ elif menu == "➕ Importação de Lotes":
                     st.success("🎉 Lote adicionado com sucesso à base principal e despachado aos motoristas!")
                     st.session_state.texto_importacao = ""
                     st.session_state.df_preview = pd.DataFrame()
-                    st.cache_data.clear()
+                    carregar_dados_completos.clear()
+                    st.rerun()
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
@@ -703,7 +744,7 @@ elif menu == "📋 Triagem e Romaneio":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 aba.update_cell(idx + 2, df_raw.columns.get_loc('STATUS') + 1, 'CONFERIDO')
                                 st.success(f"✅ Pedido {df_raw.at[idx, 'PEDIDO']} CONFERIDO com sucesso!")
-                                st.cache_data.clear()
+                                carregar_dados_completos.clear()
                             except Exception as e: st.error(f"Erro ao salvar: {e}")
                         elif status_atual == 'PENDENTE': st.error(f"❌ O pedido {df_raw.at[idx, 'PEDIDO']} ainda está PENDENTE. O agente precisa dar baixa primeiro!")
                         elif status_atual == 'CONFERIDO': st.warning(f"⚠️ O pedido {df_raw.at[idx, 'PEDIDO']} já estava conferido!")
@@ -743,7 +784,7 @@ elif menu == "📋 Triagem e Romaneio":
                                 aba.clear()
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 st.success(f"🎉 {len(p_ids)} pedidos enviados para o Despacho!")
-                                st.cache_data.clear()
+                                carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
             else: st.info("Nenhum pedido aguardando triagem (Apenas pacotes 'Coletados' chegam aqui).")
@@ -801,7 +842,7 @@ elif menu == "📋 Triagem e Romaneio":
                                     'LABORATORIO': f"CONJUNTO DE {len(sel_lista)} PEDIDOS", 'TOMADOR': base_tomador, 'ROMANEIO': id_romaneio
                                 }]
                                 despachar_para_appsheet(lote_app)
-                                st.cache_data.clear()
+                                carregar_dados_completos.clear()
                                 
                                 pdf = FPDF()
                                 pdf.add_page()
