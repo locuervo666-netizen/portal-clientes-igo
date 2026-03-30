@@ -3,3 +3,6 @@ pandas
 gspread
 streamlit-autorefresh
 streamlit-aggrid
+fpdf
+holidays
+xlsxwriter
