@@ -263,8 +263,6 @@ st.markdown(f"""<style>
 [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c}; padding-top: 2rem !important; }}
 .dinamic-text {{ color: {txt_main} !important; }}
 .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
-div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu} !important; }}
-div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu_ativo} !important; }}
 </style>""", unsafe_allow_html=True)
 
 def obter_css_grid():
@@ -881,7 +879,7 @@ elif menu == "📋 Triagem e Romaneio":
                 
                 st.markdown("---")
                 
-                # AQUI ESTÁ A CORREÇÃO DA DATA E DOS AGENTES NO ROMANEIO!
+                # CORREÇÃO FATORIAL AQUI: c_data está perfeitamente definido agora.
                 c_mot, c_data, c_btn = st.columns([2, 1, 2])
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                 motorista_escolhido = c_mot.selectbox("👤 Motorista (Buscar):", ["Selecione..."] + logins_disp)
