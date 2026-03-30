@@ -8,10 +8,9 @@ import urllib.parse
 from datetime import datetime, date, timezone, timedelta
 from streamlit_autorefresh import st_autorefresh
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
+from google.oauth2.service_account import Credentials
 
 FUSO_BR = timezone(timedelta(hours=-3))
-
-# 🎯 AQUI ESTÁ A CORREÇÃO: O link agora é o de download direto do Google Drive!
 LOGO_IGO = "https://drive.google.com/uc?export=view&id=10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY"
 
 # =======================================================
@@ -74,15 +73,44 @@ def buscar_lat_lon(cidade, uf):
     return None, None
 
 # =======================================================
-# 🔗 MOTOR DE DADOS PRINCIPAL
+# 🔗 MOTOR DE DADOS PRINCIPAL (CORRIGIDO PARA A NUVEM)
 # =======================================================
+@st.cache_resource
+def conectar_banco_seguro():
+    """Conecta ao Google Sheets buscando as chaves no PC ou no Cofre da Nuvem"""
+    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    
+    # 1. TENTA MODO LOCAL (Seu PC Windows)
+    caminho_windows = os.path.join(os.path.expanduser("~"), "IGO_Logistica_Sistema")
+    cred_win = os.path.join(caminho_windows, "credentials.json")
+    
+    if os.path.exists(cred_win):
+        try:
+            creds = Credentials.from_service_account_file(cred_win, scopes=scopes)
+            return gspread.authorize(creds)
+        except Exception as e:
+            st.error(f"Erro ao ler arquivo local credentials.json: {e}")
+            
+    # 2. TENTA MODO NUVEM (Streamlit Secrets)
+    else:
+        try:
+            # Puxa o dicionário JSON que você colou no cofre do Streamlit
+            if "gcp_service_account" in st.secrets:
+                cred_dict = dict(st.secrets["gcp_service_account"])
+                creds = Credentials.from_service_account_info(cred_dict, scopes=scopes)
+                return gspread.authorize(creds)
+            else:
+                st.error("❌ Cofre do Streamlit vazio. Crie o 'gcp_service_account' no painel Secrets.")
+                return None
+        except Exception as e:
+            st.error(f"Erro ao ler cofre da nuvem: {e}")
+            return None
+
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
     try:
-        if "google_credentials" in st.secrets:
-            gc = gspread.oauth(credentials_filename="cred_temp.json", authorized_user_filename="token_temp.json")
-        else:
-            gc = gspread.oauth(credentials_filename="credentials.json", authorized_user_filename="token.json")
+        gc = conectar_banco_seguro()
+        if not gc: return pd.DataFrame()
             
         planilha = gc.open("DB_IGO_Logistica")
         aba_m = planilha.worksheet("Memoria_Sistema")
