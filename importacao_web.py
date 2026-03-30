@@ -110,15 +110,12 @@ def carregar_dados_completos(_planilha):
     except Exception: pass
     return pd.DataFrame()
 
-# ======== VARIÁVEIS GLOBAIS BLINDADAS ========
+# ======== VARIÁVEIS GLOBAIS ========
 planilha_db = conectar_banco()
 DF_AGENTES = carregar_dados_agentes(planilha_db)
 FERIADOS_BR = holidays.Brazil()
 CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "MB_CAEP"]
-
-# CORREÇÃO: "hoje_br" AGORA É GLOBAL E DISPONÍVEL PARA TODAS AS ABAS
 hoje_br = datetime.now(FUSO_BR).date() 
-# ==============================================
 
 def carregar_dicionario_rotas(df_agentes):
     base_agentes = {}
@@ -792,7 +789,7 @@ elif menu == "➕ Importação de Lotes":
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO E COM FOTOS/DADOS COMPLETO)
 # =============================================================================
 elif menu == "📋 Triagem e Romaneio":
     st.markdown("<h2 class='dinamic-text'>📋 Triagem e Despacho</h2>", unsafe_allow_html=True)
@@ -884,6 +881,7 @@ elif menu == "📋 Triagem e Romaneio":
                     else: tem_sel_pdf = len(selecionados) > 0
                 
                 st.markdown("---")
+                
                 c_mot, c_data, c_btn = st.columns([2, 1, 2])
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                 motorista_escolhido = c_mot.selectbox("👤 Motorista (Buscar):", ["Selecione..."] + logins_disp)
@@ -892,7 +890,7 @@ elif menu == "📋 Triagem e Romaneio":
                 if c_btn.button("🚚 Gerar Romaneio PDF e Despachar", type="primary", use_container_width=True):
                     if not tem_sel_pdf or motorista_escolhido == "Selecione...": st.warning("⚠️ Selecione os pedidos e um motorista!")
                     else:
-                        with st.spinner("Gerando PDF e atualizando em lote (Anti-Bloqueio)..."):
+                        with st.spinner("Gerando PDF e enviando um por um ao AppSheet..."):
                             if isinstance(selecionados, pd.DataFrame): sel_lista = selecionados.to_dict('records')
                             else: sel_lista = selecionados
                             id_romaneio = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
@@ -914,14 +912,21 @@ elif menu == "📋 Triagem e Romaneio":
                                 aba.clear()
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 
-                                base_tomador = sel_lista[0].get('TOMADOR', 'CLIENTE')
-                                base_cidade = sel_lista[0].get('CIDADE', '')
-                                lote_app = [{
-                                    'PEDIDO': id_romaneio, 'MOTORISTA': motorista_escolhido,
-                                    'ENDERECO': "ENTREGA DE LOTE NO TOMADOR", 'NUMERO': f"{len(sel_lista)} VOLUMES",
-                                    'BAIRRO': base_tomador, 'CIDADE': base_cidade, 'CEP': "---",
-                                    'LABORATORIO': f"CONJUNTO DE {len(sel_lista)} PEDIDOS", 'TOMADOR': base_tomador, 'ROMANEIO': id_romaneio
-                                }]
+                                # AQUI FOI ONDE A MÁGICA FOI CORRIGIDA (Envia individual para o APP)
+                                lote_app = []
+                                for _, row in df_nuvem[mascara_pedidos].iterrows():
+                                    lote_app.append({
+                                        'PEDIDO': str(row.get('PEDIDO', '')),
+                                        'MOTORISTA': motorista_escolhido,
+                                        'ENDERECO': str(row.get('ENDERECO', '')),
+                                        'NUMERO': str(row.get('NUMERO', '')),
+                                        'BAIRRO': str(row.get('BAIRRO', '')),
+                                        'CIDADE': str(row.get('CIDADE', '')),
+                                        'CEP': str(row.get('CEP', '')),
+                                        'LABORATORIO': str(row.get('LABORATORIO', '')),
+                                        'TOMADOR': str(row.get('TOMADOR', '')),
+                                        'ROMANEIO': id_romaneio
+                                    })
                                 despachar_para_appsheet(lote_app)
                                 carregar_dados_completos.clear()
                                 
