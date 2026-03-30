@@ -587,10 +587,10 @@ if menu == "📊 Dashboard de Controle":
                     else:
                         logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                         novo_mot = st.selectbox("Novo Agente (Digite para buscar):", logins_disp)
-                        nova_data_troca = st.date_input("Nova Data do Pedido (SLA será refeito):", format="DD/MM/YYYY", value=hoje_br)
+                        nova_data_troca = st.date_input("Nova Data do Pedido (SLA NÃO muda):", format="DD/MM/YYYY", value=hoje_br)
                         
                         if st.button("Confirmar Troca", type="primary", use_container_width=True):
-                            with st.spinner("Trocando..."):
+                            with st.spinner("Trocando motorista..."):
                                 try:
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     dados_aba = aba.get_all_values()
@@ -603,19 +603,15 @@ if menu == "📊 Dashboard de Controle":
                                             df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
                                             df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
                                             df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
+                                            # SLA REMOVIDO: DATA_LIMITE fica intocada!
                                             
-                                            for i in df_nuvem[mask].index:
-                                                prazo = calcular_sla_dias(df_nuvem.at[i, 'UF'], df_nuvem.at[i, 'CIDADE'])
-                                                df_nuvem.at[i, 'PRAZO_DIAS'] = prazo
-                                                df_nuvem.at[i, 'DATA_LIMITE'] = calcular_data_limite(df_nuvem.at[i, 'DATA'], prazo)
-                                                
                                             l_app = df_nuvem[mask].iloc[0]
                                             lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
                                     
                                     aba.clear()
                                     aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     despachar_para_appsheet(lista_app_troca)
-                                    st.success("Trocado e Prazos Atualizados!")
+                                    st.success("Trocado!")
                                     carregar_dados_completos.clear()
                                     st.rerun()
                                 except Exception as e: st.error(f"Erro: {e}")
@@ -885,9 +881,10 @@ elif menu == "📋 Triagem e Romaneio":
                     else: tem_sel_pdf = len(selecionados) > 0
                 
                 st.markdown("---")
-                c_mot, c_btn = st.columns([3, 2])
-                lista_mots = sorted(df_raw['AGENTE_RAW'].dropna().unique().tolist())
-                motorista_escolhido = c_mot.selectbox("👤 Quem fará a entrega deste lote? (Digite para buscar)", ["Selecione..."] + lista_mots)
+                c_mot, c_data, c_btn = st.columns([2, 1, 2])
+                logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                motorista_escolhido = c_mot.selectbox("👤 Motorista (Buscar):", ["Selecione..."] + logins_disp)
+                data_despacho = c_data.date_input("📅 Data do Romaneio:", format="DD/MM/YYYY", value=hoje_br)
                 
                 if c_btn.button("🚚 Gerar Romaneio PDF e Despachar", type="primary", use_container_width=True):
                     if not tem_sel_pdf or motorista_escolhido == "Selecione...": st.warning("⚠️ Selecione os pedidos e um motorista!")
@@ -905,6 +902,9 @@ elif menu == "📋 Triagem e Romaneio":
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(pedidos_ids)
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'EM ROTA DE ENTREGA'
                                 df_nuvem.loc[mascara_pedidos, 'ROMANEIO'] = id_romaneio
+                                df_nuvem.loc[mascara_pedidos, 'DATA'] = data_despacho.strftime("%d/%m/%Y")
+                                # SLA REMOVIDO DAQUI TAMBÉM: DATA_LIMITE FICA INTOCADA!
+                                
                                 if 'AGENTE_RAW' in df_nuvem.columns:
                                     df_nuvem.loc[mascara_pedidos, 'AGENTE_RAW'] = motorista_escolhido
                                 
@@ -927,7 +927,7 @@ elif menu == "📋 Triagem e Romaneio":
                                 pdf.set_draw_color(44, 62, 80); pdf.set_line_width(1); pdf.rect(5, 5, 200, 287)
                                 pdf.set_y(15); pdf.set_font("Arial", "B", 18); pdf.set_text_color(44, 62, 80); pdf.cell(0, 8, f"PROTOCOLO DE ROMANEIO", ln=True, align="C")
                                 pdf.set_font("Arial", "B", 13); pdf.set_text_color(52, 152, 219); pdf.cell(0, 8, f"LOTE: {id_romaneio} | DESPACHO IGO", ln=True, align="C")
-                                pdf.set_font("Arial", "I", 10); pdf.set_text_color(127, 140, 141); pdf.cell(0, 6, f"Motorista: {motorista_escolhido} | Data: {datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
+                                pdf.set_font("Arial", "I", 10); pdf.set_text_color(127, 140, 141); pdf.cell(0, 6, f"Motorista: {motorista_escolhido} | Data do Romaneio: {data_despacho.strftime('%d/%m/%Y')}", ln=True, align="C")
                                 pdf.ln(10); pdf.line(15, pdf.get_y(), 195, pdf.get_y()); pdf.ln(8)
                                 pdf.set_fill_color(52, 152, 219); pdf.set_text_color(255, 255, 255); pdf.set_font("Arial", "B", 10)
                                 pdf.cell(15, 8, "ITEM", 1, 0, "C", True); pdf.cell(35, 8, "PEDIDO", 1, 0, "C", True)
