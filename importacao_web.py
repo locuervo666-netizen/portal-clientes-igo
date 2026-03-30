@@ -35,7 +35,6 @@ def conectar_banco():
         token_win = os.path.join(caminho_windows, "token.json")
         
         if os.path.exists(cred_win):
-            # Se o arquivo existe no PC, usa o login normal
             gc = gspread.oauth(credentials_filename=cred_win, authorized_user_filename=token_win)
             return gc.open("DB_IGO_Logistica")
 
@@ -43,11 +42,8 @@ def conectar_banco():
         elif "google_token_json" in st.secrets:
             import json
             from google.oauth2.credentials import Credentials
-            
-            # Transforma o texto do segredo de volta em informação de login
             token_info = json.loads(st.secrets["google_token_json"])
             creds = Credentials.from_authorized_user_info(token_info, scopes)
-            
             gc = gspread.authorize(creds)
             return gc.open("DB_IGO_Logistica")
             
@@ -255,7 +251,7 @@ def obter_css_grid():
     return base_css
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD DE CONTROLE (BARRA TKINTER RESTAURADA E ALINHADA)
+# 🚀 MÓDULO 1: DASHBOARD DE CONTROLE
 # =============================================================================
 if menu == "📊 Dashboard de Controle":
     df_raw = carregar_dados_completos(planilha_db)
@@ -509,72 +505,97 @@ if menu == "📊 Dashboard de Controle":
     else: st.info("Carregando base de dados...")
 
 # =============================================================================
-# ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
+# ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES (REFEITO E COM AGGRID)
 # =============================================================================
 elif menu == "➕ Importação de Lotes":
     st.markdown("<h2 class='dinamic-text'>➕ Central de Importação</h2>", unsafe_allow_html=True)
+    
+    # Aviso de Segurança Claro para o Usuário
+    st.success("🛡️ **SEGURANÇA DO HISTÓRICO:** O sistema de importação sempre **ADICIONA** os novos pedidos na base. O seu histórico do dia (como os lotes de RJ e Juiz de Fora) estão seguros e não serão apagados ao importar uma nova planilha.")
+    
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
     if "texto_importacao" not in st.session_state: st.session_state.texto_importacao = ""
 
-    c1, c2 = st.columns([1, 3])
-    with c1:
-        tom = st.selectbox("🏢 Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-        dt_c = st.date_input("📅 Data da Coleta:", format="DD/MM/YYYY")
-    with c2:
-        txt = st.text_area("📋 Cole os dados do Excel aqui (Ctrl+V):", height=150, key="texto_importacao")
+    with st.container(border=True):
+        st.markdown("#### 1. Dados do Lote e Colagem")
+        c1, c2, c3 = st.columns([1, 1, 2])
+        with c1:
+            tom = st.selectbox("🏢 Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+        with c2:
+            dt_c = st.date_input("📅 Data da Coleta:", format="DD/MM/YYYY")
 
-    if st.button("🔍 1. Tratar e Roteirizar", type="primary", use_container_width=True):
-        if not txt or tom == "Selecione...": st.warning("Preencha tudo!")
-        else:
-            try:
-                leitor = csv.reader(io.StringIO(txt), delimiter='\t' if '\t' in txt else ';')
-                dados = [l for l in leitor if any(x.strip() for x in l)]
-                idx_h = 0
-                for i, l in enumerate(dados[:10]):
-                    if any(p in " ".join(l).upper() for p in ['PEDIDO', 'CIDADE', 'LABORAT']): idx_h = i; break
-                
-                df_limpo = pd.DataFrame(dados[idx_h+1:], columns=[c.upper().strip() for c in dados[idx_h]]).fillna("").astype(str)
-                for col in df_limpo.columns: df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
-                
-                mapa = {}
-                for c in df_limpo.columns:
-                    cl = tratar_texto_global(c)
-                    if any(x in cl for x in ['PEDIDO', 'SOLICITA']): mapa[c] = 'PEDIDO'
-                    elif any(x in cl for x in ['LABORAT', 'CLINIC']): mapa[c] = 'LABORATORIO'
-                    elif any(x in cl for x in ['ENDERE', 'RUA']): mapa[c] = 'ENDERECO'
-                    elif any(x in cl for x in ['NUM', 'Nº']): mapa[c] = 'NUMERO'
-                    elif 'BAIRRO' in cl: mapa[c] = 'BAIRRO'
-                    elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa[c] = 'CIDADE'
-                    elif any(x in cl for x in ['UF', 'ESTADO']): mapa[c] = 'UF'
-                    elif 'CEP' in cl: mapa[c] = 'CEP'
-                
-                df_limpo.rename(columns=mapa, inplace=True)
-                for c in ['PEDIDO', 'LABORATORIO', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
-                    if c not in df_limpo.columns: df_limpo[c] = ""
-                
-                for idx, row in df_limpo.iterrows():
-                    e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
-                    if e and (not n or not b):
-                        cep_m = re.search(r'(\d{5}-?\d{3})', e)
-                        if cep_m: df_limpo.at[idx, 'CEP'] = cep_m.group(1); e = e.replace(cep_m.group(1), '').strip(' ,-')
-                        if ',' in e and not n: 
-                            pts = e.split(',')
-                            df_limpo.at[idx, 'ENDERECO'], df_limpo.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
+        txt = st.text_area("📋 Cole os dados do Excel aqui (Ctrl+V):", height=150, key="texto_importacao", help="Apenas copie as células do Excel e cole direto aqui.")
 
-                df_limpo['TOMADOR'], df_limpo['DATA'] = tom, dt_c.strftime("%d/%m/%Y")
-                df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
-                st.session_state.df_preview = df_limpo[['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
-                st.success("Faxina concluída!")
-            except Exception as e: st.error(f"Erro: {e}")
+        col_btn1, _ = st.columns([1, 2])
+        if col_btn1.button("🔍 1. Tratar e Roteirizar", type="primary", use_container_width=True):
+            if not txt or tom == "Selecione...": st.warning("Preencha o Tomador e cole os dados!")
+            else:
+                try:
+                    leitor = csv.reader(io.StringIO(txt), delimiter='\t' if '\t' in txt else ';')
+                    dados = [l for l in leitor if any(x.strip() for x in l)]
+                    idx_h = 0
+                    for i, l in enumerate(dados[:10]):
+                        if any(p in " ".join(l).upper() for p in ['PEDIDO', 'CIDADE', 'LABORAT']): idx_h = i; break
+                    
+                    df_limpo = pd.DataFrame(dados[idx_h+1:], columns=[c.upper().strip() for c in dados[idx_h]]).fillna("").astype(str)
+                    for col in df_limpo.columns: df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
+                    
+                    mapa = {}
+                    for c in df_limpo.columns:
+                        cl = tratar_texto_global(c)
+                        if any(x in cl for x in ['PEDIDO', 'SOLICITA']): mapa[c] = 'PEDIDO'
+                        elif any(x in cl for x in ['LABORAT', 'CLINIC']): mapa[c] = 'LABORATORIO'
+                        elif any(x in cl for x in ['ENDERE', 'RUA']): mapa[c] = 'ENDERECO'
+                        elif any(x in cl for x in ['NUM', 'Nº']): mapa[c] = 'NUMERO'
+                        elif 'BAIRRO' in cl: mapa[c] = 'BAIRRO'
+                        elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa[c] = 'CIDADE'
+                        elif any(x in cl for x in ['UF', 'ESTADO']): mapa[c] = 'UF'
+                        elif 'CEP' in cl: mapa[c] = 'CEP'
+                    
+                    df_limpo.rename(columns=mapa, inplace=True)
+                    for c in ['PEDIDO', 'LABORATORIO', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
+                        if c not in df_limpo.columns: df_limpo[c] = ""
+                    
+                    for idx, row in df_limpo.iterrows():
+                        e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
+                        if e and (not n or not b):
+                            cep_m = re.search(r'(\d{5}-?\d{3})', e)
+                            if cep_m: df_limpo.at[idx, 'CEP'] = cep_m.group(1); e = e.replace(cep_m.group(1), '').strip(' ,-')
+                            if ',' in e and not n: 
+                                pts = e.split(',')
+                                df_limpo.at[idx, 'ENDERECO'], df_limpo.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
+
+                    # Limpeza forçada para garantir o filtro de UF e Cidade nos relatórios
+                    df_limpo['UF'] = df_limpo['UF'].astype(str).str.upper().str.strip()
+                    df_limpo['CIDADE'] = df_limpo['CIDADE'].astype(str).str.upper().str.strip()
+
+                    df_limpo['TOMADOR'], df_limpo['DATA'] = tom, dt_c.strftime("%d/%m/%Y")
+                    df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
+                    st.session_state.df_preview = df_limpo[['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
+                    st.success("Faxina concluída! Verifique a tabela abaixo.")
+                except Exception as e: st.error(f"Erro no processamento: {e}")
 
     if not st.session_state.df_preview.empty:
-        st.markdown("### 👀 Preview")
-        def pintar_erros(row): return ['background-color: #FDEDEC; color: #B03A2E; font-weight: bold;'] * len(row) if row['AGENTE_RAW'] == "" else [''] * len(row)
-        st.dataframe(st.session_state.df_preview.style.apply(pintar_erros, axis=1), use_container_width=True)
-        if (st.session_state.df_preview['AGENTE_RAW'] == "").any(): st.warning("⚠️ Há pedidos SEM MOTORISTA atribuído!")
+        st.markdown("---")
+        st.markdown("### 👀 2. Preview dos Dados (Verifique antes de salvar)")
         
-        if st.button("🚀 2. SALVAR TUDO NO GOOGLE SHEETS", type="primary"):
-            with st.spinner("Enviando..."):
+        if (st.session_state.df_preview['AGENTE_RAW'] == "").any(): 
+            st.error("⚠️ Atenção: Há pedidos SEM MOTORISTA atribuído! Eles estão marcados com fundo vermelho na tabela.")
+        
+        # Substituíndo st.dataframe por AgGrid para não "espremer" as colunas
+        gb_prev = GridOptionsBuilder.from_dataframe(st.session_state.df_preview)
+        gb_prev.configure_default_column(resizable=True, sortable=True, minWidth=130)
+        
+        # Colorir linhas com problema de roteirização
+        js_err = JsCode("function(p){if(p.data.AGENTE_RAW == ''){return {'backgroundColor': '#FDEDEC', 'color': '#B03A2E', 'fontWeight': 'bold'};} return {};}")
+        gb_prev.configure_grid_options(getRowStyle=js_err)
+        
+        AgGrid(st.session_state.df_preview, gridOptions=gb_prev.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_btn2, _ = st.columns([1, 2])
+        if col_btn2.button("🚀 3. SALVAR TUDO NO GOOGLE SHEETS", type="primary", use_container_width=True):
+            with st.spinner("Adicionando à base geral..."):
                 df_final = st.session_state.df_preview.copy()
                 for idx, row in df_final.iterrows():
                     if not str(row['PEDIDO']).strip() or row['PEDIDO'] == 'NAN': df_final.at[idx, 'PEDIDO'] = str(random.randint(100000, 999999))
@@ -586,7 +607,10 @@ elif menu == "➕ Importação de Lotes":
                 try:
                     aba = planilha_db.worksheet("Memoria_Sistema")
                     atuais = aba.get_all_values()
+                    
+                    # Esta é a linha mágica que preserva o histórico de RJ/JF e todos os outros
                     df_up = pd.concat([pd.DataFrame(atuais[1:], columns=atuais[0]), df_final], ignore_index=True) if len(atuais) > 1 else df_final
+                    
                     aba.clear()
                     aba.update("A1", [df_up.columns.tolist()] + df_up.fillna("").astype(str).values.tolist())
                     
@@ -600,10 +624,10 @@ elif menu == "➕ Importação de Lotes":
                             })
                     if lista_app: despachar_para_appsheet(lista_app)
                     
-                    st.success("🎉 Salvo com sucesso e enviado para os motoristas!")
+                    st.success("🎉 Lote adicionado com sucesso à base principal e despachado aos motoristas!")
                     st.session_state.texto_importacao = ""
                     st.session_state.df_preview = pd.DataFrame()
-                    st.rerun()
+                    st.cache_data.clear() # Limpa o cache para o painel principal atualizar na hora
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
