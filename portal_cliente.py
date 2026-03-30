@@ -11,6 +11,8 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 from google.oauth2.service_account import Credentials
 
 FUSO_BR = timezone(timedelta(hours=-3))
+
+# 🎯 AQUI ESTÁ A CORREÇÃO: O link agora é o de download direto do Google Drive!
 LOGO_IGO = "https://drive.google.com/uc?export=view&id=10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY"
 
 # =======================================================
@@ -73,41 +75,37 @@ def buscar_lat_lon(cidade, uf):
     return None, None
 
 # =======================================================
-# 🔗 MOTOR DE DADOS PRINCIPAL (CORRIGIDO PARA A NUVEM)
+# 🔗 MOTOR DE DADOS PRINCIPAL (CORRIGIDO PARA OAUTH DUPLO)
 # =======================================================
 @st.cache_resource
 def conectar_banco_seguro():
     """Conecta ao Google Sheets buscando as chaves no PC ou no Cofre da Nuvem"""
-    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    
-    # 1. TENTA MODO LOCAL (Seu PC Windows)
-    caminho_windows = os.path.join(os.path.expanduser("~"), "IGO_Logistica_Sistema")
-    cred_win = os.path.join(caminho_windows, "credentials.json")
-    
-    if os.path.exists(cred_win):
-        try:
-            creds = Credentials.from_service_account_file(cred_win, scopes=scopes)
-            return gspread.authorize(creds)
-        except Exception as e:
-            st.error(f"Erro ao ler arquivo local credentials.json: {e}")
+    try:
+        # 1. TENTA MODO LOCAL (Seu PC Windows)
+        caminho_windows = os.path.join(os.path.expanduser("~"), "IGO_Logistica_Sistema")
+        cred_win = os.path.join(caminho_windows, "credentials.json")
+        token_win = os.path.join(caminho_windows, "token.json")
+        
+        if os.path.exists(cred_win) and os.path.exists(token_win):
+            return gspread.oauth(credentials_filename=cred_win, authorized_user_filename=token_win)
             
-    # 2. TENTA MODO NUVEM (Streamlit Secrets)
-    else:
-        try:
-            if "google_json" in st.secrets:
-                import json
-                cred_dict = json.loads(st.secrets["google_json"])
-                creds = Credentials.from_service_account_info(cred_dict, scopes=scopes)
-                return gspread.authorize(creds)
-            else:
-                st.error("❌ Cofre do Streamlit vazio. Siga o passo a passo para colar o JSON.")
-                return None
-        except Exception as e:
-            st.error(f"Erro na leitura da chave: Certifique-se de ter usado três aspas simples (''') no cofre.")
+        # 2. TENTA MODO NUVEM (Streamlit Secrets)
+        elif "google_cred_json" in st.secrets and "google_token_json" in st.secrets:
+            # Cria os arquivos temporários invisíveis na nuvem
+            with open("cred_temp.json", "w", encoding="utf-8") as f:
+                f.write(st.secrets["google_cred_json"])
+            with open("token_temp.json", "w", encoding="utf-8") as f:
+                f.write(st.secrets["google_token_json"])
+                
+            return gspread.oauth(credentials_filename="cred_temp.json", authorized_user_filename="token_temp.json")
+            
+        else:
+            st.error("❌ Cofre do Streamlit vazio. Preencha google_cred_json e google_token_json.")
             return None
-        except Exception as e:
-            st.error(f"Erro ao ler cofre da nuvem: {e}")
-            return None
+            
+    except Exception as e:
+        st.error(f"Erro de Conexão com o Google: {e}")
+        return None
 
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
