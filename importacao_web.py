@@ -564,7 +564,44 @@ if menu == "📊 Dashboard de Controle":
                 
             col_b6.button("⚙️ Colunas", disabled=True, use_container_width=True, help="Use o menu no canto direito da tabela.")
 
-    else: st.info("Carregando base de dados...")
+    else:
+        st.warning("📭 O banco de dados está totalmente vazio no momento.")
+        st.markdown("### 🚀 Dê a partida no sistema:")
+        col_vazia, _ = st.columns([1, 3])
+        
+        with col_vazia.popover("➕ Criar Primeiro Pedido Manual", use_container_width=True):
+            st.markdown("Inserir Pedido Inicial (Urgências e Testes)")
+            with st.form("form_manual_vazio", clear_on_submit=True):
+                m_tomador = st.selectbox("Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+                m_data = st.date_input("Data:", format="DD/MM/YYYY")
+                m_lab = st.text_input("Lab/Clínica:")
+                m_rua = st.text_input("Endereço:")
+                m_bai = st.text_input("Bairro:")
+                m_cid = st.text_input("Cidade:")
+                logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                m_agente_escolha = st.selectbox("Motorista:", ["Automático (Por Rota)"] + logins_disp)
+                
+                if st.form_submit_button("💾 Salvar Pedido", type="primary"):
+                    if m_tomador == "Selecione..." or not m_cid: st.error("Tomador e Cidade são obrigatórios!")
+                    else:
+                        with st.spinner("Salvando..."):
+                            m_agente = obter_login_agente(m_cid, m_bai, m_lab, m_rua, DF_AGENTES) if m_agente_escolha == "Automático (Por Rota)" else m_agente_escolha
+                            m_prazo = calcular_sla_dias("SP", m_cid)
+                            m_limite = calcular_data_limite(m_data.strftime("%d/%m/%Y"), m_prazo)
+                            m_pedido = str(random.randint(100000, 999999))
+                            novo_ped = pd.DataFrame([{'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 'LABORATORIO': m_lab.upper(), 'ENDERECO': m_rua.upper(), 'NUMERO': "", 'BAIRRO': m_bai.upper(), 'CIDADE': m_cid.upper(), 'UF': "SP", 'CEP': "", 'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""}])
+                            try:
+                                aba_memoria = planilha_db.worksheet("Memoria_Sistema")
+                                dados_atuais = aba_memoria.get_all_values()
+                                df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
+                                df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
+                                aba_memoria.clear()
+                                aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
+                                if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
+                                st.success(f"Pedido {m_pedido} criado!")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as e: st.error(f"Erro: {e}")
 
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
