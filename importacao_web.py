@@ -603,7 +603,6 @@ if menu == "📊 Dashboard de Controle":
                                             df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
                                             df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
                                             df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
-                                            # SLA REMOVIDO: DATA_LIMITE fica intocada!
                                             
                                             l_app = df_nuvem[mask].iloc[0]
                                             lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
@@ -881,6 +880,8 @@ elif menu == "📋 Triagem e Romaneio":
                     else: tem_sel_pdf = len(selecionados) > 0
                 
                 st.markdown("---")
+                
+                # AQUI ESTÁ A CORREÇÃO DA DATA E DOS AGENTES NO ROMANEIO!
                 c_mot, c_data, c_btn = st.columns([2, 1, 2])
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                 motorista_escolhido = c_mot.selectbox("👤 Motorista (Buscar):", ["Selecione..."] + logins_disp)
@@ -900,10 +901,10 @@ elif menu == "📋 Triagem e Romaneio":
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(pedidos_ids)
+                                
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'EM ROTA DE ENTREGA'
                                 df_nuvem.loc[mascara_pedidos, 'ROMANEIO'] = id_romaneio
                                 df_nuvem.loc[mascara_pedidos, 'DATA'] = data_despacho.strftime("%d/%m/%Y")
-                                # SLA REMOVIDO DAQUI TAMBÉM: DATA_LIMITE FICA INTOCADA!
                                 
                                 if 'AGENTE_RAW' in df_nuvem.columns:
                                     df_nuvem.loc[mascara_pedidos, 'AGENTE_RAW'] = motorista_escolhido
