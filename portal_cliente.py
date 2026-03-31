@@ -437,36 +437,29 @@ Atendimento IGO Logística."""
                         
                         if col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
                         elif col == 'FOTO_URL':
+                            # --- CÓDIGO 100% CORRIGIDO AQUI! RETORNA STRING PURA SEM TRAVAR O REACT ---
                             link_jscode = JsCode("""
                             function(params) {
-                                let container = document.createElement('div');
-                                container.style.textAlign = 'center';
-                                
-                                // Verifica se existe um link válido
-                                if (params.value && params.value !== '' && params.value.toLowerCase() !== 'nan' && params.value.includes('http')) {
-                                    container.innerHTML = '<span style="cursor: pointer; font-size: 18px; display: block; margin-top: 2px;" title="Clique para ver a foto">📸</span>';
-                                    
-                                    // Ação de clique para abrir o Modal
-                                    container.onclick = () => {
-                                        let modal = document.createElement('div');
-                                        modal.style.position = 'fixed'; modal.style.zIndex = '999999';
-                                        modal.style.left = '0'; modal.style.top = '0'; modal.style.width = '100vw'; modal.style.height = '100vh';
-                                        modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
-                                        modal.style.display = 'flex'; modal.style.flexDirection = 'column'; modal.style.justifyContent = 'center'; modal.style.alignItems = 'center'; modal.style.cursor = 'zoom-out';
-                                        
-                                        let img = document.createElement('img');
-                                        img.src = params.value; 
-                                        img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '8px'; img.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
-                                        
-                                        let txt = document.createElement('div');
-                                        txt.innerText = '✖ Clique em qualquer lugar para fechar'; txt.style.color = '#ffffff'; txt.style.marginTop = '15px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontSize = '14px'; txt.style.fontWeight = 'bold';
-                                        
-                                        modal.appendChild(img); modal.appendChild(txt);
-                                        modal.onclick = () => { document.body.removeChild(modal); }; 
-                                        document.body.appendChild(modal);
-                                    };
+                                if (!params.value || params.value === '' || String(params.value).toLowerCase() === 'nan' || !String(params.value).includes('http')) {
+                                    return '';
                                 }
-                                return container;
+                                
+                                let url = params.value;
+                                
+                                // Script de clique convertido numa string concatenada
+                                let jsClick = "let m = document.createElement('div');" +
+                                    "m.style.position='fixed'; m.style.zIndex='999999'; m.style.left='0'; m.style.top='0';" +
+                                    "m.style.width='100vw'; m.style.height='100vh'; m.style.backgroundColor='rgba(0,0,0,0.85)';" +
+                                    "m.style.display='flex'; m.style.flexDirection='column'; m.style.justifyContent='center'; m.style.alignItems='center'; m.style.cursor='zoom-out';" +
+                                    "let i = document.createElement('img'); i.src='" + url + "';" +
+                                    "i.style.maxWidth='90%'; i.style.maxHeight='85%'; i.style.borderRadius='8px'; i.style.boxShadow='0 4px 20px rgba(0,0,0,0.5)';" +
+                                    "let t = document.createElement('div'); t.innerText='✖ Clique em qualquer lugar para fechar'; t.style.color='#fff'; t.style.marginTop='15px'; t.style.fontWeight='bold'; t.style.fontFamily='sans-serif';" +
+                                    "m.appendChild(i); m.appendChild(t);" +
+                                    "m.onclick = function() { document.body.removeChild(m); };" +
+                                    "document.body.appendChild(m);";
+
+                                // Retornamos o HTML em String ao invés do DocumentObject (evita o Error #31!)
+                                return '<div style="text-align: center; margin-top: 2px;"><span style="cursor: pointer; font-size: 18px;" title="Clique para ver a foto" onclick="' + jsClick + '">📸</span></div>';
                             }
                             """)
                             gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70, minWidth=70)
