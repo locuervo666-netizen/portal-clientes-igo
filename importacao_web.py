@@ -58,7 +58,6 @@ def carregar_dados_agentes(_planilha):
     except Exception: pass
     return pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
 
-# 🧠 O CÉREBRO RESTAURADO (Com a Mágica do Lote)
 @st.cache_data(ttl=20)
 def carregar_dados_completos(_planilha):
     if not _planilha: return pd.DataFrame()
@@ -86,7 +85,6 @@ def carregar_dados_completos(_planilha):
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                     
-                    # === DICIONÁRIO DE ROMANEIOS PARA APLICAR STATUS EM MASSA ===
                     rom_mask = df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)
                     rom_dict = df_app_clean[rom_mask].set_index('PEDIDO').to_dict('index')
                     
@@ -98,7 +96,6 @@ def carregar_dados_completos(_planilha):
                         s_app = str(row.get('APP_STATUS', '')).strip().upper()
                         rom_id = str(row.get('ROMANEIO', '')).strip()
                         
-                        # Se o Romaneio foi baixado no app, todo o lote ganha o status!
                         if rom_id in rom_dict:
                             s_rom = str(rom_dict[rom_id].get('APP_STATUS', '')).strip().upper()
                             if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']:
@@ -117,7 +114,6 @@ def carregar_dados_completos(_planilha):
                         f_app = str(row.get('APP_FOTO', '')).strip()
                         rom_id = str(row.get('ROMANEIO', '')).strip()
                         
-                        # Se o Romaneio tem foto, todo o lote recebe a foto!
                         if rom_id in rom_dict:
                             f_rom = str(rom_dict[rom_id].get('APP_FOTO', '')).strip()
                             if f_rom and f_rom.upper() != 'NAN':
@@ -169,9 +165,16 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         return True
     except Exception: return False
 
+def padronizar_texto(texto):
+    """Remove acentos e converte para MAIÚSCULAS"""
+    if pd.isna(texto) or not texto: return ""
+    texto_str = str(texto).strip()
+    texto_sem_acento = unicodedata.normalize('NFKD', texto_str).encode('ASCII', 'ignore').decode('utf-8')
+    return texto_sem_acento.upper()
+
 def tratar_texto_global(texto):
     if pd.isna(texto): return ""
-    t = unicodedata.normalize('NFKD', str(texto).replace('"', '').replace("'", "").replace('\n', ' ')).encode('ASCII', 'ignore').decode('utf-8').upper().strip()
+    t = padronizar_texto(texto)
     if t in ['0', '0.0', 'NAN', 'NONE', 'NAT']: return ""
     return t[:-2] if t.endswith('.0') else t
 
@@ -273,7 +276,8 @@ with st.sidebar:
     with col_tema: st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-    menu = st.radio("Navegação:", ["📊 Dashboard de Controle", "➕ Importação de Lotes", "📋 Triagem e Romaneio", "📥 Exportar Relatórios", "⚙️ Configurar Rotas"], label_visibility="collapsed")
+    # NOVO MENU: A aba "Novo Pedido" ganhou uma página dedicada para não espremer o Dashboard
+    menu = st.radio("Navegação:", ["📊 Dashboard de Controle", "📝 Novo Pedido Manual", "➕ Importação de Lotes", "📋 Triagem e Romaneio", "📥 Exportar Relatórios", "⚙️ Configurar Rotas"], label_visibility="collapsed")
     st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
     st.divider()
     if st.button("🚪 Sair do Sistema", use_container_width=True, type="secondary"):
@@ -338,6 +342,7 @@ def obter_css_grid():
 # =============================================================================
 if menu == "📊 Dashboard de Controle":
     df_raw = carregar_dados_completos(planilha_db)
+    hoje_br = datetime.now(FUSO_BR).date()
     
     if not df_raw.empty:
         df_raw['FOTO_URL'] = df_raw['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
@@ -413,9 +418,9 @@ if menu == "📊 Dashboard de Controle":
             gb = GridOptionsBuilder.from_dataframe(df_grid)
             gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
             
-            # 🔥 CORREÇÃO DO "SELECT ALL"
-            gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
-            gb.configure_grid_options(rowMultiSelectWithClick=True, suppressRowClickSelection=False)
+            # 🔥 CORREÇÃO DA SELEÇÃO: Checkbox no cabeçalho funciona com clique na linha!
+            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
+            gb.configure_grid_options(rowMultiSelectWithClick=True)
             
             st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'800'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'800'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'800'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'800'};} return {'fontWeight':'bold'};}")
             gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, minWidth=170)
@@ -451,8 +456,7 @@ if menu == "📊 Dashboard de Controle":
             """)
             gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90)
             
-            # 🔥 CORREÇÃO DE CAPTURA DO SELECIONAR TODOS NA GRID
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED)
+            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -474,48 +478,9 @@ if menu == "📊 Dashboard de Controle":
                 </style>
             """, unsafe_allow_html=True)
             
-            col_b1, col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns([1.3, 1, 1, 1.4, 1.2, 0.9])
+            col_b2, col_b3, col_b4, col_b5 = st.columns([1.5, 1.5, 1.5, 1.5])
             
-            with col_b1.popover("➕ Novo Pedido", use_container_width=True):
-                st.markdown("Inserir Pedido Manual")
-                with st.form("form_manual", clear_on_submit=True):
-                    m_tomador = st.selectbox("Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-                    m_data = st.date_input("Data *", format="DD/MM/YYYY")
-                    m_lab = st.text_input("Lab/Clínica *")
-                    m_rua = st.text_input("Endereço *")
-                    m_bai = st.text_input("Bairro *")
-                    m_cid = st.text_input("Cidade *")
-                    logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-                    m_agente_escolha = st.selectbox("Agente (Digite para buscar):", ["Automático (Por Rota)"] + logins_disp)
-                    
-                    if st.form_submit_button("💾 Salvar Pedido", type="primary"):
-                        if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
-                            st.error("⚠️ Preencha Tomador, Laboratório, Endereço, Bairro e Cidade!")
-                        else:
-                            with st.spinner("Gerando ID sequencial e Salvando..."):
-                                m_agente = obter_login_agente(m_cid, m_bai, m_lab, m_rua, DF_AGENTES) if m_agente_escolha == "Automático (Por Rota)" else m_agente_escolha
-                                m_prazo = calcular_sla_dias("SP", m_cid)
-                                m_limite = calcular_data_limite(m_data.strftime("%d/%m/%Y"), m_prazo)
-                                
-                                try:
-                                    aba_memoria = planilha_db.worksheet("Memoria_Sistema")
-                                    dados_atuais = aba_memoria.get_all_values()
-                                    df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
-                                    
-                                    m_pedido = str(obter_proximo_id(df_nuvem))
-                                    
-                                    novo_ped = pd.DataFrame([{'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 'LABORATORIO': m_lab.upper(), 'ENDERECO': m_rua.upper(), 'NUMERO': "", 'BAIRRO': m_bai.upper(), 'CIDADE': m_cid.upper(), 'UF': "SP", 'CEP': "", 'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""}])
-                                    df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
-                                    
-                                    aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
-                                    
-                                    if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
-                                    st.success(f"Pedido {m_pedido} criado!")
-                                    carregar_dados_completos.clear()
-                                    st.rerun()
-                                except Exception as e: st.error(f"Erro: {e}")
-
-            with col_b2.popover("📲 Dar Baixa", use_container_width=True):
+            with col_b2.popover("📲 Dar Baixa Manual", use_container_width=True):
                 if not tem_sel: st.warning("Selecione na Grid primeiro!")
                 else:
                     status_baixa = st.selectbox("Novo Status:", ["ENTREGUE ✅", "PROBLEMA 🚨", "CANCELADO ❌", "PENDENTE ⏳"])
@@ -562,16 +527,16 @@ if menu == "📊 Dashboard de Controle":
                                     st.rerun()
                                 except Exception as e: st.error(f"Erro: {e}")
 
-            with col_b3.popover("👯 Clonar", use_container_width=True):
+            with col_b3.popover("👯 Clonar Pedidos", use_container_width=True):
                 if not tem_sel: st.warning("Selecione na Grid primeiro!")
                 else:
-                    st.markdown(f"**Duplicar {len(p_ids)} pedidos**")
+                    st.markdown(f"**Duplicar {len(p_ids)} pedidos selecionados**")
                     clone_data = st.date_input("Nova Data do Pedido:", format="DD/MM/YYYY", value=hoje_br)
                     logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                     clone_mot = st.selectbox("Agente (Digite para buscar):", ["Manter Original"] + logins_disp)
                     
                     if st.button("Confirmar Clone", type="primary", use_container_width=True):
-                        with st.spinner("Clonando..."):
+                        with st.spinner("Clonando na base segura..."):
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
@@ -583,7 +548,6 @@ if menu == "📊 Dashboard de Controle":
                                 for pid in p_ids:
                                     if pid in df_nuvem['PEDIDO'].values:
                                         l_orig = df_nuvem[df_nuvem['PEDIDO'] == pid].iloc[0].copy()
-                                        
                                         novo_id = str(prox_id)
                                         prox_id += 1
                                         
@@ -611,15 +575,13 @@ if menu == "📊 Dashboard de Controle":
                                             })
 
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                
                                 if clones_para_app: despachar_para_appsheet(clones_para_app)
-                                
                                 st.success("Clonado com SUCESSO!")
                                 carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e: st.error(f"Erro ao clonar: {e}")
 
-            with col_b4.popover("🔄 Motorista", use_container_width=True):
+            with col_b4.popover("🔄 Trocar Motorista", use_container_width=True):
                 if not tem_sel: st.warning("Selecione na Grid primeiro!")
                 else:
                     tem_entregue = df_grid[df_grid['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
@@ -655,52 +617,75 @@ if menu == "📊 Dashboard de Controle":
                                     st.rerun()
                                 except Exception as e: st.error(f"Erro: {e}")
 
-            if col_b5.button("🔄 Atualizar", use_container_width=True):
+            if col_b5.button("🔄 Atualizar Painel", use_container_width=True):
                 carregar_dados_completos.clear()
                 st.rerun()
-                
-            col_b6.button("⚙️ Configs", disabled=True, use_container_width=True)
 
     else:
-        st.warning("📭 O banco de dados está vazio no momento.")
-        st.markdown("### 🚀 Dê a partida no sistema:")
-        col_vazia, _ = st.columns([1, 3])
-        
-        with col_vazia.popover("➕ Criar Primeiro Pedido", use_container_width=True):
-            with st.form("form_manual_vazio", clear_on_submit=True):
-                m_tomador = st.selectbox("Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-                m_data = st.date_input("Data *", format="DD/MM/YYYY")
-                m_lab = st.text_input("Lab/Clínica *")
-                m_rua = st.text_input("Endereço *")
-                m_bai = st.text_input("Bairro *")
-                m_cid = st.text_input("Cidade *")
-                logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-                m_agente_escolha = st.selectbox("Agente (Digite para buscar):", ["Automático (Por Rota)"] + logins_disp)
-                
-                if st.form_submit_button("💾 Salvar Pedido", type="primary"):
-                    if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
-                        st.error("⚠️ Preencha Tomador, Laboratório, Endereço, Bairro e Cidade!")
-                    else:
-                        with st.spinner("Salvando..."):
-                            m_agente = obter_login_agente(m_cid, m_bai, m_lab, m_rua, DF_AGENTES) if m_agente_escolha == "Automático (Por Rota)" else m_agente_escolha
-                            m_prazo = calcular_sla_dias("SP", m_cid)
-                            m_limite = calcular_data_limite(m_data.strftime("%d/%m/%Y"), m_prazo)
+        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Novo Pedido Manual' no menu lateral para começar.")
+
+# =============================================================================
+# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL (ABA ISOLADA E PADRONIZADA)
+# =============================================================================
+elif menu == "📝 Novo Pedido Manual":
+    st.markdown("<h2 class='dinamic-text'>📝 Inserir Pedido Manual</h2>", unsafe_allow_html=True)
+    st.markdown("Use esta tela para gerar pedidos de emergência. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente.**")
+    
+    with st.container(border=True):
+        with st.form("form_manual_page", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            m_tomador = col1.selectbox("Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+            m_data = col2.date_input("Data do Pedido *", format="DD/MM/YYYY", value=hoje_br)
+            
+            m_lab = st.text_input("Lab/Clínica *")
+            m_rua = st.text_input("Endereço *")
+            
+            col3, col4 = st.columns(2)
+            m_bai = col3.text_input("Bairro *")
+            m_cid = col4.text_input("Cidade *")
+            
+            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+            m_agente_escolha = st.selectbox("Agente Designado (Busque ou deixe Automático):", ["Automático (Por Rota)"] + logins_disp)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.form_submit_button("🚀 Gerar e Salvar Pedido", type="primary", use_container_width=True):
+                if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
+                    st.error("⚠️ Preencha todos os campos obrigatórios (marcados com *)!")
+                else:
+                    with st.spinner("Padronizando textos e salvando na nuvem..."):
+                        # Padroniza tudo (Tira acentos e coloca MAIÚSCULAS)
+                        lab_limpo = padronizar_texto(m_lab)
+                        rua_limpa = padronizar_texto(m_rua)
+                        bai_limpo = padronizar_texto(m_bai)
+                        cid_limpa = padronizar_texto(m_cid)
+                        
+                        m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES) if m_agente_escolha == "Automático (Por Rota)" else m_agente_escolha
+                        m_prazo = calcular_sla_dias("SP", cid_limpa)
+                        m_limite = calcular_data_limite(m_data.strftime("%d/%m/%Y"), m_prazo)
+                        
+                        try:
+                            aba_memoria = planilha_db.worksheet("Memoria_Sistema")
+                            dados_atuais = aba_memoria.get_all_values()
+                            df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
                             
-                            try:
-                                aba_memoria = planilha_db.worksheet("Memoria_Sistema")
-                                dados_atuais = aba_memoria.get_all_values()
-                                df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
-                                
-                                m_pedido = str(obter_proximo_id(df_nuvem))
-                                
-                                novo_ped = pd.DataFrame([{'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 'LABORATORIO': m_lab.upper(), 'ENDERECO': m_rua.upper(), 'NUMERO': "", 'BAIRRO': m_bai.upper(), 'CIDADE': m_cid.upper(), 'UF': "SP", 'CEP': "", 'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""}])
-                                df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
-                                aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
-                                if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
-                                st.success(f"Pedido {m_pedido} criado!")
-                                carregar_dados_completos.clear()
-                                st.rerun()
-                            except Exception as e: st.error(f"Erro: {e}")
+                            m_pedido = str(obter_proximo_id(df_nuvem))
+                            
+                            novo_ped = pd.DataFrame([{
+                                'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 
+                                'LABORATORIO': lab_limpo, 'ENDERECO': rua_limpa, 'NUMERO': "", 'BAIRRO': bai_limpo, 
+                                'CIDADE': cid_limpa, 'UF': "SP", 'CEP': "", 'STATUS': 'PENDENTE', 
+                                'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 
+                                'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""
+                            }])
+                            
+                            df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
+                            aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
+                            
+                            if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
+                            
+                            st.success(f"🎉 Pedido {m_pedido} criado e padronizado com sucesso! Acesse o Dashboard para visualizar.")
+                            carregar_dados_completos.clear()
+                        except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
@@ -716,7 +701,7 @@ elif menu == "➕ Importação de Lotes":
         st.markdown("#### 1. Dados do Lote e Colagem")
         c1, c2, c3 = st.columns([1, 1, 2])
         with c1: tom = st.selectbox("🏢 Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-        with c2: dt_c = st.date_input("📅 Data da Coleta:", format="DD/MM/YYYY")
+        with c2: dt_c = st.date_input("📅 Data da Coleta:", format="DD/MM/YYYY", value=hoje_br)
 
         txt = st.text_area("📋 Cole os dados do Excel aqui (Ctrl+V):", height=150, key="texto_importacao", help="Apenas copie as células do Excel e cole direto aqui.")
 
@@ -826,7 +811,7 @@ elif menu == "➕ Importação de Lotes":
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO E COM FOTOS/DADOS COMPLETO)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO)
 # =============================================================================
 elif menu == "📋 Triagem e Romaneio":
     st.markdown("<h2 class='dinamic-text'>📋 Triagem e Despacho</h2>", unsafe_allow_html=True)
@@ -871,10 +856,10 @@ elif menu == "📋 Triagem e Romaneio":
                 gb_fila.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
                 
                 # 🔥 CORREÇÃO DO "SELECT ALL"
-                gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
-                gb_fila.configure_grid_options(rowMultiSelectWithClick=True, suppressRowClickSelection=False)
+                gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+                gb_fila.configure_grid_options(rowMultiSelectWithClick=True)
                 
-                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED)
+                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
                 
                 selecionados_manuais = grid_fila_resp['selected_rows']
                 tem_selecao = False
@@ -909,10 +894,10 @@ elif menu == "📋 Triagem e Romaneio":
                 gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
                 
                 # 🔥 CORREÇÃO DO "SELECT ALL"
-                gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
-                gb.configure_grid_options(rowMultiSelectWithClick=True, suppressRowClickSelection=False)
+                gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+                gb.configure_grid_options(rowMultiSelectWithClick=True)
                 
-                grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED)
+                grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
                 
                 selecionados = grid_resp['selected_rows']
                 tem_sel_pdf = False
@@ -950,7 +935,6 @@ elif menu == "📋 Triagem e Romaneio":
                                 
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 
-                                # AQUI ESTÁ O SEU DESEJO ATENDIDO: ENVIA 1 LOTE INTEIRO PARA O MOTORISTA
                                 base_tomador = sel_lista[0].get('TOMADOR', 'CLIENTE')
                                 base_cidade = sel_lista[0].get('CIDADE', '')
                                 lote_app = [{
