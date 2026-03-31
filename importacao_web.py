@@ -314,10 +314,10 @@ def obter_proximo_id(df):
 # =============================================================================
 
 # Variáveis de Cores Tema Medical/Tech
-bg_app = "#F8FAFC"        # Cinza gelo clarinho para fundo
-bg_side = "#0F172A"       # Azul marinho escuro (Slate 900) para menu lateral
-txt_main = "#0F172A"      # Slate 900 para texto principal
-border_c = "#E2E8F0"      # Slate 200 para bordas suaves
+bg_app = "#F8FAFC"        
+bg_side = "#0F172A"       
+txt_main = "#0F172A"      
+border_c = "#E2E8F0"      
 
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
@@ -429,7 +429,7 @@ def obter_css_grid():
         ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "8px", "overflow": "hidden"},
         ".ag-header": {"background-color": "#F8FAFC !important", "border-bottom": "1px solid #CBD5E1 !important"},
         ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "800 !important", "font-size": "12px !important", "text-transform": "uppercase"},
-        ".ag-header-icon": {"color": "#0284C7 !important"}, /* Ícone do filtro em destaque */
+        ".ag-header-icon": {"color": "#0284C7 !important"}, # Ícone do filtro em destaque 
         ".ag-cell": {"font-size": "13px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
         ".ag-row-even": {"background-color": "#FFFFFF !important"},
         ".ag-row-odd": {"background-color": "#F8FAFC !important"},
@@ -1130,7 +1130,7 @@ elif menu == "🔬 Triagem e Romaneio":
                                 # 🔥 NOVO DESIGN DE PDF: Estilo Clean/Premium, ID Cliente, Fontes Menores
                                 pdf = FPDF()
                                 pdf.add_page()
-                                pdf.set_draw_color(15, 23, 42)  # Slate 900
+                                pdf.set_draw_color(15, 23, 42)  
                                 pdf.set_line_width(0.3)
                                 pdf.rect(5, 5, 200, 287)
                                 
@@ -1140,21 +1140,20 @@ elif menu == "🔬 Triagem e Romaneio":
                                 pdf.cell(0, 6, f"PROTOCOLO DE ROMANEIO TÉCNICO - IGO LOGISTICA", ln=True, align="C")
                                 
                                 pdf.set_font("Arial", "B", 10)
-                                pdf.set_text_color(2, 132, 199) # Sky 600
+                                pdf.set_text_color(2, 132, 199) 
                                 pdf.cell(0, 5, f"LOTE DE EXPEDIÇÃO: {id_romaneio}", ln=True, align="C")
                                 
                                 pdf.set_font("Arial", "", 8)
-                                pdf.set_text_color(100, 116, 139) # Slate 500
+                                pdf.set_text_color(100, 116, 139) 
                                 pdf.cell(0, 4, f"Agente Designado: {motorista_escolhido.upper()}   |   Data do Embarque: {data_despacho.strftime('%d/%m/%Y')}", ln=True, align="C")
                                 
                                 pdf.ln(3)
                                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
                                 pdf.ln(3)
                                 
-                                pdf.set_fill_color(15, 23, 42) # Fundo do Cabeçalho da Tabela
+                                pdf.set_fill_color(15, 23, 42) 
                                 pdf.set_text_color(255, 255, 255)
                                 pdf.set_font("Arial", "B", 7)
-                                # Reduzindo larguras para encaixar o ID Cliente com perfeição
                                 pdf.cell(10, 5, "ITEM", 1, 0, "C", True)
                                 pdf.cell(25, 5, "PEDIDO", 1, 0, "C", True)
                                 pdf.cell(30, 5, "ID CLIENTE", 1, 0, "C", True) 
@@ -1162,12 +1161,12 @@ elif menu == "🔬 Triagem e Romaneio":
                                 pdf.cell(35, 5, "CIDADE", 1, 0, "C", True)
                                 pdf.cell(10, 5, "UF", 1, 1, "C", True)
                                 
-                                pdf.set_text_color(51, 65, 85) # Slate 700 para texto
+                                pdf.set_text_color(51, 65, 85) 
                                 pdf.set_font("Arial", "", 7)
                                 
                                 for idx, item in enumerate(sel_lista, 1):
                                     fill = (idx % 2 == 0)
-                                    if fill: pdf.set_fill_color(241, 245, 249) # Linha zebra Slate 50
+                                    if fill: pdf.set_fill_color(241, 245, 249) 
                                     else: pdf.set_fill_color(255, 255, 255)
                                     
                                     qr_val = str(item.get('QR_CODE', ''))
