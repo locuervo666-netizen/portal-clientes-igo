@@ -1000,8 +1000,8 @@ elif menu == "📋 Triagem e Romaneio":
             st.markdown("#### Histórico de Triagem e Romaneios")
             st.info("Visualização rápida de todos os pedidos já movimentados na triagem.")
             
-            # Exclui PENDENTE e COLETADO. Mostra todo o resto (Conferido, Em Rota, Entregue, Frustrada, etc).
-            df_hist = df_raw[~df_raw['STATUS'].astype(str).str.upper().isin(['PENDENTE', 'COLETADO'])].copy()
+            # 🔥 CORREÇÃO: Mostra APENAS pedidos com status CONFERIDO
+            df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
             
             if not df_hist.empty:
                 colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW']
