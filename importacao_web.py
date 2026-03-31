@@ -415,7 +415,7 @@ if menu == "📊 Dashboard de Controle":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'STATUS_DISPLAY', 'AGENTE_RAW', 'LABORATORIO', 'CIDADE', 'UF', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'STATUS_DISPLAY', 'AGENTE_RAW', 'LABORATORIO', 'CIDADE', 'UF', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CEP']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
         
         if busca:
@@ -769,7 +769,14 @@ elif menu == "➕ Importação de Lotes":
     if not st.session_state.df_preview.empty:
         st.markdown("---")
         
-        # 🔥 SISTEMA DE DUAS GAVETAS (OK e ERRO)
+        # 🔥 BOTÃO DE CANCELAR ADICIONADO AO LADO DO TÍTULO DO PREVIEW
+        col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
+        col_tit.markdown("### 👀 2. Preview dos Dados (Barreira de Segurança)")
+        if col_canc.button("❌ Cancelar / Limpar", type="secondary", use_container_width=True):
+            st.session_state.df_preview = pd.DataFrame()
+            if 'import_success' in st.session_state: st.session_state.import_success = ""
+            st.rerun()
+
         df_preview = st.session_state.df_preview
         mask_err = (df_preview['AGENTE_RAW'].astype(str).str.strip() == "") | (df_preview['AGENTE_RAW'].astype(str).str.upper() == "NAN")
         df_err = df_preview[mask_err]
@@ -790,7 +797,6 @@ elif menu == "➕ Importação de Lotes":
                 
                 for idx, row in df_err.iterrows():
                     st.markdown(f"**Pedido:** {row['PEDIDO']} | **Lab:** {row['LABORATORIO']} | **Endereço:** {row['ENDERECO']} - {row['BAIRRO']}, {row['CIDADE']}")
-                    # Dropdown nativo com busca inteligente!
                     correcoes[idx] = st.selectbox(f"Motorista para o pedido {row['PEDIDO']}:", ["Selecione..."] + logins_disp, key=f"fix_mot_{idx}")
                     st.divider()
                 
@@ -807,7 +813,6 @@ elif menu == "➕ Importação de Lotes":
                     st.rerun()
 
         else:
-            # GAVETA 100% VERDE
             st.success(f"✅ Maravilha! Todos os {len(df_ok)} pedidos estão roteirizados e prontos para importação.")
             
             gb_prev = GridOptionsBuilder.from_dataframe(df_ok)
@@ -851,7 +856,6 @@ elif menu == "➕ Importação de Lotes":
                                 })
                         if lista_app: despachar_para_appsheet(lista_app)
                         
-                        # 🔥 CONFIRMAÇÃO PERMANENTE (Salva na memória antes de recarregar)
                         st.session_state.import_success = f"🎉 SUCESSO ABSOLUTO! Lote de {len(df_final)} pedidos foi importado e despachado para os motoristas."
                         st.session_state.df_preview = pd.DataFrame()
                         carregar_dados_completos.clear()
