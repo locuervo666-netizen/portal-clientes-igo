@@ -349,7 +349,7 @@ with st.sidebar:
     
     # 🔥 AQUI ESTÁ A LOGO NA BARRA LATERAL (Removido o IGO ADMIN)
     with col_logo: 
-        # st.image("logo.png", use_container_width=True) # Descomente para usar a imagem
+        # st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True) # Descomente para usar a imagem
         st.markdown("<h3 style='color:#38BDF8; margin: 0; padding-bottom: 5px; font-weight: 800;'>SISTEMA IGO</h3>", unsafe_allow_html=True)
     
     with col_tema: st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
