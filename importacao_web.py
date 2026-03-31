@@ -383,7 +383,7 @@ if menu == "📊 Dashboard de Controle":
         if 'DATA_LIMITE' in df_raw.columns: df_raw['DATA_LIMITE'] = df_raw['DATA_LIMITE'].fillna("").astype(str)
         if 'DATA_ENTREGA' in df_raw.columns: df_raw['DATA_ENTREGA'] = df_raw['DATA_ENTREGA'].fillna("").astype(str)
 
-        st.markdown("<div class='dinamic-border' style='padding-bottom: 10px; margin-bottom: 20px;'><h2 class='dinamic-text' style='margin:0;'>📊 Painel de Controle Operacional</h2></div>", unsafe_allow_html=True)
+        st.markdown("<div class='dinamic-border' style='padding-bottom: 10px; margin-bottom: 20px;'><h4 class='dinamic-text' style='margin:0;'>📊 Painel de Controle Operacional</h4></div>", unsafe_allow_html=True)
 
         col_f1, col_f2 = st.columns(2)
         f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
@@ -428,15 +428,13 @@ if menu == "📊 Dashboard de Controle":
 
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
-            gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
+            # 🔥 ADICIONADO: filter=True. Agora todas as colunas têm filtro e barra de pesquisa interna!
+            gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
             
-            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
-            
-            cols_editaveis = ['TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP']
-            gb.configure_columns(cols_editaveis, editable=True)
+            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
             
             st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'800'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'800'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'800'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'800'};} return {'fontWeight':'bold'};}")
-            gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, minWidth=170, editable=False)
+            gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, minWidth=170)
             
             img_js = JsCode("""
             class FotoRenderer {
@@ -467,9 +465,9 @@ if menu == "📊 Dashboard de Controle":
                 getGui() { return this.eGui; }
             }
             """)
-            gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90, editable=False)
+            gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90)
             
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED | GridUpdateMode.VALUE_CHANGED)
+            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -491,7 +489,8 @@ if menu == "📊 Dashboard de Controle":
                 </style>
             """, unsafe_allow_html=True)
             
-            col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns([1.5, 1.5, 1.5, 1.5, 1.5])
+            # 🔥 BOTÃO DE EDIÇÃO REMOVIDO PARA EVITAR ACIDENTES. VOLTAMOS COM 4 COLUNAS BEM ESPAÇADAS.
+            col_b2, col_b3, col_b4, col_b5 = st.columns([1.5, 1.5, 1.5, 1.5])
             
             with col_b2.popover("📲 Dar Baixa Manual", use_container_width=True):
                 if not tem_sel: st.warning("Selecione na Grid primeiro!")
@@ -633,31 +632,6 @@ if menu == "📊 Dashboard de Controle":
             if col_b5.button("🔄 Atualizar Painel", use_container_width=True):
                 carregar_dados_completos.clear()
                 st.rerun()
-                
-            if col_b6.button("✏️ Salvar Edições", use_container_width=True, type="secondary", help="Dê duplo clique na tabela para editar textos e clique aqui para salvar."):
-                df_modificado = pd.DataFrame(grid_response['data'])
-                if not df_modificado.empty:
-                    with st.spinner("Salvando edições da tabela no banco de dados..."):
-                        try:
-                            aba = planilha_db.worksheet("Memoria_Sistema")
-                            dados_aba = aba.get_all_values()
-                            df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                            
-                            df_mod_dict = df_modificado.set_index('PEDIDO').to_dict('index')
-                            
-                            for idx, row in df_nuvem.iterrows():
-                                pid = str(row['PEDIDO'])
-                                if pid in df_mod_dict:
-                                    for col in cols_editaveis:
-                                        if col in df_mod_dict[pid] and col in df_nuvem.columns:
-                                            df_nuvem.at[idx, col] = df_mod_dict[pid][col]
-                                            
-                            aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                            st.success("Tabela editada salva com sucesso!")
-                            carregar_dados_completos.clear()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao salvar edições: {e}")
 
     else:
         st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Novo Pedido Manual' no menu lateral para começar.")
@@ -666,7 +640,7 @@ if menu == "📊 Dashboard de Controle":
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL (ABA ISOLADA E PADRONIZADA)
 # =============================================================================
 elif menu == "📝 Novo Pedido Manual":
-    st.markdown("<h2 class='dinamic-text'>📝 Inserir Pedido Manual</h2>", unsafe_allow_html=True)
+    st.markdown("<h4 class='dinamic-text'>📝 Inserir Pedido Manual</h4>", unsafe_allow_html=True)
     st.markdown("Use esta tela para gerar pedidos de emergência. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente.**")
     
     with st.container(border=True):
@@ -728,7 +702,7 @@ elif menu == "📝 Novo Pedido Manual":
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
 elif menu == "➕ Importação de Lotes":
-    st.markdown("<h2 class='dinamic-text'>➕ Central de Importação</h2>", unsafe_allow_html=True)
+    st.markdown("<h4 class='dinamic-text'>➕ Central de Importação</h4>", unsafe_allow_html=True)
     st.success("🛡️ **SEGURANÇA DO HISTÓRICO:** O sistema de importação sempre **ADICIONA** os novos pedidos na base. O seu histórico do dia estão seguros.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
@@ -797,7 +771,8 @@ elif menu == "➕ Importação de Lotes":
             st.error("⚠️ Atenção: Há pedidos SEM MOTORISTA atribuído! Estão marcados em vermelho.")
         
         gb_prev = GridOptionsBuilder.from_dataframe(st.session_state.df_preview)
-        gb_prev.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
+        # 🔥 ADICIONADO FILTRO AQUI TAMBÉM
+        gb_prev.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
         
         js_err = JsCode("function(p){if(p.data.AGENTE_RAW == ''){return {'backgroundColor': '#FDEDEC', 'color': '#B03A2E', 'fontWeight': 'bold'};} return {};}")
         gb_prev.configure_grid_options(getRowStyle=js_err)
@@ -851,7 +826,7 @@ elif menu == "➕ Importação de Lotes":
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO)
 # =============================================================================
 elif menu == "📋 Triagem e Romaneio":
-    st.markdown("<h2 class='dinamic-text'>📋 Triagem e Despacho</h2>", unsafe_allow_html=True)
+    st.markdown("<h4 class='dinamic-text'>📋 Triagem e Despacho</h4>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -895,7 +870,8 @@ elif menu == "📋 Triagem e Romaneio":
             if not df_fila.empty:
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
-                gb_fila.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
+                # 🔥 ADICIONADO FILTRO AQUI TAMBÉM
+                gb_fila.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
                 
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
@@ -931,17 +907,16 @@ elif menu == "📋 Triagem e Romaneio":
             df_conf = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
             if not df_conf.empty:
                 
-                # 🔥 NOVO FILTRO DE TOMADOR AQUI
                 lista_tomadores_conf = sorted(df_conf['TOMADOR'].astype(str).unique().tolist())
                 c_filtro, _ = st.columns([1, 2])
                 tomador_filtro = c_filtro.selectbox("🏢 Filtrar Lote por Tomador:", ["Todos"] + [t for t in lista_tomadores_conf if t.strip()])
                 
                 if tomador_filtro != "Todos":
                     df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
-                # --------------------------------
                 
                 gb = GridOptionsBuilder.from_dataframe(df_conf[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']])
-                gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
+                # 🔥 ADICIONADO FILTRO AQUI TAMBÉM
+                gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
                 
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
@@ -1030,7 +1005,7 @@ elif menu == "📋 Triagem e Romaneio":
 # 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
 # =============================================================================
 elif menu == "📥 Exportar Relatórios":
-    st.markdown("<h2 class='dinamic-text'>📥 Central de Exportações</h2>", unsafe_allow_html=True)
+    st.markdown("<h4 class='dinamic-text'>📥 Central de Exportações</h4>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -1088,7 +1063,7 @@ elif menu == "📥 Exportar Relatórios":
 # ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
 # =============================================================================
 elif menu == "⚙️ Configurar Rotas":
-    st.markdown("<h2 class='dinamic-text'>⚙️ Gestão de Agentes e Rotas</h2>", unsafe_allow_html=True)
+    st.markdown("<h4 class='dinamic-text'>⚙️ Gestão de Agentes e Rotas</h4>", unsafe_allow_html=True)
     
     tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
     
