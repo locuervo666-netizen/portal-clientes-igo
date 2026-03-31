@@ -7,6 +7,7 @@ import unicodedata
 import holidays
 import os
 import tempfile
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 import random
 import gspread
@@ -290,7 +291,8 @@ with st.sidebar:
     with col_tema: st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-    menu = st.radio("Navegação:", ["📊 Dashboard de Controle", "📝 Novo Pedido Manual", "➕ Importação de Lotes", "📋 Triagem e Romaneio", "📥 Exportar Relatórios", "⚙️ Configurar Rotas"], label_visibility="collapsed")
+    # 🔥 A ADIÇÃO DA ABA DE ZAP AQUI NO MENU:
+    menu = st.radio("Navegação:", ["📊 Dashboard de Controle", "📝 Novo Pedido Manual", "➕ Importação de Lotes", "📋 Triagem e Romaneio", "📱 Disparo WhatsApp", "📥 Exportar Relatórios", "⚙️ Configurar Rotas"], label_visibility="collapsed")
     st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
     st.divider()
     if st.button("🚪 Sair do Sistema", use_container_width=True, type="secondary"):
@@ -697,6 +699,83 @@ elif menu == "📝 Novo Pedido Manual":
                         except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
+# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
+# =============================================================================
+elif menu == "📱 Disparo WhatsApp":
+    st.markdown("<h4 class='dinamic-text'>📱 Central de Disparo via WhatsApp</h4>", unsafe_allow_html=True)
+    st.markdown("Selecione a data para visualizar e enviar as rotas pendentes para os motoristas.")
+    
+    df_raw = carregar_dados_completos(planilha_db)
+    
+    if not df_raw.empty:
+        # Filtro de Data
+        data_filtro = st.date_input("📅 Filtrar pedidos da data:", value=hoje_br)
+        
+        # Filtrar apenas Pendentes para a data selecionada
+        df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
+        
+        if df_pendentes.empty:
+            st.success(f"Nenhuma coleta/entrega PENDENTE para o dia {data_filtro.strftime('%d/%m/%Y')}.")
+        else:
+            # Agrupar por Motorista
+            agentes_com_rota = df_pendentes['AGENTE_RAW'].dropna().unique()
+            agentes_com_rota = [ag for ag in agentes_com_rota if str(ag).strip()]
+            
+            if not agentes_com_rota:
+                st.warning("Existem pedidos pendentes, mas nenhum deles tem um motorista atribuído.")
+            else:
+                st.info(f"Encontrados **{len(df_pendentes)}** pedidos distribuídos entre **{len(agentes_com_rota)}** motoristas.")
+                
+                # Dicionário de telefones da base de agentes
+                dict_telefones = {}
+                if not DF_AGENTES.empty:
+                    # Garantir que o login e o telefone estão limpos
+                    for _, row in DF_AGENTES.iterrows():
+                        login = str(row.get('LOGIN DO AGENTE', '')).strip().lower()
+                        tel = str(row.get('TELEFONE', '')).strip()
+                        # Limpa qualquer coisa que não seja número do telefone
+                        tel_limpo = re.sub(r'\D', '', tel)
+                        if login and tel_limpo:
+                            dict_telefones[login] = tel_limpo
+
+                # Criar um card para cada motorista
+                for agente in sorted(agentes_com_rota):
+                    df_agente = df_pendentes[df_pendentes['AGENTE_RAW'] == agente]
+                    qtd_pedidos = len(df_agente)
+                    telefone = dict_telefones.get(str(agente).strip().lower(), "")
+                    
+                    with st.expander(f"👤 Motorista: {str(agente).upper()} ({qtd_pedidos} pacotes)", expanded=False):
+                        st.dataframe(df_agente[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True, use_container_width=True)
+                        
+                        if telefone:
+                            # Montar a mensagem do WhatsApp
+                            msg = f"🚚 *ROTA IGO LOGÍSTICA*\n"
+                            msg += f"Data: {data_filtro.strftime('%d/%m/%Y')}\n"
+                            msg += f"Motorista: {str(agente).upper()}\n\n"
+                            msg += f"📦 *COLETAS / ENTREGAS ({qtd_pedidos}):*\n\n"
+                            
+                            for i, (_, row) in enumerate(df_agente.iterrows(), 1):
+                                msg += f"*{i}️⃣ Pedido:* {row['PEDIDO']}\n"
+                                msg += f"🏥 *Tomador:* {row.get('TOMADOR', '')}\n"
+                                msg += f"🏢 *Local:* {row.get('LABORATORIO', '')}\n"
+                                msg += f"📍 *Endereço:* {row.get('ENDERECO', '')}, {row.get('NUMERO', '')} - {row.get('BAIRRO', '')}, {row.get('CIDADE', '')}\n"
+                                if str(row.get('OBSERVACOES', '')).strip() and str(row.get('OBSERVACOES', '')).upper() != 'NAN':
+                                    msg += f"📝 *Obs:* {row['OBSERVACOES']}\n"
+                                msg += "------------------------\n"
+                            
+                            msg += "\nBom trabalho e dirija com segurança!"
+                            
+                            # Codificar a mensagem para o formato de URL
+                            msg_codificada = urllib.parse.quote(msg)
+                            link_whatsapp = f"https://api.whatsapp.com/send?phone={telefone}&text={msg_codificada}"
+                            
+                            st.link_button("📲 Enviar Rota pelo WhatsApp", link_whatsapp, type="primary")
+                        else:
+                            st.error(f"⚠️ Telefone não encontrado para o login '{agente}'. Cadastre o telefone na aba 'Configurar Rotas'.")
+    else:
+        st.warning("📭 O banco de dados está vazio no momento.")
+
+# =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
 elif menu == "➕ Importação de Lotes":
@@ -995,20 +1074,16 @@ elif menu == "📋 Triagem e Romaneio":
                             except Exception as e: st.error(f"Erro ao processar despacho: {e}")
             else: st.info("Nenhum pedido com status 'CONFERIDO' no momento.")
 
-        # 🔥 ABA 3: HISTÓRICO DE TRIAGEM (AGORA COM TODOS OS STATUS APÓS PENDENTE/COLETADO)
         with t3:
             st.markdown("#### Histórico de Triagem e Despacho")
             st.info("Visualização rápida de todos os pedidos já conferidos ou despachados.")
             
-            # Filtro que inclui todo o fluxo pós-triagem.
             status_mostrar = ['CONFERIDO', 'EM ROTA DE ENTREGA', 'ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']
             df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper().isin(status_mostrar)].copy()
             
             if not df_hist.empty:
-                # Ordena para os pedidos mais recentes ficarem no topo por padrão
                 df_hist = df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])
                 
-                # Adicionada a coluna ROMANEIO para visualizar em qual Lote o pacote foi despachado
                 colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
                 df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
                 
