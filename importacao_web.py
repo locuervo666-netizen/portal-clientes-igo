@@ -347,15 +347,15 @@ with st.sidebar:
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
     
-    # 🔥 MENU ATUALIZADO COM A ABA DO PAINEL TV
+    # 🔥 MENU REORDENADO: Painel TV movido para as últimas opções
     menu = st.radio("Navegação:", [
         "📊 Dashboard de Controle", 
-        "📺 Painel TV (Métricas)", 
         "📝 Novo Pedido Manual", 
         "➕ Importação de Lotes", 
         "📋 Triagem e Romaneio", 
         "📱 Disparo WhatsApp", 
         "📥 Exportar Relatórios", 
+        "📺 Painel TV (Métricas)", 
         "⚙️ Configurar Rotas"
     ], label_visibility="collapsed")
     
@@ -420,6 +420,25 @@ def obter_css_grid():
         })
     return base_css
 
+def calc_status_display(row):
+    status_final = str(row.get('STATUS', '')).strip().upper()
+    previsao = str(row.get('DATA_LIMITE', '')).strip()
+    res = '⏳ Pendente'
+    
+    if 'ENTREGUE' in status_final: res = '✅ Entregue'
+    elif 'COLETADO' in status_final: res = '📦 Coletado'
+    elif 'ROTA' in status_final: res = '🚚 Em Rota'
+    elif 'CONFERIDO' in status_final: res = '☑️ Conferido'
+    elif 'FRUSTRADA' in status_final: res = '❌ Frustrada'
+    elif 'CANCELADO' in status_final: res = '🚫 Cancelado'
+    elif 'PROBLEMA' in status_final: res = '🚨 Problema'
+    
+    if '✅' not in res and '🚫' not in res and '❌' not in res and previsao:
+        try:
+            if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: res = f"🚨 ATRASADO ({res})"
+        except: pass
+    return res
+
 # =============================================================================
 # 🚀 MÓDULO 1: DASHBOARD DE CONTROLE
 # =============================================================================
@@ -428,26 +447,6 @@ if menu == "📊 Dashboard de Controle":
     
     if not df_raw.empty:
         df_raw['FOTO_URL'] = df_raw['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
-        
-        def calc_status_display(row):
-            status_final = str(row.get('STATUS', '')).strip().upper()
-            previsao = str(row.get('DATA_LIMITE', '')).strip()
-            res = '⏳ Pendente'
-            
-            if 'ENTREGUE' in status_final: res = '✅ Entregue'
-            elif 'COLETADO' in status_final: res = '📦 Coletado'
-            elif 'ROTA' in status_final: res = '🚚 Em Rota'
-            elif 'CONFERIDO' in status_final: res = '☑️ Conferido'
-            elif 'FRUSTRADA' in status_final: res = '❌ Frustrada'
-            elif 'CANCELADO' in status_final: res = '🚫 Cancelado'
-            elif 'PROBLEMA' in status_final: res = '🚨 Problema'
-            
-            if '✅' not in res and '🚫' not in res and '❌' not in res and previsao:
-                try:
-                    if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: res = f"🚨 ATRASADO ({res})"
-                except: pass
-            return res
-
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         
         if 'DATA_LIMITE' in df_raw.columns: df_raw['DATA_LIMITE'] = df_raw['DATA_LIMITE'].fillna("").astype(str)
@@ -703,123 +702,6 @@ if menu == "📊 Dashboard de Controle":
 
     else:
         st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Novo Pedido Manual' no menu lateral para começar.")
-
-# =============================================================================
-# 📺 MÓDULO NOVO: PAINEL TV (MÉTRICAS EXECUTIVAS)
-# =============================================================================
-elif menu == "📺 Painel TV (Métricas)":
-    st.markdown("<h4 class='dinamic-text'>📺 Painel de Métricas (Visualização de TV)</h4>", unsafe_allow_html=True)
-    df_raw = carregar_dados_completos(planilha_db)
-    
-    if not df_raw.empty:
-        # Simplifica o status para as métricas da TV
-        def calc_status_display_tv(row):
-            status_final = str(row.get('STATUS', '')).strip().upper()
-            res = 'PENDENTE'
-            if 'ENTREGUE' in status_final: res = 'ENTREGUE'
-            elif 'COLETADO' in status_final: res = 'COLETADO'
-            elif 'ROTA' in status_final: res = 'EM ROTA'
-            elif 'CONFERIDO' in status_final: res = 'CONFERIDO'
-            elif 'FRUSTRADA' in status_final: res = 'FRUSTRADA'
-            elif 'CANCELADO' in status_final: res = 'CANCELADO'
-            elif 'PROBLEMA' in status_final: res = 'PROBLEMA'
-            return res
-        
-        df_raw['STATUS_SIMPLES'] = df_raw.apply(calc_status_display_tv, axis=1)
-        
-        c_f1, c_f2 = st.columns([1, 3])
-        data_tv = c_f1.date_input("📅 Dados do Dia:", value=hoje_br)
-        
-        df_hoje = df_raw[df_raw['DATA_OBJ'] == data_tv]
-        dia_anterior = data_tv - timedelta(days=1)
-        df_ontem = df_raw[df_raw['DATA_OBJ'] == dia_anterior]
-        
-        total_hoje = len(df_hoje)
-        total_ontem = len(df_ontem)
-        delta_pedidos = total_hoje - total_ontem
-        
-        st.markdown("---")
-        
-        # --- LINHA 1: MÉTRICAS GERAIS (BOLSA DE VALORES) ---
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
-        c1.metric("📦 Total de Pedidos", total_hoje, delta=f"{delta_pedidos} vs Ontem")
-        
-        entregues = len(df_hoje[df_hoje['STATUS_SIMPLES'] == 'ENTREGUE'])
-        pendentes = len(df_hoje[df_hoje['STATUS_SIMPLES'] == 'PENDENTE'])
-        coletados = len(df_hoje[df_hoje['STATUS_SIMPLES'].isin(['COLETADO', 'CONFERIDO'])])
-        em_rota = len(df_hoje[df_hoje['STATUS_SIMPLES'] == 'EM ROTA'])
-        frustrados = len(df_hoje[df_hoje['STATUS_SIMPLES'].isin(['FRUSTRADA', 'PROBLEMA', 'CANCELADO'])])
-        
-        c2.metric("✅ Entregues", entregues)
-        c3.metric("⏳ Pendentes", pendentes)
-        c4.metric("📦 Triagem/Coletados", coletados)
-        c5.metric("🚚 Em Rota", em_rota)
-        c6.metric("❌ Frustrados", frustrados)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # --- LINHA 2: BARRA DE PROGRESSO GLOBAL ---
-        st.markdown("#### 🎯 Termômetro de Conclusão da Operação")
-        if total_hoje > 0:
-            concluidos = entregues + frustrados
-            progresso_pct = int((concluidos / total_hoje) * 100)
-        else:
-            progresso_pct = 0
-            
-        st.progress(progresso_pct / 100.0, text=f"{progresso_pct}% de Conclusão ({concluidos} de {total_hoje} pedidos finalizados na rua)")
-        
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        
-        # --- LINHA 3: TABELA DE DESEMPENHO E GRÁFICO ---
-        col_tv1, col_tv2 = st.columns([2, 1])
-        
-        with col_tv1:
-            st.markdown("#### 🏆 Top Motoristas (Métrica de Conclusão)")
-            if not df_hoje.empty:
-                df_mot = df_hoje.copy()
-                df_mot['CONCLUIDO'] = df_mot['STATUS_SIMPLES'].isin(['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']).astype(int)
-                
-                resumo_mot = df_mot.groupby('AGENTE_RAW').agg(
-                    Total=('PEDIDO', 'count'),
-                    Concluidos=('CONCLUIDO', 'sum')
-                ).reset_index()
-                
-                resumo_mot['Pendentes/Em Rota'] = resumo_mot['Total'] - resumo_mot['Concluidos']
-                resumo_mot['% Concluído'] = (resumo_mot['Concluidos'] / resumo_mot['Total'] * 100).round(1)
-                
-                resumo_mot = resumo_mot.sort_values(by='Total', ascending=False)
-                resumo_mot.rename(columns={'AGENTE_RAW': 'Motorista'}, inplace=True)
-                
-                # Tabela lindíssima com barra de progresso nativa do Streamlit
-                st.dataframe(
-                    resumo_mot,
-                    column_config={
-                        "Motorista": st.column_config.TextColumn("👤 Motorista"),
-                        "Total": st.column_config.NumberColumn("📦 Total do Dia"),
-                        "Concluidos": st.column_config.NumberColumn("✅ Finalizados"),
-                        "Pendentes/Em Rota": st.column_config.NumberColumn("🚚 Na Rua / Pendente"),
-                        "% Concluído": st.column_config.ProgressColumn(
-                            "📊 Barra de Status Individual",
-                            format="%f%%",
-                            min_value=0,
-                            max_value=100,
-                        ),
-                    },
-                    hide_index=True,
-                    use_container_width=True
-                )
-            else:
-                st.info("Nenhum motorista com rotas nesta data.")
-                
-        with col_tv2:
-            st.markdown("#### 📊 Raio-X do Status")
-            if not df_hoje.empty:
-                status_counts = df_hoje['STATUS_SIMPLES'].value_counts().reset_index()
-                status_counts.columns = ['Status', 'Quantidade']
-                st.bar_chart(data=status_counts, x='Status', y='Quantidade', color='#38BDF8')
-                
-    else:
-        st.warning("📭 O banco de dados está vazio no momento.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL (ABA ISOLADA E PADRONIZADA)
@@ -1279,6 +1161,7 @@ elif menu == "📋 Triagem e Romaneio":
                 
     else: st.info("O banco de dados está vazio no momento.")
 
+
 # =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
 # =============================================================================
@@ -1347,6 +1230,7 @@ elif menu == "📱 Disparo WhatsApp":
     else:
         st.warning("📭 O banco de dados está vazio no momento.")
 
+
 # =============================================================================
 # 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
 # =============================================================================
@@ -1404,6 +1288,124 @@ elif menu == "📥 Exportar Relatórios":
                     st.download_button("📥 Baixar Customizado", data=gerar_excel_memoria(df_custom), file_name=f"Relatorio_Custom.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 else: st.warning("Nenhum dado encontrado.")
     else: st.warning("O banco de dados está vazio.")
+
+# =============================================================================
+# 📺 MÓDULO NOVO: PAINEL TV (MÉTRICAS EXECUTIVAS ULTRA PREMIUM)
+# =============================================================================
+elif menu == "📺 Painel TV (Métricas)":
+    st.markdown("<h3 class='dinamic-text'>📺 Painel Executivo de Operação</h3>", unsafe_allow_html=True)
+    df_raw = carregar_dados_completos(planilha_db)
+    
+    def criar_card(titulo, valor, subtitulo, gradiente):
+        return f"""
+        <div style="background: {gradiente}; padding: 20px; border-radius: 12px; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); height: 140px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px;">
+            <p style="margin:0; font-size: 16px; font-weight: 600; opacity: 0.9;">{titulo}</p>
+            <h1 style="margin:0; font-size: 38px; font-weight: 900; letter-spacing: 1px;">{valor}</h1>
+            <p style="margin:0; font-size: 13px; opacity: 0.8; font-weight: 500;">{subtitulo}</p>
+        </div>
+        """
+    
+    if not df_raw.empty:
+        df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
+        
+        c_f1, c_f2 = st.columns([1, 3])
+        data_tv = c_f1.date_input("📅 Visualizar Métrica da Data:", value=hoje_br)
+        
+        df_hoje = df_raw[df_raw['DATA_OBJ'] == data_tv].copy()
+        dia_anterior = data_tv - timedelta(days=1)
+        df_ontem = df_raw[df_raw['DATA_OBJ'] == dia_anterior]
+        
+        total_hoje = len(df_hoje)
+        total_ontem = len(df_ontem)
+        delta_pedidos = total_hoje - total_ontem
+        sinal = "📈" if delta_pedidos >= 0 else "📉"
+        
+        # --- CÁLCULO DAS MÉTRICAS ---
+        entregues = df_hoje['STATUS_DISPLAY'].str.contains('Entregue', case=False, na=False).sum()
+        frustrados = df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False, na=False).sum()
+        atrasados = df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False, na=False).sum()
+        coletados = df_hoje['STATUS_DISPLAY'].str.contains('Coletado|Conferido', case=False, na=False).sum()
+        em_rota = df_hoje['STATUS_DISPLAY'].str.contains('Em Rota', case=False, na=False).sum()
+        pendentes = df_hoje['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False).sum()
+        
+        # --- LINHA 1: BLOCOS HTML PREMIUM ---
+        c1, c2, c3, c4 = st.columns(4)
+        c1.markdown(criar_card("📦 Total de Pedidos", total_hoje, f"{sinal} {delta_pedidos} em relação a ontem", "linear-gradient(135deg, #1E293B 0%, #334155 100%)"), unsafe_allow_html=True)
+        c2.markdown(criar_card("⏳ Pendentes", pendentes, "Aguardando motorista (Na rua)", "linear-gradient(135deg, #64748B 0%, #94A3B8 100%)"), unsafe_allow_html=True)
+        c3.markdown(criar_card("📦 Coletados / Triagem", coletados, "Parte do motorista concluída", "linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)"), unsafe_allow_html=True)
+        c4.markdown(criar_card("🚨 Atrasados", atrasados, "Estouraram o Prazo Limite (SLA)", "linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%)"), unsafe_allow_html=True)
+        
+        # --- LINHA 2: BLOCOS HTML PREMIUM ---
+        c5, c6, c7, c8 = st.columns(4)
+        c5.markdown(criar_card("🚚 Em Rota", em_rota, "Despachados / Em trânsito", "linear-gradient(135deg, #9A3412 0%, #F59E0B 100%)"), unsafe_allow_html=True)
+        c6.markdown(criar_card("✅ Entregues", entregues, "Finalizados com sucesso", "linear-gradient(135deg, #064E3B 0%, #10B981 100%)"), unsafe_allow_html=True)
+        c7.markdown(criar_card("❌ Frustrados", frustrados, "Devoluções ou Problemas", "linear-gradient(135deg, #991B1B 0%, #EF4444 100%)"), unsafe_allow_html=True)
+        
+        # --- BARRA DE PROGRESSO GLOBAL ---
+        with c8:
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("#### 🎯 Conclusão da Varredura")
+            # Se o status NÃO é pendente, o motorista já "tocou" naquilo (coletou ou deu erro).
+            concluidos_globais = total_hoje - pendentes
+            progresso_pct = int((concluidos_globais / total_hoje) * 100) if total_hoje > 0 else 0
+            st.progress(progresso_pct / 100.0, text=f"{progresso_pct}% de Eficiência ({concluidos_globais} de {total_hoje} pacotes tocados)")
+            st.markdown("<p style='font-size:12px; color:gray; margin-top:-10px;'>Mede se o agente já coletou ou frustrou o pacote na rua.</p>", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # --- TABELA DE DESEMPENHO E GRÁFICO ---
+        col_tv1, col_tv2 = st.columns([2, 1])
+        
+        with col_tv1:
+            st.markdown("#### 🏆 Top Motoristas (Métrica de Varredura/Coleta)")
+            if not df_hoje.empty:
+                df_mot = df_hoje.copy()
+                
+                # O motorista concluiu a parte dele se o pacote já saiu de PENDENTE (seja coletado, frustrado, etc)
+                df_mot['CONCLUIDO_COLETA'] = (~df_mot['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False)).astype(int)
+                
+                resumo_mot = df_mot.groupby('AGENTE_RAW').agg(
+                    Total=('PEDIDO', 'count'),
+                    Concluidos=('CONCLUIDO_COLETA', 'sum')
+                ).reset_index()
+                
+                resumo_mot['Faltam_Na_Rua'] = resumo_mot['Total'] - resumo_mot['Concluidos']
+                resumo_mot['% Concluído'] = (resumo_mot['Concluidos'] / resumo_mot['Total'] * 100).round(1)
+                
+                resumo_mot = resumo_mot.sort_values(by='Total', ascending=False)
+                resumo_mot.rename(columns={'AGENTE_RAW': 'Motorista'}, inplace=True)
+                
+                st.dataframe(
+                    resumo_mot,
+                    column_config={
+                        "Motorista": st.column_config.TextColumn("👤 Motorista"),
+                        "Total": st.column_config.NumberColumn("📦 Total do Dia"),
+                        "Concluidos": st.column_config.NumberColumn("✅ Ação Realizada"),
+                        "Faltam_Na_Rua": st.column_config.NumberColumn("⏳ Aguardando Ação"),
+                        "% Concluído": st.column_config.ProgressColumn(
+                            "📊 Barra de Desempenho",
+                            format="%f%%",
+                            min_value=0,
+                            max_value=100,
+                        ),
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.info("Nenhum motorista com rotas nesta data.")
+                
+        with col_tv2:
+            st.markdown("#### 📊 Raio-X do Status Geral")
+            if not df_hoje.empty:
+                # Limpa a string de status para ficar bonito no gráfico (Ex: de "🚨 ATRASADO (⏳ PENDENTE)" para "PENDENTE")
+                df_hoje['STATUS_CHART'] = df_hoje['STATUS'].str.upper()
+                status_counts = df_hoje['STATUS_CHART'].value_counts().reset_index()
+                status_counts.columns = ['Status', 'Quantidade']
+                st.bar_chart(data=status_counts, x='Status', y='Quantidade', color='#38BDF8')
+                
+    else:
+        st.warning("📭 O banco de dados está vazio no momento.")
 
 # =============================================================================
 # ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
