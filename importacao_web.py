@@ -414,7 +414,7 @@ if menu == "📊 Dashboard de Controle":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'STATUS_DISPLAY', 'AGENTE_RAW', 'LABORATORIO', 'CIDADE', 'UF', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CEP']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'STATUS_DISPLAY', 'AGENTE_RAW', 'LABORATORIO', 'CIDADE', 'UF', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
         
         if busca:
@@ -428,10 +428,9 @@ if menu == "📊 Dashboard de Controle":
 
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
-            # 🔥 ADICIONADO: filter=True. Agora todas as colunas têm filtro e barra de pesquisa interna!
             gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
             
-            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
+            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
             
             st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'800'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'800'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'800'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'800'};} return {'fontWeight':'bold'};}")
             gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, minWidth=170)
@@ -489,7 +488,6 @@ if menu == "📊 Dashboard de Controle":
                 </style>
             """, unsafe_allow_html=True)
             
-            # 🔥 BOTÃO DE EDIÇÃO REMOVIDO PARA EVITAR ACIDENTES. VOLTAMOS COM 4 COLUNAS BEM ESPAÇADAS.
             col_b2, col_b3, col_b4, col_b5 = st.columns([1.5, 1.5, 1.5, 1.5])
             
             with col_b2.popover("📲 Dar Baixa Manual", use_container_width=True):
@@ -771,7 +769,6 @@ elif menu == "➕ Importação de Lotes":
             st.error("⚠️ Atenção: Há pedidos SEM MOTORISTA atribuído! Estão marcados em vermelho.")
         
         gb_prev = GridOptionsBuilder.from_dataframe(st.session_state.df_preview)
-        # 🔥 ADICIONADO FILTRO AQUI TAMBÉM
         gb_prev.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
         
         js_err = JsCode("function(p){if(p.data.AGENTE_RAW == ''){return {'backgroundColor': '#FDEDEC', 'color': '#B03A2E', 'fontWeight': 'bold'};} return {};}")
@@ -823,14 +820,14 @@ elif menu == "➕ Importação de Lotes":
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO E COM ABA HISTÓRICO)
 # =============================================================================
 elif menu == "📋 Triagem e Romaneio":
     st.markdown("<h4 class='dinamic-text'>📋 Triagem e Despacho</h4>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        t1, t2 = st.tabs(["📦 1. Bipar / Selecionar Pedidos Coletados", "🚚 2. Gerar Romaneio e Despachar"])
+        t1, t2, t3 = st.tabs(["📦 1. Bipar / Selecionar", "🚚 2. Gerar Romaneio", "🕒 3. Histórico Recente"])
         
         with t1:
             st.info("💡 Apenas pedidos **COLETADOS** aparecerão aqui.")
@@ -870,7 +867,6 @@ elif menu == "📋 Triagem e Romaneio":
             if not df_fila.empty:
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
-                # 🔥 ADICIONADO FILTRO AQUI TAMBÉM
                 gb_fila.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
                 
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
@@ -915,7 +911,6 @@ elif menu == "📋 Triagem e Romaneio":
                     df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
                 
                 gb = GridOptionsBuilder.from_dataframe(df_conf[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']])
-                # 🔥 ADICIONADO FILTRO AQUI TAMBÉM
                 gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
                 
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
@@ -999,6 +994,29 @@ elif menu == "📋 Triagem e Romaneio":
                                 st.download_button(label="📥 BAIXAR ROMANEIO EM PDF", data=pdf_bytes, file_name=f"Romaneio_{id_romaneio}.pdf", mime="application/pdf", type="primary")
                             except Exception as e: st.error(f"Erro ao processar despacho: {e}")
             else: st.info("Nenhum pedido com status 'CONFERIDO' no momento.")
+
+        # 🔥 NOVA ABA 3: HISTÓRICO DE TRIAGEM
+        with t3:
+            st.markdown("#### Histórico de Triagem e Romaneios")
+            st.info("Visualização rápida de todos os pedidos já movimentados na triagem.")
+            
+            # Exclui PENDENTE e COLETADO. Mostra todo o resto (Conferido, Em Rota, Entregue, Frustrada, etc).
+            df_hist = df_raw[~df_raw['STATUS'].astype(str).str.upper().isin(['PENDENTE', 'COLETADO'])].copy()
+            
+            if not df_hist.empty:
+                colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW']
+                df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
+                
+                gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
+                gb_hist.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
+                
+                st_js = JsCode("function(p){let v=p.value||''; if(v.includes('ENTREGUE')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'800'};} if(v.includes('FRUSTRADA') || v.includes('PROBLEMA')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'800'};} if(v.includes('EM ROTA')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'800'};} if(v.includes('CONFERIDO')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'800'};} return {'fontWeight':'bold'};}")
+                gb_hist.configure_column("STATUS", headerName="STATUS", cellStyle=st_js, minWidth=170)
+                
+                AgGrid(df_hist_show, gridOptions=gb_hist.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
+            else:
+                st.warning("Nenhum histórico recente encontrado.")
+                
     else: st.info("O banco de dados está vazio no momento.")
 
 # =============================================================================
