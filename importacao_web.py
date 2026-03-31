@@ -347,7 +347,6 @@ with st.sidebar:
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
     
-    # 🔥 MENU REORDENADO: Painel TV movido para as últimas opções
     menu = st.radio("Navegação:", [
         "📊 Dashboard de Controle", 
         "📝 Novo Pedido Manual", 
@@ -396,11 +395,10 @@ div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ color: 
 div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu_ativo} !important; }}
 </style>""", unsafe_allow_html=True)
 
+# 🔥 AJUSTE DO CABEÇALHO DA GRID (CLEAN E CONTRASTADO PARA VER OS FILTROS)
 def obter_css_grid():
     base_css = {
         ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "6px"},
-        ".ag-header": {"background-color": "#1e293b !important"},
-        ".ag-header-cell-text": {"color": "#f8fafc !important", "font-weight": "bold", "font-size": "13px !important"},
         ".ag-cell": {"font-size": "13px !important", "display": "flex", "align-items": "center"},
         ".ag-row-selected": {"background-color": "#3B82F6 !important", "color": "#ffffff !important"},
         ".ag-row-selected .ag-cell": {"color": "#ffffff !important"}
@@ -408,14 +406,20 @@ def obter_css_grid():
     if st.session_state.modo_escuro:
         base_css.update({
             ".ag-root-wrapper": {"background-color": "#0e1117 !important", "border-color": "#334155 !important"},
+            ".ag-header": {"background-color": "#161b22 !important", "border-bottom": "1px solid #334155 !important"},
+            ".ag-header-cell-text": {"color": "#e2e8f0 !important", "font-weight": "bold", "font-size": "13px !important"},
             ".ag-cell": {"color": "#e2e8f0 !important", "border-bottom": "1px solid #1e293b !important"},
-            ".ag-row-even": {"background-color": "#0f172a !important"}, ".ag-row-odd": {"background-color": "#161b22 !important"}, 
+            ".ag-row-even": {"background-color": "#0f172a !important"}, 
+            ".ag-row-odd": {"background-color": "#161b22 !important"}, 
             ".ag-row-hover": {"background-color": "#334155 !important"}
         })
     else:
         base_css.update({
+            ".ag-header": {"background-color": "#f8fafc !important", "border-bottom": "1px solid #cbd5e1 !important"},
+            ".ag-header-cell-text": {"color": "#0f172a !important", "font-weight": "bold", "font-size": "13px !important"},
             ".ag-cell": {"color": "#334155 !important", "border-bottom": "1px solid #f1f5f9 !important"},
-            ".ag-row-even": {"background-color": "#ffffff !important"}, ".ag-row-odd": {"background-color": "#f8fafc !important"}, 
+            ".ag-row-even": {"background-color": "#ffffff !important"}, 
+            ".ag-row-odd": {"background-color": "#f8fafc !important"}, 
             ".ag-row-hover": {"background-color": "#e2e8f0 !important"}
         })
     return base_css
@@ -456,7 +460,9 @@ if menu == "📊 Dashboard de Controle":
 
         col_f1, col_f2 = st.columns(2)
         f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
-        f_data = col_f2.date_input("📅 Período de Análise:", value=(df_raw['DATA_OBJ'].min(), hoje_br))
+        
+        # 🔥 FIX: format="DD/MM/YYYY" em todos os date_inputs
+        f_data = col_f2.date_input("📅 Período de Análise:", value=(df_raw['DATA_OBJ'].min(), hoje_br), format="DD/MM/YYYY")
         
         df_f = df_raw.copy()
         if f_cli != "Todos": df_f = df_f[df_f['TOMADOR'] == f_cli]
@@ -1161,7 +1167,6 @@ elif menu == "📋 Triagem e Romaneio":
                 
     else: st.info("O banco de dados está vazio no momento.")
 
-
 # =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
 # =============================================================================
@@ -1172,7 +1177,7 @@ elif menu == "📱 Disparo WhatsApp":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        data_filtro = st.date_input("📅 Filtrar pedidos da data:", value=hoje_br)
+        data_filtro = st.date_input("📅 Filtrar pedidos da data:", value=hoje_br, format="DD/MM/YYYY")
         
         df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
         
@@ -1229,7 +1234,6 @@ elif menu == "📱 Disparo WhatsApp":
                             st.error(f"⚠️ Telefone não encontrado para o login '{agente}'. Cadastre o telefone na aba 'Configurar Rotas'.")
     else:
         st.warning("📭 O banco de dados está vazio no momento.")
-
 
 # =============================================================================
 # 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
@@ -1309,7 +1313,7 @@ elif menu == "📺 Painel TV (Métricas)":
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         
         c_f1, c_f2 = st.columns([1, 3])
-        data_tv = c_f1.date_input("📅 Visualizar Métrica da Data:", value=hoje_br)
+        data_tv = c_f1.date_input("📅 Visualizar Métrica da Data:", value=hoje_br, format="DD/MM/YYYY")
         
         df_hoje = df_raw[df_raw['DATA_OBJ'] == data_tv].copy()
         dia_anterior = data_tv - timedelta(days=1)
@@ -1320,7 +1324,6 @@ elif menu == "📺 Painel TV (Métricas)":
         delta_pedidos = total_hoje - total_ontem
         sinal = "📈" if delta_pedidos >= 0 else "📉"
         
-        # --- CÁLCULO DAS MÉTRICAS ---
         entregues = df_hoje['STATUS_DISPLAY'].str.contains('Entregue', case=False, na=False).sum()
         frustrados = df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False, na=False).sum()
         atrasados = df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False, na=False).sum()
@@ -1328,24 +1331,20 @@ elif menu == "📺 Painel TV (Métricas)":
         em_rota = df_hoje['STATUS_DISPLAY'].str.contains('Em Rota', case=False, na=False).sum()
         pendentes = df_hoje['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False).sum()
         
-        # --- LINHA 1: BLOCOS HTML PREMIUM ---
         c1, c2, c3, c4 = st.columns(4)
         c1.markdown(criar_card("📦 Total de Pedidos", total_hoje, f"{sinal} {delta_pedidos} em relação a ontem", "linear-gradient(135deg, #1E293B 0%, #334155 100%)"), unsafe_allow_html=True)
         c2.markdown(criar_card("⏳ Pendentes", pendentes, "Aguardando motorista (Na rua)", "linear-gradient(135deg, #64748B 0%, #94A3B8 100%)"), unsafe_allow_html=True)
         c3.markdown(criar_card("📦 Coletados / Triagem", coletados, "Parte do motorista concluída", "linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)"), unsafe_allow_html=True)
         c4.markdown(criar_card("🚨 Atrasados", atrasados, "Estouraram o Prazo Limite (SLA)", "linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%)"), unsafe_allow_html=True)
         
-        # --- LINHA 2: BLOCOS HTML PREMIUM ---
         c5, c6, c7, c8 = st.columns(4)
         c5.markdown(criar_card("🚚 Em Rota", em_rota, "Despachados / Em trânsito", "linear-gradient(135deg, #9A3412 0%, #F59E0B 100%)"), unsafe_allow_html=True)
         c6.markdown(criar_card("✅ Entregues", entregues, "Finalizados com sucesso", "linear-gradient(135deg, #064E3B 0%, #10B981 100%)"), unsafe_allow_html=True)
         c7.markdown(criar_card("❌ Frustrados", frustrados, "Devoluções ou Problemas", "linear-gradient(135deg, #991B1B 0%, #EF4444 100%)"), unsafe_allow_html=True)
         
-        # --- BARRA DE PROGRESSO GLOBAL ---
         with c8:
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("#### 🎯 Conclusão da Varredura")
-            # Se o status NÃO é pendente, o motorista já "tocou" naquilo (coletou ou deu erro).
             concluidos_globais = total_hoje - pendentes
             progresso_pct = int((concluidos_globais / total_hoje) * 100) if total_hoje > 0 else 0
             st.progress(progresso_pct / 100.0, text=f"{progresso_pct}% de Eficiência ({concluidos_globais} de {total_hoje} pacotes tocados)")
@@ -1353,15 +1352,12 @@ elif menu == "📺 Painel TV (Métricas)":
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- TABELA DE DESEMPENHO E GRÁFICO ---
         col_tv1, col_tv2 = st.columns([2, 1])
         
         with col_tv1:
             st.markdown("#### 🏆 Top Motoristas (Métrica de Varredura/Coleta)")
             if not df_hoje.empty:
                 df_mot = df_hoje.copy()
-                
-                # O motorista concluiu a parte dele se o pacote já saiu de PENDENTE (seja coletado, frustrado, etc)
                 df_mot['CONCLUIDO_COLETA'] = (~df_mot['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False)).astype(int)
                 
                 resumo_mot = df_mot.groupby('AGENTE_RAW').agg(
@@ -1398,7 +1394,6 @@ elif menu == "📺 Painel TV (Métricas)":
         with col_tv2:
             st.markdown("#### 📊 Raio-X do Status Geral")
             if not df_hoje.empty:
-                # Limpa a string de status para ficar bonito no gráfico (Ex: de "🚨 ATRASADO (⏳ PENDENTE)" para "PENDENTE")
                 df_hoje['STATUS_CHART'] = df_hoje['STATUS'].str.upper()
                 status_counts = df_hoje['STATUS_CHART'].value_counts().reset_index()
                 status_counts.columns = ['Status', 'Quantidade']
