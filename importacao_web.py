@@ -215,7 +215,6 @@ def despachar_para_appsheet(lista_pedidos_dicts):
     except Exception: return False
 
 def padronizar_texto(texto):
-    """Remove acentos e converte para MAIÚSCULAS"""
     if pd.isna(texto) or not texto: return ""
     texto_str = str(texto).strip()
     texto_sem_acento = unicodedata.normalize('NFKD', texto_str).encode('ASCII', 'ignore').decode('utf-8')
@@ -342,13 +341,24 @@ with st.sidebar:
     col_logo, col_tema = st.columns([3, 1], vertical_alignment="center")
     
     with col_logo: 
-        # 🔥 LOGO PUXADA DIRETO DO LINK DA INTERNET PARA O MENU LATERAL
         st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
     
     with col_tema: st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-    menu = st.radio("Navegação:", ["📊 Dashboard de Controle", "📝 Novo Pedido Manual", "➕ Importação de Lotes", "📋 Triagem e Romaneio", "📱 Disparo WhatsApp", "📥 Exportar Relatórios", "⚙️ Configurar Rotas"], label_visibility="collapsed")
+    
+    # 🔥 MENU ATUALIZADO COM A ABA DO PAINEL TV
+    menu = st.radio("Navegação:", [
+        "📊 Dashboard de Controle", 
+        "📺 Painel TV (Métricas)", 
+        "📝 Novo Pedido Manual", 
+        "➕ Importação de Lotes", 
+        "📋 Triagem e Romaneio", 
+        "📱 Disparo WhatsApp", 
+        "📥 Exportar Relatórios", 
+        "⚙️ Configurar Rotas"
+    ], label_visibility="collapsed")
+    
     st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
     st.divider()
     
@@ -693,6 +703,123 @@ if menu == "📊 Dashboard de Controle":
 
     else:
         st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Novo Pedido Manual' no menu lateral para começar.")
+
+# =============================================================================
+# 📺 MÓDULO NOVO: PAINEL TV (MÉTRICAS EXECUTIVAS)
+# =============================================================================
+elif menu == "📺 Painel TV (Métricas)":
+    st.markdown("<h4 class='dinamic-text'>📺 Painel de Métricas (Visualização de TV)</h4>", unsafe_allow_html=True)
+    df_raw = carregar_dados_completos(planilha_db)
+    
+    if not df_raw.empty:
+        # Simplifica o status para as métricas da TV
+        def calc_status_display_tv(row):
+            status_final = str(row.get('STATUS', '')).strip().upper()
+            res = 'PENDENTE'
+            if 'ENTREGUE' in status_final: res = 'ENTREGUE'
+            elif 'COLETADO' in status_final: res = 'COLETADO'
+            elif 'ROTA' in status_final: res = 'EM ROTA'
+            elif 'CONFERIDO' in status_final: res = 'CONFERIDO'
+            elif 'FRUSTRADA' in status_final: res = 'FRUSTRADA'
+            elif 'CANCELADO' in status_final: res = 'CANCELADO'
+            elif 'PROBLEMA' in status_final: res = 'PROBLEMA'
+            return res
+        
+        df_raw['STATUS_SIMPLES'] = df_raw.apply(calc_status_display_tv, axis=1)
+        
+        c_f1, c_f2 = st.columns([1, 3])
+        data_tv = c_f1.date_input("📅 Dados do Dia:", value=hoje_br)
+        
+        df_hoje = df_raw[df_raw['DATA_OBJ'] == data_tv]
+        dia_anterior = data_tv - timedelta(days=1)
+        df_ontem = df_raw[df_raw['DATA_OBJ'] == dia_anterior]
+        
+        total_hoje = len(df_hoje)
+        total_ontem = len(df_ontem)
+        delta_pedidos = total_hoje - total_ontem
+        
+        st.markdown("---")
+        
+        # --- LINHA 1: MÉTRICAS GERAIS (BOLSA DE VALORES) ---
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1.metric("📦 Total de Pedidos", total_hoje, delta=f"{delta_pedidos} vs Ontem")
+        
+        entregues = len(df_hoje[df_hoje['STATUS_SIMPLES'] == 'ENTREGUE'])
+        pendentes = len(df_hoje[df_hoje['STATUS_SIMPLES'] == 'PENDENTE'])
+        coletados = len(df_hoje[df_hoje['STATUS_SIMPLES'].isin(['COLETADO', 'CONFERIDO'])])
+        em_rota = len(df_hoje[df_hoje['STATUS_SIMPLES'] == 'EM ROTA'])
+        frustrados = len(df_hoje[df_hoje['STATUS_SIMPLES'].isin(['FRUSTRADA', 'PROBLEMA', 'CANCELADO'])])
+        
+        c2.metric("✅ Entregues", entregues)
+        c3.metric("⏳ Pendentes", pendentes)
+        c4.metric("📦 Triagem/Coletados", coletados)
+        c5.metric("🚚 Em Rota", em_rota)
+        c6.metric("❌ Frustrados", frustrados)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # --- LINHA 2: BARRA DE PROGRESSO GLOBAL ---
+        st.markdown("#### 🎯 Termômetro de Conclusão da Operação")
+        if total_hoje > 0:
+            concluidos = entregues + frustrados
+            progresso_pct = int((concluidos / total_hoje) * 100)
+        else:
+            progresso_pct = 0
+            
+        st.progress(progresso_pct / 100.0, text=f"{progresso_pct}% de Conclusão ({concluidos} de {total_hoje} pedidos finalizados na rua)")
+        
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        
+        # --- LINHA 3: TABELA DE DESEMPENHO E GRÁFICO ---
+        col_tv1, col_tv2 = st.columns([2, 1])
+        
+        with col_tv1:
+            st.markdown("#### 🏆 Top Motoristas (Métrica de Conclusão)")
+            if not df_hoje.empty:
+                df_mot = df_hoje.copy()
+                df_mot['CONCLUIDO'] = df_mot['STATUS_SIMPLES'].isin(['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']).astype(int)
+                
+                resumo_mot = df_mot.groupby('AGENTE_RAW').agg(
+                    Total=('PEDIDO', 'count'),
+                    Concluidos=('CONCLUIDO', 'sum')
+                ).reset_index()
+                
+                resumo_mot['Pendentes/Em Rota'] = resumo_mot['Total'] - resumo_mot['Concluidos']
+                resumo_mot['% Concluído'] = (resumo_mot['Concluidos'] / resumo_mot['Total'] * 100).round(1)
+                
+                resumo_mot = resumo_mot.sort_values(by='Total', ascending=False)
+                resumo_mot.rename(columns={'AGENTE_RAW': 'Motorista'}, inplace=True)
+                
+                # Tabela lindíssima com barra de progresso nativa do Streamlit
+                st.dataframe(
+                    resumo_mot,
+                    column_config={
+                        "Motorista": st.column_config.TextColumn("👤 Motorista"),
+                        "Total": st.column_config.NumberColumn("📦 Total do Dia"),
+                        "Concluidos": st.column_config.NumberColumn("✅ Finalizados"),
+                        "Pendentes/Em Rota": st.column_config.NumberColumn("🚚 Na Rua / Pendente"),
+                        "% Concluído": st.column_config.ProgressColumn(
+                            "📊 Barra de Status Individual",
+                            format="%f%%",
+                            min_value=0,
+                            max_value=100,
+                        ),
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.info("Nenhum motorista com rotas nesta data.")
+                
+        with col_tv2:
+            st.markdown("#### 📊 Raio-X do Status")
+            if not df_hoje.empty:
+                status_counts = df_hoje['STATUS_SIMPLES'].value_counts().reset_index()
+                status_counts.columns = ['Status', 'Quantidade']
+                st.bar_chart(data=status_counts, x='Status', y='Quantidade', color='#38BDF8')
+                
+    else:
+        st.warning("📭 O banco de dados está vazio no momento.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL (ABA ISOLADA E PADRONIZADA)
