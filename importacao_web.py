@@ -19,49 +19,60 @@ from fpdf import FPDF
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =============================================================================
-# 🔗 1. CONFIGURAÇÃO DA PÁGINA E AUTENTICAÇÃO (NOVO COFRE)
+# 🔗 1. CONFIGURAÇÃO DA PÁGINA E AUTENTICAÇÃO (NOVO COFRE HEALTH-TECH)
 # =============================================================================
-st.set_page_config(page_title="Sistema - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
+st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🧬", initial_sidebar_state="expanded")
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
 # Cria a variável de segurança se ela não existir
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
-# Se não estiver logado, mostra a tela de login e PARALISA o resto do sistema
+# Se não estiver logado, mostra a tela de login premium e PARALISA o resto do sistema
 if not st.session_state.autenticado:
-    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1.5, 1])
+    # CSS Customizado só para a tela de login
+    st.markdown("""
+        <style>
+        [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #F0F4F8 0%, #E2E8F0 100%) !important; }
+        .login-card { background: #FFFFFF; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05), 0 20px 48px rgba(0, 0, 0, 0.05); border: 1px solid #F1F5F9; }
+        .login-title { color: #0F172A; font-weight: 800; font-size: 24px; margin-top: 15px; letter-spacing: -0.5px; }
+        .login-subtitle { color: #64748B; font-size: 14px; margin-bottom: 30px; font-weight: 500; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1.2, 1])
     
     with col2:
-        with st.container(border=True):
-            st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+        
+        # Logo Puxada da Nuvem
+        st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=180)
             
-            # 🔥 LOGO PUXADA DIRETO DO LINK DA INTERNET
-            st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
-                
-            st.markdown("<p style='color: gray; margin-top: 10px;'>Acesso Restrito ao Painel Operacional</p>", unsafe_allow_html=True)
-            st.markdown("</div><br>", unsafe_allow_html=True)
+        st.markdown("<div class='login-title'>CADEIA DE CUSTÓDIA</div>", unsafe_allow_html=True)
+        st.markdown("<div class='login-subtitle'>Acesso Restrito ao C.C.O Toxicológico</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        with st.form("form_login"):
+            usuario = st.text_input("👤 Usuário Corporativo")
+            senha = st.text_input("🔑 Senha de Acesso", type="password")
+            st.markdown("<br>", unsafe_allow_html=True)
+            submit = st.form_submit_button("AUTENTICAR", use_container_width=True, type="primary")
             
-            with st.form("form_login"):
-                usuario = st.text_input("👤 Usuário")
-                senha = st.text_input("🔑 Senha", type="password")
-                submit = st.form_submit_button("Entrar no Sistema", use_container_width=True, type="primary")
+            if submit:
+                logins_autorizados = {
+                    "robson.melo": "123",
+                    "william.bertoldo": "123"
+                }
                 
-                if submit:
-                    # 🔥 MÚLTIPLOS LOGINS CONFIGURADOS AQUI
-                    logins_autorizados = {
-                        "robson.melo": "123",
-                        "william.bertoldo": "123"
-                    }
-                    
-                    if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
-                        st.session_state.autenticado = True
-                        st.rerun()
-                    else:
-                        st.error("❌ Usuário ou senha incorretos.")
+                if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
+                    st.session_state.autenticado = True
+                    st.rerun()
+                else:
+                    st.error("❌ Credenciais inválidas ou acesso negado.")
+        st.markdown("</div>", unsafe_allow_html=True)
     
-    # O comando st.stop() é o que impede que o resto da página carregue se não houver login
     st.stop()
 
 
@@ -299,89 +310,132 @@ def obter_proximo_id(df):
         return 100000
 
 # =============================================================================
-# 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM (ÁREA LOGADA - THEME CLARO FIXO)
+# 🎨 3. INTERFACE E NAVEGAÇÃO (DESIGN CLINICAL PREMIUM)
 # =============================================================================
 
-# Modo escuro desativado por definitivo
-bg_app = "#f8fafc"
-bg_side = "#ffffff"
-txt_main = "#0f172a"
-txt_menu = "#64748b"
-txt_menu_ativo = "#0284c7"
-border_c = "#e2e8f0"
+# Variáveis de Cores Tema Medical/Tech
+bg_app = "#F8FAFC"        # Cinza gelo clarinho para fundo
+bg_side = "#0F172A"       # Azul marinho escuro (Slate 900) para menu lateral
+txt_main = "#0F172A"      # Slate 900 para texto principal
+border_c = "#E2E8F0"      # Slate 200 para bordas suaves
 
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
 with st.sidebar:
-    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
+    st.markdown("<div style='text-align: center; padding-bottom: 20px;'>", unsafe_allow_html=True)
+    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=140)
     st.markdown("</div>", unsafe_allow_html=True)
     
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-    
+    # 🔥 ÍCONES LABORATORIAIS E NOMENCLATURAS PREMIUM
     menu = st.radio("Navegação:", [
-        "📊 Dashboard de Controle", 
-        "📝 Novo Pedido Manual", 
-        "➕ Importação de Lotes", 
-        "📋 Triagem e Romaneio", 
+        "📊 C.C.O - Dashboard", 
+        "🧪 Inserir Coleta Manual", 
+        "🧬 Importação de Lotes", 
+        "🔬 Triagem e Romaneio", 
         "📱 Disparo WhatsApp", 
         "📥 Exportar Relatórios", 
         "📺 Painel TV (Métricas)", 
-        "⚙️ Configurar Rotas"
+        "⚙️ Matriz de Rotas"
     ], label_visibility="collapsed")
     
     st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
     st.divider()
     
-    if st.button("🚪 Sair do Sistema", use_container_width=True, type="secondary"):
+    if st.button("🚪 Encerrar Sessão", use_container_width=True):
         st.session_state.autenticado = False
         st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
         
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    with st.expander("🛡️ Backup de Segurança"):
-        st.markdown("<p style='font-size: 12px; color: gray;'>Gere uma cópia física completa de todo o histórico do banco de dados.</p>", unsafe_allow_html=True)
+    with st.expander("🛡️ Auditoria de Backup"):
+        st.markdown("<p style='font-size: 11px; color: #94A3B8;'>Gerar cópia física integral da cadeia de custódia (DB).</p>", unsafe_allow_html=True)
         df_bkp = carregar_dados_completos(planilha_db)
         if not df_bkp.empty:
             st.download_button(
-                label="📥 Baixar Backup (.xlsx)", 
+                label="📥 Baixar DB (.xlsx)", 
                 data=gerar_excel_memoria(df_bkp), 
-                file_name=f"BKP_IGO_Logistica_{datetime.now(FUSO_BR).strftime('%d%m%Y_%H%M')}.xlsx", 
+                file_name=f"AUDITORIA_IGO_{datetime.now(FUSO_BR).strftime('%d%m%Y_%H%M')}.xlsx", 
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
                 use_container_width=True,
                 type="primary"
             )
 
+# CSS Master - Ultra Premium
 st.markdown(f"""<style>
+/* Fundo Geral */
 [data-testid="stAppViewContainer"] {{ background-color: {bg_app} !important; }}
-[data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c}; padding-top: 2rem !important; }}
-.dinamic-text {{ color: {txt_main} !important; }}
-.dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
-div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu} !important; font-size: 15px !important; font-weight: 600 !important; margin: 0 !important; transition: color 0.2s ease !important; }}
-div[role="radiogroup"] > label {{ width: 100% !important; padding: 12px 16px !important; border-radius: 8px !important; margin: 0 !important; border: none !important; background-color: transparent !important; cursor: pointer !important; transition: all 0.2s ease-in-out !important; box-sizing: border-box !important; }}
-div[role="radiogroup"] > label:hover {{ background-color: rgba(56, 189, 248, 0.08) !important; }}
+
+/* Sidebar Premium Escura */
+[data-testid="stSidebar"] {{ 
+    background: linear-gradient(180deg, #0B1120 0%, #0F172A 100%) !important; 
+    border-right: none !important; 
+    padding-top: 1rem !important; 
+}}
+
+/* Esconder os botões circulares nativos do Radio */
 div[role="radiogroup"] label div[data-testid="stRadio-radio"] {{ display: none !important; }}
-div[role="radiogroup"] > label[data-checked="true"] {{ background-color: rgba(56, 189, 248, 0.12) !important; border-left: 4px solid #38BDF8 !important; border-radius: 0 8px 8px 0 !important; }}
-div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu_ativo} !important; font-weight: 700 !important; }}
-div.st-key-kpi_total button {{ background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}}
-div.st-key-kpi_entregue button {{ background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}}
-div.st-key-kpi_frus button {{ background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}}
-div.st-key-kpi_atra button {{ background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}}
-div.st-key-kpi_hoje button {{ background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}}
-div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p {{ font-weight: 800 !important; font-size: 15px !important; margin: 0 !important; color: white !important;}}
+
+/* Textos Globais */
+.dinamic-text {{ color: {txt_main} !important; font-weight: 800; letter-spacing: -0.5px; }}
+.dinamic-border {{ border-bottom: 2px solid #CBD5E1 !important; margin-bottom: 24px; padding-bottom: 8px; }}
+
+/* Botões do Menu Lateral (Pill Design) */
+div[role="radiogroup"] {{ gap: 4px !important; }}
+div[role="radiogroup"] > label {{ 
+    width: 100% !important; padding: 12px 16px !important; border-radius: 10px !important; 
+    margin: 0 !important; border: none !important; background-color: transparent !important; 
+    cursor: pointer !important; transition: all 0.2s ease-in-out !important; box-sizing: border-box !important;
+}}
+div[role="radiogroup"] > label:hover {{ background-color: rgba(56, 189, 248, 0.1) !important; transform: translateX(4px); }}
+div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ 
+    color: #94A3B8 !important; font-size: 14px !important; font-weight: 600 !important; margin: 0 !important; transition: color 0.2s ease !important; 
+}}
+
+/* Menu Lateral Ativo (Azul Médico Vibrante) */
+div[role="radiogroup"] > label[data-checked="true"] {{ 
+    background: linear-gradient(90deg, #0284C7 0%, #0EA5E9 100%) !important; 
+    border-left: none !important; box-shadow: 0 4px 10px rgba(2, 132, 199, 0.2); 
+}}
+div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ 
+    color: #FFFFFF !important; font-weight: 700 !important; text-shadow: 0 1px 2px rgba(0,0,0,0.2); 
+}}
+
+/* Estilo Premium dos Botões Superiores (Bolsa de Valores C.C.O) */
+div.st-key-kpi_total button {{ background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; height: 85px !important; border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }}
+div.st-key-kpi_entregue button {{ background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important; height: 85px !important; border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: 0 4px 6px rgba(16,185,129,0.2); }}
+div.st-key-kpi_frus button {{ background: linear-gradient(135deg, #991B1B 0%, #EF4444 100%) !important; height: 85px !important; border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: 0 4px 6px rgba(239,68,68,0.2); }}
+div.st-key-kpi_atra button {{ background: linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%) !important; height: 85px !important; border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: 0 4px 6px rgba(185,28,28,0.2); }}
+div.st-key-kpi_hoje button {{ background: linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%) !important; height: 85px !important; border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: 0 4px 6px rgba(14,165,233,0.2); }}
+
+div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p {{ 
+    color: white !important; font-weight: 800 !important; font-size: 15px !important; letter-spacing: 0.5px; margin: 0 !important; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}}
+
+/* Estilo Geral de Botões Streamlit */
+.stButton > button[kind="primary"] {{ 
+    background: linear-gradient(90deg, #0284C7 0%, #0EA5E9 100%) !important; 
+    border: none !important; box-shadow: 0 4px 6px rgba(2, 132, 199, 0.2) !important; border-radius: 8px !important; font-weight: 700 !important; 
+}}
+.stButton > button[kind="primary"]:hover {{ transform: translateY(-2px); box-shadow: 0 6px 12px rgba(2, 132, 199, 0.3) !important; }}
+
+/* Containers / Caixas de agrupamento */
+[data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] {{ 
+    background: #FFFFFF; padding: 24px; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); border: 1px solid #F1F5F9; 
+}}
 </style>""", unsafe_allow_html=True)
 
-# 🔥 AJUSTE DO CABEÇALHO DA GRID (CLEAN CLARO E BEM VISÍVEL)
+# 🔥 CABEÇALHO DA GRID (CLEAN, CLARO E ALTO CONTRASTE)
 def obter_css_grid():
     return {
-        ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "6px"},
-        ".ag-header": {"background-color": "#f8fafc !important", "border-bottom": "1px solid #cbd5e1 !important"},
-        ".ag-header-cell-text": {"color": "#0f172a !important", "font-weight": "bold", "font-size": "12px !important"},
-        ".ag-cell": {"font-size": "12px !important", "color": "#334155 !important", "border-bottom": "1px solid #f1f5f9 !important", "display": "flex", "align-items": "center"},
-        ".ag-row-even": {"background-color": "#ffffff !important"},
-        ".ag-row-odd": {"background-color": "#f8fafc !important"},
-        ".ag-row-hover": {"background-color": "#e2e8f0 !important"},
-        ".ag-row-selected": {"background-color": "#3B82F6 !important", "color": "#ffffff !important"},
-        ".ag-row-selected .ag-cell": {"color": "#ffffff !important"}
+        ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "8px", "overflow": "hidden"},
+        ".ag-header": {"background-color": "#F8FAFC !important", "border-bottom": "1px solid #CBD5E1 !important"},
+        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "800 !important", "font-size": "12px !important", "text-transform": "uppercase"},
+        ".ag-header-icon": {"color": "#0284C7 !important"}, /* Ícone do filtro em destaque */
+        ".ag-cell": {"font-size": "13px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
+        ".ag-row-even": {"background-color": "#FFFFFF !important"},
+        ".ag-row-odd": {"background-color": "#F8FAFC !important"},
+        ".ag-row-hover": {"background-color": "#F1F5F9 !important"},
+        ".ag-row-selected": {"background-color": "rgba(14, 165, 233, 0.15) !important", "color": "#0369A1 !important"},
+        ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
     }
 
 def calc_status_display(row):
@@ -404,9 +458,9 @@ def calc_status_display(row):
     return res
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD DE CONTROLE
+# 🚀 MÓDULO 1: C.C.O DASHBOARD
 # =============================================================================
-if menu == "📊 Dashboard de Controle":
+if menu == "📊 C.C.O - Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -416,12 +470,10 @@ if menu == "📊 Dashboard de Controle":
         if 'DATA_LIMITE' in df_raw.columns: df_raw['DATA_LIMITE'] = df_raw['DATA_LIMITE'].fillna("").astype(str)
         if 'DATA_ENTREGA' in df_raw.columns: df_raw['DATA_ENTREGA'] = df_raw['DATA_ENTREGA'].fillna("").astype(str)
 
-        st.markdown("<div class='dinamic-border' style='padding-bottom: 10px; margin-bottom: 20px;'><h4 class='dinamic-text' style='margin:0;'>📊 Painel de Controle Operacional</h4></div>", unsafe_allow_html=True)
+        st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📊 Centro de Controle Operacional</h3></div>", unsafe_allow_html=True)
 
         col_f1, col_f2 = st.columns(2)
         f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
-        
-        # 🔥 FIX: format="DD/MM/YYYY" em todos os date_inputs
         f_data = col_f2.date_input("📅 Período de Análise:", value=(df_raw['DATA_OBJ'].min(), hoje_br), format="DD/MM/YYYY")
         
         df_f = df_raw.copy()
@@ -441,7 +493,7 @@ if menu == "📊 Dashboard de Controle":
         c5.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
         st.markdown("<br>", unsafe_allow_html=True)
-        busca = st.text_input("🔎 Busca Rápida na Tabela (Qualquer campo):", placeholder="Ex: Nome do Lab, Cidade, Pedido...")
+        busca = st.text_input("🔎 Busca Rápida de Rastreio (Código, Lab, Cidade...):", placeholder="Digite para filtrar a tabela abaixo...")
 
         df_grid = df_f.copy()
         if st.session_state.filtro_kpi_admin == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue')]
@@ -456,7 +508,7 @@ if menu == "📊 Dashboard de Controle":
             mask = df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)
             df_grid = df_grid[mask]
 
-        st.markdown(f"<p class='dinamic-text' style='color:#10B981 !important; font-weight:bold; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M')}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#10B981; font-weight:700; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
         
         container_botoes = st.container()
         container_grid = st.container()
@@ -467,7 +519,7 @@ if menu == "📊 Dashboard de Controle":
             
             gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
             
-            st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'800'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'800'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'800'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'800'};} return {'fontWeight':'bold'};}")
+            st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#059669','fontWeight':'800'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#DC2626','fontWeight':'800'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#D97706','fontWeight':'800'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#2563EB','fontWeight':'800'};} return {'fontWeight':'bold', 'color': '#64748B'};}")
             gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, minWidth=170)
             
             img_js = JsCode("""
@@ -482,14 +534,14 @@ if menu == "📊 Dashboard de Controle":
                             let modal = document.createElement('div');
                             modal.style.position = 'fixed'; modal.style.zIndex = '999999';
                             modal.style.left = '0'; modal.style.top = '0'; modal.style.width = '100vw'; modal.style.height = '100vh';
-                            modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
+                            modal.style.backgroundColor = 'rgba(15,23,42,0.9)';
                             modal.style.display = 'flex'; modal.style.flexDirection = 'column'; modal.style.justifyContent = 'center'; modal.style.alignItems = 'center'; modal.style.cursor = 'zoom-out';
                             let img = document.createElement('img');
                             img.src = val; 
-                            img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '10px'; img.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
+                            img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '12px'; img.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
                             let txt = document.createElement('div');
-                            txt.innerText = '✖ Clique em qualquer lugar para fechar'; 
-                            txt.style.color = '#ffffff'; txt.style.marginTop = '15px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontWeight = 'bold';
+                            txt.innerText = '✖ Fechar Visualização'; 
+                            txt.style.color = '#ffffff'; txt.style.marginTop = '20px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontWeight = 'bold'; txt.style.padding = '8px 16px'; txt.style.background = 'rgba(255,255,255,0.1)'; txt.style.borderRadius = '20px';
                             modal.appendChild(img); modal.appendChild(txt);
                             modal.onclick = () => { document.body.removeChild(modal); };
                             document.body.appendChild(modal);
@@ -501,7 +553,7 @@ if menu == "📊 Dashboard de Controle":
             """)
             gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90)
             
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
+            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -518,7 +570,7 @@ if menu == "📊 Dashboard de Controle":
             st.markdown("""
                 <style>
                 div[data-testid="stPopover"] > button, button[kind="secondary"] {
-                    white-space: nowrap !important; overflow: hidden !important; font-weight: bold !important; font-size: 14px !important;
+                    white-space: nowrap !important; overflow: hidden !important; font-weight: bold !important; font-size: 14px !important; border-radius: 8px !important;
                 }
                 </style>
             """, unsafe_allow_html=True)
@@ -667,23 +719,23 @@ if menu == "📊 Dashboard de Controle":
                 st.rerun()
 
     else:
-        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Novo Pedido Manual' no menu lateral para começar.")
+        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '🧪 Inserir Coleta Manual' no menu lateral para começar.")
 
 # =============================================================================
-# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL (ABA ISOLADA E PADRONIZADA)
+# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
-elif menu == "📝 Novo Pedido Manual":
-    st.markdown("<h4 class='dinamic-text'>📝 Inserir Pedido Manual</h4>", unsafe_allow_html=True)
-    st.markdown("Use esta tela para gerar pedidos de emergência. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente.**")
+elif menu == "🧪 Inserir Coleta Manual":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🧪 Inserir Nova Coleta Manual</h3></div>", unsafe_allow_html=True)
+    st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
     
     with st.container(border=True):
         with st.form("form_manual_page", clear_on_submit=True):
             col1, col2 = st.columns(2)
-            m_tomador = col1.selectbox("Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+            m_tomador = col1.selectbox("Laboratório Solicitante (Tomador) *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
             m_data = col2.date_input("Data do Pedido *", format="DD/MM/YYYY", value=hoje_br)
             
-            m_lab = st.text_input("Lab/Clínica *")
-            m_rua = st.text_input("Endereço *")
+            m_lab = st.text_input("Ponto de Coleta (Clínica/Posto) *")
+            m_rua = st.text_input("Logradouro *")
             
             col3, col4 = st.columns(2)
             m_bai = col3.text_input("Bairro *")
@@ -693,7 +745,7 @@ elif menu == "📝 Novo Pedido Manual":
             m_agente_escolha = st.selectbox("Agente Designado (Busque ou deixe Automático):", ["Automático (Por Rota)"] + logins_disp)
             
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.form_submit_button("🚀 Gerar e Salvar Pedido", type="primary", use_container_width=True):
+            if st.form_submit_button("🚀 Injetar na Base e Roteirizar", type="primary", use_container_width=True):
                 if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
                     st.error("⚠️ Preencha todos os campos obrigatórios (marcados com *)!")
                 else:
@@ -727,31 +779,31 @@ elif menu == "📝 Novo Pedido Manual":
                             
                             if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
                             
-                            st.success(f"🎉 Pedido {m_pedido} criado e padronizado com sucesso! Acesse o Dashboard para visualizar.")
+                            st.success(f"🎉 Pedido {m_pedido} criado e padronizado com sucesso! Acesse o C.C.O para visualizar.")
                             carregar_dados_completos.clear()
                         except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
-elif menu == "➕ Importação de Lotes":
-    st.markdown("<h4 class='dinamic-text'>➕ Central de Importação</h4>", unsafe_allow_html=True)
-    st.success("🛡️ **SEGURANÇA DO HISTÓRICO:** O sistema de importação sempre **ADICIONA** os novos pedidos na base. O seu histórico do dia estão seguros.")
+elif menu == "🧬 Importação de Lotes":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🧬 Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
+    st.success("🛡️ **AUDITORIA DE DADOS ATIVA:** O sistema avalia padronizações de vários clientes (Airlab, FFW, etc) e adiciona os pacotes à base sem destruir seu histórico do dia.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
     if "import_success" in st.session_state and st.session_state.import_success:
         st.success(st.session_state.import_success)
 
     with st.container(border=True):
-        st.markdown("#### 1. Dados do Lote e Colagem")
+        st.markdown("#### 1. Mapeamento de Planilha e Colagem")
         c1, c2, c3 = st.columns([1, 1, 2])
-        with c1: tom = st.selectbox("🏢 Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-        with c2: dt_c = st.date_input("📅 Data da Coleta:", format="DD/MM/YYYY", value=hoje_br)
+        with c1: tom = st.selectbox("🏢 Tomador Central:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+        with c2: dt_c = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br)
 
-        txt = st.text_area("📋 Cole os dados do Excel aqui (Ctrl+V):", height=150, help="Apenas copie as células do Excel e cole direto aqui.")
+        txt = st.text_area("📋 Cole os dados da planilha do cliente (Ctrl+V):", height=150, help="Apenas copie as células do Excel e cole direto aqui. O Cérebro IA formata sozinho.")
 
         col_btn1, _ = st.columns([1, 2])
-        if col_btn1.button("🔍 1. Tratar e Roteirizar", type="primary", use_container_width=True):
+        if col_btn1.button("🔍 1. Processar Matriz e Roteirizar", type="primary", use_container_width=True):
             if not txt or tom == "Selecione...": st.warning("Preencha o Tomador e cole os dados!")
             else:
                 if "import_success" in st.session_state:
@@ -835,8 +887,8 @@ elif menu == "➕ Importação de Lotes":
         st.markdown("---")
         
         col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
-        col_tit.markdown("### 👀 2. Preview dos Dados (Barreira de Segurança)")
-        if col_canc.button("❌ Cancelar / Limpar", type="secondary", use_container_width=True):
+        col_tit.markdown("### 👀 2. Preview de Carga (Porta de Segurança)")
+        if col_canc.button("❌ Cancelar / Limpar Matriz", type="secondary", use_container_width=True):
             st.session_state.df_preview = pd.DataFrame()
             if 'import_success' in st.session_state: st.session_state.import_success = ""
             st.rerun()
@@ -847,24 +899,24 @@ elif menu == "➕ Importação de Lotes":
         df_ok = df_preview[~mask_err]
 
         if not df_err.empty:
-            st.error(f"🚨 **Atenção:** Encontramos {len(df_err)} pedido(s) sem motorista designado. Corrija-os na gaveta abaixo para liberar o botão de salvar.")
+            st.error(f"🚨 **Atenção:** Encontramos {len(df_err)} pedido(s) sem motorista designado. Corrija-os na gaveta abaixo para liberar o botão de Injetar Base.")
             
             if not df_ok.empty:
-                with st.expander(f"✅ Gaveta Verde: {len(df_ok)} Pedido(s) Prontos para Salvar", expanded=False):
+                with st.expander(f"✅ Gaveta Verde: {len(df_ok)} Pedido(s) Auditados e Prontos", expanded=False):
                     st.dataframe(df_ok, hide_index=True, use_container_width=True)
             
-            st.markdown("### 🛠️ Gaveta Vermelha: Correção Pendente")
-            st.info("💡 Clique na caixa de seleção abaixo para **digitar e buscar** o nome do motorista.")
+            st.markdown("### 🛠️ Gaveta Vermelha: Auditoria Pendente")
+            st.info("💡 A inteligência artificial não encontrou roteiro de Cidade/Bairro. Digite para buscar o motorista de emergência.")
             with st.form("form_correcao_agentes"):
                 correcoes = {}
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                 
                 for idx, row in df_err.iterrows():
-                    st.markdown(f"**Pedido:** {row['PEDIDO']} | **Lab:** {row['LABORATORIO']} | **Endereço:** {row['ENDERECO']} - {row['BAIRRO']}, {row['CIDADE']}")
-                    correcoes[idx] = st.selectbox(f"Motorista para o pedido {row['PEDIDO']}:", ["Selecione..."] + logins_disp, key=f"fix_mot_{idx}")
+                    st.markdown(f"**Cód:** {row['PEDIDO']} | **Local:** {row['LABORATORIO']} | **Logradouro:** {row['ENDERECO']} - {row['BAIRRO']}, {row['CIDADE']}")
+                    correcoes[idx] = st.selectbox(f"Responsável pelo ID {row['PEDIDO']}:", ["Selecione..."] + logins_disp, key=f"fix_mot_{idx}")
                     st.divider()
                 
-                if st.form_submit_button("💾 Aplicar Correções", type="primary"):
+                if st.form_submit_button("💾 Validar Correções de Rota", type="primary"):
                     todas_corrigidas = True
                     for idx, novo_mot in correcoes.items():
                         if novo_mot != "Selecione...":
@@ -873,11 +925,11 @@ elif menu == "➕ Importação de Lotes":
                             todas_corrigidas = False
                     
                     if not todas_corrigidas:
-                        st.warning("⚠️ Ainda há pedidos sem motorista na lista. Preencha todos para liberar o lote.")
+                        st.warning("⚠️ O lote está bloqueado. Preencha todos os motoristas de emergência para liberar o botão verde.")
                     st.rerun()
 
         else:
-            st.success(f"✅ Maravilha! Todos os {len(df_ok)} pedidos estão roteirizados e prontos para importação.")
+            st.success(f"✅ Protocolo validado! {len(df_ok)} pedidos blindados e roteirizados para injeção.")
             
             gb_prev = GridOptionsBuilder.from_dataframe(df_ok)
             gb_prev.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
@@ -886,8 +938,8 @@ elif menu == "➕ Importação de Lotes":
             st.markdown("<br>", unsafe_allow_html=True)
             col_btn2, _ = st.columns([1, 2])
             
-            if col_btn2.button("🚀 3. SALVAR TUDO NO GOOGLE SHEETS", type="primary", use_container_width=True):
-                with st.spinner("Adicionando à base geral..."):
+            if col_btn2.button("🚀 3. INJETAR LOTE NO DB E APLICATIVOS", type="primary", use_container_width=True):
+                with st.spinner("Processando injeção em nuvem..."):
                     df_final = df_ok.copy()
                     
                     try:
@@ -920,28 +972,28 @@ elif menu == "➕ Importação de Lotes":
                                 })
                         if lista_app: despachar_para_appsheet(lista_app)
                         
-                        st.session_state.import_success = f"🎉 SUCESSO ABSOLUTO! Lote de {len(df_final)} pedidos foi importado e despachado para os motoristas."
+                        st.session_state.import_success = f"🎉 INTEGRAÇÃO CONCLUÍDA! Lote de {len(df_final)} pedidos auditados injetado no sistema com sucesso."
                         st.session_state.df_preview = pd.DataFrame()
                         carregar_dados_completos.clear()
                         st.rerun()
-                    except Exception as e: st.error(f"Erro ao salvar: {e}")
+                    except Exception as e: st.error(f"Falha de Injeção Crítica: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO PARA PDF PREMIUM)
 # =============================================================================
-elif menu == "📋 Triagem e Romaneio":
-    st.markdown("<h4 class='dinamic-text'>📋 Triagem e Despacho</h4>", unsafe_allow_html=True)
+elif menu == "🔬 Triagem e Romaneio":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🔬 Terminal de Triagem e Expedição</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        t1, t2, t3 = st.tabs(["📦 1. Bipar / Selecionar", "🚚 2. Gerar Romaneio", "🕒 3. Histórico Recente"])
+        t1, t2, t3 = st.tabs(["📦 1. Bipar Lacre / QR Code", "🚚 2. Gerar Documento de Romaneio", "🕒 3. Histórico de Varredura"])
         
         with t1:
-            st.info("💡 Apenas pedidos **COLETADOS** aparecerão aqui.")
+            st.info("💡 A auditoria de triagem aceita apenas materiais **COLETADOS** pelo aplicativo.")
             with st.form("form_bip", clear_on_submit=True):
                 col_bip, col_btn = st.columns([4, 1])
-                bip_input = col_bip.text_input("🔍 Bipar QR Code / Pedido:")
-                bip_submit = col_btn.form_submit_button("Bipar", use_container_width=True)
+                bip_input = col_bip.text_input("🔍 Bipar QR Code de Validação:")
+                bip_submit = col_btn.form_submit_button("Auditar", use_container_width=True)
                 
                 if bip_submit and bip_input:
                     termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
@@ -960,16 +1012,16 @@ elif menu == "📋 Triagem e Romaneio":
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 aba.update_cell(idx + 2, df_raw.columns.get_loc('STATUS') + 1, 'CONFERIDO')
-                                st.success(f"✅ Pedido {df_raw.at[idx, 'PEDIDO']} CONFERIDO com sucesso!")
+                                st.success(f"✅ Pedido {df_raw.at[idx, 'PEDIDO']} VALIDADO COM SUCESSO e liberado para expedição!")
                                 carregar_dados_completos.clear()
-                            except Exception as e: st.error(f"Erro ao salvar: {e}")
-                        elif status_atual == 'PENDENTE': st.error(f"❌ O pedido {df_raw.at[idx, 'PEDIDO']} ainda está PENDENTE. O agente precisa dar baixa primeiro!")
-                        elif status_atual == 'CONFERIDO': st.warning(f"⚠️ O pedido {df_raw.at[idx, 'PEDIDO']} já estava conferido!")
-                        else: st.error(f"❌ O pedido {df_raw.at[idx, 'PEDIDO']} está com status: {status_atual}.")
-                    else: st.error(f"❌ Pedido não encontrado: {bip_input}")
+                            except Exception as e: st.error(f"Falha ao registrar auditoria: {e}")
+                        elif status_atual == 'PENDENTE': st.error(f"❌ VIOLAÇÃO DE CADEIA: O código {df_raw.at[idx, 'PEDIDO']} consta como PENDENTE de coleta no aplicativo do agente.")
+                        elif status_atual == 'CONFERIDO': st.warning(f"⚠️ O volume {df_raw.at[idx, 'PEDIDO']} já estava conferido na base.")
+                        else: st.error(f"❌ O volume {df_raw.at[idx, 'PEDIDO']} consta com status impeditivo: {status_atual}.")
+                    else: st.error(f"❌ Assinatura não reconhecida na base de dados: {bip_input}")
             
             st.markdown("---")
-            st.markdown("#### Seleção Manual de Pedidos (Filtrado: Só Coletados)")
+            st.markdown("#### Terminal de Validação em Lote (Recurso Manual)")
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
@@ -986,10 +1038,10 @@ elif menu == "📋 Triagem e Romaneio":
                     if isinstance(selecionados_manuais, pd.DataFrame): tem_selecao = not selecionados_manuais.empty
                     else: tem_selecao = len(selecionados_manuais) > 0
 
-                if st.button("✅ Enviar Selecionados para Despacho", type="primary"):
-                    if not tem_selecao: st.warning("⚠️ Selecione os pedidos na tabela acima primeiro!")
+                if st.button("✅ Confirmar Triagem em Lote", type="primary"):
+                    if not tem_selecao: st.warning("⚠️ Assinale as caixas na grade primeiro.")
                     else:
-                        with st.spinner("Atualizando pedidos selecionados em lote (Anti-Bloqueio)..."):
+                        with st.spinner("Registrando auditoria em massa..."):
                             if isinstance(selecionados_manuais, pd.DataFrame): p_ids = selecionados_manuais['PEDIDO'].astype(str).tolist()
                             else: p_ids = [str(r['PEDIDO']) for r in selecionados_manuais]
                             try:
@@ -999,25 +1051,24 @@ elif menu == "📋 Triagem e Romaneio":
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(p_ids)
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'CONFERIDO'
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                st.success(f"🎉 {len(p_ids)} pedidos enviados para o Despacho!")
+                                st.success(f"🎉 Lote de {len(p_ids)} amostras liberado para a aba de Romaneio!")
                                 carregar_dados_completos.clear()
                                 st.rerun()
-                            except Exception as e: st.error(f"Erro: {e}")
-            else: st.info("Nenhum pedido aguardando triagem (Apenas pacotes 'Coletados' chegam aqui).")
+                            except Exception as e: st.error(f"Falha de conexão: {e}")
+            else: st.info("O salão está vazio. Apenas materiais marcados como 'Coletados' chegam à triagem.")
 
         with t2:
-            st.markdown("#### Selecione os pedidos Conferidos para gerar o Romaneio")
+            st.markdown("#### Matriz de Expedição (Romaneio)")
             df_conf = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
             if not df_conf.empty:
                 
                 lista_tomadores_conf = sorted(df_conf['TOMADOR'].astype(str).unique().tolist())
                 c_filtro, _ = st.columns([1, 2])
-                tomador_filtro = c_filtro.selectbox("🏢 Filtrar Lote por Tomador:", ["Todos"] + [t for t in lista_tomadores_conf if t.strip()])
+                tomador_filtro = c_filtro.selectbox("🏢 Blindagem de Carga (Filtro por Tomador):", ["Todos"] + [t for t in lista_tomadores_conf if t.strip()])
                 
                 if tomador_filtro != "Todos":
                     df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
                 
-                # 🔥 FIX: ADICIONADA A COLUNA QR_CODE NA TABELA DE SELEÇÃO DO ROMANEIO
                 colunas_romaneio = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']
                 if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
                 
@@ -1037,13 +1088,14 @@ elif menu == "📋 Triagem e Romaneio":
                 st.markdown("---")
                 c_mot, c_data, c_btn = st.columns([2, 1, 2])
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-                motorista_escolhido = c_mot.selectbox("👤 Motorista (Buscar):", ["Selecione..."] + logins_disp)
-                data_despacho = c_data.date_input("📅 Data do Romaneio:", format="DD/MM/YYYY", value=hoje_br)
+                motorista_escolhido = c_mot.selectbox("👤 Responsável pelo Transporte:", ["Selecione..."] + logins_disp)
+                # 🔥 FIX: format="DD/MM/YYYY" 
+                data_despacho = c_data.date_input("📅 Data de Embarque:", format="DD/MM/YYYY", value=hoje_br)
                 
-                if c_btn.button("🚚 Gerar Romaneio PDF e Despachar", type="primary", use_container_width=True):
-                    if not tem_sel_pdf or motorista_escolhido == "Selecione...": st.warning("⚠️ Selecione os pedidos e um motorista!")
+                if c_btn.button("🚚 Gerar Doc. Oficial e Despachar", type="primary", use_container_width=True):
+                    if not tem_sel_pdf or motorista_escolhido == "Selecione...": st.warning("⚠️ Exigência de Rota: Marque os pacotes e informe o responsável.")
                     else:
-                        with st.spinner("Gerando PDF e enviando o Lote ao AppSheet (Anti-Bloqueio)..."):
+                        with st.spinner("Gerando Romaneio PDF (Selo IGO) e injetando no roteiro do motorista..."):
                             if isinstance(selecionados, pd.DataFrame): sel_lista = selecionados.to_dict('records')
                             else: sel_lista = selecionados
                             id_romaneio = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
@@ -1075,46 +1127,47 @@ elif menu == "📋 Triagem e Romaneio":
                                 despachar_para_appsheet(lote_app)
                                 carregar_dados_completos.clear()
                                 
-                                # 🔥 NOVO DESIGN DE PDF: Mais limpo, fontes menores e com coluna ID CLIENTE (QR CODE)
+                                # 🔥 NOVO DESIGN DE PDF: Estilo Clean/Premium, ID Cliente, Fontes Menores
                                 pdf = FPDF()
                                 pdf.add_page()
-                                pdf.set_draw_color(44, 62, 80)
-                                pdf.set_line_width(0.5)
+                                pdf.set_draw_color(15, 23, 42)  # Slate 900
+                                pdf.set_line_width(0.3)
                                 pdf.rect(5, 5, 200, 287)
                                 
-                                pdf.set_y(12)
-                                pdf.set_font("Arial", "B", 16)
-                                pdf.set_text_color(44, 62, 80)
-                                pdf.cell(0, 6, f"PROTOCOLO DE ROMANEIO - IGO LOGISTICA", ln=True, align="C")
+                                pdf.set_y(10)
+                                pdf.set_font("Arial", "B", 14)
+                                pdf.set_text_color(15, 23, 42)
+                                pdf.cell(0, 6, f"PROTOCOLO DE ROMANEIO TÉCNICO - IGO LOGISTICA", ln=True, align="C")
                                 
-                                pdf.set_font("Arial", "B", 11)
-                                pdf.set_text_color(2, 132, 199)
-                                pdf.cell(0, 6, f"LOTE DE DESPACHO: {id_romaneio}", ln=True, align="C")
+                                pdf.set_font("Arial", "B", 10)
+                                pdf.set_text_color(2, 132, 199) # Sky 600
+                                pdf.cell(0, 5, f"LOTE DE EXPEDIÇÃO: {id_romaneio}", ln=True, align="C")
                                 
-                                pdf.set_font("Arial", "", 9)
-                                pdf.set_text_color(100, 116, 139)
-                                pdf.cell(0, 5, f"Motorista: {motorista_escolhido.upper()}   |   Data do Romaneio: {data_despacho.strftime('%d/%m/%Y')}", ln=True, align="C")
+                                pdf.set_font("Arial", "", 8)
+                                pdf.set_text_color(100, 116, 139) # Slate 500
+                                pdf.cell(0, 4, f"Agente Designado: {motorista_escolhido.upper()}   |   Data do Embarque: {data_despacho.strftime('%d/%m/%Y')}", ln=True, align="C")
                                 
-                                pdf.ln(5)
+                                pdf.ln(3)
                                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-                                pdf.ln(5)
+                                pdf.ln(3)
                                 
-                                pdf.set_fill_color(2, 132, 199)
+                                pdf.set_fill_color(15, 23, 42) # Fundo do Cabeçalho da Tabela
                                 pdf.set_text_color(255, 255, 255)
-                                pdf.set_font("Arial", "B", 8)
-                                pdf.cell(10, 6, "ITEM", 1, 0, "C", True)
-                                pdf.cell(25, 6, "PEDIDO", 1, 0, "C", True)
-                                pdf.cell(30, 6, "ID CLIENTE", 1, 0, "C", True) # Puxa do QR Code
-                                pdf.cell(75, 6, "LABORATORIO", 1, 0, "C", True)
-                                pdf.cell(40, 6, "CIDADE", 1, 0, "C", True)
-                                pdf.cell(10, 6, "UF", 1, 1, "C", True)
+                                pdf.set_font("Arial", "B", 7)
+                                # Reduzindo larguras para encaixar o ID Cliente com perfeição
+                                pdf.cell(10, 5, "ITEM", 1, 0, "C", True)
+                                pdf.cell(25, 5, "PEDIDO", 1, 0, "C", True)
+                                pdf.cell(30, 5, "ID CLIENTE", 1, 0, "C", True) 
+                                pdf.cell(80, 5, "PONTO DE COLETA / LABORATÓRIO", 1, 0, "C", True)
+                                pdf.cell(35, 5, "CIDADE", 1, 0, "C", True)
+                                pdf.cell(10, 5, "UF", 1, 1, "C", True)
                                 
-                                pdf.set_text_color(51, 65, 85)
+                                pdf.set_text_color(51, 65, 85) # Slate 700 para texto
                                 pdf.set_font("Arial", "", 7)
                                 
                                 for idx, item in enumerate(sel_lista, 1):
                                     fill = (idx % 2 == 0)
-                                    if fill: pdf.set_fill_color(241, 245, 249)
+                                    if fill: pdf.set_fill_color(241, 245, 249) # Linha zebra Slate 50
                                     else: pdf.set_fill_color(255, 255, 255)
                                     
                                     qr_val = str(item.get('QR_CODE', ''))
@@ -1123,34 +1176,34 @@ elif menu == "📋 Triagem e Romaneio":
                                     pdf.cell(10, 5, str(idx), 1, 0, "C", True)
                                     pdf.cell(25, 5, str(item.get('PEDIDO','')), 1, 0, "C", True)
                                     pdf.cell(30, 5, qr_val, 1, 0, "C", True)
-                                    pdf.cell(75, 5, str(item.get('LABORATORIO',''))[:45], 1, 0, "L", True)
-                                    pdf.cell(40, 5, str(item.get('CIDADE',''))[:25], 1, 0, "L", True)
+                                    pdf.cell(80, 5, str(item.get('LABORATORIO',''))[:48], 1, 0, "L", True)
+                                    pdf.cell(35, 5, str(item.get('CIDADE',''))[:22], 1, 0, "L", True)
                                     pdf.cell(10, 5, str(item.get('UF','')), 1, 1, "C", True)
                                     
-                                pdf.ln(5)
-                                pdf.set_font("Arial", "B", 9)
-                                pdf.set_text_color(44, 62, 80)
-                                pdf.cell(0, 6, f"TOTAL DE VOLUMES DESPACHADOS: {len(sel_lista)}", ln=True, align="R")
+                                pdf.ln(4)
+                                pdf.set_font("Arial", "B", 8)
+                                pdf.set_text_color(15, 23, 42)
+                                pdf.cell(0, 5, f"TOTAL DE VOLUMES CONFERIDOS E EMBARCADOS: {len(sel_lista)}", ln=True, align="R")
                                 
-                                pdf.set_y(-30)
+                                pdf.set_y(-25)
                                 pdf.line(20, pdf.get_y(), 90, pdf.get_y())
                                 pdf.line(120, pdf.get_y(), 190, pdf.get_y())
-                                pdf.set_font("Arial", "B", 8)
-                                pdf.cell(95, 5, "ASSINATURA MOTORISTA (IGO)", 0, 0, "C")
-                                pdf.cell(95, 5, "ASSINATURA DA BASE / RESPONSAVEL", 0, 1, "C")
+                                pdf.set_font("Arial", "B", 7)
+                                pdf.cell(95, 4, "ASSINATURA CADEIA (MOTORISTA)", 0, 0, "C")
+                                pdf.cell(95, 4, "ASSINATURA EXPEDIÇÃO (BASE IGO)", 0, 1, "C")
                                 
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
                                     pdf.output(tmp_pdf.name)
                                     with open(tmp_pdf.name, "rb") as f: pdf_bytes = f.read()
                                 
-                                st.success(f"🎉 Lote {id_romaneio} com {len(sel_lista)} pedidos despachado com sucesso!")
-                                st.download_button(label="📥 BAIXAR ROMANEIO EM PDF", data=pdf_bytes, file_name=f"Romaneio_{id_romaneio}.pdf", mime="application/pdf", type="primary")
-                            except Exception as e: st.error(f"Erro ao processar despacho: {e}")
-            else: st.info("Nenhum pedido com status 'CONFERIDO' no momento.")
+                                st.success(f"🎉 O Lote de Código {id_romaneio} contendo {len(sel_lista)} amostras foi lacrado!")
+                                st.download_button(label="📥 BAIXAR PROTOCOLO TÉCNICO (PDF)", data=pdf_bytes, file_name=f"Romaneio_Tecnico_{id_romaneio}.pdf", mime="application/pdf", type="primary")
+                            except Exception as e: st.error(f"Interrupção na Criptografia de Carga: {e}")
+            else: st.info("O salão está vazio. Somente lotes validados na Triagem aparecem para despacho.")
 
         with t3:
-            st.markdown("#### Histórico de Triagem e Despacho")
-            st.info("Visualização rápida de todos os pedidos já conferidos ou despachados.")
+            st.markdown("#### Histórico Analítico de Triagem e Despacho")
+            st.info("Visão macro de todas as amostras que já ultrapassaram a etapa de Logística de Rua (Coleta).")
             
             status_mostrar = ['CONFERIDO', 'EM ROTA DE ENTREGA', 'ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']
             df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper().isin(status_mostrar)].copy()
@@ -1164,12 +1217,12 @@ elif menu == "📋 Triagem e Romaneio":
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
                 gb_hist.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
                 
-                st_js = JsCode("function(p){let v=p.value||''; if(v.includes('ENTREGUE')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'800'};} if(v.includes('FRUSTRADA') || v.includes('PROBLEMA')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'800'};} if(v.includes('EM ROTA')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'800'};} if(v.includes('CONFERIDO')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'800'};} return {'fontWeight':'bold'};}")
+                st_js = JsCode("function(p){let v=p.value||''; if(v.includes('ENTREGUE')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#059669','fontWeight':'800'};} if(v.includes('FRUSTRADA') || v.includes('PROBLEMA')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#DC2626','fontWeight':'800'};} if(v.includes('EM ROTA')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#D97706','fontWeight':'800'};} if(v.includes('CONFERIDO')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#2563EB','fontWeight':'800'};} return {'fontWeight':'bold'};}")
                 gb_hist.configure_column("STATUS", headerName="STATUS", cellStyle=st_js, minWidth=170)
                 
                 AgGrid(df_hist_show, gridOptions=gb_hist.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
             else:
-                st.warning("Nenhum histórico de triagem ou despacho encontrado.")
+                st.warning("O arquivo histórico de varreduras está temporariamente em branco.")
                 
     else: st.info("O banco de dados está vazio no momento.")
 
@@ -1177,27 +1230,27 @@ elif menu == "📋 Triagem e Romaneio":
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
 # =============================================================================
 elif menu == "📱 Disparo WhatsApp":
-    st.markdown("<h4 class='dinamic-text'>📱 Central de Disparo via WhatsApp</h4>", unsafe_allow_html=True)
-    st.markdown("Selecione a data para visualizar e enviar as rotas pendentes para os motoristas.")
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
+    st.markdown("Acione o terminal de comando para injetar o cronograma oficial de rotas no WhatsApp corporativo da equipe.")
     
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
         # 🔥 FIX: format="DD/MM/YYYY" 
-        data_filtro = st.date_input("📅 Filtrar pedidos da data:", value=hoje_br, format="DD/MM/YYYY")
+        data_filtro = st.date_input("📅 Cronograma da Data:", value=hoje_br, format="DD/MM/YYYY")
         
         df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
         
         if df_pendentes.empty:
-            st.success(f"Nenhuma coleta/entrega PENDENTE para o dia {data_filtro.strftime('%d/%m/%Y')}.")
+            st.success(f"Nenhum volume PENDENTE detectado no raio logístico de {data_filtro.strftime('%d/%m/%Y')}.")
         else:
             agentes_com_rota = df_pendentes['AGENTE_RAW'].dropna().unique()
             agentes_com_rota = [ag for ag in agentes_com_rota if str(ag).strip()]
             
             if not agentes_com_rota:
-                st.warning("Existem pedidos pendentes, mas nenhum deles tem um motorista atribuído.")
+                st.warning("Falha de Roteirização Crítica: Os volumes foram captados pela nuvem, mas as diretrizes de rota estão cegas (Sem Motorista).")
             else:
-                st.info(f"Encontrados **{len(df_pendentes)}** pedidos distribuídos entre **{len(agentes_com_rota)}** motoristas.")
+                st.info(f"Radar ativado. Rastreando **{len(df_pendentes)}** pontos de parada distribuídos nos vetores de **{len(agentes_com_rota)}** agentes de campo.")
                 
                 dict_telefones = {}
                 if not DF_AGENTES.empty:
@@ -1213,32 +1266,32 @@ elif menu == "📱 Disparo WhatsApp":
                     qtd_pedidos = len(df_agente)
                     telefone = dict_telefones.get(str(agente).strip().lower(), "")
                     
-                    with st.expander(f"👤 Motorista: {str(agente).upper()} ({qtd_pedidos} pacotes)", expanded=False):
+                    with st.expander(f"👤 Agente Tático: {str(agente).upper()} | Volumes na Rota: {qtd_pedidos}", expanded=False):
                         st.dataframe(df_agente[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True, use_container_width=True)
                         
                         if telefone:
-                            msg = f"🚚 *ROTA IGO LOGÍSTICA*\n"
+                            msg = f"🚚 *ROTA OFICIAL IGO LOGÍSTICA*\n"
                             msg += f"Data: {data_filtro.strftime('%d/%m/%Y')}\n"
-                            msg += f"Motorista: {str(agente).upper()}\n\n"
-                            msg += f"📦 *COLETAS / ENTREGAS ({qtd_pedidos}):*\n\n"
+                            msg += f"Agente Tático: {str(agente).upper()}\n\n"
+                            msg += f"🧪 *VOLUMES BIOLÓGICOS/TOXICOLÓGICOS ({qtd_pedidos}):*\n\n"
                             
                             for i, (_, row) in enumerate(df_agente.iterrows(), 1):
-                                msg += f"*{i}️⃣ Pedido:* {row['PEDIDO']}\n"
-                                msg += f"🏥 *Tomador:* {row.get('TOMADOR', '')}\n"
-                                msg += f"🏢 *Local:* {row.get('LABORATORIO', '')}\n"
-                                msg += f"📍 *Endereço:* {row.get('ENDERECO', '')}, {row.get('NUMERO', '')} - {row.get('BAIRRO', '')}, {row.get('CIDADE', '')}\n"
+                                msg += f"*{i}️⃣ Identificador:* {row['PEDIDO']}\n"
+                                msg += f"🏥 *Clínica Solicitante:* {row.get('TOMADOR', '')}\n"
+                                msg += f"🏢 *Base de Captação:* {row.get('LABORATORIO', '')}\n"
+                                msg += f"📍 *Coordenadas:* {row.get('ENDERECO', '')}, {row.get('NUMERO', '')} - {row.get('BAIRRO', '')}, {row.get('CIDADE', '')}\n"
                                 if str(row.get('OBSERVACOES', '')).strip() and str(row.get('OBSERVACOES', '')).upper() != 'NAN':
-                                    msg += f"📝 *Obs:* {row['OBSERVACOES']}\n"
+                                    msg += f"📝 *Aviso de Rota:* {row['OBSERVACOES']}\n"
                                 msg += "------------------------\n"
                             
-                            msg += "\nBom trabalho e dirija com segurança!"
+                            msg += "\nZele pela integridade do material. Dirija com extrema segurança."
                             
                             msg_codificada = urllib.parse.quote(msg)
                             link_whatsapp = f"https://api.whatsapp.com/send?phone={telefone}&text={msg_codificada}"
                             
-                            st.link_button("📲 Enviar Rota pelo WhatsApp", link_whatsapp, type="primary")
+                            st.link_button("📲 Emitir Ordem de Deslocamento Automática", link_whatsapp, type="primary")
                         else:
-                            st.error(f"⚠️ Telefone não encontrado para o login '{agente}'. Cadastre o telefone na aba 'Configurar Rotas'.")
+                            st.error(f"⚠️ Barreira de Comunicação: A diretriz de contato numérico do agente '{agente}' está corrompida ou vazia no DB.")
     else:
         st.warning("📭 O banco de dados está vazio no momento.")
 
@@ -1246,7 +1299,7 @@ elif menu == "📱 Disparo WhatsApp":
 # 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
 # =============================================================================
 elif menu == "📥 Exportar Relatórios":
-    st.markdown("<h4 class='dinamic-text'>📥 Central de Exportações</h4>", unsafe_allow_html=True)
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining e Exportação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -1254,7 +1307,7 @@ elif menu == "📥 Exportar Relatórios":
         df_export_base = df_raw[[c for c in colunas_export if c in df_raw.columns]].copy()
         if 'AGENTE_RAW' in df_export_base.columns: df_export_base.rename(columns={'AGENTE_RAW': 'MOTORISTA'}, inplace=True)
         
-        st.markdown("### ⚡ Relatórios de Fechamento Padrão")
+        st.markdown("### ⚡ Auditoria Rápida de Lotes Pré-Configurados")
         col_rel1, col_rel2, col_rel3 = st.columns(3)
         
         df_rj = df_export_base[df_export_base['UF'].str.upper() == 'RJ'] if 'UF' in df_export_base.columns else pd.DataFrame()
@@ -1264,27 +1317,27 @@ elif menu == "📥 Exportar Relatórios":
         else: df_rjjf = df_rj
             
         if not df_rjjf.empty:
-            col_rel1.download_button("📥 Extrair RJ / JF", data=gerar_excel_memoria(df_rjjf), file_name=f"Relatorio_RJ_JF_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-        else: col_rel1.button("📥 Extrair RJ / JF (Sem Dados)", disabled=True, use_container_width=True)
+            col_rel1.download_button("📥 Minerar Bloco RJ / JF", data=gerar_excel_memoria(df_rjjf), file_name=f"Datamining_RJ_JF_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        else: col_rel1.button("📥 Minerar Bloco RJ / JF (Zero Ocorrências)", disabled=True, use_container_width=True)
 
         if 'MOTORISTA' in df_export_base.columns:
             df_lud = df_export_base[df_export_base['MOTORISTA'].str.lower().str.contains('ludmila|veloz', na=False)]
             if not df_lud.empty:
-                col_rel2.download_button("📥 Extrair Ludmila / Veloz", data=gerar_excel_memoria(df_lud), file_name=f"Relatorio_Ludmila_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-            else: col_rel2.button("📥 Extrair Ludmila / Veloz (Sem Dados)", disabled=True, use_container_width=True)
+                col_rel2.download_button("📥 Minerar Base Ludmila / Veloz", data=gerar_excel_memoria(df_lud), file_name=f"Datamining_Ludmila_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            else: col_rel2.button("📥 Minerar Base Ludmila / Veloz (Zero Ocorrências)", disabled=True, use_container_width=True)
         
-        col_rel3.download_button("📥 Relatório Geral (Todos)", data=gerar_excel_memoria(df_export_base), file_name=f"Relatorio_Geral_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary", use_container_width=True)
+        col_rel3.download_button("📥 Extração Completa (Nuvem Integral)", data=gerar_excel_memoria(df_export_base), file_name=f"BKP_Integral_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary", use_container_width=True)
         
         st.markdown("---")
-        st.markdown("### 🔍 Gerador de Relatório Personalizado")
+        st.markdown("### 🔍 Motor Analítico Customizável (Pesquisa Cruzada)")
         with st.form("form_rel_custom"):
             cf1, cf2 = st.columns(2)
-            c_ag = cf1.text_input("👤 Agente (Nome/Login):")
-            c_cid = cf2.text_input("🏙️ Cidade:")
-            c_uf = cf1.text_input("🗺️ UF:")
-            c_base = cf2.text_input("🏢 Base Oper. (Tomador/Lab):")
+            c_ag = cf1.text_input("👤 Codinome do Agente:")
+            c_cid = cf2.text_input("🏙️ Raio de Busca (Cidade):")
+            c_uf = cf1.text_input("🗺️ Vetor Estadual (UF):")
+            c_base = cf2.text_input("🏢 Hub Logístico (Tomador/Clínica):")
             
-            if st.form_submit_button("Gerar Relatório Customizado"):
+            if st.form_submit_button("Executar Pesquisa e Compilar Tabela"):
                 df_custom = df_export_base.copy()
                 if c_ag and 'MOTORISTA' in df_custom.columns: df_custom = df_custom[df_custom['MOTORISTA'].str.upper().str.contains(c_ag.upper(), na=False)]
                 if c_cid and 'CIDADE' in df_custom.columns: df_custom = df_custom[df_custom['CIDADE'].str.upper().str.contains(c_cid.upper(), na=False)]
@@ -1295,24 +1348,24 @@ elif menu == "📥 Exportar Relatórios":
                     df_custom = df_custom[mt | ml]
                 
                 if not df_custom.empty:
-                    st.success(f"Relatório gerado com {len(df_custom)} linhas!")
-                    st.download_button("📥 Baixar Customizado", data=gerar_excel_memoria(df_custom), file_name=f"Relatorio_Custom.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                else: st.warning("Nenhum dado encontrado.")
+                    st.success(f"Pesquisa concluída! Encontramos uma massa de {len(df_custom)} volumes cruzados com as suas restrições.")
+                    st.download_button("📥 Fazer Download do Relatório Cru (Excel)", data=gerar_excel_memoria(df_custom), file_name=f"Pesquisa_Customizada_IGO.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                else: st.warning("Nenhum dado cruzado sob essas métricas foi identificado na nuvem.")
     else: st.warning("O banco de dados está vazio.")
 
 # =============================================================================
 # 📺 MÓDULO NOVO: PAINEL TV (MÉTRICAS EXECUTIVAS ULTRA PREMIUM)
 # =============================================================================
 elif menu == "📺 Painel TV (Métricas)":
-    st.markdown("<h3 class='dinamic-text'>📺 Painel Executivo de Operação</h3>", unsafe_allow_html=True)
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📺 Painel de Exibição Executivo (Live View)</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
     def criar_card(titulo, valor, subtitulo, gradiente):
         return f"""
-        <div style="background: {gradiente}; padding: 20px; border-radius: 12px; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); height: 140px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px;">
-            <p style="margin:0; font-size: 16px; font-weight: 600; opacity: 0.9;">{titulo}</p>
-            <h1 style="margin:0; font-size: 38px; font-weight: 900; letter-spacing: 1px;">{valor}</h1>
-            <p style="margin:0; font-size: 13px; opacity: 0.8; font-weight: 500;">{subtitulo}</p>
+        <div style="background: {gradiente}; padding: 20px; border-radius: 12px; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); height: 140px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
+            <p style="margin:0; font-size: 15px; font-weight: 700; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px;">{titulo}</p>
+            <h1 style="margin:0; font-size: 42px; font-weight: 900; letter-spacing: -1px;">{valor}</h1>
+            <p style="margin:0; font-size: 12px; opacity: 0.8; font-weight: 500;">{subtitulo}</p>
         </div>
         """
     
@@ -1321,7 +1374,7 @@ elif menu == "📺 Painel TV (Métricas)":
         
         c_f1, c_f2 = st.columns([1, 3])
         # 🔥 FIX: format="DD/MM/YYYY" 
-        data_tv = c_f1.date_input("📅 Visualizar Métrica da Data:", value=hoje_br, format="DD/MM/YYYY")
+        data_tv = c_f1.date_input("📅 Fixar Painel na Data (Tracking Radar):", value=hoje_br, format="DD/MM/YYYY")
         
         df_hoje = df_raw[df_raw['DATA_OBJ'] == data_tv].copy()
         dia_anterior = data_tv - timedelta(days=1)
@@ -1340,30 +1393,30 @@ elif menu == "📺 Painel TV (Métricas)":
         pendentes = df_hoje['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False).sum()
         
         c1, c2, c3, c4 = st.columns(4)
-        c1.markdown(criar_card("📦 Total de Pedidos", total_hoje, f"{sinal} {delta_pedidos} em relação a ontem", "linear-gradient(135deg, #1E293B 0%, #334155 100%)"), unsafe_allow_html=True)
-        c2.markdown(criar_card("⏳ Pendentes", pendentes, "Aguardando motorista (Na rua)", "linear-gradient(135deg, #64748B 0%, #94A3B8 100%)"), unsafe_allow_html=True)
-        c3.markdown(criar_card("📦 Coletados / Triagem", coletados, "Parte do motorista concluída", "linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)"), unsafe_allow_html=True)
-        c4.markdown(criar_card("🚨 Atrasados", atrasados, "Estouraram o Prazo Limite (SLA)", "linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%)"), unsafe_allow_html=True)
+        c1.markdown(criar_card("📦 Fluxo Operacional", total_hoje, f"{sinal} {delta_pedidos} volumes relativos à D-1", "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)"), unsafe_allow_html=True)
+        c2.markdown(criar_card("⏳ Agentes em Deslocamento", pendentes, "Aguardando interceptação de campo", "linear-gradient(135deg, #475569 0%, #64748B 100%)"), unsafe_allow_html=True)
+        c3.markdown(criar_card("🧪 Auditados na Triagem", coletados, "Blindados e prontos para rota", "linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%)"), unsafe_allow_html=True)
+        c4.markdown(criar_card("🚨 Gargalo de SLA", atrasados, "Volumes em ruptura de teto de prazo", "linear-gradient(135deg, #991B1B 0%, #DC2626 100%)"), unsafe_allow_html=True)
         
         c5, c6, c7, c8 = st.columns(4)
-        c5.markdown(criar_card("🚚 Em Rota", em_rota, "Despachados / Em trânsito", "linear-gradient(135deg, #9A3412 0%, #F59E0B 100%)"), unsafe_allow_html=True)
-        c6.markdown(criar_card("✅ Entregues", entregues, "Finalizados com sucesso", "linear-gradient(135deg, #064E3B 0%, #10B981 100%)"), unsafe_allow_html=True)
-        c7.markdown(criar_card("❌ Frustrados", frustrados, "Devoluções ou Problemas", "linear-gradient(135deg, #991B1B 0%, #EF4444 100%)"), unsafe_allow_html=True)
+        c5.markdown(criar_card("🚚 Comboio de Transferência", em_rota, "Volumes sob proteção de expedição", "linear-gradient(135deg, #B45309 0%, #F59E0B 100%)"), unsafe_allow_html=True)
+        c6.markdown(criar_card("✅ Finalizados (Sucesso)", entregues, "Entregas homologadas com perfeição", "linear-gradient(135deg, #047857 0%, #10B981 100%)"), unsafe_allow_html=True)
+        c7.markdown(criar_card("❌ Frustrações de Pista", frustrados, "Reversões ou Falhas Graves", "linear-gradient(135deg, #B91C1C 0%, #EF4444 100%)"), unsafe_allow_html=True)
         
         with c8:
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("#### 🎯 Conclusão da Varredura")
+            st.markdown("#### 🎯 Performance Tática de Rua")
             concluidos_globais = total_hoje - pendentes
             progresso_pct = int((concluidos_globais / total_hoje) * 100) if total_hoje > 0 else 0
-            st.progress(progresso_pct / 100.0, text=f"{progresso_pct}% de Eficiência ({concluidos_globais} de {total_hoje} pacotes tocados)")
-            st.markdown("<p style='font-size:12px; color:gray; margin-top:-10px;'>Mede se o agente já coletou ou frustrou o pacote na rua.</p>", unsafe_allow_html=True)
+            st.progress(progresso_pct / 100.0, text=f"Radar de Eficiência: {progresso_pct}%")
+            st.markdown(f"<p style='font-size:12px; color:gray; margin-top:-10px;'>A base identificou reação tática em <b>{concluidos_globais}</b> de <b>{total_hoje}</b> pacotes.</p>", unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         
         col_tv1, col_tv2 = st.columns([2, 1])
         
         with col_tv1:
-            st.markdown("#### 🏆 Top Motoristas (Métrica de Varredura/Coleta)")
+            st.markdown("#### 🏆 Painel Tático Individual de Agentes")
             if not df_hoje.empty:
                 df_mot = df_hoje.copy()
                 df_mot['CONCLUIDO_COLETA'] = (~df_mot['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False)).astype(int)
@@ -1382,12 +1435,12 @@ elif menu == "📺 Painel TV (Métricas)":
                 st.dataframe(
                     resumo_mot,
                     column_config={
-                        "Motorista": st.column_config.TextColumn("👤 Motorista"),
-                        "Total": st.column_config.NumberColumn("📦 Total do Dia"),
-                        "Concluidos": st.column_config.NumberColumn("✅ Ação Realizada"),
-                        "Faltam_Na_Rua": st.column_config.NumberColumn("⏳ Aguardando Ação"),
+                        "Motorista": st.column_config.TextColumn("👤 Identificação Tática"),
+                        "Total": st.column_config.NumberColumn("📦 Vetor do Dia"),
+                        "Concluidos": st.column_config.NumberColumn("✅ Ação Definitiva"),
+                        "Faltam_Na_Rua": st.column_config.NumberColumn("⏳ Alvo Pendente"),
                         "% Concluído": st.column_config.ProgressColumn(
-                            "📊 Barra de Desempenho",
+                            "📊 Barra de Combate",
                             format="%f%%",
                             min_value=0,
                             max_value=100,
@@ -1397,24 +1450,24 @@ elif menu == "📺 Painel TV (Métricas)":
                     use_container_width=True
                 )
             else:
-                st.info("Nenhum motorista com rotas nesta data.")
+                st.info("O radar logístico indica 0 atividades em solo para este dia.")
                 
         with col_tv2:
-            st.markdown("#### 📊 Raio-X do Status Geral")
+            st.markdown("#### 📊 Raio-X de Temperatura do DB")
             if not df_hoje.empty:
                 df_hoje['STATUS_CHART'] = df_hoje['STATUS'].str.upper()
                 status_counts = df_hoje['STATUS_CHART'].value_counts().reset_index()
                 status_counts.columns = ['Status', 'Quantidade']
-                st.bar_chart(data=status_counts, x='Status', y='Quantidade', color='#38BDF8')
+                st.bar_chart(data=status_counts, x='Status', y='Quantidade', color='#0284C7')
                 
     else:
-        st.warning("📭 O banco de dados está vazio no momento.")
+        st.warning("📭 O banco de dados central está vazio.")
 
 # =============================================================================
 # ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
 # =============================================================================
-elif menu == "⚙️ Configurar Rotas":
-    st.markdown("<h4 class='dinamic-text'>⚙️ Gestão de Agentes e Rotas</h4>", unsafe_allow_html=True)
+elif menu == "⚙️ Matriz de Rotas":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
     
     tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
     
