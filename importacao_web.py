@@ -78,8 +78,17 @@ def carregar_dados_completos(_planilha):
                     cols_to_extract = ['PEDIDO', 'STATUS', 'OBSERVACOES']
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
                     
+                    # 🔥 CORREÇÃO: CAPTURAR A COLUNA DO QR CODE DO APPSHEET
+                    col_qr_app = None
+                    for c in ['QR_CODE', 'QRCODE', 'QR', 'CODIGO']:
+                        if c in df_app.columns:
+                            col_qr_app = c
+                            break
+                    if col_qr_app: cols_to_extract.append(col_qr_app)
+                    
                     df_app_clean = df_app[[c for c in cols_to_extract if c in df_app.columns]].copy()
                     rename_map = {'STATUS': 'APP_STATUS', 'OBSERVACOES': 'APP_OBS', 'FOTO': 'APP_FOTO'}
+                    if col_qr_app: rename_map[col_qr_app] = 'APP_QR'
                     df_app_clean.rename(columns=rename_map, inplace=True)
                     
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
@@ -91,6 +100,13 @@ def carregar_dados_completos(_planilha):
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
                     
+                    # 🔥 GARANTIR QUE O QR CODE EXISTA NO DF FINAL
+                    if 'APP_QR' in df.columns:
+                        if 'QR_CODE' not in df.columns:
+                            df['QR_CODE'] = df['APP_QR']
+                        else:
+                            df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
+
                     def get_true_status(row):
                         s_db = str(row.get('STATUS', '')).strip().upper()
                         s_app = str(row.get('APP_STATUS', '')).strip().upper()
@@ -416,10 +432,10 @@ if menu == "📊 Dashboard de Controle":
             gb = GridOptionsBuilder.from_dataframe(df_grid)
             gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
             
-            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
+            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
             
             st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'800'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'800'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'800'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'800'};} return {'fontWeight':'bold'};}")
-            gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, minWidth=170)
+            gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, minWidth=170, editable=False)
             
             img_js = JsCode("""
             class FotoRenderer {
@@ -450,7 +466,7 @@ if menu == "📊 Dashboard de Controle":
                 getGui() { return this.eGui; }
             }
             """)
-            gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90)
+            gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90, editable=False)
             
             grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
             
@@ -649,7 +665,6 @@ elif menu == "📝 Novo Pedido Manual":
                     st.error("⚠️ Preencha todos os campos obrigatórios (marcados com *)!")
                 else:
                     with st.spinner("Padronizando textos e salvando na nuvem..."):
-                        # Padroniza tudo (Tira acentos e coloca MAIÚSCULAS)
                         lab_limpo = padronizar_texto(m_lab)
                         rua_limpa = padronizar_texto(m_rua)
                         bai_limpo = padronizar_texto(m_bai)
@@ -827,13 +842,12 @@ elif menu == "📋 Triagem e Romaneio":
                     termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
                     df_raw['PED_LIMPO'] = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
                     
-                    # --- CORREÇÃO: BUSCAR TAMBÉM NA COLUNA QR_CODE ---
+                    # 🔥 CORREÇÃO: CRUZA O BIP TANTO NO PEDIDO QUANTO NO QR_CODE LIDO PELO APP
                     if 'QR_CODE' in df_raw.columns:
                         df_raw['QR_LIMPO'] = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
                         mask = (df_raw['PED_LIMPO'] == termo) | (df_raw['QR_LIMPO'] == termo)
                     else:
                         mask = (df_raw['PED_LIMPO'] == termo)
-                    # -------------------------------------------------
                     
                     if mask.any():
                         idx = df_raw[mask].index[-1]
@@ -859,6 +873,7 @@ elif menu == "📋 Triagem e Romaneio":
                 gb_fila.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
                 
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+                gb_fila.configure_grid_options(rowMultiSelectWithClick=True)
                 
                 grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
                 
@@ -895,6 +910,7 @@ elif menu == "📋 Triagem e Romaneio":
                 gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
                 
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+                gb.configure_grid_options(rowMultiSelectWithClick=True)
                 
                 grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
                 
