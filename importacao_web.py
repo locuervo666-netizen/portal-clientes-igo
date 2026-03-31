@@ -820,7 +820,7 @@ elif menu == "➕ Importação de Lotes":
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO E COM ABA HISTÓRICO)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO)
 # =============================================================================
 elif menu == "📋 Triagem e Romaneio":
     st.markdown("<h4 class='dinamic-text'>📋 Triagem e Despacho</h4>", unsafe_allow_html=True)
@@ -995,16 +995,21 @@ elif menu == "📋 Triagem e Romaneio":
                             except Exception as e: st.error(f"Erro ao processar despacho: {e}")
             else: st.info("Nenhum pedido com status 'CONFERIDO' no momento.")
 
-        # 🔥 NOVA ABA 3: HISTÓRICO DE TRIAGEM
+        # 🔥 ABA 3: HISTÓRICO DE TRIAGEM (AGORA COM TODOS OS STATUS APÓS PENDENTE/COLETADO)
         with t3:
-            st.markdown("#### Histórico de Triagem e Romaneios")
-            st.info("Visualização rápida de todos os pedidos já movimentados na triagem.")
+            st.markdown("#### Histórico de Triagem e Despacho")
+            st.info("Visualização rápida de todos os pedidos já conferidos ou despachados.")
             
-            # 🔥 CORREÇÃO: Mostra APENAS pedidos com status CONFERIDO
-            df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
+            # Filtro que inclui todo o fluxo pós-triagem.
+            status_mostrar = ['CONFERIDO', 'EM ROTA DE ENTREGA', 'ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']
+            df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper().isin(status_mostrar)].copy()
             
             if not df_hist.empty:
-                colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW']
+                # Ordena para os pedidos mais recentes ficarem no topo por padrão
+                df_hist = df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])
+                
+                # Adicionada a coluna ROMANEIO para visualizar em qual Lote o pacote foi despachado
+                colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
                 df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
                 
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
@@ -1015,7 +1020,7 @@ elif menu == "📋 Triagem e Romaneio":
                 
                 AgGrid(df_hist_show, gridOptions=gb_hist.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
             else:
-                st.warning("Nenhum histórico recente encontrado.")
+                st.warning("Nenhum histórico de triagem ou despacho encontrado.")
                 
     else: st.info("O banco de dados está vazio no momento.")
 
