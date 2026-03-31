@@ -53,7 +53,7 @@ CLIENTES_CONFIG = {
 }
 
 # =======================================================
-# 🔗 MOTOR DE DADOS PRINCIPAL (CORRIGIDO PARA A NUVEM)
+# 🔗 MOTOR DE DADOS PRINCIPAL (CORRIGIDO PARA PUXAR FOTO DO APP)
 # =======================================================
 @st.cache_resource
 def conectar_banco_seguro():
@@ -108,12 +108,15 @@ def carregar_dados_nuvem():
                     col_obs = 'OBSERVACOES' if 'OBSERVACOES' in cols_limpas else (cols_limpas[10] if len(cols_limpas) > 10 else None)
                     col_detalhes = 'DETALHES' if 'DETALHES' in cols_limpas else (cols_limpas[14] if len(cols_limpas) > 14 else None)
                     col_receb = 'RECEBEDOR' if 'RECEBEDOR' in cols_limpas else (cols_limpas[16] if len(cols_limpas) > 16 else None)
+                    # ✅ AGORA PUXA A FOTO CORRETAMENTE DO APPSHEET
+                    col_foto = 'FOTO' if 'FOTO' in cols_limpas else ('IMAGEM' if 'IMAGEM' in cols_limpas else None)
                     
                     cols_ext = ['PEDIDO']
                     if col_status and col_status not in cols_ext: cols_ext.append(col_status)
                     if col_obs and col_obs not in cols_ext: cols_ext.append(col_obs)
                     if col_detalhes and col_detalhes not in cols_ext: cols_ext.append(col_detalhes)
                     if col_receb and col_receb not in cols_ext: cols_ext.append(col_receb)
+                    if col_foto and col_foto not in cols_ext: cols_ext.append(col_foto)
                     
                     df_app_clean = df_app[cols_ext].copy()
                     
@@ -122,15 +125,19 @@ def carregar_dados_nuvem():
                         o = str(r.get(col_obs, '')) if col_obs else ''
                         d = str(r.get(col_detalhes, '')) if col_detalhes else ''
                         rec = str(r.get(col_receb, '')) if col_receb else ''
+                        f = str(r.get(col_foto, '')) if col_foto else ''
+                        
                         s = s.strip() if s.upper() != 'NAN' else ''
                         o = o.strip() if o.upper() != 'NAN' else ''
                         d = d.strip() if d.upper() != 'NAN' else ''
                         rec = rec.strip() if rec.upper() != 'NAN' else ''
+                        f = f.strip() if f.upper() != 'NAN' else ''
                         q = d if d else rec
-                        return pd.Series([s, o, q])
+                        return pd.Series([s, o, q, f])
                         
-                    df_app_clean[['APP_STATUS', 'APP_OBS', 'APP_QUEM']] = df_app_clean.apply(extrair_dados_app, axis=1)
-                    df_app_clean = df_app_clean[['PEDIDO', 'APP_STATUS', 'APP_OBS', 'APP_QUEM']]
+                    # INSERINDO APP_FOTO NO TRATAMENTO
+                    df_app_clean[['APP_STATUS', 'APP_OBS', 'APP_QUEM', 'APP_FOTO']] = df_app_clean.apply(extrair_dados_app, axis=1)
+                    df_app_clean = df_app_clean[['PEDIDO', 'APP_STATUS', 'APP_OBS', 'APP_QUEM', 'APP_FOTO']]
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                     
@@ -146,9 +153,16 @@ def carregar_dados_nuvem():
                     
                     if not df_app_rom.empty:
                         df = pd.merge(df, df_app_rom, on='ROMANEIO', how='left', suffixes=('', '_R'))
-                        for c in ['APP_STATUS', 'APP_QUEM', 'APP_OBS']:
+                        for c in ['APP_STATUS', 'APP_QUEM', 'APP_OBS', 'APP_FOTO']:
                             if c in df.columns and f"{c}_R" in df.columns:
                                 df[c] = df[f"{c}_R"].replace("", pd.NA).combine_first(df[c].replace("", pd.NA)).fillna("")
+                    
+                    # ✅ SUBSTITUI A FOTO VAZIA DA MEMÓRIA PELA FOTO REAL DO APLICATIVO
+                    if 'APP_FOTO' in df.columns:
+                        if 'FOTO' not in df.columns:
+                            df['FOTO'] = df['APP_FOTO']
+                        else:
+                            df['FOTO'] = df['APP_FOTO'].replace("", pd.NA).combine_first(df['FOTO'].replace("", pd.NA)).fillna("")
             except: pass
             if 'DATA' in df.columns: df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
@@ -432,7 +446,6 @@ Atendimento IGO Logística."""
                         
                         if col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
                         elif col == 'FOTO_URL':
-                            # --- CÓDIGO CORRIGIDO AQUI! USO DE CLASS + <a> TAG ---
                             link_jscode = JsCode("""
                             class FotoRenderer {
                                 init(params) {
@@ -440,12 +453,9 @@ Atendimento IGO Logística."""
                                     this.eGui.style.textAlign = 'center';
                                     
                                     let val = params.value;
-                                    // Verifica se realmente tem um link válido para a foto
                                     if (val && typeof val === 'string' && val.trim() !== '' && val.toLowerCase() !== 'nan' && val.includes('http')) {
-                                        // Cria um link nativo que abre a foto do AppSheet em uma nova aba
                                         this.eGui.innerHTML = '<a href="' + val + '" target="_blank" style="text-decoration: none; font-size: 18px;" title="Clique para abrir a foto">📸</a>';
                                     } else {
-                                        // Se a linha não tiver foto no banco (ex: "Sem material"), exibe um traço
                                         this.eGui.innerHTML = '<span style="color: #cbd5e1; font-size: 14px;" title="Nenhuma foto registrada">➖</span>';
                                     }
                                 }
