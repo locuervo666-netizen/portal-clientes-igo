@@ -723,50 +723,84 @@ elif menu == "➕ Importação de Lotes":
                 if "import_success" in st.session_state:
                     st.session_state.import_success = ""
                 try:
-                    leitor = csv.reader(io.StringIO(txt), delimiter='\t' if '\t' in txt else ';')
-                    dados = [l for l in leitor if any(x.strip() for x in l)]
+                    # 1. Leitura Inteligente do formato colado (vírgula, ponto e vírgula ou tab)
+                    delim = '\t' if '\t' in txt else (';' if ';' in txt else ',')
+                    df_raw_import = pd.read_csv(io.StringIO(txt), sep=delim, header=None, dtype=str).fillna("")
+                    
+                    # 2. Radar Profundo de Cabeçalho (olha até a 15ª linha)
                     idx_h = 0
+                    max_matches = 0
+                    for i in range(min(15, len(df_raw_import))):
+                        row_str = " ".join(df_raw_import.iloc[i].astype(str).values).upper()
+                        row_str = unicodedata.normalize('NFKD', row_str).encode('ASCII', 'ignore').decode('utf-8')
+                        matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP'] if kw in row_str)
+                        if matches > max_matches:
+                            max_matches = matches
+                            idx_h = i
                     
-                    # 🔥 BUSCA DE CABEÇALHO EXPANDIDA PARA NÃO SE PERDER EM EXCEL BAGUNÇADO
-                    for i, l in enumerate(dados[:15]):
-                        linha_str = " ".join(l).upper()
-                        if any(p in linha_str for p in ['PEDIDO', 'CIDADE', 'LABORAT', 'CODIGO', 'POSTO', 'NOME', 'ENDERE', 'LOGRADOURO', 'CLIENTE']): 
-                            idx_h = i; break
+                    # 3. Montar a tabela com o cabeçalho correto
+                    df_limpo = df_raw_import.iloc[idx_h+1:].copy()
+                    df_limpo.columns = [str(c).strip() for c in df_raw_import.iloc[idx_h].values]
+                    df_limpo = df_limpo.loc[:, ~df_limpo.columns.duplicated()] # Limpa colunas clonadas pelo Excel
                     
-                    df_limpo = pd.DataFrame(dados[idx_h+1:], columns=[c.upper().strip() for c in dados[idx_h]]).fillna("").astype(str)
-                    for col in df_limpo.columns: df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
+                    # 4. Forçar o tratamento de caracteres e maiúsculas
+                    for col in df_limpo.columns: 
+                        df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
                     
-                    # 🔥 DICIONÁRIO DE SINÔNIMOS INTELIGENTE (O TRATADOR TURBINADO)
+                    # 5. O Dicionário de Sinônimos Blindado
                     mapa = {}
                     for c in df_limpo.columns:
-                        cl = tratar_texto_global(c).replace('*', '') # Remove asteriscos irritantes do Excel
+                        cl = str(c).upper().strip()
+                        cl = unicodedata.normalize('NFKD', cl).encode('ASCII', 'ignore').decode('utf-8')
+                        cl = ''.join(e for e in cl if e.isalnum()) # Tira o asterisco do NOME*
                         
-                        if any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO', 'ID']): mapa[c] = 'PEDIDO'
-                        elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): mapa[c] = 'LABORATORIO'
-                        elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): mapa[c] = 'ENDERECO'
-                        elif any(x in cl for x in ['NUM', 'Nº', 'NRO', 'NO']) or cl == 'N': mapa[c] = 'NUMERO'
-                        elif 'BAIRRO' in cl: mapa[c] = 'BAIRRO'
-                        elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa[c] = 'CIDADE'
-                        elif any(x in cl for x in ['UF', 'ESTADO']): mapa[c] = 'UF'
-                        elif 'CEP' in cl: mapa[c] = 'CEP'
+                        if not cl: continue
+                        
+                        if any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': 
+                            if 'PEDIDO' not in mapa.values(): mapa[c] = 'PEDIDO'
+                        elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): 
+                            if 'LABORATORIO' not in mapa.values(): mapa[c] = 'LABORATORIO'
+                        elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): 
+                            if 'ENDERECO' not in mapa.values(): mapa[c] = 'ENDERECO'
+                        elif any(x in cl for x in ['NUM', 'NRO']) or cl in ['N', 'NO']: 
+                            if 'NUMERO' not in mapa.values(): mapa[c] = 'NUMERO'
+                        elif 'BAIRRO' in cl: 
+                            if 'BAIRRO' not in mapa.values(): mapa[c] = 'BAIRRO'
+                        elif any(x in cl for x in ['CIDADE', 'MUNIC']): 
+                            if 'CIDADE' not in mapa.values(): mapa[c] = 'CIDADE'
+                        elif any(x in cl for x in ['ESTADO', 'UF']): 
+                            if 'UF' not in mapa.values(): mapa[c] = 'UF'
+                        elif 'CEP' in cl: 
+                            if 'CEP' not in mapa.values(): mapa[c] = 'CEP'
                     
                     df_limpo.rename(columns=mapa, inplace=True)
+                    
+                    # 6. Criar colunas que faltaram por segurança
                     for c in ['PEDIDO', 'LABORATORIO', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
                         if c not in df_limpo.columns: df_limpo[c] = ""
                     
+                    # 7. Separar Endereço / Número / Bairro
                     for idx, row in df_limpo.iterrows():
                         e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
                         if e and (not n or not b):
                             cep_m = re.search(r'(\d{5}-?\d{3})', e)
-                            if cep_m: df_limpo.at[idx, 'CEP'] = cep_m.group(1); e = e.replace(cep_m.group(1), '').strip(' ,-')
+                            if cep_m: 
+                                df_limpo.at[idx, 'CEP'] = cep_m.group(1)
+                                e = e.replace(cep_m.group(1), '').strip(' ,-')
                             if ',' in e and not n: 
                                 pts = e.split(',')
-                                df_limpo.at[idx, 'ENDERECO'], df_limpo.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
+                                df_limpo.at[idx, 'ENDERECO'] = pts[0].strip()
+                                df_limpo.at[idx, 'NUMERO'] = pts[1].strip()
 
                     df_limpo['UF'] = df_limpo['UF'].astype(str).str.upper().str.strip()
                     df_limpo['CIDADE'] = df_limpo['CIDADE'].astype(str).str.upper().str.strip()
-                    df_limpo['TOMADOR'], df_limpo['DATA'] = tom, dt_c.strftime("%d/%m/%Y")
+                    df_limpo['TOMADOR'] = tom
+                    df_limpo['DATA'] = dt_c.strftime("%d/%m/%Y")
                     df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
+                    
+                    # 8. A Vassoura Final (tira sujeira de Excel vazio)
+                    df_limpo = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""]
+                    
                     st.session_state.df_preview = df_limpo[['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
                     st.rerun()
                 except Exception as e: st.error(f"Erro no processamento: {e}")
