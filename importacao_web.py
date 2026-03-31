@@ -39,7 +39,7 @@ if not st.session_state.autenticado:
             
             # 🟢 DICA: Para usar a sua logomarca real, coloque a imagem na pasta do sistema 
             # com o nome "logo.png" e apague o caractere '#' da linha abaixo:
-            # st.image("logo.png", use_container_width=True) 
+              st.image("logo.png", use_container_width=True) 
             
             st.markdown("<h1 style='color: #38BDF8;'>🚚 IGO Logística</h1>", unsafe_allow_html=True)
             st.markdown("<p style='color: gray;'>Acesso Restrito ao Painel Operacional</p>", unsafe_allow_html=True)
@@ -349,7 +349,7 @@ with st.sidebar:
     
     # 🔥 AQUI ESTÁ A LOGO NA BARRA LATERAL (Removido o IGO ADMIN)
     with col_logo: 
-        # st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True) # Descomente para usar a imagem
+           st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True) # Descomente para usar a imagem
         st.markdown("<h3 style='color:#38BDF8; margin: 0; padding-bottom: 5px; font-weight: 800;'>SISTEMA IGO</h3>", unsafe_allow_html=True)
     
     with col_tema: st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
