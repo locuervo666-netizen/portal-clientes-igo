@@ -276,7 +276,6 @@ with st.sidebar:
     with col_tema: st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-    # NOVO MENU: A aba "Novo Pedido" ganhou uma página dedicada para não espremer o Dashboard
     menu = st.radio("Navegação:", ["📊 Dashboard de Controle", "📝 Novo Pedido Manual", "➕ Importação de Lotes", "📋 Triagem e Romaneio", "📥 Exportar Relatórios", "⚙️ Configurar Rotas"], label_visibility="collapsed")
     st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
     st.divider()
@@ -342,7 +341,6 @@ def obter_css_grid():
 # =============================================================================
 if menu == "📊 Dashboard de Controle":
     df_raw = carregar_dados_completos(planilha_db)
-    hoje_br = datetime.now(FUSO_BR).date()
     
     if not df_raw.empty:
         df_raw['FOTO_URL'] = df_raw['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
@@ -418,9 +416,7 @@ if menu == "📊 Dashboard de Controle":
             gb = GridOptionsBuilder.from_dataframe(df_grid)
             gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
             
-            # 🔥 CORREÇÃO DA SELEÇÃO: Checkbox no cabeçalho funciona com clique na linha!
             gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
-            gb.configure_grid_options(rowMultiSelectWithClick=True)
             
             st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'800'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'800'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'800'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'800'};} return {'fontWeight':'bold'};}")
             gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, minWidth=170)
@@ -830,7 +826,14 @@ elif menu == "📋 Triagem e Romaneio":
                 if bip_submit and bip_input:
                     termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
                     df_raw['PED_LIMPO'] = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
-                    mask = (df_raw['PED_LIMPO'] == termo)
+                    
+                    # --- CORREÇÃO: BUSCAR TAMBÉM NA COLUNA QR_CODE ---
+                    if 'QR_CODE' in df_raw.columns:
+                        df_raw['QR_LIMPO'] = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
+                        mask = (df_raw['PED_LIMPO'] == termo) | (df_raw['QR_LIMPO'] == termo)
+                    else:
+                        mask = (df_raw['PED_LIMPO'] == termo)
+                    # -------------------------------------------------
                     
                     if mask.any():
                         idx = df_raw[mask].index[-1]
@@ -855,9 +858,7 @@ elif menu == "📋 Triagem e Romaneio":
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
                 gb_fila.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
                 
-                # 🔥 CORREÇÃO DO "SELECT ALL"
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
-                gb_fila.configure_grid_options(rowMultiSelectWithClick=True)
                 
                 grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
                 
@@ -893,9 +894,7 @@ elif menu == "📋 Triagem e Romaneio":
                 gb = GridOptionsBuilder.from_dataframe(df_conf[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']])
                 gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
                 
-                # 🔥 CORREÇÃO DO "SELECT ALL"
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
-                gb.configure_grid_options(rowMultiSelectWithClick=True)
                 
                 grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
                 
