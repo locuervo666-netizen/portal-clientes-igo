@@ -59,7 +59,6 @@ CLIENTES_CONFIG = {
 def conectar_banco_seguro():
     """Conecta ao Google Sheets buscando as chaves no PC ou no Cofre da Nuvem"""
     try:
-        # 1. TENTA MODO LOCAL (Seu PC Windows)
         caminho_windows = os.path.join(os.path.expanduser("~"), "IGO_Logistica_Sistema")
         cred_win = os.path.join(caminho_windows, "credentials.json")
         token_win = os.path.join(caminho_windows, "token.json")
@@ -67,9 +66,7 @@ def conectar_banco_seguro():
         if os.path.exists(cred_win) and os.path.exists(token_win):
             return gspread.oauth(credentials_filename=cred_win, authorized_user_filename=token_win)
             
-        # 2. TENTA MODO NUVEM (Streamlit Secrets)
         elif "google_cred_json" in st.secrets and "google_token_json" in st.secrets:
-            # Cria os arquivos temporários invisíveis na nuvem
             with open("cred_temp.json", "w", encoding="utf-8") as f:
                 f.write(st.secrets["google_cred_json"])
             with open("token_temp.json", "w", encoding="utf-8") as f:
@@ -165,7 +162,6 @@ if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 # 🔐 3. LOGIN PREMIUM (SaaS)
 # =======================================================
 if not st.session_state.logado:
-    # Fundo Premium (Padrão de Pontos)
     st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { 
@@ -405,7 +401,6 @@ Atendimento IGO Logística."""
 
                 df_grid['STATUS'] = df_grid['STATUS_DISPLAY'] 
                 
-                # Puxa apenas as colunas que o usuário quer ver (sem criar colunas falsas de Ação)
                 df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
                 
                 if busca_inteligente:
@@ -437,29 +432,26 @@ Atendimento IGO Logística."""
                         
                         if col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
                         elif col == 'FOTO_URL':
-                            # --- CÓDIGO 100% CORRIGIDO AQUI! RETORNA STRING PURA SEM TRAVAR O REACT ---
+                            # --- CÓDIGO CORRIGIDO AQUI! USO DE CLASS + <a> TAG ---
                             link_jscode = JsCode("""
-                            function(params) {
-                                if (!params.value || params.value === '' || String(params.value).toLowerCase() === 'nan' || !String(params.value).includes('http')) {
-                                    return '';
+                            class FotoRenderer {
+                                init(params) {
+                                    this.eGui = document.createElement('div');
+                                    this.eGui.style.textAlign = 'center';
+                                    
+                                    let val = params.value;
+                                    // Verifica se realmente tem um link válido para a foto
+                                    if (val && typeof val === 'string' && val.trim() !== '' && val.toLowerCase() !== 'nan' && val.includes('http')) {
+                                        // Cria um link nativo que abre a foto do AppSheet em uma nova aba
+                                        this.eGui.innerHTML = '<a href="' + val + '" target="_blank" style="text-decoration: none; font-size: 18px;" title="Clique para abrir a foto">📸</a>';
+                                    } else {
+                                        // Se a linha não tiver foto no banco (ex: "Sem material"), exibe um traço
+                                        this.eGui.innerHTML = '<span style="color: #cbd5e1; font-size: 14px;" title="Nenhuma foto registrada">➖</span>';
+                                    }
                                 }
-                                
-                                let url = params.value;
-                                
-                                // Script de clique convertido numa string concatenada
-                                let jsClick = "let m = document.createElement('div');" +
-                                    "m.style.position='fixed'; m.style.zIndex='999999'; m.style.left='0'; m.style.top='0';" +
-                                    "m.style.width='100vw'; m.style.height='100vh'; m.style.backgroundColor='rgba(0,0,0,0.85)';" +
-                                    "m.style.display='flex'; m.style.flexDirection='column'; m.style.justifyContent='center'; m.style.alignItems='center'; m.style.cursor='zoom-out';" +
-                                    "let i = document.createElement('img'); i.src='" + url + "';" +
-                                    "i.style.maxWidth='90%'; i.style.maxHeight='85%'; i.style.borderRadius='8px'; i.style.boxShadow='0 4px 20px rgba(0,0,0,0.5)';" +
-                                    "let t = document.createElement('div'); t.innerText='✖ Clique em qualquer lugar para fechar'; t.style.color='#fff'; t.style.marginTop='15px'; t.style.fontWeight='bold'; t.style.fontFamily='sans-serif';" +
-                                    "m.appendChild(i); m.appendChild(t);" +
-                                    "m.onclick = function() { document.body.removeChild(m); };" +
-                                    "document.body.appendChild(m);";
-
-                                // Retornamos o HTML em String ao invés do DocumentObject (evita o Error #31!)
-                                return '<div style="text-align: center; margin-top: 2px;"><span style="cursor: pointer; font-size: 18px;" title="Clique para ver a foto" onclick="' + jsClick + '">📸</span></div>';
+                                getGui() {
+                                    return this.eGui;
+                                }
                             }
                             """)
                             gb.configure_column(col, headerName=header_name, cellRenderer=link_jscode, width=70, minWidth=70)
