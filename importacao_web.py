@@ -154,16 +154,6 @@ FERIADOS_BR = holidays.Brazil()
 CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "MB_CAEP"]
 hoje_br = datetime.now(FUSO_BR).date() 
 
-def carregar_dicionario_rotas(df_agentes):
-    base_agentes = {}
-    if not df_agentes.empty:
-        for _, row in df_agentes.iterrows():
-            rota = str(row["ROTA MAPEADA"]).strip().replace(" ➔ ", "---")
-            login = str(row["LOGIN DO AGENTE"]).strip().lower()
-            if rota and rota != "SEM ROTA DEFINIDA": base_agentes[rota] = login
-    return base_agentes
-BASE_AGENTES = carregar_dicionario_rotas(DF_AGENTES)
-
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts: return False
     try:
@@ -197,13 +187,36 @@ def limpar_nome_local_rota(texto):
     t = tratar_texto_global(texto)
     return t.split('/')[0].split('-')[0].strip()
 
+# 🔥 CORREÇÃO: O TRADUTOR UNIVERSAL DE ROTAS
 def obter_login_agente(cidade, bairro, laboratorio, endereco="", base_rotas_df=pd.DataFrame()):
     if base_rotas_df.empty: return ""
-    rotas_dict = dict(zip(base_rotas_df['ROTA MAPEADA'].str.upper(), base_rotas_df['LOGIN DO AGENTE'].str.lower()))
-    cid, bai, lab, end = limpar_nome_local_rota(cidade), limpar_nome_local_rota(bairro), tratar_texto_global(laboratorio), tratar_texto_global(endereco)
-    chaves = [f"{cid}---{bai}---{end}", f"{cid}---{lab}", f"{cid}---{bai}", cid]
+    
+    rotas_dict = {}
+    for _, row in base_rotas_df.iterrows():
+        rota_banco = str(row['ROTA MAPEADA']).upper()
+        # Transforma a setinha num separador seguro antes de limpar os acentos
+        rota_banco = rota_banco.replace(" ➔ ", "---").replace(" -> ", "---")
+        # Aplica a mesma limpeza (sem acento) para bater exatamente com a busca
+        rota_limpa = padronizar_texto(rota_banco)
+        rotas_dict[rota_limpa] = str(row['LOGIN DO AGENTE']).lower().strip()
+    
+    cid = limpar_nome_local_rota(cidade)
+    bai = limpar_nome_local_rota(bairro)
+    lab = tratar_texto_global(laboratorio)
+    end = tratar_texto_global(endereco)
+    
+    # A Hierarquia Absoluta (Do mais específico para o mais geral)
+    chaves = [
+        f"{cid}---{bai}---{end}",
+        f"{cid}---{bai}---{lab}",
+        f"{cid}---{lab}",
+        f"{cid}---{bai}",
+        cid
+    ]
+    
     for c in chaves:
-        if c in rotas_dict: return rotas_dict[c]
+        if c in rotas_dict: 
+            return rotas_dict[c]
     return ""
 
 def calcular_sla_dias(uf, cidade):
@@ -723,11 +736,9 @@ elif menu == "➕ Importação de Lotes":
                 if "import_success" in st.session_state:
                     st.session_state.import_success = ""
                 try:
-                    # 1. Leitura Inteligente do formato colado (vírgula, ponto e vírgula ou tab)
                     delim = '\t' if '\t' in txt else (';' if ';' in txt else ',')
                     df_raw_import = pd.read_csv(io.StringIO(txt), sep=delim, header=None, dtype=str).fillna("")
                     
-                    # 2. Radar Profundo de Cabeçalho (olha até a 15ª linha)
                     idx_h = 0
                     max_matches = 0
                     for i in range(min(15, len(df_raw_import))):
@@ -738,21 +749,18 @@ elif menu == "➕ Importação de Lotes":
                             max_matches = matches
                             idx_h = i
                     
-                    # 3. Montar a tabela com o cabeçalho correto
                     df_limpo = df_raw_import.iloc[idx_h+1:].copy()
                     df_limpo.columns = [str(c).strip() for c in df_raw_import.iloc[idx_h].values]
-                    df_limpo = df_limpo.loc[:, ~df_limpo.columns.duplicated()] # Limpa colunas clonadas pelo Excel
+                    df_limpo = df_limpo.loc[:, ~df_limpo.columns.duplicated()] 
                     
-                    # 4. Forçar o tratamento de caracteres e maiúsculas
                     for col in df_limpo.columns: 
                         df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
                     
-                    # 5. O Dicionário de Sinônimos Blindado
                     mapa = {}
                     for c in df_limpo.columns:
                         cl = str(c).upper().strip()
                         cl = unicodedata.normalize('NFKD', cl).encode('ASCII', 'ignore').decode('utf-8')
-                        cl = ''.join(e for e in cl if e.isalnum()) # Tira o asterisco do NOME*
+                        cl = ''.join(e for e in cl if e.isalnum()) 
                         
                         if not cl: continue
                         
@@ -775,11 +783,9 @@ elif menu == "➕ Importação de Lotes":
                     
                     df_limpo.rename(columns=mapa, inplace=True)
                     
-                    # 6. Criar colunas que faltaram por segurança
                     for c in ['PEDIDO', 'LABORATORIO', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
                         if c not in df_limpo.columns: df_limpo[c] = ""
                     
-                    # 7. Separar Endereço / Número / Bairro
                     for idx, row in df_limpo.iterrows():
                         e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
                         if e and (not n or not b):
@@ -798,7 +804,6 @@ elif menu == "➕ Importação de Lotes":
                     df_limpo['DATA'] = dt_c.strftime("%d/%m/%Y")
                     df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
                     
-                    # 8. A Vassoura Final (tira sujeira de Excel vazio)
                     df_limpo = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""]
                     
                     st.session_state.df_preview = df_limpo[['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
@@ -901,7 +906,7 @@ elif menu == "➕ Importação de Lotes":
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO E COM ABA HISTÓRICO)
 # =============================================================================
 elif menu == "📋 Triagem e Romaneio":
     st.markdown("<h4 class='dinamic-text'>📋 Triagem e Despacho</h4>", unsafe_allow_html=True)
