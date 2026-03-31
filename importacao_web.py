@@ -39,7 +39,7 @@ if not st.session_state.autenticado:
             
             # 🟢 DICA: Para usar a sua logomarca real, coloque a imagem na pasta do sistema 
             # com o nome "logo.png" e apague o caractere '#' da linha abaixo:
-              st.image("logo.png", use_container_width=True) 
+            # st.image("logo.png", use_container_width=True) 
             
             st.markdown("<h1 style='color: #38BDF8;'>🚚 IGO Logística</h1>", unsafe_allow_html=True)
             st.markdown("<p style='color: gray;'>Acesso Restrito ao Painel Operacional</p>", unsafe_allow_html=True)
