@@ -19,23 +19,20 @@ from fpdf import FPDF
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =============================================================================
-# 🔗 1. CONFIGURAÇÃO DA PÁGINA E AUTENTICAÇÃO (NOVO COFRE HEALTH-TECH)
+# 🔗 1. CONFIGURAÇÃO DA PÁGINA E AUTENTICAÇÃO
 # =============================================================================
-st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🧬", initial_sidebar_state="expanded")
+st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
-# Cria a variável de segurança se ela não existir
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
-# Se não estiver logado, mostra a tela de login premium e PARALISA o resto do sistema
 if not st.session_state.autenticado:
-    # CSS Customizado só para a tela de login
     st.markdown("""
         <style>
-        [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #F0F4F8 0%, #E2E8F0 100%) !important; }
-        .login-card { background: #FFFFFF; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05), 0 20px 48px rgba(0, 0, 0, 0.05); border: 1px solid #F1F5F9; }
-        .login-title { color: #0F172A; font-weight: 800; font-size: 24px; margin-top: 15px; letter-spacing: -0.5px; }
+        [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
+        .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; }
+        .login-title { color: #0F172A; font-weight: 800; font-size: 22px; margin-top: 15px; letter-spacing: -0.5px; }
         .login-subtitle { color: #64748B; font-size: 14px; margin-bottom: 30px; font-weight: 500; }
         </style>
     """, unsafe_allow_html=True)
@@ -47,18 +44,17 @@ if not st.session_state.autenticado:
         st.markdown("<div class='login-card'>", unsafe_allow_html=True)
         st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         
-        # Logo Puxada da Nuvem
         st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=180)
             
-        st.markdown("<div class='login-title'>CADEIA DE CUSTÓDIA</div>", unsafe_allow_html=True)
-        st.markdown("<div class='login-subtitle'>Acesso Restrito ao C.C.O Toxicológico</div>", unsafe_allow_html=True)
+        st.markdown("<div class='login-title'>PORTAL CORPORATIVO</div>", unsafe_allow_html=True)
+        st.markdown("<div class='login-subtitle'>Autenticação de Operadores - IGO Logística</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
         
         with st.form("form_login"):
-            usuario = st.text_input("👤 Usuário Corporativo")
-            senha = st.text_input("🔑 Senha de Acesso", type="password")
+            usuario = st.text_input("👤 Usuário")
+            senha = st.text_input("🔑 Senha", type="password")
             st.markdown("<br>", unsafe_allow_html=True)
-            submit = st.form_submit_button("AUTENTICAR", use_container_width=True, type="primary")
+            submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
             
             if submit:
                 logins_autorizados = {
@@ -70,14 +66,14 @@ if not st.session_state.autenticado:
                     st.session_state.autenticado = True
                     st.rerun()
                 else:
-                    st.error("❌ Credenciais inválidas ou acesso negado.")
+                    st.error("❌ Credenciais inválidas.")
         st.markdown("</div>", unsafe_allow_html=True)
     
     st.stop()
 
 
 # =============================================================================
-# 🔗 2. CONEXÃO COM A NUVEM E CÉREBRO DE DADOS (ÁREA PROTEGIDA)
+# 🔗 2. CONEXÃO COM A NUVEM E CÉREBRO DE DADOS
 # =============================================================================
 @st.cache_resource
 def conectar_banco():
@@ -310,44 +306,45 @@ def obter_proximo_id(df):
         return 100000
 
 # =============================================================================
-# 🎨 3. INTERFACE E NAVEGAÇÃO (DESIGN CLINICAL PREMIUM)
+# 🎨 3. INTERFACE E NAVEGAÇÃO (DESIGN CORPORATIVO CLEAN)
 # =============================================================================
 
-# Variáveis de Cores Tema Medical/Tech
+# Fundo claro global
 bg_app = "#F8FAFC"        
-bg_side = "#0F172A"       
+bg_side = "#FFFFFF"  # Sidebar Branca (Logo combina perfeitamente)
 txt_main = "#0F172A"      
 border_c = "#E2E8F0"      
 
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
 with st.sidebar:
-    st.markdown("<div style='text-align: center; padding-bottom: 20px;'>", unsafe_allow_html=True)
-    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=140)
+    st.markdown("<div style='text-align: center; padding-bottom: 10px; padding-top: 10px;'>", unsafe_allow_html=True)
+    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=150)
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # 🔥 ÍCONES LABORATORIAIS E NOMENCLATURAS PREMIUM
+    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+    
     menu = st.radio("Navegação:", [
-        "📊 C.C.O - Dashboard", 
-        "🧪 Inserir Coleta Manual", 
-        "🧬 Importação de Lotes", 
+        "📊 Dashboard Operacional", 
+        "📝 Inserir Pedido Manual", 
+        "📥 Importação de Lotes", 
         "🔬 Triagem e Romaneio", 
         "📱 Disparo WhatsApp", 
-        "📥 Exportar Relatórios", 
-        "📺 Painel TV (Métricas)", 
-        "⚙️ Matriz de Rotas"
+        "📁 Exportar Relatórios", 
+        "⚙️ Matriz de Rotas",
+        "📺 Painel TV (Métricas)"  # Painel TV no final
     ], label_visibility="collapsed")
     
     st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
     st.divider()
     
-    if st.button("🚪 Encerrar Sessão", use_container_width=True):
+    if st.button("🚪 Sair do Sistema", use_container_width=True, type="secondary"):
         st.session_state.autenticado = False
         st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
         
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     with st.expander("🛡️ Auditoria de Backup"):
-        st.markdown("<p style='font-size: 11px; color: #94A3B8;'>Gerar cópia física integral da cadeia de custódia (DB).</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 11px; color: #64748B;'>Gerar cópia física integral da cadeia de dados.</p>", unsafe_allow_html=True)
         df_bkp = carregar_dados_completos(planilha_db)
         if not df_bkp.empty:
             st.download_button(
@@ -359,82 +356,62 @@ with st.sidebar:
                 type="primary"
             )
 
-# CSS Master - Ultra Premium
 st.markdown(f"""<style>
-/* Fundo Geral */
 [data-testid="stAppViewContainer"] {{ background-color: {bg_app} !important; }}
+[data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c} !important; padding-top: 1rem !important; }}
 
-/* Sidebar Premium Escura */
-[data-testid="stSidebar"] {{ 
-    background: linear-gradient(180deg, #0B1120 0%, #0F172A 100%) !important; 
-    border-right: none !important; 
-    padding-top: 1rem !important; 
-}}
-
-/* Esconder os botões circulares nativos do Radio */
 div[role="radiogroup"] label div[data-testid="stRadio-radio"] {{ display: none !important; }}
-
-/* Textos Globais */
 .dinamic-text {{ color: {txt_main} !important; font-weight: 800; letter-spacing: -0.5px; }}
-.dinamic-border {{ border-bottom: 2px solid #CBD5E1 !important; margin-bottom: 24px; padding-bottom: 8px; }}
+.dinamic-border {{ border-bottom: 2px solid #E2E8F0 !important; margin-bottom: 24px; padding-bottom: 8px; }}
 
-/* Botões do Menu Lateral (Pill Design) */
 div[role="radiogroup"] {{ gap: 4px !important; }}
 div[role="radiogroup"] > label {{ 
-    width: 100% !important; padding: 12px 16px !important; border-radius: 10px !important; 
+    width: 100% !important; padding: 10px 16px !important; border-radius: 8px !important; 
     margin: 0 !important; border: none !important; background-color: transparent !important; 
-    cursor: pointer !important; transition: all 0.2s ease-in-out !important; box-sizing: border-box !important;
+    cursor: pointer !important; transition: all 0.2s ease-in-out !important;
 }}
-div[role="radiogroup"] > label:hover {{ background-color: rgba(56, 189, 248, 0.1) !important; transform: translateX(4px); }}
+div[role="radiogroup"] > label:hover {{ background-color: #F1F5F9 !important; }}
 div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ 
-    color: #94A3B8 !important; font-size: 14px !important; font-weight: 600 !important; margin: 0 !important; transition: color 0.2s ease !important; 
+    color: #475569 !important; font-size: 14px !important; font-weight: 600 !important; margin: 0 !important; 
 }}
-
-/* Menu Lateral Ativo (Azul Médico Vibrante) */
 div[role="radiogroup"] > label[data-checked="true"] {{ 
-    background: linear-gradient(90deg, #0284C7 0%, #0EA5E9 100%) !important; 
-    border-left: none !important; box-shadow: 0 4px 10px rgba(2, 132, 199, 0.2); 
+    background-color: #E0F2FE !important; 
+    border-left: 4px solid #0284C7 !important; 
+    border-radius: 0 8px 8px 0 !important;
 }}
 div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ 
-    color: #FFFFFF !important; font-weight: 700 !important; text-shadow: 0 1px 2px rgba(0,0,0,0.2); 
+    color: #0369A1 !important; font-weight: 700 !important; 
 }}
 
-/* Estilo Premium dos Botões Superiores (Bolsa de Valores C.C.O) */
-div.st-key-kpi_total button {{ background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; height: 85px !important; border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }}
-div.st-key-kpi_entregue button {{ background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important; height: 85px !important; border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: 0 4px 6px rgba(16,185,129,0.2); }}
-div.st-key-kpi_frus button {{ background: linear-gradient(135deg, #991B1B 0%, #EF4444 100%) !important; height: 85px !important; border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: 0 4px 6px rgba(239,68,68,0.2); }}
-div.st-key-kpi_atra button {{ background: linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%) !important; height: 85px !important; border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: 0 4px 6px rgba(185,28,28,0.2); }}
-div.st-key-kpi_hoje button {{ background: linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%) !important; height: 85px !important; border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: 0 4px 6px rgba(14,165,233,0.2); }}
+/* Botoes de Metricas Padrao (Dashboard) */
+div.st-key-kpi_total button {{ background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
+div.st-key-kpi_entregue button {{ background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; box-shadow: 0 2px 4px rgba(16,185,129,0.1); }}
+div.st-key-kpi_frus button {{ background: linear-gradient(135deg, #991B1B 0%, #EF4444 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; box-shadow: 0 2px 4px rgba(239,68,68,0.1); }}
+div.st-key-kpi_atra button {{ background: linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; box-shadow: 0 2px 4px rgba(185,28,28,0.1); }}
+div.st-key-kpi_hoje button {{ background: linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; box-shadow: 0 2px 4px rgba(14,165,233,0.1); }}
+div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p {{ color: white !important; font-weight: 800 !important; font-size: 14px !important; margin: 0 !important; }}
 
-div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p {{ 
-    color: white !important; font-weight: 800 !important; font-size: 15px !important; letter-spacing: 0.5px; margin: 0 !important; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}}
-
-/* Estilo Geral de Botões Streamlit */
 .stButton > button[kind="primary"] {{ 
-    background: linear-gradient(90deg, #0284C7 0%, #0EA5E9 100%) !important; 
-    border: none !important; box-shadow: 0 4px 6px rgba(2, 132, 199, 0.2) !important; border-radius: 8px !important; font-weight: 700 !important; 
+    background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; 
 }}
-.stButton > button[kind="primary"]:hover {{ transform: translateY(-2px); box-shadow: 0 6px 12px rgba(2, 132, 199, 0.3) !important; }}
+.stButton > button[kind="primary"]:hover {{ background: #0369A1 !important; }}
 
-/* Containers / Caixas de agrupamento */
 [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] {{ 
-    background: #FFFFFF; padding: 24px; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); border: 1px solid #F1F5F9; 
+    background: #FFFFFF; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); border: 1px solid #E2E8F0; 
 }}
 </style>""", unsafe_allow_html=True)
 
-# 🔥 CABEÇALHO DA GRID (CLEAN, CLARO E ALTO CONTRASTE)
 def obter_css_grid():
     return {
-        ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "8px", "overflow": "hidden"},
+        ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "6px", "overflow": "hidden"},
         ".ag-header": {"background-color": "#F8FAFC !important", "border-bottom": "1px solid #CBD5E1 !important"},
-        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "800 !important", "font-size": "12px !important", "text-transform": "uppercase"},
-        ".ag-header-icon": {"color": "#0284C7 !important"}, # Ícone do filtro em destaque 
-        ".ag-cell": {"font-size": "13px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
+        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "700 !important", "font-size": "12px !important"},
+        ".ag-header-icon": {"color": "#0284C7 !important"}, 
+        ".ag-cell": {"font-size": "12px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
         ".ag-row-even": {"background-color": "#FFFFFF !important"},
         ".ag-row-odd": {"background-color": "#F8FAFC !important"},
         ".ag-row-hover": {"background-color": "#F1F5F9 !important"},
-        ".ag-row-selected": {"background-color": "rgba(14, 165, 233, 0.15) !important", "color": "#0369A1 !important"},
+        ".ag-row-selected": {"background-color": "#E0F2FE !important", "color": "#0369A1 !important"},
         ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
     }
 
@@ -458,9 +435,9 @@ def calc_status_display(row):
     return res
 
 # =============================================================================
-# 🚀 MÓDULO 1: C.C.O DASHBOARD
+# 🚀 MÓDULO 1: DASHBOARD
 # =============================================================================
-if menu == "📊 C.C.O - Dashboard":
+if menu == "📊 Dashboard Operacional":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -470,7 +447,7 @@ if menu == "📊 C.C.O - Dashboard":
         if 'DATA_LIMITE' in df_raw.columns: df_raw['DATA_LIMITE'] = df_raw['DATA_LIMITE'].fillna("").astype(str)
         if 'DATA_ENTREGA' in df_raw.columns: df_raw['DATA_ENTREGA'] = df_raw['DATA_ENTREGA'].fillna("").astype(str)
 
-        st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📊 Centro de Controle Operacional</h3></div>", unsafe_allow_html=True)
+        st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📊 Painel de Controle e Gestão</h3></div>", unsafe_allow_html=True)
 
         col_f1, col_f2 = st.columns(2)
         f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
@@ -508,7 +485,7 @@ if menu == "📊 C.C.O - Dashboard":
             mask = df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)
             df_grid = df_grid[mask]
 
-        st.markdown(f"<p style='color:#10B981; font-weight:700; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
         
         container_botoes = st.container()
         container_grid = st.container()
@@ -516,10 +493,9 @@ if menu == "📊 C.C.O - Dashboard":
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
             gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
-            
             gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
             
-            st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#059669','fontWeight':'800'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#DC2626','fontWeight':'800'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#D97706','fontWeight':'800'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#2563EB','fontWeight':'800'};} return {'fontWeight':'bold', 'color': '#64748B'};}")
+            st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'};} return {'fontWeight':'600', 'color': '#64748B'};}")
             gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, minWidth=170)
             
             img_js = JsCode("""
@@ -529,7 +505,7 @@ if menu == "📊 C.C.O - Dashboard":
                     this.eGui.style.textAlign = 'center';
                     let val = params.value;
                     if (val && val !== '' && val !== 'nan' && val !== 'None' && val.includes('http')) {
-                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 18px;" title="Ver Comprovante">📸</span>';
+                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 16px;" title="Ver Comprovante">📸</span>';
                         this.eGui.onclick = () => {
                             let modal = document.createElement('div');
                             modal.style.position = 'fixed'; modal.style.zIndex = '999999';
@@ -538,7 +514,7 @@ if menu == "📊 C.C.O - Dashboard":
                             modal.style.display = 'flex'; modal.style.flexDirection = 'column'; modal.style.justifyContent = 'center'; modal.style.alignItems = 'center'; modal.style.cursor = 'zoom-out';
                             let img = document.createElement('img');
                             img.src = val; 
-                            img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '12px'; img.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
+                            img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '8px'; img.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
                             let txt = document.createElement('div');
                             txt.innerText = '✖ Fechar Visualização'; 
                             txt.style.color = '#ffffff'; txt.style.marginTop = '20px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontWeight = 'bold'; txt.style.padding = '8px 16px'; txt.style.background = 'rgba(255,255,255,0.1)'; txt.style.borderRadius = '20px';
@@ -570,7 +546,7 @@ if menu == "📊 C.C.O - Dashboard":
             st.markdown("""
                 <style>
                 div[data-testid="stPopover"] > button, button[kind="secondary"] {
-                    white-space: nowrap !important; overflow: hidden !important; font-weight: bold !important; font-size: 14px !important; border-radius: 8px !important;
+                    white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 14px !important; border-radius: 6px !important;
                 }
                 </style>
             """, unsafe_allow_html=True)
@@ -591,7 +567,6 @@ if menu == "📊 C.C.O - Dashboard":
 
                     if st.button("Confirmar Baixa", type="primary", use_container_width=True):
                         status_limpo = status_baixa.split(" ")[0].upper()
-                        
                         if tem_entregue and status_limpo != 'ENTREGUE' and senha_reversao != '123':
                             st.error("❌ Senha incorreta ou vazia! Reversão bloqueada.")
                         else:
@@ -605,9 +580,7 @@ if menu == "📊 C.C.O - Dashboard":
                                         df_nuvem.loc[mask, 'STATUS'] = status_limpo
                                         if status_limpo == "ENTREGUE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                         elif status_limpo == "PENDENTE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
-                                    
                                     aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    
                                     try:
                                         aba_app = planilha_db.worksheet("App_Tarefas")
                                         dados_app = aba_app.get_all_values()
@@ -618,7 +591,6 @@ if menu == "📊 C.C.O - Dashboard":
                                                 df_app.loc[mascara_app, 'STATUS'] = status_limpo
                                                 aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
                                     except: pass 
-
                                     st.success("Atualizado!")
                                     carregar_dados_completos.clear()
                                     st.rerun()
@@ -638,39 +610,27 @@ if menu == "📊 C.C.O - Dashboard":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                
                                 prox_id = obter_proximo_id(df_nuvem)
                                 clones_para_app = []
-                                
                                 for pid in p_ids:
                                     if pid in df_nuvem['PEDIDO'].values:
                                         l_orig = df_nuvem[df_nuvem['PEDIDO'] == pid].iloc[0].copy()
                                         novo_id = str(prox_id)
                                         prox_id += 1
-                                        
                                         l_orig['PEDIDO'] = novo_id
                                         l_orig['DATA'] = clone_data.strftime("%d/%m/%Y")
                                         l_orig['STATUS'] = "PENDENTE"
                                         l_orig['DATA_ENTREGA'] = ""; l_orig['FOTO'] = ""; l_orig['ROMANEIO'] = ""
-                                        
-                                        if clone_mot != "Manter Original":
-                                            l_orig['AGENTE_RAW'] = clone_mot
-                                            
+                                        if clone_mot != "Manter Original": l_orig['AGENTE_RAW'] = clone_mot
                                         prazo = calcular_sla_dias(l_orig.get('UF', 'SP'), l_orig.get('CIDADE', ''))
                                         l_orig['PRAZO_DIAS'] = prazo
                                         l_orig['DATA_LIMITE'] = calcular_data_limite(l_orig['DATA'], prazo)
-                                            
                                         df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
-                                        
                                         if str(l_orig.get('AGENTE_RAW','')).strip():
                                             clones_para_app.append({
-                                                'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'],
-                                                'ENDERECO': l_orig.get('ENDERECO',''), 'NUMERO': l_orig.get('NUMERO',''),
-                                                'BAIRRO': l_orig.get('BAIRRO',''), 'CIDADE': l_orig.get('CIDADE',''),
-                                                'CEP': l_orig.get('CEP',''), 'LABORATORIO': l_orig.get('LABORATORIO',''),
-                                                'TOMADOR': l_orig.get('TOMADOR','')
+                                                'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'], 'ENDERECO': l_orig.get('ENDERECO',''), 'NUMERO': l_orig.get('NUMERO',''),
+                                                'BAIRRO': l_orig.get('BAIRRO',''), 'CIDADE': l_orig.get('CIDADE',''), 'CEP': l_orig.get('CEP',''), 'LABORATORIO': l_orig.get('LABORATORIO',''), 'TOMADOR': l_orig.get('TOMADOR','')
                                             })
-
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 if clones_para_app: despachar_para_appsheet(clones_para_app)
                                 st.success("Clonado com SUCESSO!")
@@ -682,8 +642,7 @@ if menu == "📊 C.C.O - Dashboard":
                 if not tem_sel: st.warning("Selecione na Grid primeiro!")
                 else:
                     tem_entregue = df_grid[df_grid['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
-                    if tem_entregue:
-                        st.error("⚠️ Não é possível trocar motorista de pedidos já ENTREGUES.")
+                    if tem_entregue: st.error("⚠️ Não é possível trocar motorista de pedidos já ENTREGUES.")
                     else:
                         logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                         novo_mot = st.selectbox("Novo Agente (Digite para buscar):", logins_disp)
@@ -696,17 +655,14 @@ if menu == "📊 C.C.O - Dashboard":
                                     dados_aba = aba.get_all_values()
                                     df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
                                     lista_app_troca = []
-                                    
                                     for pid in p_ids:
                                         mask = df_nuvem['PEDIDO'] == pid
                                         if mask.any():
                                             df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
                                             df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
                                             df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
-                                            
                                             l_app = df_nuvem[mask].iloc[0]
                                             lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
-                                    
                                     aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     despachar_para_appsheet(lista_app_troca)
                                     st.success("Trocado!")
@@ -719,13 +675,13 @@ if menu == "📊 C.C.O - Dashboard":
                 st.rerun()
 
     else:
-        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '🧪 Inserir Coleta Manual' no menu lateral para começar.")
+        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Novo Pedido Manual' para começar.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
-elif menu == "🧪 Inserir Coleta Manual":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🧪 Inserir Nova Coleta Manual</h3></div>", unsafe_allow_html=True)
+elif menu == "📝 Novo Pedido Manual":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
     st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
     
     with st.container(border=True):
@@ -786,8 +742,8 @@ elif menu == "🧪 Inserir Coleta Manual":
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
-elif menu == "🧬 Importação de Lotes":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🧬 Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
+elif menu == "➕ Importação de Lotes":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
     st.success("🛡️ **AUDITORIA DE DADOS ATIVA:** O sistema avalia padronizações de vários clientes (Airlab, FFW, etc) e adiciona os pacotes à base sem destruir seu histórico do dia.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
@@ -979,7 +935,7 @@ elif menu == "🧬 Importação de Lotes":
                     except Exception as e: st.error(f"Falha de Injeção Crítica: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO PARA PDF PREMIUM)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO 
 # =============================================================================
 elif menu == "🔬 Triagem e Romaneio":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🔬 Terminal de Triagem e Expedição</h3></div>", unsafe_allow_html=True)
@@ -1216,7 +1172,7 @@ elif menu == "🔬 Triagem e Romaneio":
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
                 gb_hist.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
                 
-                st_js = JsCode("function(p){let v=p.value||''; if(v.includes('ENTREGUE')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#059669','fontWeight':'800'};} if(v.includes('FRUSTRADA') || v.includes('PROBLEMA')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#DC2626','fontWeight':'800'};} if(v.includes('EM ROTA')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#D97706','fontWeight':'800'};} if(v.includes('CONFERIDO')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#2563EB','fontWeight':'800'};} return {'fontWeight':'bold'};}")
+                st_js = JsCode("function(p){let v=p.value||''; if(v.includes('ENTREGUE')){return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'};} if(v.includes('FRUSTRADA') || v.includes('PROBLEMA')){return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'};} if(v.includes('EM ROTA')){return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'};} if(v.includes('CONFERIDO')){return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'};} return {'fontWeight':'600', 'color':'#64748B'};}")
                 gb_hist.configure_column("STATUS", headerName="STATUS", cellStyle=st_js, minWidth=170)
                 
                 AgGrid(df_hist_show, gridOptions=gb_hist.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
@@ -1297,7 +1253,7 @@ elif menu == "📱 Disparo WhatsApp":
 # =============================================================================
 # 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
 # =============================================================================
-elif menu == "📥 Exportar Relatórios":
+elif menu == "📁 Exportar Relatórios":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining e Exportação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
@@ -1353,18 +1309,19 @@ elif menu == "📥 Exportar Relatórios":
     else: st.warning("O banco de dados está vazio.")
 
 # =============================================================================
-# 📺 MÓDULO NOVO: PAINEL TV (MÉTRICAS EXECUTIVAS ULTRA PREMIUM)
+# 📺 MÓDULO NOVO: PAINEL TV (MÉTRICAS EXECUTIVAS NASDAQ)
 # =============================================================================
 elif menu == "📺 Painel TV (Métricas)":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📺 Painel de Exibição Executivo (Live View)</h3></div>", unsafe_allow_html=True)
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📺 Terminal Tático Operacional (Live View)</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
-    def criar_card(titulo, valor, subtitulo, gradiente):
+    # 🔥 NOVO CARD ESTILO TERMINAL FINANCEIRO (BLACK / NASDAQ)
+    def criar_card(titulo, valor, subtitulo, cor_acento):
         return f"""
-        <div style="background: {gradiente}; padding: 20px; border-radius: 12px; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); height: 140px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
-            <p style="margin:0; font-size: 15px; font-weight: 700; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px;">{titulo}</p>
-            <h1 style="margin:0; font-size: 42px; font-weight: 900; letter-spacing: -1px;">{valor}</h1>
-            <p style="margin:0; font-size: 12px; opacity: 0.8; font-weight: 500;">{subtitulo}</p>
+        <div style="background-color: #0B1120; border-left: 4px solid {cor_acento}; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 140px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px; border-right: 1px solid #1E293B; border-top: 1px solid #1E293B; border-bottom: 1px solid #1E293B;">
+            <p style="margin:0; font-size: 13px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">{titulo}</p>
+            <h1 style="margin:0; font-size: 46px; font-weight: 900; color: #FFFFFF; font-family: 'Courier New', monospace; letter-spacing: -1px;">{valor}</h1>
+            <p style="margin:0; font-size: 12px; font-weight: 600; color: {cor_acento};">{subtitulo}</p>
         </div>
         """
     
@@ -1373,7 +1330,7 @@ elif menu == "📺 Painel TV (Métricas)":
         
         c_f1, c_f2 = st.columns([1, 3])
         # 🔥 FIX: format="DD/MM/YYYY" 
-        data_tv = c_f1.date_input("📅 Fixar Painel na Data (Tracking Radar):", value=hoje_br, format="DD/MM/YYYY")
+        data_tv = c_f1.date_input("📅 Tracker Data:", value=hoje_br, format="DD/MM/YYYY")
         
         df_hoje = df_raw[df_raw['DATA_OBJ'] == data_tv].copy()
         dia_anterior = data_tv - timedelta(days=1)
@@ -1382,7 +1339,8 @@ elif menu == "📺 Painel TV (Métricas)":
         total_hoje = len(df_hoje)
         total_ontem = len(df_ontem)
         delta_pedidos = total_hoje - total_ontem
-        sinal = "📈" if delta_pedidos >= 0 else "📉"
+        sinal = "▲" if delta_pedidos >= 0 else "▼"
+        cor_delta = "#10B981" if delta_pedidos >= 0 else "#EF4444"
         
         entregues = df_hoje['STATUS_DISPLAY'].str.contains('Entregue', case=False, na=False).sum()
         frustrados = df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False, na=False).sum()
@@ -1392,30 +1350,30 @@ elif menu == "📺 Painel TV (Métricas)":
         pendentes = df_hoje['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False).sum()
         
         c1, c2, c3, c4 = st.columns(4)
-        c1.markdown(criar_card("📦 Fluxo Operacional", total_hoje, f"{sinal} {delta_pedidos} volumes relativos à D-1", "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)"), unsafe_allow_html=True)
-        c2.markdown(criar_card("⏳ Agentes em Deslocamento", pendentes, "Aguardando interceptação de campo", "linear-gradient(135deg, #475569 0%, #64748B 100%)"), unsafe_allow_html=True)
-        c3.markdown(criar_card("🧪 Auditados na Triagem", coletados, "Blindados e prontos para rota", "linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%)"), unsafe_allow_html=True)
-        c4.markdown(criar_card("🚨 Gargalo de SLA", atrasados, "Volumes em ruptura de teto de prazo", "linear-gradient(135deg, #991B1B 0%, #DC2626 100%)"), unsafe_allow_html=True)
+        c1.markdown(criar_card("VOLUMES TOTAIS", total_hoje, f"{sinal} {delta_pedidos} D-1", cor_delta), unsafe_allow_html=True)
+        c2.markdown(criar_card("PENDENTES RUA", pendentes, "Aguardando Interceptação", "#64748B"), unsafe_allow_html=True)
+        c3.markdown(criar_card("TRIAGEM INTERNA", coletados, "Blindados e Roteirizados", "#38BDF8"), unsafe_allow_html=True)
+        c4.markdown(criar_card("SLA ROMPIDO", atrasados, "Volumes em Atraso Crítico", "#EF4444"), unsafe_allow_html=True)
         
         c5, c6, c7, c8 = st.columns(4)
-        c5.markdown(criar_card("🚚 Comboio de Transferência", em_rota, "Volumes sob proteção de expedição", "linear-gradient(135deg, #B45309 0%, #F59E0B 100%)"), unsafe_allow_html=True)
-        c6.markdown(criar_card("✅ Finalizados (Sucesso)", entregues, "Entregas homologadas com perfeição", "linear-gradient(135deg, #047857 0%, #10B981 100%)"), unsafe_allow_html=True)
-        c7.markdown(criar_card("❌ Frustrações de Pista", frustrados, "Reversões ou Falhas Graves", "linear-gradient(135deg, #B91C1C 0%, #EF4444 100%)"), unsafe_allow_html=True)
+        c5.markdown(criar_card("TRANSFERÊNCIA", em_rota, "Expedição em Trânsito", "#F59E0B"), unsafe_allow_html=True)
+        c6.markdown(criar_card("SUCESSO ABSOLUTO", entregues, "Entregas Homologadas", "#10B981"), unsafe_allow_html=True)
+        c7.markdown(criar_card("OCORRÊNCIAS TÉC.", frustrados, "Reversões ou Falhas", "#F43F5E"), unsafe_allow_html=True)
         
         with c8:
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("#### 🎯 Performance Tática de Rua")
+            st.markdown("#### 🎯 Eficiência Tática")
             concluidos_globais = total_hoje - pendentes
             progresso_pct = int((concluidos_globais / total_hoje) * 100) if total_hoje > 0 else 0
-            st.progress(progresso_pct / 100.0, text=f"Radar de Eficiência: {progresso_pct}%")
-            st.markdown(f"<p style='font-size:12px; color:gray; margin-top:-10px;'>A base identificou reação tática em <b>{concluidos_globais}</b> de <b>{total_hoje}</b> pacotes.</p>", unsafe_allow_html=True)
+            st.progress(progresso_pct / 100.0, text=f"Índice Radar: {progresso_pct}%")
+            st.markdown(f"<p style='font-size:12px; color:#475569; margin-top:-10px; font-weight:600;'>Base logou reação em <b>{concluidos_globais}</b> de <b>{total_hoje}</b> alvos.</p>", unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         
         col_tv1, col_tv2 = st.columns([2, 1])
         
         with col_tv1:
-            st.markdown("#### 🏆 Painel Tático Individual de Agentes")
+            st.markdown("#### 🏆 Performance Individual em Solo")
             if not df_hoje.empty:
                 df_mot = df_hoje.copy()
                 df_mot['CONCLUIDO_COLETA'] = (~df_mot['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False)).astype(int)
@@ -1436,7 +1394,7 @@ elif menu == "📺 Painel TV (Métricas)":
                     column_config={
                         "Motorista": st.column_config.TextColumn("👤 Identificação Tática"),
                         "Total": st.column_config.NumberColumn("📦 Vetor do Dia"),
-                        "Concluidos": st.column_config.NumberColumn("✅ Ação Definitiva"),
+                        "Concluidos": st.column_config.NumberColumn("✅ Ação Realizada"),
                         "Faltam_Na_Rua": st.column_config.NumberColumn("⏳ Alvo Pendente"),
                         "% Concluído": st.column_config.ProgressColumn(
                             "📊 Barra de Combate",
@@ -1452,7 +1410,7 @@ elif menu == "📺 Painel TV (Métricas)":
                 st.info("O radar logístico indica 0 atividades em solo para este dia.")
                 
         with col_tv2:
-            st.markdown("#### 📊 Raio-X de Temperatura do DB")
+            st.markdown("#### 📊 Distribuição de Carga")
             if not df_hoje.empty:
                 df_hoje['STATUS_CHART'] = df_hoje['STATUS'].str.upper()
                 status_counts = df_hoje['STATUS_CHART'].value_counts().reset_index()
