@@ -37,12 +37,10 @@ if not st.session_state.autenticado:
         with st.container(border=True):
             st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
             
-            # 🟢 DICA: Para usar a sua logomarca real, coloque a imagem na pasta do sistema 
-            # com o nome "logo.png" e apague o caractere '#' da linha abaixo:
-            # st.image("logo.png", use_container_width=True) 
-            
-            st.markdown("<h1 style='color: #38BDF8;'>🚚 IGO Logística</h1>", unsafe_allow_html=True)
-            st.markdown("<p style='color: gray;'>Acesso Restrito ao Painel Operacional</p>", unsafe_allow_html=True)
+            # 🔥 LOGO PUXADA DIRETO DO LINK DA INTERNET
+            st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
+                
+            st.markdown("<p style='color: gray; margin-top: 10px;'>Acesso Restrito ao Painel Operacional</p>", unsafe_allow_html=True)
             st.markdown("</div><br>", unsafe_allow_html=True)
             
             with st.form("form_login"):
@@ -51,12 +49,17 @@ if not st.session_state.autenticado:
                 submit = st.form_submit_button("Entrar no Sistema", use_container_width=True, type="primary")
                 
                 if submit:
-                    # 🟢 VOCÊ PODE ALTERAR O USUÁRIO E SENHA AQUI:
-                    if usuario == "admin" and senha == "igo2026":
+                    # 🔥 MÚLTIPLOS LOGINS CONFIGURADOS AQUI
+                    logins_autorizados = {
+                        "robson.melo": "123",
+                        "william.bertoldo": "123"
+                    }
+                    
+                    if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
                         st.session_state.autenticado = True
                         st.rerun()
                     else:
-                        st.error("Usuário ou senha incorretos.")
+                        st.error("❌ Usuário ou senha incorretos.")
     
     # O comando st.stop() é o que impede que o resto da página carregue se não houver login
     st.stop()
@@ -195,16 +198,6 @@ FERIADOS_BR = holidays.Brazil()
 CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "MB_CAEP"]
 hoje_br = datetime.now(FUSO_BR).date() 
 
-def carregar_dicionario_rotas(df_agentes):
-    base_agentes = {}
-    if not df_agentes.empty:
-        for _, row in df_agentes.iterrows():
-            rota = str(row["ROTA MAPEADA"]).strip().replace(" ➔ ", "---")
-            login = str(row["LOGIN DO AGENTE"]).strip().lower()
-            if rota and rota != "SEM ROTA DEFINIDA": base_agentes[rota] = login
-    return base_agentes
-BASE_AGENTES = carregar_dicionario_rotas(DF_AGENTES)
-
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts: return False
     try:
@@ -222,6 +215,7 @@ def despachar_para_appsheet(lista_pedidos_dicts):
     except Exception: return False
 
 def padronizar_texto(texto):
+    """Remove acentos e converte para MAIÚSCULAS"""
     if pd.isna(texto) or not texto: return ""
     texto_str = str(texto).strip()
     texto_sem_acento = unicodedata.normalize('NFKD', texto_str).encode('ASCII', 'ignore').decode('utf-8')
@@ -347,10 +341,9 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 with st.sidebar:
     col_logo, col_tema = st.columns([3, 1], vertical_alignment="center")
     
-    # 🔥 AQUI ESTÁ A LOGO NA BARRA LATERAL (Removido o IGO ADMIN)
     with col_logo: 
-           st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True) # Descomente para usar a imagem
-        st.markdown("<h3 style='color:#38BDF8; margin: 0; padding-bottom: 5px; font-weight: 800;'>SISTEMA IGO</h3>", unsafe_allow_html=True)
+        # 🔥 LOGO PUXADA DIRETO DO LINK DA INTERNET PARA O MENU LATERAL
+        st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
     
     with col_tema: st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
     
@@ -359,7 +352,6 @@ with st.sidebar:
     st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
     st.divider()
     
-    # 🔥 BOTÃO DE SAIR AGORA DESTROI A SESSÃO (LOGOUT)
     if st.button("🚪 Sair do Sistema", use_container_width=True, type="secondary"):
         st.session_state.autenticado = False
         st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
