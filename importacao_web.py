@@ -299,51 +299,23 @@ def obter_proximo_id(df):
         return 100000
 
 # =============================================================================
-# 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM (ÁREA LOGADA)
+# 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM (ÁREA LOGADA - THEME CLARO FIXO)
 # =============================================================================
 
-if 'modo_escuro' not in st.session_state: st.session_state.modo_escuro = False
-
-st.markdown("""
-    <style>
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;}
-    [data-testid="stSidebarNav"] {display: none;}
-    
-    div.stRadio > div[role="radiogroup"] { display: flex; flex-direction: column; gap: 8px; width: 100% !important; }
-    div[role="radiogroup"] > label {
-        width: 100% !important; padding: 12px 16px !important; border-radius: 8px !important;
-        margin: 0 !important; border: none !important; background-color: transparent !important;
-        cursor: pointer !important; transition: all 0.2s ease-in-out !important; box-sizing: border-box !important;
-    }
-    div[role="radiogroup"] > label:hover { background-color: rgba(56, 189, 248, 0.08) !important; }
-    div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; }
-    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p { 
-        font-size: 15px !important; font-weight: 600 !important; margin: 0 !important;
-        color: #64748b !important; transition: color 0.2s ease !important;
-    }
-    div[role="radiogroup"] > label[data-checked="true"] { 
-        background-color: rgba(56, 189, 248, 0.12) !important; border-left: 4px solid #38BDF8 !important; border-radius: 0 8px 8px 0 !important;
-    }
-    div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p { color: #0284c7 !important; font-weight: 700 !important; }
-
-    div.st-key-kpi_total button { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_entregue button { background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_hoje button { background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}
-    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { font-weight: 800 !important; font-size: 15px !important; margin: 0 !important; color: white !important;}
-    </style>
-""", unsafe_allow_html=True)
+# Modo escuro desativado por definitivo
+bg_app = "#f8fafc"
+bg_side = "#ffffff"
+txt_main = "#0f172a"
+txt_menu = "#64748b"
+txt_menu_ativo = "#0284c7"
+border_c = "#e2e8f0"
 
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
 with st.sidebar:
-    col_logo, col_tema = st.columns([3, 1], vertical_alignment="center")
-    
-    with col_logo: 
-        st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
-    
-    with col_tema: st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
+    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
     
@@ -379,50 +351,38 @@ with st.sidebar:
                 type="primary"
             )
 
-bg_app = "#0e1117" if st.session_state.modo_escuro else "#f8fafc"
-bg_side = "#161b22" if st.session_state.modo_escuro else "#ffffff"
-txt_main = "#f8fafc" if st.session_state.modo_escuro else "#0f172a"
-txt_menu = "#cbd5e1" if st.session_state.modo_escuro else "#64748b"
-txt_menu_ativo = "#38bdf8" if st.session_state.modo_escuro else "#0284c7"
-border_c = "#334155" if st.session_state.modo_escuro else "#e2e8f0"
-
 st.markdown(f"""<style>
 [data-testid="stAppViewContainer"] {{ background-color: {bg_app} !important; }}
 [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c}; padding-top: 2rem !important; }}
 .dinamic-text {{ color: {txt_main} !important; }}
 .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
-div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu} !important; }}
-div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu_ativo} !important; }}
+div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu} !important; font-size: 15px !important; font-weight: 600 !important; margin: 0 !important; transition: color 0.2s ease !important; }}
+div[role="radiogroup"] > label {{ width: 100% !important; padding: 12px 16px !important; border-radius: 8px !important; margin: 0 !important; border: none !important; background-color: transparent !important; cursor: pointer !important; transition: all 0.2s ease-in-out !important; box-sizing: border-box !important; }}
+div[role="radiogroup"] > label:hover {{ background-color: rgba(56, 189, 248, 0.08) !important; }}
+div[role="radiogroup"] label div[data-testid="stRadio-radio"] {{ display: none !important; }}
+div[role="radiogroup"] > label[data-checked="true"] {{ background-color: rgba(56, 189, 248, 0.12) !important; border-left: 4px solid #38BDF8 !important; border-radius: 0 8px 8px 0 !important; }}
+div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ color: {txt_menu_ativo} !important; font-weight: 700 !important; }}
+div.st-key-kpi_total button {{ background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}}
+div.st-key-kpi_entregue button {{ background: linear-gradient(135deg, #064E3B 0%, #10B981 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}}
+div.st-key-kpi_frus button {{ background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}}
+div.st-key-kpi_atra button {{ background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}}
+div.st-key-kpi_hoje button {{ background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; color: white !important;}}
+div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p {{ font-weight: 800 !important; font-size: 15px !important; margin: 0 !important; color: white !important;}}
 </style>""", unsafe_allow_html=True)
 
-# 🔥 AJUSTE DO CABEÇALHO DA GRID (CLEAN E CONTRASTADO PARA VER OS FILTROS)
+# 🔥 AJUSTE DO CABEÇALHO DA GRID (CLEAN CLARO E BEM VISÍVEL)
 def obter_css_grid():
-    base_css = {
+    return {
         ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "6px"},
-        ".ag-cell": {"font-size": "13px !important", "display": "flex", "align-items": "center"},
+        ".ag-header": {"background-color": "#f8fafc !important", "border-bottom": "1px solid #cbd5e1 !important"},
+        ".ag-header-cell-text": {"color": "#0f172a !important", "font-weight": "bold", "font-size": "12px !important"},
+        ".ag-cell": {"font-size": "12px !important", "color": "#334155 !important", "border-bottom": "1px solid #f1f5f9 !important", "display": "flex", "align-items": "center"},
+        ".ag-row-even": {"background-color": "#ffffff !important"},
+        ".ag-row-odd": {"background-color": "#f8fafc !important"},
+        ".ag-row-hover": {"background-color": "#e2e8f0 !important"},
         ".ag-row-selected": {"background-color": "#3B82F6 !important", "color": "#ffffff !important"},
         ".ag-row-selected .ag-cell": {"color": "#ffffff !important"}
     }
-    if st.session_state.modo_escuro:
-        base_css.update({
-            ".ag-root-wrapper": {"background-color": "#0e1117 !important", "border-color": "#334155 !important"},
-            ".ag-header": {"background-color": "#161b22 !important", "border-bottom": "1px solid #334155 !important"},
-            ".ag-header-cell-text": {"color": "#e2e8f0 !important", "font-weight": "bold", "font-size": "13px !important"},
-            ".ag-cell": {"color": "#e2e8f0 !important", "border-bottom": "1px solid #1e293b !important"},
-            ".ag-row-even": {"background-color": "#0f172a !important"}, 
-            ".ag-row-odd": {"background-color": "#161b22 !important"}, 
-            ".ag-row-hover": {"background-color": "#334155 !important"}
-        })
-    else:
-        base_css.update({
-            ".ag-header": {"background-color": "#f8fafc !important", "border-bottom": "1px solid #cbd5e1 !important"},
-            ".ag-header-cell-text": {"color": "#0f172a !important", "font-weight": "bold", "font-size": "13px !important"},
-            ".ag-cell": {"color": "#334155 !important", "border-bottom": "1px solid #f1f5f9 !important"},
-            ".ag-row-even": {"background-color": "#ffffff !important"}, 
-            ".ag-row-odd": {"background-color": "#f8fafc !important"}, 
-            ".ag-row-hover": {"background-color": "#e2e8f0 !important"}
-        })
-    return base_css
 
 def calc_status_display(row):
     status_final = str(row.get('STATUS', '')).strip().upper()
@@ -1057,7 +1017,11 @@ elif menu == "📋 Triagem e Romaneio":
                 if tomador_filtro != "Todos":
                     df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
                 
-                gb = GridOptionsBuilder.from_dataframe(df_conf[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']])
+                # 🔥 FIX: ADICIONADA A COLUNA QR_CODE NA TABELA DE SELEÇÃO DO ROMANEIO
+                colunas_romaneio = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']
+                if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
+                
+                gb = GridOptionsBuilder.from_dataframe(df_conf[colunas_romaneio])
                 gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
                 
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
@@ -1111,27 +1075,69 @@ elif menu == "📋 Triagem e Romaneio":
                                 despachar_para_appsheet(lote_app)
                                 carregar_dados_completos.clear()
                                 
+                                # 🔥 NOVO DESIGN DE PDF: Mais limpo, fontes menores e com coluna ID CLIENTE (QR CODE)
                                 pdf = FPDF()
                                 pdf.add_page()
-                                pdf.set_draw_color(44, 62, 80); pdf.set_line_width(1); pdf.rect(5, 5, 200, 287)
-                                pdf.set_y(15); pdf.set_font("Arial", "B", 18); pdf.set_text_color(44, 62, 80); pdf.cell(0, 8, f"PROTOCOLO DE ROMANEIO", ln=True, align="C")
-                                pdf.set_font("Arial", "B", 13); pdf.set_text_color(52, 152, 219); pdf.cell(0, 8, f"LOTE: {id_romaneio} | DESPACHO IGO", ln=True, align="C")
-                                pdf.set_font("Arial", "I", 10); pdf.set_text_color(127, 140, 141); pdf.cell(0, 6, f"Motorista: {motorista_escolhido} | Data do Romaneio: {data_despacho.strftime('%d/%m/%Y')}", ln=True, align="C")
-                                pdf.ln(10); pdf.line(15, pdf.get_y(), 195, pdf.get_y()); pdf.ln(8)
-                                pdf.set_fill_color(52, 152, 219); pdf.set_text_color(255, 255, 255); pdf.set_font("Arial", "B", 10)
-                                pdf.cell(15, 8, "ITEM", 1, 0, "C", True); pdf.cell(35, 8, "PEDIDO", 1, 0, "C", True)
-                                pdf.cell(90, 8, "LABORATORIO", 1, 0, "C", True); pdf.cell(40, 8, "CIDADE", 1, 0, "C", True)
-                                pdf.cell(10, 8, "UF", 1, 1, "C", True)
-                                pdf.set_text_color(44, 62, 80); pdf.set_font("Arial", "", 9)
+                                pdf.set_draw_color(44, 62, 80)
+                                pdf.set_line_width(0.5)
+                                pdf.rect(5, 5, 200, 287)
+                                
+                                pdf.set_y(12)
+                                pdf.set_font("Arial", "B", 16)
+                                pdf.set_text_color(44, 62, 80)
+                                pdf.cell(0, 6, f"PROTOCOLO DE ROMANEIO - IGO LOGISTICA", ln=True, align="C")
+                                
+                                pdf.set_font("Arial", "B", 11)
+                                pdf.set_text_color(2, 132, 199)
+                                pdf.cell(0, 6, f"LOTE DE DESPACHO: {id_romaneio}", ln=True, align="C")
+                                
+                                pdf.set_font("Arial", "", 9)
+                                pdf.set_text_color(100, 116, 139)
+                                pdf.cell(0, 5, f"Motorista: {motorista_escolhido.upper()}   |   Data do Romaneio: {data_despacho.strftime('%d/%m/%Y')}", ln=True, align="C")
+                                
+                                pdf.ln(5)
+                                pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+                                pdf.ln(5)
+                                
+                                pdf.set_fill_color(2, 132, 199)
+                                pdf.set_text_color(255, 255, 255)
+                                pdf.set_font("Arial", "B", 8)
+                                pdf.cell(10, 6, "ITEM", 1, 0, "C", True)
+                                pdf.cell(25, 6, "PEDIDO", 1, 0, "C", True)
+                                pdf.cell(30, 6, "ID CLIENTE", 1, 0, "C", True) # Puxa do QR Code
+                                pdf.cell(75, 6, "LABORATORIO", 1, 0, "C", True)
+                                pdf.cell(40, 6, "CIDADE", 1, 0, "C", True)
+                                pdf.cell(10, 6, "UF", 1, 1, "C", True)
+                                
+                                pdf.set_text_color(51, 65, 85)
+                                pdf.set_font("Arial", "", 7)
+                                
                                 for idx, item in enumerate(sel_lista, 1):
                                     fill = (idx % 2 == 0)
-                                    if fill: pdf.set_fill_color(248, 249, 249)
-                                    pdf.cell(15, 6, str(idx), 1, 0, "C", fill); pdf.cell(35, 6, str(item.get('PEDIDO','')), 1, 0, "C", fill)
-                                    pdf.cell(90, 6, str(item.get('LABORATORIO',''))[:45], 1, 0, "L", fill); pdf.cell(40, 6, str(item.get('CIDADE',''))[:20], 1, 0, "L", fill)
-                                    pdf.cell(10, 6, str(item.get('UF','')), 1, 1, "C", fill)
-                                pdf.ln(10); pdf.set_font("Arial", "B", 11); pdf.cell(0, 10, f"TOTAL DE VOLUMES: {len(sel_lista)}", ln=True, align="R")
-                                pdf.set_y(-50); pdf.line(20, pdf.get_y(), 90, pdf.get_y()); pdf.line(120, pdf.get_y(), 190, pdf.get_y())
-                                pdf.set_font("Arial", "B", 9); pdf.cell(95, 5, "MOTORISTA (IGO)", 0, 0, "C"); pdf.cell(95, 5, "ASSINATURA DA BASE", 0, 1, "C")
+                                    if fill: pdf.set_fill_color(241, 245, 249)
+                                    else: pdf.set_fill_color(255, 255, 255)
+                                    
+                                    qr_val = str(item.get('QR_CODE', ''))
+                                    if qr_val.upper() == 'NAN' or not qr_val: qr_val = "-"
+                                    
+                                    pdf.cell(10, 5, str(idx), 1, 0, "C", True)
+                                    pdf.cell(25, 5, str(item.get('PEDIDO','')), 1, 0, "C", True)
+                                    pdf.cell(30, 5, qr_val, 1, 0, "C", True)
+                                    pdf.cell(75, 5, str(item.get('LABORATORIO',''))[:45], 1, 0, "L", True)
+                                    pdf.cell(40, 5, str(item.get('CIDADE',''))[:25], 1, 0, "L", True)
+                                    pdf.cell(10, 5, str(item.get('UF','')), 1, 1, "C", True)
+                                    
+                                pdf.ln(5)
+                                pdf.set_font("Arial", "B", 9)
+                                pdf.set_text_color(44, 62, 80)
+                                pdf.cell(0, 6, f"TOTAL DE VOLUMES DESPACHADOS: {len(sel_lista)}", ln=True, align="R")
+                                
+                                pdf.set_y(-30)
+                                pdf.line(20, pdf.get_y(), 90, pdf.get_y())
+                                pdf.line(120, pdf.get_y(), 190, pdf.get_y())
+                                pdf.set_font("Arial", "B", 8)
+                                pdf.cell(95, 5, "ASSINATURA MOTORISTA (IGO)", 0, 0, "C")
+                                pdf.cell(95, 5, "ASSINATURA DA BASE / RESPONSAVEL", 0, 1, "C")
                                 
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
                                     pdf.output(tmp_pdf.name)
@@ -1177,6 +1183,7 @@ elif menu == "📱 Disparo WhatsApp":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
+        # 🔥 FIX: format="DD/MM/YYYY" 
         data_filtro = st.date_input("📅 Filtrar pedidos da data:", value=hoje_br, format="DD/MM/YYYY")
         
         df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
@@ -1313,6 +1320,7 @@ elif menu == "📺 Painel TV (Métricas)":
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         
         c_f1, c_f2 = st.columns([1, 3])
+        # 🔥 FIX: format="DD/MM/YYYY" 
         data_tv = c_f1.date_input("📅 Visualizar Métrica da Data:", value=hoje_br, format="DD/MM/YYYY")
         
         df_hoje = df_raw[df_raw['DATA_OBJ'] == data_tv].copy()
