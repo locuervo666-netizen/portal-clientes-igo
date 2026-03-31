@@ -108,7 +108,6 @@ def carregar_dados_nuvem():
                     col_obs = 'OBSERVACOES' if 'OBSERVACOES' in cols_limpas else (cols_limpas[10] if len(cols_limpas) > 10 else None)
                     col_detalhes = 'DETALHES' if 'DETALHES' in cols_limpas else (cols_limpas[14] if len(cols_limpas) > 14 else None)
                     col_receb = 'RECEBEDOR' if 'RECEBEDOR' in cols_limpas else (cols_limpas[16] if len(cols_limpas) > 16 else None)
-                    # ✅ AGORA PUXA A FOTO CORRETAMENTE DO APPSHEET
                     col_foto = 'FOTO' if 'FOTO' in cols_limpas else ('IMAGEM' if 'IMAGEM' in cols_limpas else None)
                     
                     cols_ext = ['PEDIDO']
@@ -135,7 +134,6 @@ def carregar_dados_nuvem():
                         q = d if d else rec
                         return pd.Series([s, o, q, f])
                         
-                    # INSERINDO APP_FOTO NO TRATAMENTO
                     df_app_clean[['APP_STATUS', 'APP_OBS', 'APP_QUEM', 'APP_FOTO']] = df_app_clean.apply(extrair_dados_app, axis=1)
                     df_app_clean = df_app_clean[['PEDIDO', 'APP_STATUS', 'APP_OBS', 'APP_QUEM', 'APP_FOTO']]
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
@@ -157,7 +155,6 @@ def carregar_dados_nuvem():
                             if c in df.columns and f"{c}_R" in df.columns:
                                 df[c] = df[f"{c}_R"].replace("", pd.NA).combine_first(df[c].replace("", pd.NA)).fillna("")
                     
-                    # ✅ SUBSTITUI A FOTO VAZIA DA MEMÓRIA PELA FOTO REAL DO APLICATIVO
                     if 'APP_FOTO' in df.columns:
                         if 'FOTO' not in df.columns:
                             df['FOTO'] = df['APP_FOTO']
@@ -446,15 +443,76 @@ Atendimento IGO Logística."""
                         
                         if col == 'STATUS': gb.configure_column(col, headerName=header_name, cellStyle=status_jscode, width=130, minWidth=120)
                         elif col == 'FOTO_URL':
+                            # --- AQUI ESTÁ A MÁGICA DO MODAL (ESTRUTURA SEGURA DE CLASSE) ---
                             link_jscode = JsCode("""
-                            class FotoRenderer {
+                            class FotoModalRenderer {
                                 init(params) {
                                     this.eGui = document.createElement('div');
                                     this.eGui.style.textAlign = 'center';
                                     
                                     let val = params.value;
+                                    
                                     if (val && typeof val === 'string' && val.trim() !== '' && val.toLowerCase() !== 'nan' && val.includes('http')) {
-                                        this.eGui.innerHTML = '<a href="' + val + '" target="_blank" style="text-decoration: none; font-size: 18px;" title="Clique para abrir a foto">📸</a>';
+                                        // Cria o ícone da câmera
+                                        let icon = document.createElement('span');
+                                        icon.innerHTML = '📸';
+                                        icon.style.cursor = 'pointer';
+                                        icon.style.fontSize = '18px';
+                                        icon.title = 'Clique para ver a foto';
+                                        
+                                        // Adiciona o evento de clique que abre o Modal idêntico ao do Admin
+                                        icon.onclick = function(e) {
+                                            e.preventDefault(); // Previne o erro do React
+                                            
+                                            // Cria o fundo escuro
+                                            let modal = document.createElement('div');
+                                            modal.style.position = 'fixed';
+                                            modal.style.zIndex = '9999999';
+                                            modal.style.left = '0';
+                                            modal.style.top = '0';
+                                            modal.style.width = '100vw';
+                                            modal.style.height = '100vh';
+                                            modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
+                                            modal.style.display = 'flex';
+                                            modal.style.flexDirection = 'column';
+                                            modal.style.justifyContent = 'center';
+                                            modal.style.alignItems = 'center';
+                                            modal.style.cursor = 'zoom-out';
+                                            
+                                            // Cria a Imagem
+                                            let img = document.createElement('img');
+                                            img.src = val;
+                                            img.style.maxWidth = '90%';
+                                            img.style.maxHeight = '85%';
+                                            img.style.borderRadius = '8px';
+                                            img.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
+                                            img.style.objectFit = 'contain';
+                                            
+                                            // Cria o Texto embaixo
+                                            let txt = document.createElement('div');
+                                            txt.innerText = '✖ Clique em qualquer lugar para fechar';
+                                            txt.style.color = '#ffffff';
+                                            txt.style.marginTop = '15px';
+                                            txt.style.fontFamily = 'sans-serif';
+                                            txt.style.fontSize = '16px';
+                                            txt.style.fontWeight = 'bold';
+                                            
+                                            // Adiciona na tela
+                                            modal.appendChild(img);
+                                            modal.appendChild(txt);
+                                            
+                                            // Fechar modal ao clicar
+                                            modal.onclick = function() {
+                                                if(document.body.contains(modal)) {
+                                                    document.body.removeChild(modal);
+                                                }
+                                            };
+                                            
+                                            // Põe o modal no corpo da página (vai cobrir toda a área da grid)
+                                            document.body.appendChild(modal);
+                                        };
+                                        
+                                        this.eGui.appendChild(icon);
                                     } else {
                                         this.eGui.innerHTML = '<span style="color: #cbd5e1; font-size: 14px;" title="Nenhuma foto registrada">➖</span>';
                                     }
