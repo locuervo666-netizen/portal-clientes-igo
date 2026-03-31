@@ -415,7 +415,7 @@ if menu == "📊 Dashboard de Controle":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'STATUS_DISPLAY', 'AGENTE_RAW', 'LABORATORIO', 'CIDADE', 'UF', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CEP']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'STATUS_DISPLAY', 'AGENTE_RAW', 'LABORATORIO', 'CIDADE', 'UF', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
         
         if busca:
@@ -705,6 +705,8 @@ elif menu == "➕ Importação de Lotes":
     st.success("🛡️ **SEGURANÇA DO HISTÓRICO:** O sistema de importação sempre **ADICIONA** os novos pedidos na base. O seu histórico do dia estão seguros.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
+    if "import_success" in st.session_state and st.session_state.import_success:
+        st.success(st.session_state.import_success)
 
     with st.container(border=True):
         st.markdown("#### 1. Dados do Lote e Colagem")
@@ -718,6 +720,9 @@ elif menu == "➕ Importação de Lotes":
         if col_btn1.button("🔍 1. Tratar e Roteirizar", type="primary", use_container_width=True):
             if not txt or tom == "Selecione...": st.warning("Preencha o Tomador e cole os dados!")
             else:
+                # Limpa a mensagem de sucesso se estiver fazendo uma nova importação
+                if "import_success" in st.session_state:
+                    st.session_state.import_success = ""
                 try:
                     leitor = csv.reader(io.StringIO(txt), delimiter='\t' if '\t' in txt else ';')
                     dados = [l for l in leitor if any(x.strip() for x in l)]
@@ -758,43 +763,64 @@ elif menu == "➕ Importação de Lotes":
                     df_limpo['TOMADOR'], df_limpo['DATA'] = tom, dt_c.strftime("%d/%m/%Y")
                     df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
                     st.session_state.df_preview = df_limpo[['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
-                    st.success("Faxina concluída! Verifique a tabela abaixo.")
+                    st.rerun()
                 except Exception as e: st.error(f"Erro no processamento: {e}")
 
     if not st.session_state.df_preview.empty:
         st.markdown("---")
-        st.markdown("### 👀 2. Preview dos Dados (Barreira de Segurança)")
         
-        tem_pendencia = (st.session_state.df_preview['AGENTE_RAW'] == "").any()
-        if tem_pendencia: 
-            st.warning("⚠️ **Atenção:** Há pedidos SEM MOTORISTA! Dê um **duplo clique** na coluna 'AGENTE_RAW' (marcada em vermelho) para atribuir um motorista manualmente ou corrigir a cidade antes de salvar.")
-        
-        gb_prev = GridOptionsBuilder.from_dataframe(st.session_state.df_preview)
-        gb_prev.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
-        
-        # 🔥 A MÁGICA DA EDIÇÃO AQUI: Menu suspenso para escolher o motorista nas linhas com falha!
-        logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-        gb_prev.configure_column("AGENTE_RAW", editable=True, cellEditor='agSelectCellEditor', cellEditorParams={'values': [""] + logins_disp})
-        gb_prev.configure_column("CIDADE", editable=True)
-        gb_prev.configure_column("BAIRRO", editable=True)
-        
-        js_err = JsCode("function(p){if(p.data.AGENTE_RAW == ''){return {'backgroundColor': '#FDEDEC', 'color': '#B03A2E', 'fontWeight': 'bold'};} return {};}")
-        gb_prev.configure_grid_options(getRowStyle=js_err)
-        
-        grid_prev_resp = AgGrid(st.session_state.df_preview, gridOptions=gb_prev.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.VALUE_CHANGED)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        col_btn2, _ = st.columns([1, 2])
-        if col_btn2.button("🚀 3. SALVAR TUDO NO GOOGLE SHEETS", type="primary", use_container_width=True):
+        # 🔥 SISTEMA DE DUAS GAVETAS (OK e ERRO)
+        df_preview = st.session_state.df_preview
+        mask_err = (df_preview['AGENTE_RAW'].astype(str).str.strip() == "") | (df_preview['AGENTE_RAW'].astype(str).str.upper() == "NAN")
+        df_err = df_preview[mask_err]
+        df_ok = df_preview[~mask_err]
+
+        if not df_err.empty:
+            st.error(f"🚨 **Atenção:** Encontramos {len(df_err)} pedido(s) sem motorista designado. Corrija-os na gaveta abaixo para liberar o botão de salvar.")
             
-            # Puxa os dados da tabela que o usuário acabou de editar!
-            df_final = pd.DataFrame(grid_prev_resp['data'])
+            if not df_ok.empty:
+                with st.expander(f"✅ Gaveta Verde: {len(df_ok)} Pedido(s) Prontos para Salvar", expanded=False):
+                    st.dataframe(df_ok, hide_index=True, use_container_width=True)
             
-            # 🔥 BLOQUEIO DE SEGURANÇA: Impede o salvamento se o agente ainda estiver vazio!
-            if (df_final['AGENTE_RAW'].astype(str).str.strip() == "").any() or (df_final['AGENTE_RAW'].astype(str).str.upper() == "NAN").any():
-                st.error("🚨 **BLOQUEADO:** Você ainda tem pedidos sem motorista! Dê duplo clique na coluna 'AGENTE_RAW' (em vermelho) na tabela acima, escolha um motorista, aperte a tecla Enter e tente salvar novamente.")
-            else:
+            st.markdown("### 🛠️ Gaveta Vermelha: Correção Pendente")
+            st.info("💡 Clique na caixa de seleção abaixo para **digitar e buscar** o nome do motorista.")
+            with st.form("form_correcao_agentes"):
+                correcoes = {}
+                logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                
+                for idx, row in df_err.iterrows():
+                    st.markdown(f"**Pedido:** {row['PEDIDO']} | **Lab:** {row['LABORATORIO']} | **Endereço:** {row['ENDERECO']} - {row['BAIRRO']}, {row['CIDADE']}")
+                    # Dropdown nativo com busca inteligente!
+                    correcoes[idx] = st.selectbox(f"Motorista para o pedido {row['PEDIDO']}:", ["Selecione..."] + logins_disp, key=f"fix_mot_{idx}")
+                    st.divider()
+                
+                if st.form_submit_button("💾 Aplicar Correções", type="primary"):
+                    todas_corrigidas = True
+                    for idx, novo_mot in correcoes.items():
+                        if novo_mot != "Selecione...":
+                            st.session_state.df_preview.at[idx, 'AGENTE_RAW'] = novo_mot
+                        else:
+                            todas_corrigidas = False
+                    
+                    if not todas_corrigidas:
+                        st.warning("⚠️ Ainda há pedidos sem motorista na lista. Preencha todos para liberar o lote.")
+                    st.rerun()
+
+        else:
+            # GAVETA 100% VERDE
+            st.success(f"✅ Maravilha! Todos os {len(df_ok)} pedidos estão roteirizados e prontos para importação.")
+            
+            gb_prev = GridOptionsBuilder.from_dataframe(df_ok)
+            gb_prev.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
+            AgGrid(df_ok, gridOptions=gb_prev.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_btn2, _ = st.columns([1, 2])
+            
+            if col_btn2.button("🚀 3. SALVAR TUDO NO GOOGLE SHEETS", type="primary", use_container_width=True):
                 with st.spinner("Adicionando à base geral..."):
+                    df_final = df_ok.copy()
+                    
                     try:
                         aba = planilha_db.worksheet("Memoria_Sistema")
                         atuais = aba.get_all_values()
@@ -825,14 +851,15 @@ elif menu == "➕ Importação de Lotes":
                                 })
                         if lista_app: despachar_para_appsheet(lista_app)
                         
-                        st.success("🎉 Lote adicionado com sucesso à base principal e despachado aos motoristas!")
+                        # 🔥 CONFIRMAÇÃO PERMANENTE (Salva na memória antes de recarregar)
+                        st.session_state.import_success = f"🎉 SUCESSO ABSOLUTO! Lote de {len(df_final)} pedidos foi importado e despachado para os motoristas."
                         st.session_state.df_preview = pd.DataFrame()
                         carregar_dados_completos.clear()
                         st.rerun()
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO E COM ABA HISTÓRICO)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO)
 # =============================================================================
 elif menu == "📋 Triagem e Romaneio":
     st.markdown("<h4 class='dinamic-text'>📋 Triagem e Despacho</h4>", unsafe_allow_html=True)
