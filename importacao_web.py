@@ -720,26 +720,31 @@ elif menu == "➕ Importação de Lotes":
         if col_btn1.button("🔍 1. Tratar e Roteirizar", type="primary", use_container_width=True):
             if not txt or tom == "Selecione...": st.warning("Preencha o Tomador e cole os dados!")
             else:
-                # Limpa a mensagem de sucesso se estiver fazendo uma nova importação
                 if "import_success" in st.session_state:
                     st.session_state.import_success = ""
                 try:
                     leitor = csv.reader(io.StringIO(txt), delimiter='\t' if '\t' in txt else ';')
                     dados = [l for l in leitor if any(x.strip() for x in l)]
                     idx_h = 0
-                    for i, l in enumerate(dados[:10]):
-                        if any(p in " ".join(l).upper() for p in ['PEDIDO', 'CIDADE', 'LABORAT']): idx_h = i; break
+                    
+                    # 🔥 BUSCA DE CABEÇALHO EXPANDIDA PARA NÃO SE PERDER EM EXCEL BAGUNÇADO
+                    for i, l in enumerate(dados[:15]):
+                        linha_str = " ".join(l).upper()
+                        if any(p in linha_str for p in ['PEDIDO', 'CIDADE', 'LABORAT', 'CODIGO', 'POSTO', 'NOME', 'ENDERE', 'LOGRADOURO', 'CLIENTE']): 
+                            idx_h = i; break
                     
                     df_limpo = pd.DataFrame(dados[idx_h+1:], columns=[c.upper().strip() for c in dados[idx_h]]).fillna("").astype(str)
                     for col in df_limpo.columns: df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
                     
+                    # 🔥 DICIONÁRIO DE SINÔNIMOS INTELIGENTE (O TRATADOR TURBINADO)
                     mapa = {}
                     for c in df_limpo.columns:
-                        cl = tratar_texto_global(c)
-                        if any(x in cl for x in ['PEDIDO', 'SOLICITA']): mapa[c] = 'PEDIDO'
-                        elif any(x in cl for x in ['LABORAT', 'CLINIC']): mapa[c] = 'LABORATORIO'
-                        elif any(x in cl for x in ['ENDERE', 'RUA']): mapa[c] = 'ENDERECO'
-                        elif any(x in cl for x in ['NUM', 'Nº']): mapa[c] = 'NUMERO'
+                        cl = tratar_texto_global(c).replace('*', '') # Remove asteriscos irritantes do Excel
+                        
+                        if any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO', 'ID']): mapa[c] = 'PEDIDO'
+                        elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): mapa[c] = 'LABORATORIO'
+                        elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): mapa[c] = 'ENDERECO'
+                        elif any(x in cl for x in ['NUM', 'Nº', 'NRO', 'NO']) or cl == 'N': mapa[c] = 'NUMERO'
                         elif 'BAIRRO' in cl: mapa[c] = 'BAIRRO'
                         elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa[c] = 'CIDADE'
                         elif any(x in cl for x in ['UF', 'ESTADO']): mapa[c] = 'UF'
@@ -769,7 +774,6 @@ elif menu == "➕ Importação de Lotes":
     if not st.session_state.df_preview.empty:
         st.markdown("---")
         
-        # 🔥 BOTÃO DE CANCELAR ADICIONADO AO LADO DO TÍTULO DO PREVIEW
         col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
         col_tit.markdown("### 👀 2. Preview dos Dados (Barreira de Segurança)")
         if col_canc.button("❌ Cancelar / Limpar", type="secondary", use_container_width=True):
