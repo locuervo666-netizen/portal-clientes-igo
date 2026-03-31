@@ -291,7 +291,6 @@ with st.sidebar:
     with col_tema: st.session_state.modo_escuro = st.toggle("🌙", value=st.session_state.modo_escuro, label_visibility="collapsed", help="Alternar Modo Claro/Escuro")
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-    # 🔥 A ADIÇÃO DA ABA DE ZAP AQUI NO MENU:
     menu = st.radio("Navegação:", ["📊 Dashboard de Controle", "📝 Novo Pedido Manual", "➕ Importação de Lotes", "📋 Triagem e Romaneio", "📱 Disparo WhatsApp", "📥 Exportar Relatórios", "⚙️ Configurar Rotas"], label_visibility="collapsed")
     st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
     st.divider()
@@ -416,7 +415,7 @@ if menu == "📊 Dashboard de Controle":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'STATUS_DISPLAY', 'AGENTE_RAW', 'LABORATORIO', 'CIDADE', 'UF', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'STATUS_DISPLAY', 'AGENTE_RAW', 'LABORATORIO', 'CIDADE', 'UF', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CEP']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
         
         if busca:
@@ -699,83 +698,6 @@ elif menu == "📝 Novo Pedido Manual":
                         except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
-# =============================================================================
-elif menu == "📱 Disparo WhatsApp":
-    st.markdown("<h4 class='dinamic-text'>📱 Central de Disparo via WhatsApp</h4>", unsafe_allow_html=True)
-    st.markdown("Selecione a data para visualizar e enviar as rotas pendentes para os motoristas.")
-    
-    df_raw = carregar_dados_completos(planilha_db)
-    
-    if not df_raw.empty:
-        # Filtro de Data
-        data_filtro = st.date_input("📅 Filtrar pedidos da data:", value=hoje_br)
-        
-        # Filtrar apenas Pendentes para a data selecionada
-        df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
-        
-        if df_pendentes.empty:
-            st.success(f"Nenhuma coleta/entrega PENDENTE para o dia {data_filtro.strftime('%d/%m/%Y')}.")
-        else:
-            # Agrupar por Motorista
-            agentes_com_rota = df_pendentes['AGENTE_RAW'].dropna().unique()
-            agentes_com_rota = [ag for ag in agentes_com_rota if str(ag).strip()]
-            
-            if not agentes_com_rota:
-                st.warning("Existem pedidos pendentes, mas nenhum deles tem um motorista atribuído.")
-            else:
-                st.info(f"Encontrados **{len(df_pendentes)}** pedidos distribuídos entre **{len(agentes_com_rota)}** motoristas.")
-                
-                # Dicionário de telefones da base de agentes
-                dict_telefones = {}
-                if not DF_AGENTES.empty:
-                    # Garantir que o login e o telefone estão limpos
-                    for _, row in DF_AGENTES.iterrows():
-                        login = str(row.get('LOGIN DO AGENTE', '')).strip().lower()
-                        tel = str(row.get('TELEFONE', '')).strip()
-                        # Limpa qualquer coisa que não seja número do telefone
-                        tel_limpo = re.sub(r'\D', '', tel)
-                        if login and tel_limpo:
-                            dict_telefones[login] = tel_limpo
-
-                # Criar um card para cada motorista
-                for agente in sorted(agentes_com_rota):
-                    df_agente = df_pendentes[df_pendentes['AGENTE_RAW'] == agente]
-                    qtd_pedidos = len(df_agente)
-                    telefone = dict_telefones.get(str(agente).strip().lower(), "")
-                    
-                    with st.expander(f"👤 Motorista: {str(agente).upper()} ({qtd_pedidos} pacotes)", expanded=False):
-                        st.dataframe(df_agente[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True, use_container_width=True)
-                        
-                        if telefone:
-                            # Montar a mensagem do WhatsApp
-                            msg = f"🚚 *ROTA IGO LOGÍSTICA*\n"
-                            msg += f"Data: {data_filtro.strftime('%d/%m/%Y')}\n"
-                            msg += f"Motorista: {str(agente).upper()}\n\n"
-                            msg += f"📦 *COLETAS / ENTREGAS ({qtd_pedidos}):*\n\n"
-                            
-                            for i, (_, row) in enumerate(df_agente.iterrows(), 1):
-                                msg += f"*{i}️⃣ Pedido:* {row['PEDIDO']}\n"
-                                msg += f"🏥 *Tomador:* {row.get('TOMADOR', '')}\n"
-                                msg += f"🏢 *Local:* {row.get('LABORATORIO', '')}\n"
-                                msg += f"📍 *Endereço:* {row.get('ENDERECO', '')}, {row.get('NUMERO', '')} - {row.get('BAIRRO', '')}, {row.get('CIDADE', '')}\n"
-                                if str(row.get('OBSERVACOES', '')).strip() and str(row.get('OBSERVACOES', '')).upper() != 'NAN':
-                                    msg += f"📝 *Obs:* {row['OBSERVACOES']}\n"
-                                msg += "------------------------\n"
-                            
-                            msg += "\nBom trabalho e dirija com segurança!"
-                            
-                            # Codificar a mensagem para o formato de URL
-                            msg_codificada = urllib.parse.quote(msg)
-                            link_whatsapp = f"https://api.whatsapp.com/send?phone={telefone}&text={msg_codificada}"
-                            
-                            st.link_button("📲 Enviar Rota pelo WhatsApp", link_whatsapp, type="primary")
-                        else:
-                            st.error(f"⚠️ Telefone não encontrado para o login '{agente}'. Cadastre o telefone na aba 'Configurar Rotas'.")
-    else:
-        st.warning("📭 O banco de dados está vazio no momento.")
-
-# =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
 elif menu == "➕ Importação de Lotes":
@@ -783,7 +705,6 @@ elif menu == "➕ Importação de Lotes":
     st.success("🛡️ **SEGURANÇA DO HISTÓRICO:** O sistema de importação sempre **ADICIONA** os novos pedidos na base. O seu histórico do dia estão seguros.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
-    if "texto_importacao" not in st.session_state: st.session_state.texto_importacao = ""
 
     with st.container(border=True):
         st.markdown("#### 1. Dados do Lote e Colagem")
@@ -791,7 +712,7 @@ elif menu == "➕ Importação de Lotes":
         with c1: tom = st.selectbox("🏢 Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
         with c2: dt_c = st.date_input("📅 Data da Coleta:", format="DD/MM/YYYY", value=hoje_br)
 
-        txt = st.text_area("📋 Cole os dados do Excel aqui (Ctrl+V):", height=150, key="texto_importacao", help="Apenas copie as células do Excel e cole direto aqui.")
+        txt = st.text_area("📋 Cole os dados do Excel aqui (Ctrl+V):", height=150, help="Apenas copie as células do Excel e cole direto aqui.")
 
         col_btn1, _ = st.columns([1, 2])
         if col_btn1.button("🔍 1. Tratar e Roteirizar", type="primary", use_container_width=True):
@@ -842,64 +763,76 @@ elif menu == "➕ Importação de Lotes":
 
     if not st.session_state.df_preview.empty:
         st.markdown("---")
-        st.markdown("### 👀 2. Preview dos Dados")
+        st.markdown("### 👀 2. Preview dos Dados (Barreira de Segurança)")
         
-        if (st.session_state.df_preview['AGENTE_RAW'] == "").any(): 
-            st.error("⚠️ Atenção: Há pedidos SEM MOTORISTA atribuído! Estão marcados em vermelho.")
+        tem_pendencia = (st.session_state.df_preview['AGENTE_RAW'] == "").any()
+        if tem_pendencia: 
+            st.warning("⚠️ **Atenção:** Há pedidos SEM MOTORISTA! Dê um **duplo clique** na coluna 'AGENTE_RAW' (marcada em vermelho) para atribuir um motorista manualmente ou corrigir a cidade antes de salvar.")
         
         gb_prev = GridOptionsBuilder.from_dataframe(st.session_state.df_preview)
         gb_prev.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
         
+        # 🔥 A MÁGICA DA EDIÇÃO AQUI: Menu suspenso para escolher o motorista nas linhas com falha!
+        logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+        gb_prev.configure_column("AGENTE_RAW", editable=True, cellEditor='agSelectCellEditor', cellEditorParams={'values': [""] + logins_disp})
+        gb_prev.configure_column("CIDADE", editable=True)
+        gb_prev.configure_column("BAIRRO", editable=True)
+        
         js_err = JsCode("function(p){if(p.data.AGENTE_RAW == ''){return {'backgroundColor': '#FDEDEC', 'color': '#B03A2E', 'fontWeight': 'bold'};} return {};}")
         gb_prev.configure_grid_options(getRowStyle=js_err)
         
-        AgGrid(st.session_state.df_preview, gridOptions=gb_prev.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
+        grid_prev_resp = AgGrid(st.session_state.df_preview, gridOptions=gb_prev.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.VALUE_CHANGED)
         
         st.markdown("<br>", unsafe_allow_html=True)
         col_btn2, _ = st.columns([1, 2])
         if col_btn2.button("🚀 3. SALVAR TUDO NO GOOGLE SHEETS", type="primary", use_container_width=True):
-            with st.spinner("Adicionando à base geral..."):
-                df_final = st.session_state.df_preview.copy()
-                
-                try:
-                    aba = planilha_db.worksheet("Memoria_Sistema")
-                    atuais = aba.get_all_values()
-                    df_up = pd.DataFrame(atuais[1:], columns=atuais[0]) if len(atuais) > 1 else pd.DataFrame()
-                    
-                    prox_id = obter_proximo_id(df_up)
-                    
-                    for idx, row in df_final.iterrows():
-                        if not str(row['PEDIDO']).strip() or row['PEDIDO'] == 'NAN': 
-                            df_final.at[idx, 'PEDIDO'] = str(prox_id)
-                            prox_id += 1
-                    
-                    df_final['PRAZO_DIAS'] = df_final.apply(lambda r: calcular_sla_dias(r['UF'], r['CIDADE']), axis=1)
-                    df_final['DATA_LIMITE'] = df_final.apply(lambda r: calcular_data_limite(r['DATA'], int(r['PRAZO_DIAS'])), axis=1)
-                    df_final['STATUS'], df_final['DATA_ENTREGA'], df_final['FOTO'], df_final['ROMANEIO'] = 'PENDENTE', '', '', ''
-                    
-                    df_up = pd.concat([df_up, df_final], ignore_index=True) if not df_up.empty else df_final
-                    
-                    aba.update("A1", [df_up.columns.tolist()] + df_up.fillna("").astype(str).values.tolist())
-                    
-                    lista_app = []
-                    for _, r in df_final.iterrows():
-                        if str(r.get('AGENTE_RAW','')).strip():
-                            lista_app.append({
-                                'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'], 'ENDERECO': r['ENDERECO'],
-                                'NUMERO': r['NUMERO'], 'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'],
-                                'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'], 'TOMADOR': r['TOMADOR']
-                            })
-                    if lista_app: despachar_para_appsheet(lista_app)
-                    
-                    st.success("🎉 Lote adicionado com sucesso à base principal e despachado aos motoristas!")
-                    st.session_state.texto_importacao = ""
-                    st.session_state.df_preview = pd.DataFrame()
-                    carregar_dados_completos.clear()
-                    st.rerun()
-                except Exception as e: st.error(f"Erro ao salvar: {e}")
+            
+            # Puxa os dados da tabela que o usuário acabou de editar!
+            df_final = pd.DataFrame(grid_prev_resp['data'])
+            
+            # 🔥 BLOQUEIO DE SEGURANÇA: Impede o salvamento se o agente ainda estiver vazio!
+            if (df_final['AGENTE_RAW'].astype(str).str.strip() == "").any() or (df_final['AGENTE_RAW'].astype(str).str.upper() == "NAN").any():
+                st.error("🚨 **BLOQUEADO:** Você ainda tem pedidos sem motorista! Dê duplo clique na coluna 'AGENTE_RAW' (em vermelho) na tabela acima, escolha um motorista, aperte a tecla Enter e tente salvar novamente.")
+            else:
+                with st.spinner("Adicionando à base geral..."):
+                    try:
+                        aba = planilha_db.worksheet("Memoria_Sistema")
+                        atuais = aba.get_all_values()
+                        df_up = pd.DataFrame(atuais[1:], columns=atuais[0]) if len(atuais) > 1 else pd.DataFrame()
+                        
+                        prox_id = obter_proximo_id(df_up)
+                        
+                        for idx, row in df_final.iterrows():
+                            if not str(row['PEDIDO']).strip() or str(row['PEDIDO']).upper() == 'NAN': 
+                                df_final.at[idx, 'PEDIDO'] = str(prox_id)
+                                prox_id += 1
+                        
+                        df_final['PRAZO_DIAS'] = df_final.apply(lambda r: calcular_sla_dias(r['UF'], r['CIDADE']), axis=1)
+                        df_final['DATA_LIMITE'] = df_final.apply(lambda r: calcular_data_limite(r['DATA'], int(r['PRAZO_DIAS'])), axis=1)
+                        df_final['STATUS'], df_final['DATA_ENTREGA'], df_final['FOTO'], df_final['ROMANEIO'] = 'PENDENTE', '', '', ''
+                        
+                        df_up = pd.concat([df_up, df_final], ignore_index=True) if not df_up.empty else df_final
+                        
+                        aba.update("A1", [df_up.columns.tolist()] + df_up.fillna("").astype(str).values.tolist())
+                        
+                        lista_app = []
+                        for _, r in df_final.iterrows():
+                            if str(r.get('AGENTE_RAW','')).strip():
+                                lista_app.append({
+                                    'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'], 'ENDERECO': r['ENDERECO'],
+                                    'NUMERO': r['NUMERO'], 'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'],
+                                    'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'], 'TOMADOR': r['TOMADOR']
+                                })
+                        if lista_app: despachar_para_appsheet(lista_app)
+                        
+                        st.success("🎉 Lote adicionado com sucesso à base principal e despachado aos motoristas!")
+                        st.session_state.df_preview = pd.DataFrame()
+                        carregar_dados_completos.clear()
+                        st.rerun()
+                    except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (OTIMIZADO E COM ABA HISTÓRICO)
 # =============================================================================
 elif menu == "📋 Triagem e Romaneio":
     st.markdown("<h4 class='dinamic-text'>📋 Triagem e Despacho</h4>", unsafe_allow_html=True)
@@ -1098,6 +1031,74 @@ elif menu == "📋 Triagem e Romaneio":
                 st.warning("Nenhum histórico de triagem ou despacho encontrado.")
                 
     else: st.info("O banco de dados está vazio no momento.")
+
+# =============================================================================
+# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
+# =============================================================================
+elif menu == "📱 Disparo WhatsApp":
+    st.markdown("<h4 class='dinamic-text'>📱 Central de Disparo via WhatsApp</h4>", unsafe_allow_html=True)
+    st.markdown("Selecione a data para visualizar e enviar as rotas pendentes para os motoristas.")
+    
+    df_raw = carregar_dados_completos(planilha_db)
+    
+    if not df_raw.empty:
+        data_filtro = st.date_input("📅 Filtrar pedidos da data:", value=hoje_br)
+        
+        df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
+        
+        if df_pendentes.empty:
+            st.success(f"Nenhuma coleta/entrega PENDENTE para o dia {data_filtro.strftime('%d/%m/%Y')}.")
+        else:
+            agentes_com_rota = df_pendentes['AGENTE_RAW'].dropna().unique()
+            agentes_com_rota = [ag for ag in agentes_com_rota if str(ag).strip()]
+            
+            if not agentes_com_rota:
+                st.warning("Existem pedidos pendentes, mas nenhum deles tem um motorista atribuído.")
+            else:
+                st.info(f"Encontrados **{len(df_pendentes)}** pedidos distribuídos entre **{len(agentes_com_rota)}** motoristas.")
+                
+                dict_telefones = {}
+                if not DF_AGENTES.empty:
+                    for _, row in DF_AGENTES.iterrows():
+                        login = str(row.get('LOGIN DO AGENTE', '')).strip().lower()
+                        tel = str(row.get('TELEFONE', '')).strip()
+                        tel_limpo = re.sub(r'\D', '', tel)
+                        if login and tel_limpo:
+                            dict_telefones[login] = tel_limpo
+
+                for agente in sorted(agentes_com_rota):
+                    df_agente = df_pendentes[df_pendentes['AGENTE_RAW'] == agente]
+                    qtd_pedidos = len(df_agente)
+                    telefone = dict_telefones.get(str(agente).strip().lower(), "")
+                    
+                    with st.expander(f"👤 Motorista: {str(agente).upper()} ({qtd_pedidos} pacotes)", expanded=False):
+                        st.dataframe(df_agente[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True, use_container_width=True)
+                        
+                        if telefone:
+                            msg = f"🚚 *ROTA IGO LOGÍSTICA*\n"
+                            msg += f"Data: {data_filtro.strftime('%d/%m/%Y')}\n"
+                            msg += f"Motorista: {str(agente).upper()}\n\n"
+                            msg += f"📦 *COLETAS / ENTREGAS ({qtd_pedidos}):*\n\n"
+                            
+                            for i, (_, row) in enumerate(df_agente.iterrows(), 1):
+                                msg += f"*{i}️⃣ Pedido:* {row['PEDIDO']}\n"
+                                msg += f"🏥 *Tomador:* {row.get('TOMADOR', '')}\n"
+                                msg += f"🏢 *Local:* {row.get('LABORATORIO', '')}\n"
+                                msg += f"📍 *Endereço:* {row.get('ENDERECO', '')}, {row.get('NUMERO', '')} - {row.get('BAIRRO', '')}, {row.get('CIDADE', '')}\n"
+                                if str(row.get('OBSERVACOES', '')).strip() and str(row.get('OBSERVACOES', '')).upper() != 'NAN':
+                                    msg += f"📝 *Obs:* {row['OBSERVACOES']}\n"
+                                msg += "------------------------\n"
+                            
+                            msg += "\nBom trabalho e dirija com segurança!"
+                            
+                            msg_codificada = urllib.parse.quote(msg)
+                            link_whatsapp = f"https://api.whatsapp.com/send?phone={telefone}&text={msg_codificada}"
+                            
+                            st.link_button("📲 Enviar Rota pelo WhatsApp", link_whatsapp, type="primary")
+                        else:
+                            st.error(f"⚠️ Telefone não encontrado para o login '{agente}'. Cadastre o telefone na aba 'Configurar Rotas'.")
+    else:
+        st.warning("📭 O banco de dados está vazio no momento.")
 
 # =============================================================================
 # 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
