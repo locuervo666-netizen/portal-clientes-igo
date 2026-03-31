@@ -12,7 +12,7 @@ import random
 import gspread
 import uuid
 from streamlit_autorefresh import st_autorefresh
-from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, GridUpdateMode
 from fpdf import FPDF
 
 FUSO_BR = timezone(timedelta(hours=-3))
@@ -85,24 +85,12 @@ def carregar_dados_completos(_planilha):
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                     
-                    # === DICIONÁRIO DE ROMANEIOS PARA APLICAR STATUS EM MASSA ===
-                    rom_mask = df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)
-                    rom_dict = df_app_clean[rom_mask].set_index('PEDIDO').to_dict('index')
-                    
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
                     
                     def get_true_status(row):
                         s_db = str(row.get('STATUS', '')).strip().upper()
                         s_app = str(row.get('APP_STATUS', '')).strip().upper()
-                        rom_id = str(row.get('ROMANEIO', '')).strip()
-                        
-                        # Se o Romaneio foi baixado no app, todo o lote ganha o status!
-                        if rom_id in rom_dict:
-                            s_rom = str(rom_dict[rom_id].get('APP_STATUS', '')).strip().upper()
-                            if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']:
-                                return s_rom
-                                
                         if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_db
                         if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_app
                         if s_db in ['EM ROTA DE ENTREGA', 'CONFERIDO']: return s_db
@@ -111,22 +99,9 @@ def carregar_dados_completos(_planilha):
                     
                     df['STATUS'] = df.apply(get_true_status, axis=1)
                     
-                    def get_true_foto(row):
-                        f_db = str(row.get('FOTO', '')).strip()
-                        f_app = str(row.get('APP_FOTO', '')).strip()
-                        rom_id = str(row.get('ROMANEIO', '')).strip()
-                        
-                        # Se o Romaneio tem foto, todo o lote recebe a foto!
-                        if rom_id in rom_dict:
-                            f_rom = str(rom_dict[rom_id].get('APP_FOTO', '')).strip()
-                            if f_rom and f_rom.upper() != 'NAN':
-                                return f_rom
-                                
-                        if f_app and f_app.upper() != 'NAN': return f_app
-                        return f_db
-                        
-                    if 'APP_FOTO' in df.columns or len(rom_dict) > 0:
-                        df['FOTO'] = df.apply(get_true_foto, axis=1)
+                    if 'APP_FOTO' in df.columns:
+                        df['APP_FOTO'] = df['APP_FOTO'].fillna('')
+                        df['FOTO'] = df.apply(lambda r: r['APP_FOTO'] if str(r.get('APP_FOTO','')).strip() and str(r.get('APP_FOTO','')).upper() != 'NAN' else r.get('FOTO', ''), axis=1)
                         
             except Exception: pass
             
@@ -277,6 +252,20 @@ with st.sidebar:
     st.divider()
     if st.button("🚪 Sair do Sistema", use_container_width=True, type="secondary"):
         st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
+        
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    with st.expander("🛡️ Backup de Segurança"):
+        st.markdown("<p style='font-size: 12px; color: gray;'>Gere uma cópia física completa de todo o histórico do banco de dados.</p>", unsafe_allow_html=True)
+        df_bkp = carregar_dados_completos(planilha_db)
+        if not df_bkp.empty:
+            st.download_button(
+                label="📥 Baixar Backup (.xlsx)", 
+                data=gerar_excel_memoria(df_bkp), 
+                file_name=f"BKP_IGO_Logistica_{datetime.now(FUSO_BR).strftime('%d%m%Y_%H%M')}.xlsx", 
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                use_container_width=True,
+                type="primary"
+            )
 
 bg_app = "#0e1117" if st.session_state.modo_escuro else "#f8fafc"
 bg_side = "#161b22" if st.session_state.modo_escuro else "#ffffff"
@@ -397,7 +386,9 @@ if menu == "📊 Dashboard de Controle":
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
             gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
-            gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+            
+            # 🔥 CORREÇÃO DO "SELECT ALL": Adicionado o "header_checkbox_filtered_only"
+            gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
             gb.configure_grid_options(rowMultiSelectWithClick=True, suppressRowClickSelection=False)
             
             st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.15)','color':'#10B981','fontWeight':'800'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.15)','color':'#EF4444','fontWeight':'800'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.15)','color':'#F59E0B','fontWeight':'800'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.15)','color':'#3B82F6','fontWeight':'800'};} return {'fontWeight':'bold'};}")
@@ -434,7 +425,8 @@ if menu == "📊 Dashboard de Controle":
             """)
             gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90)
             
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500, fit_columns_on_grid_load=False)
+            # 🔥 CORREÇÃO DE CAPTURA DO SELECIONAR TODOS (GridUpdateMode)
+            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=500, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED)
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -851,10 +843,13 @@ elif menu == "📋 Triagem e Romaneio":
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
                 gb_fila.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
-                gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+                
+                # 🔥 CORREÇÃO DO "SELECT ALL": Adicionado o "header_checkbox_filtered_only"
+                gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
                 gb_fila.configure_grid_options(rowMultiSelectWithClick=True, suppressRowClickSelection=False)
                 
-                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False)
+                # 🔥 CORREÇÃO DE CAPTURA DO SELECIONAR TODOS (GridUpdateMode)
+                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED)
                 
                 selecionados_manuais = grid_fila_resp['selected_rows']
                 tem_selecao = False
@@ -887,10 +882,13 @@ elif menu == "📋 Triagem e Romaneio":
             if not df_conf.empty:
                 gb = GridOptionsBuilder.from_dataframe(df_conf[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']])
                 gb.configure_default_column(resizable=True, sortable=True, minWidth=150, flex=1)
-                gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+                
+                # 🔥 CORREÇÃO DO "SELECT ALL": Adicionado o "header_checkbox_filtered_only"
+                gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
                 gb.configure_grid_options(rowMultiSelectWithClick=True, suppressRowClickSelection=False)
                 
-                grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False)
+                # 🔥 CORREÇÃO DE CAPTURA DO SELECIONAR TODOS (GridUpdateMode)
+                grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED)
                 
                 selecionados = grid_resp['selected_rows']
                 tem_sel_pdf = False
@@ -899,6 +897,7 @@ elif menu == "📋 Triagem e Romaneio":
                     else: tem_sel_pdf = len(selecionados) > 0
                 
                 st.markdown("---")
+                
                 c_mot, c_data, c_btn = st.columns([2, 1, 2])
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                 motorista_escolhido = c_mot.selectbox("👤 Motorista (Buscar):", ["Selecione..."] + logins_disp)
@@ -928,7 +927,6 @@ elif menu == "📋 Triagem e Romaneio":
                                 
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 
-                                # AQUI ESTÁ O SEU DESEJO ATENDIDO: ENVIA 1 LOTE INTEIRO PARA O MOTORISTA
                                 base_tomador = sel_lista[0].get('TOMADOR', 'CLIENTE')
                                 base_cidade = sel_lista[0].get('CIDADE', '')
                                 lote_app = [{
