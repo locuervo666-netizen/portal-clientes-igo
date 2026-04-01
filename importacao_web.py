@@ -22,52 +22,40 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # 🔗 1. CONFIGURAÇÃO DA PÁGINA E AUTENTICAÇÃO
 # =============================================================================
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
-st_autorefresh(interval=60000, limit=None, key="refresh_timer")
+
+# Alterado para 2 minutos (120000 milissegundos)
+st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
 if not st.session_state.autenticado:
-    st.markdown("""
-        <style>
-        [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
-        .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; }
-        .login-title { color: #0F172A; font-weight: 800; font-size: 22px; margin-top: 15px; letter-spacing: -0.5px; }
-        .login-subtitle { color: #64748B; font-size: 14px; margin-bottom: 30px; font-weight: 500; }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1.2, 1])
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1.5, 1])
     
     with col2:
-        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
-        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-        
-        st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=180)
+        with st.container(border=True):
+            st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+            st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
+            st.markdown("<p style='color: gray; margin-top: 10px;'>Acesso Restrito ao Painel Operacional</p>", unsafe_allow_html=True)
+            st.markdown("</div><br>", unsafe_allow_html=True)
             
-        st.markdown("<div class='login-title'>PORTAL CORPORATIVO</div>", unsafe_allow_html=True)
-        st.markdown("<div class='login-subtitle'>Autenticação de Operadores - IGO Logística</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        with st.form("form_login"):
-            usuario = st.text_input("👤 Usuário")
-            senha = st.text_input("🔑 Senha", type="password")
-            st.markdown("<br>", unsafe_allow_html=True)
-            submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
-            
-            if submit:
-                logins_autorizados = {
-                    "robson.melo": "123",
-                    "william.bertoldo": "123"
-                }
+            with st.form("form_login"):
+                usuario = st.text_input("👤 Usuário")
+                senha = st.text_input("🔑 Senha", type="password")
+                submit = st.form_submit_button("Entrar no Sistema", use_container_width=True, type="primary")
                 
-                if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
-                    st.session_state.autenticado = True
-                    st.rerun()
-                else:
-                    st.error("❌ Credenciais inválidas.")
-        st.markdown("</div>", unsafe_allow_html=True)
+                if submit:
+                    logins_autorizados = {
+                        "robson.melo": "123",
+                        "william.bertoldo": "123"
+                    }
+                    
+                    if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
+                        st.session_state.autenticado = True
+                        st.rerun()
+                    else:
+                        st.error("❌ Usuário ou senha incorretos.")
     
     st.stop()
 
@@ -331,8 +319,7 @@ with st.sidebar:
         "🔬 Triagem e Romaneio", 
         "📱 Disparo WhatsApp", 
         "📁 Exportar Relatórios", 
-        "⚙️ Matriz de Rotas",
-        "📺 Painel TV (Métricas)"  # Painel TV no final
+        "⚙️ Matriz de Rotas"
     ], label_visibility="collapsed")
     
     st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
@@ -680,7 +667,7 @@ if menu == "📊 Dashboard Operacional":
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
-elif menu == "📝 Novo Pedido Manual":
+elif menu == "📝 Inserir Pedido Manual":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
     st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
     
@@ -1045,7 +1032,6 @@ elif menu == "🔬 Triagem e Romaneio":
                 c_mot, c_data, c_btn = st.columns([2, 1, 2])
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                 motorista_escolhido = c_mot.selectbox("👤 Responsável pelo Transporte:", ["Selecione..."] + logins_disp)
-                # 🔥 FIX: format="DD/MM/YYYY" 
                 data_despacho = c_data.date_input("📅 Data de Embarque:", format="DD/MM/YYYY", value=hoje_br)
                 
                 if c_btn.button("🚚 Gerar Doc. Oficial e Despachar", type="primary", use_container_width=True):
@@ -1083,7 +1069,6 @@ elif menu == "🔬 Triagem e Romaneio":
                                 despachar_para_appsheet(lote_app)
                                 carregar_dados_completos.clear()
                                 
-                                # 🔥 NOVO DESIGN DE PDF: Estilo Clean/Premium, ID Cliente, Fontes Menores
                                 pdf = FPDF()
                                 pdf.add_page()
                                 pdf.set_draw_color(15, 23, 42)  
@@ -1191,7 +1176,6 @@ elif menu == "📱 Disparo WhatsApp":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        # 🔥 FIX: format="DD/MM/YYYY" 
         data_filtro = st.date_input("📅 Cronograma da Data:", value=hoje_br, format="DD/MM/YYYY")
         
         df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
@@ -1307,118 +1291,6 @@ elif menu == "📁 Exportar Relatórios":
                     st.download_button("📥 Fazer Download do Relatório Cru (Excel)", data=gerar_excel_memoria(df_custom), file_name=f"Pesquisa_Customizada_IGO.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 else: st.warning("Nenhum dado cruzado sob essas métricas foi identificado na nuvem.")
     else: st.warning("O banco de dados está vazio.")
-
-# =============================================================================
-# 📺 MÓDULO NOVO: PAINEL TV (MÉTRICAS EXECUTIVAS NASDAQ)
-# =============================================================================
-elif menu == "📺 Painel TV (Métricas)":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📺 Terminal Tático Operacional (Live View)</h3></div>", unsafe_allow_html=True)
-    df_raw = carregar_dados_completos(planilha_db)
-    
-    # 🔥 NOVO CARD ESTILO TERMINAL FINANCEIRO (BLACK / NASDAQ)
-    def criar_card(titulo, valor, subtitulo, cor_acento):
-        return f"""
-        <div style="background-color: #0B1120; border-left: 4px solid {cor_acento}; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 140px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px; border-right: 1px solid #1E293B; border-top: 1px solid #1E293B; border-bottom: 1px solid #1E293B;">
-            <p style="margin:0; font-size: 13px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">{titulo}</p>
-            <h1 style="margin:0; font-size: 46px; font-weight: 900; color: #FFFFFF; font-family: 'Courier New', monospace; letter-spacing: -1px;">{valor}</h1>
-            <p style="margin:0; font-size: 12px; font-weight: 600; color: {cor_acento};">{subtitulo}</p>
-        </div>
-        """
-    
-    if not df_raw.empty:
-        df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
-        
-        c_f1, c_f2 = st.columns([1, 3])
-        # 🔥 FIX: format="DD/MM/YYYY" 
-        data_tv = c_f1.date_input("📅 Tracker Data:", value=hoje_br, format="DD/MM/YYYY")
-        
-        df_hoje = df_raw[df_raw['DATA_OBJ'] == data_tv].copy()
-        dia_anterior = data_tv - timedelta(days=1)
-        df_ontem = df_raw[df_raw['DATA_OBJ'] == dia_anterior]
-        
-        total_hoje = len(df_hoje)
-        total_ontem = len(df_ontem)
-        delta_pedidos = total_hoje - total_ontem
-        sinal = "▲" if delta_pedidos >= 0 else "▼"
-        cor_delta = "#10B981" if delta_pedidos >= 0 else "#EF4444"
-        
-        entregues = df_hoje['STATUS_DISPLAY'].str.contains('Entregue', case=False, na=False).sum()
-        frustrados = df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False, na=False).sum()
-        atrasados = df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False, na=False).sum()
-        coletados = df_hoje['STATUS_DISPLAY'].str.contains('Coletado|Conferido', case=False, na=False).sum()
-        em_rota = df_hoje['STATUS_DISPLAY'].str.contains('Em Rota', case=False, na=False).sum()
-        pendentes = df_hoje['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False).sum()
-        
-        c1, c2, c3, c4 = st.columns(4)
-        c1.markdown(criar_card("VOLUMES TOTAIS", total_hoje, f"{sinal} {delta_pedidos} D-1", cor_delta), unsafe_allow_html=True)
-        c2.markdown(criar_card("PENDENTES RUA", pendentes, "Aguardando Interceptação", "#64748B"), unsafe_allow_html=True)
-        c3.markdown(criar_card("TRIAGEM INTERNA", coletados, "Blindados e Roteirizados", "#38BDF8"), unsafe_allow_html=True)
-        c4.markdown(criar_card("SLA ROMPIDO", atrasados, "Volumes em Atraso Crítico", "#EF4444"), unsafe_allow_html=True)
-        
-        c5, c6, c7, c8 = st.columns(4)
-        c5.markdown(criar_card("TRANSFERÊNCIA", em_rota, "Expedição em Trânsito", "#F59E0B"), unsafe_allow_html=True)
-        c6.markdown(criar_card("SUCESSO ABSOLUTO", entregues, "Entregas Homologadas", "#10B981"), unsafe_allow_html=True)
-        c7.markdown(criar_card("OCORRÊNCIAS TÉC.", frustrados, "Reversões ou Falhas", "#F43F5E"), unsafe_allow_html=True)
-        
-        with c8:
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("#### 🎯 Eficiência Tática")
-            concluidos_globais = total_hoje - pendentes
-            progresso_pct = int((concluidos_globais / total_hoje) * 100) if total_hoje > 0 else 0
-            st.progress(progresso_pct / 100.0, text=f"Índice Radar: {progresso_pct}%")
-            st.markdown(f"<p style='font-size:12px; color:#475569; margin-top:-10px; font-weight:600;'>Base logou reação em <b>{concluidos_globais}</b> de <b>{total_hoje}</b> alvos.</p>", unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        col_tv1, col_tv2 = st.columns([2, 1])
-        
-        with col_tv1:
-            st.markdown("#### 🏆 Performance Individual em Solo")
-            if not df_hoje.empty:
-                df_mot = df_hoje.copy()
-                df_mot['CONCLUIDO_COLETA'] = (~df_mot['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False)).astype(int)
-                
-                resumo_mot = df_mot.groupby('AGENTE_RAW').agg(
-                    Total=('PEDIDO', 'count'),
-                    Concluidos=('CONCLUIDO_COLETA', 'sum')
-                ).reset_index()
-                
-                resumo_mot['Faltam_Na_Rua'] = resumo_mot['Total'] - resumo_mot['Concluidos']
-                resumo_mot['% Concluído'] = (resumo_mot['Concluidos'] / resumo_mot['Total'] * 100).round(1)
-                
-                resumo_mot = resumo_mot.sort_values(by='Total', ascending=False)
-                resumo_mot.rename(columns={'AGENTE_RAW': 'Motorista'}, inplace=True)
-                
-                st.dataframe(
-                    resumo_mot,
-                    column_config={
-                        "Motorista": st.column_config.TextColumn("👤 Identificação Tática"),
-                        "Total": st.column_config.NumberColumn("📦 Vetor do Dia"),
-                        "Concluidos": st.column_config.NumberColumn("✅ Ação Realizada"),
-                        "Faltam_Na_Rua": st.column_config.NumberColumn("⏳ Alvo Pendente"),
-                        "% Concluído": st.column_config.ProgressColumn(
-                            "📊 Barra de Combate",
-                            format="%f%%",
-                            min_value=0,
-                            max_value=100,
-                        ),
-                    },
-                    hide_index=True,
-                    use_container_width=True
-                )
-            else:
-                st.info("O radar logístico indica 0 atividades em solo para este dia.")
-                
-        with col_tv2:
-            st.markdown("#### 📊 Distribuição de Carga")
-            if not df_hoje.empty:
-                df_hoje['STATUS_CHART'] = df_hoje['STATUS'].str.upper()
-                status_counts = df_hoje['STATUS_CHART'].value_counts().reset_index()
-                status_counts.columns = ['Status', 'Quantidade']
-                st.bar_chart(data=status_counts, x='Status', y='Quantidade', color='#0284C7')
-                
-    else:
-        st.warning("📭 O banco de dados central está vazio.")
 
 # =============================================================================
 # ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
