@@ -23,6 +23,7 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # =============================================================================
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
+# 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 if 'autenticado' not in st.session_state:
@@ -31,6 +32,8 @@ if 'autenticado' not in st.session_state:
 if not st.session_state.autenticado:
     st.markdown("""
         <style>
+        [data-testid="stHeader"] { display: none !important; } /* 🔥 Elimina a barra superior na tela de login */
+        .block-container { padding-top: 3rem !important; } /* 🔥 Puxa a tela de login para cima */
         [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
         .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; }
         .login-title { color: #0F172A; font-weight: 800; font-size: 22px; margin-top: 15px; letter-spacing: -0.5px; }
@@ -38,7 +41,6 @@ if not st.session_state.autenticado:
         </style>
     """, unsafe_allow_html=True)
     
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1.2, 1])
     
     with col2:
@@ -152,12 +154,11 @@ def carregar_dados_completos(_planilha):
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
                     
-                    # 🔥 PROTEÇÃO ABSOLUTA: Garante que QR_CODE sempre exista na memória
-                    if 'QR_CODE' not in df.columns:
-                        df['QR_CODE'] = ""
-                    
                     if 'APP_QR' in df.columns:
-                        df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
+                        if 'QR_CODE' not in df.columns:
+                            df['QR_CODE'] = df['APP_QR']
+                        else:
+                            df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
 
                     def get_true_status(row):
                         s_db = str(row.get('STATUS', '')).strip().upper()
@@ -308,7 +309,7 @@ def obter_proximo_id(df):
         return 100000
 
 # =============================================================================
-# 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM
+# 🎨 3. INTERFACE E NAVEGAÇÃO (DESIGN CORPORATIVO CLEAN)
 # =============================================================================
 
 bg_app = "#F8FAFC"        
@@ -359,6 +360,10 @@ with st.sidebar:
 st.markdown(f"""<style>
 [data-testid="stAppViewContainer"] {{ background-color: {bg_app} !important; }}
 [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c} !important; padding-top: 1rem !important; }}
+
+/* 🔥 OCULTA O BOTÃO "DEPLOY" E PUXA TUDO PARA CIMA */
+[data-testid="stHeader"] {{ display: none !important; }}
+.block-container {{ padding-top: 2rem !important; padding-bottom: 1rem !important; }}
 
 div[role="radiogroup"] label div[data-testid="stRadio-radio"] {{ display: none !important; }}
 .dinamic-text {{ color: {txt_main} !important; font-weight: 800; letter-spacing: -0.5px; }}
@@ -792,7 +797,7 @@ elif menu == "➕ Importação de Lotes":
         txt = st.text_area("📋 Cole os dados da planilha do cliente (Ctrl+V):", height=150, help="Apenas copie as células do Excel e cole direto aqui. O Cérebro IA formata sozinho.")
 
         col_btn1, _ = st.columns([1, 2])
-        if col_btn1.button("🔍 1. Tratar e Roteirizar", type="primary", use_container_width=True):
+        if col_btn1.button("🔍 1. Processar Matriz e Roteirizar", type="primary", use_container_width=True):
             if not txt or tom == "Selecione...": st.warning("Preencha o Tomador e cole os dados!")
             else:
                 if "import_success" in st.session_state:
