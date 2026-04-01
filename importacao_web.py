@@ -98,15 +98,16 @@ st.markdown("""
     .dinamic-text { color: #0F172A !important; font-weight: 800; letter-spacing: -0.5px; }
     .dinamic-border { border-bottom: 2px solid #E2E8F0 !important; margin-bottom: 24px; padding-bottom: 8px; }
     
-    div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
+    div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
         border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
     div.st-key-kpi_total button { background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; }
     div.st-key-kpi_entregue button { background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important; }
+    div.st-key-kpi_pend button { background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%) !important; } /* Laranja para Pendentes */
     div.st-key-kpi_frus button { background: linear-gradient(135deg, #991B1B 0%, #EF4444 100%) !important; }
     div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%) !important; }
     div.st-key-kpi_hoje button { background: linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%) !important; }
-    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
+    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_pend button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
         color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
     }
 
@@ -470,23 +471,28 @@ if menu == "📊 Dashboard":
         if f_cli != "Todos": df_f = df_f[df_f['TOMADOR'] == f_cli]
         if isinstance(f_data, tuple) and len(f_data) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= f_data[0]) & (df_f['DATA_OBJ'] <= f_data[1])]
 
-        n_tot, n_ent = len(df_f), len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])
-        n_frus, n_atra = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')]), len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO')])
+        n_tot = len(df_f)
+        n_ent = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])
+        n_pend = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Pendente')])
+        n_frus = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])
+        n_atra = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO')])
         n_hoje = len(df_f[df_f['DATA_OBJ'] == hoje_br])
 
-        c1, c2, c3, c4, c5 = st.columns(5)
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
         def set_kpi(v): st.session_state.filtro_kpi_admin = v
         c1.button(f"📦 TOTAL\n{n_tot}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
         c2.button(f"✅ ENTREGUES\n{n_ent}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
-        c3.button(f"❌ FRUSTRADAS\n{n_frus}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
-        c4.button(f"🚨 ATRASADOS\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
-        c5.button(f"📅 HOJE\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
+        c3.button(f"⏳ PENDENTES\n{n_pend}", key="kpi_pend", use_container_width=True, on_click=set_kpi, args=("PENDENTE",))
+        c4.button(f"❌ FRUSTRADAS\n{n_frus}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
+        c5.button(f"🚨 ATRASADOS\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
+        c6.button(f"📅 HOJE\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
         st.markdown("<br>", unsafe_allow_html=True)
         busca = st.text_input("🔎 Busca Rápida de Rastreio (Código, Lab, Cidade...):", placeholder="Digite para filtrar a tabela abaixo...")
 
         df_grid = df_f.copy()
         if st.session_state.filtro_kpi_admin == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue')]
+        elif st.session_state.filtro_kpi_admin == "PENDENTE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Pendente')]
         elif st.session_state.filtro_kpi_admin == "FRUSTRADA": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada')]
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
