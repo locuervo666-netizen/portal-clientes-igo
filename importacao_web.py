@@ -26,20 +26,10 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 # 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS DE SEGURANÇA GLOBAL (Protege o Menu Lateral e Oculta apenas a Nuvem)
+# 🔥 CSS SEGURO: Apenas ajustes de fundo e respiro, sem esconder barras do Streamlit
 st.markdown("""
     <style>
-    /* Ocultar APENAS o botão Deploy, Menu de 3 pontos e Marca d'água da Nuvem (Mantém o stHeader para o Menu funcionar) */
-    [data-testid="stToolbar"] { display: none !important; }
-    .stAppDeployButton { display: none !important; }
-    .stDeployButton { display: none !important; }
-    [class^="viewerBadge"] { display: none !important; }
-    [class*="viewerBadge"] { display: none !important; }
-    iframe[src*="badge"] { display: none !important; }
-    footer { display: none !important; }
-    
-    /* 🔥 DEVOLVE O RESPIRO DO TOPO PARA O BOTÃO DO MENU ( > ) NÃO FICAR ESCONDIDO */
-    .block-container { padding-top: 4rem !important; padding-bottom: 1rem !important; }
+    .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -794,7 +784,7 @@ elif menu == "📝 Inserir Pedido Manual":
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
-elif menu == "➕ Importação de Lotes":
+elif menu == "📥 Importação de Lotes":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
     st.success("🛡️ **AUDITORIA DE DADOS ATIVA:** O sistema avalia padronizações de vários clientes (Airlab, FFW, etc) e adiciona os pacotes à base sem destruir seu histórico do dia.")
     
