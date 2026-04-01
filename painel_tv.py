@@ -98,6 +98,8 @@ st.markdown("""
     header {visibility: hidden !important;}
     footer {visibility: hidden !important;}
     .stDeployButton {display: none !important;}
+    iframe[src*="manage"] {display: none !important;}
+    [data-testid="manage-app-button"] {display: none !important;}
     
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; margin-top: 0 !important; }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
@@ -119,7 +121,9 @@ st.markdown("""
     .metric-sub { font-size: 14px; font-weight: 700; color: #475569;}
     
     /* Tabela Premium Customizada */
-    [data-testid="stDataFrame"] { background-color: #FFFFFF; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);}
+    [data-testid="stDataFrame"] { background-color: #FFFFFF; border-radius: 10px; border: 1px solid #E2E8F0; box-shadow: 0 4px 15px rgba(0,0,0,0.04);}
+    th { color: #0F172A !important; font-size: 15px !important; font-weight: 900 !important; background-color: #F1F5F9 !important;}
+    td { font-size: 16px !important; font-weight: 600; color: #334155 !important;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -131,14 +135,14 @@ df_raw = carregar_dados_completos(planilha_db)
 hoje_br = datetime.now(FUSO_BR).date()
 hora_atual = datetime.now(FUSO_BR).strftime('%H:%M:%S')
 
-st.markdown("<h3 style='color: #0F172A; font-weight: 900; margin-bottom: 5px;'>🚨 C.C.O TÁTICO: PAINEL DE AÇÃO E ATRASOS (SLA)</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='color: #0F172A; font-weight: 900; margin-bottom: 5px; font-family: sans-serif;'>🚨 C.C.O TÁTICO: PAINEL DE AÇÃO E ATRASOS (SLA)</h3>", unsafe_allow_html=True)
 
 if df_raw.empty:
     st.info("Aguardando dados da base central...")
 else:
     df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
     
-    # 1. Filtro rigoroso: O que está Pendente E a data limite já passou (ontem ou antes)
+    # Filtro rigoroso: Pendente + data limite já passou
     if 'DATA_LIMITE_OBJ' in df_raw.columns:
         df_atrasados = df_raw[(df_raw['STATUS_DISPLAY'] == 'Pendente') & (df_raw['DATA_LIMITE_OBJ'] < hoje_br)].copy()
     elif 'DATA_OBJ' in df_raw.columns:
@@ -151,15 +155,21 @@ else:
     if total_atrasados == 0:
         st.success("✅ **EXCELENTE:** Operação impecável! Nenhum volume em atraso crítico identificado na base de dados.")
     else:
-        # 2. Cálculos Táticos
-        # Motorista mais crítico
-        agente_col = 'AGENTE_RAW' if 'AGENTE_RAW' in df_atrasados.columns else 'MOTORISTA'
-        if agente_col in df_atrasados.columns:
-            motorista_critico = df_atrasados[agente_col].value_counts().idxmax()
-            vols_motorista = df_atrasados[agente_col].value_counts().max()
+        # Lógica para identificar a coluna correta de Nome do Agente
+        cols_disponiveis = df_atrasados.columns.tolist()
+        col_nome_agente = next((col for col in ['MOTORISTA', 'NOME_MOTORISTA', 'NOME_AGENTE', 'NOME', 'AGENTE', 'ENTREGADOR'] if col in cols_disponiveis), None)
+        if not col_nome_agente and 'AGENTE_RAW' in cols_disponiveis:
+            col_nome_agente = 'AGENTE_RAW' # Fallback para o ID se o nome não existir
+            
+        # Encontrar Motorista Mais Crítico
+        if col_nome_agente and not df_atrasados[col_nome_agente].isna().all():
+            motorista_critico = df_atrasados[col_nome_agente].value_counts().idxmax()
+            vols_motorista = df_atrasados[col_nome_agente].value_counts().max()
+            if str(motorista_critico).strip() == "" or str(motorista_critico).upper() == "NAN":
+                motorista_critico = "Base (Não Roteirizado)"
         else:
             motorista_critico = "Não Atribuído"
-            vols_motorista = 0
+            vols_motorista = total_atrasados
             
         # Calcular dias de atraso
         def calc_dias_atraso(row):
@@ -186,9 +196,9 @@ else:
         with c2:
             st.markdown(f"""
             <div class="metric-card-info">
-                <div class="metric-title" style="color: #475569;">👤 MOTORISTA MAIS IMPACTADO</div>
+                <div class="metric-title" style="color: #475569;">👤 MOTORISTA/PONTO MAIS IMPACTADO</div>
                 <div class="metric-value" style="color: #0F172A; font-size: 32px; margin-top: 15px;">{motorista_critico}</div>
-                <div class="metric-sub">Possui <b style="color:#EF4444;">{vols_motorista}</b> pendências antigas</div>
+                <div class="metric-sub">Concentra <b style="color:#EF4444;">{vols_motorista}</b> pendências vencidas</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -197,62 +207,52 @@ else:
             <div class="metric-card-info" style="border-left: 5px solid #F59E0B;">
                 <div class="metric-title" style="color: #475569;">⏳ PEDIDO MAIS ANTIGO</div>
                 <div class="metric-value" style="color: #B45309;">{atraso_maximo} <span style="font-size: 20px;">Dias</span></div>
-                <div class="metric-sub">Dias de estouro no limite</div>
+                <div class="metric-sub">Dias de estouro no limite máximo</div>
             </div>
             """, unsafe_allow_html=True)
 
-        # ================== ÁREA INFERIOR: MAPA E LISTA ==================
-        st.markdown("<hr style='border: 1px solid #E2E8F0; margin-top: 5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+        # ================== LISTA COMPLETA DE DETALHES (TABELA WIDE) ==================
+        st.markdown("<hr style='border: 1px solid #E2E8F0; margin-top: 5px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #0F172A; font-weight: 900; font-size: 18px; font-family: sans-serif;'>📋 LISTA DE INTERVENÇÃO (RADAR DE ATRASOS)</h4>", unsafe_allow_html=True)
         
-        col_lista, col_mapa = st.columns([1.5, 1])
+        # Mapeamento Dinâmico de Colunas
+        col_tomador = next((col for col in ['TOMADOR', 'CLIENTE', 'EMPRESA'] if col in cols_disponiveis), None)
+        col_bairro = next((col for col in ['BAIRRO', 'DESTINO_BAIRRO', 'BAIRRO_COLETA'] if col in cols_disponiveis), None)
+        col_cidade = next((col for col in ['CIDADE', 'DESTINO_CIDADE', 'MUNICIPIO'] if col in cols_disponiveis), None)
+        col_uf = next((col for col in ['UF', 'ESTADO', 'DESTINO_UF'] if col in cols_disponiveis), None)
+        
+        # Construir a lista de colunas que vão aparecer na tela
+        cols_exibicao = ['PEDIDO']
+        if col_tomador: cols_exibicao.append(col_tomador)
+        if col_nome_agente: cols_exibicao.append(col_nome_agente)
+        if col_bairro: cols_exibicao.append(col_bairro)
+        if col_cidade: cols_exibicao.append(col_cidade)
+        if col_uf: cols_exibicao.append(col_uf)
+        cols_exibicao.append('DIAS_ATRASO')
+        
+        # Prepara o DataFrame para exibição
+        df_view = df_atrasados[cols_exibicao].sort_values(by='DIAS_ATRASO', ascending=False)
+        
+        # Configuração das Colunas no Streamlit
+        configuracao_colunas = {
+            "PEDIDO": st.column_config.TextColumn("📦 PEDIDO/AWB"),
+            "DIAS_ATRASO": st.column_config.ProgressColumn("🔴 DIAS VENCIDOS", format="%d dias", min_value=0, max_value=int(atraso_maximo) + 2)
+        }
+        
+        if col_tomador: configuracao_colunas[col_tomador] = st.column_config.TextColumn("🏢 CLIENTE")
+        if col_nome_agente: configuracao_colunas[col_nome_agente] = st.column_config.TextColumn("👤 MOTORISTA")
+        if col_bairro: configuracao_colunas[col_bairro] = st.column_config.TextColumn("📍 BAIRRO")
+        if col_cidade: configuracao_colunas[col_cidade] = st.column_config.TextColumn("🏙️ CIDADE")
+        if col_uf: configuracao_colunas[col_uf] = st.column_config.TextColumn("🗺️ UF")
 
-        # ---- LISTA DE DETALHES (TABELA) ----
-        with col_lista:
-            st.markdown("<h4 style='color: #0F172A; font-weight: 800; font-size: 16px;'>📋 DETALHAMENTO DE PENDÊNCIAS</h4>", unsafe_allow_html=True)
-            
-            # Selecionar colunas úteis para a tela
-            cols_disponiveis = df_atrasados.columns.tolist()
-            col_tomador = next((col for col in ['TOMADOR', 'CLIENTE', 'EMPRESA'] if col in cols_disponiveis), 'N/A')
-            
-            cols_exibicao = ['PEDIDO']
-            if col_tomador != 'N/A': cols_exibicao.append(col_tomador)
-            if agente_col in cols_disponiveis: cols_exibicao.append(agente_col)
-            cols_exibicao.append('DIAS_ATRASO')
-            
-            df_view = df_atrasados[cols_exibicao].sort_values(by='DIAS_ATRASO', ascending=False)
-            
-            st.dataframe(
-                df_view,
-                column_config={
-                    "PEDIDO": st.column_config.TextColumn("📦 Pedido/AWB"),
-                    col_tomador: st.column_config.TextColumn("🏢 Cliente"),
-                    agente_col: st.column_config.TextColumn("👤 Motorista"),
-                    "DIAS_ATRASO": st.column_config.ProgressColumn("🔴 Dias Vencidos", format="%d dias", min_value=0, max_value=int(atraso_maximo) + 2)
-                },
-                hide_index=True, use_container_width=True, height=400
-            )
-
-        # ---- MAPA DE CALOR/PONTOS ----
-        with col_mapa:
-            st.markdown("<h4 style='color: #0F172A; font-weight: 800; font-size: 16px;'>📍 RADAR DE DISPERSÃO</h4>", unsafe_allow_html=True)
-            
-            # Buscar colunas de latitude e longitude
-            col_lat = next((c for c in cols_disponiveis if c in ['LAT', 'LATITUDE', 'LATITUDE_DESTINO', 'LATITUDE_COLETA']), None)
-            col_lon = next((c for c in cols_disponiveis if c in ['LON', 'LONG', 'LONGITUDE', 'LONGITUDE_DESTINO', 'LONGITUDE_COLETA']), None)
-            
-            if col_lat and col_lon:
-                df_mapa = df_atrasados[[col_lat, col_lon]].copy()
-                df_mapa.rename(columns={col_lat: 'lat', col_lon: 'lon'}, inplace=True)
-                df_mapa['lat'] = pd.to_numeric(df_mapa['lat'], errors='coerce')
-                df_mapa['lon'] = pd.to_numeric(df_mapa['lon'], errors='coerce')
-                df_mapa = df_mapa.dropna()
-                
-                if not df_mapa.empty:
-                    st.map(df_mapa, color="#EF4444", size=100) # Pontos vermelhos maiores para destacar atrasos
-                else:
-                    st.warning("⚠️ Coordenadas inválidas detectadas na base.")
-            else:
-                st.info("🗺️ **Módulo Tático de Mapa Inativo**\n\nPara visualizar os atrasos no radar, é necessário que o banco de dados `DB_IGO_Logistica` possua as colunas `LATITUDE` e `LONGITUDE` preenchidas para cada pedido.")
+        # Exibe a tabela pegando 100% da largura
+        st.dataframe(
+            df_view,
+            column_config=configuracao_colunas,
+            hide_index=True, 
+            use_container_width=True, 
+            height=450
+        )
 
 # --- RODAPÉ DISCRETO ---
 st.markdown("<br>", unsafe_allow_html=True)
