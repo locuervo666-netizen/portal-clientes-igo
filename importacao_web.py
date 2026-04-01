@@ -26,22 +26,25 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 # 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 BOMBA CSS GLOBAL: Destrói permanentemente o "Manage App", "Deploy" e Menus do Streamlit
+# 🔥 BOMBA CSS GLOBAL (Caçador Implacável do Manage App e elementos do Streamlit)
 st.markdown("""
     <style>
-    header {visibility: hidden !important; display: none !important;}
-    #MainMenu {visibility: hidden !important; display: none !important;}
-    footer {visibility: hidden !important; display: none !important;}
-    .stAppDeployButton {display: none !important;}
-    [data-testid="stHeader"] {display: none !important;}
-    [data-testid="stToolbar"] {display: none !important;}
-    [data-testid="stDecoration"] {display: none !important;}
-    [data-testid="stStatusWidget"] {display: none !important;}
-    /* Caçador do botão Manage App na nuvem */
-    div[class^="viewerBadge_container"] {display: none !important;}
-    div[class^="styles_viewerBadge"] {display: none !important;}
-    .viewerBadge_link {display: none !important;}
+    /* Oculta topo e rodapé */
+    [data-testid="stHeader"] { display: none !important; }
+    [data-testid="stToolbar"] { display: none !important; }
+    [data-testid="stDecoration"] { display: none !important; }
+    [data-testid="stStatusWidget"] { display: none !important; }
+    #MainMenu { visibility: hidden !important; display: none !important; }
+    footer { visibility: hidden !important; display: none !important; }
     
+    /* Oculta os botões Deploy e Manage App gerados pela nuvem do Streamlit */
+    .stAppDeployButton { display: none !important; }
+    .stDeployButton { display: none !important; }
+    [class^="viewerBadge"] { display: none !important; }
+    [class*="viewerBadge"] { display: none !important; }
+    iframe[src*="badge"] { display: none !important; }
+    
+    /* Puxa o conteúdo para cima aproveitando a tela inteira */
     .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     </style>
@@ -412,7 +415,7 @@ div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus
     justify-content: center !important; 
     align-items: center !important; 
     padding: 0px 5px !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
 }}
 
 div.st-key-kpi_total button {{ background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; }}
@@ -597,8 +600,27 @@ if menu == "📊 Dashboard Operacional":
         with container_botoes:
             st.markdown("""
                 <style>
+                /* 🔥 BOTÕES DE AÇÃO ABAIXO DA GRID (Compactos e Amigáveis) */
                 div[data-testid="stPopover"] > button, button[kind="secondary"] {
-                    white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 14px !important; border-radius: 6px !important;
+                    white-space: nowrap !important; 
+                    overflow: hidden !important; 
+                    font-weight: 600 !important; 
+                    font-size: 12px !important; 
+                    border-radius: 6px !important;
+                    height: 32px !important; 
+                    min-height: 32px !important;
+                    padding: 0px 12px !important;
+                    border: 1px solid #CBD5E1 !important;
+                    background-color: #FFFFFF !important;
+                    color: #475569 !important;
+                    transition: all 0.2s ease !important;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+                }
+                div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
+                    border-color: #0284C7 !important;
+                    color: #0369A1 !important;
+                    background-color: #F0F9FF !important;
+                    box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
                 }
                 </style>
             """, unsafe_allow_html=True)
