@@ -8,11 +8,11 @@ from streamlit_autorefresh import st_autorefresh
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
-# 🎯 ATENÇÃO ROBSON: Cole o "Link direto" do Postimages dentro das aspas abaixo!
+# 🎯 ATENÇÃO ROBSON: Link direto da Logo IGO
 LOGO_IGO = "https://i.postimg.cc/d71mqWDx/IGO-LOGO.png"
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE (INTEGRAL)
 # =======================================================
 st.set_page_config(page_title="Monitoramento IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
@@ -44,6 +44,8 @@ st.markdown("""
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
     .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
     button[data-baseweb="tab"] { font-size: 16px !important; font-weight: 700 !important; }
+    
+    .stTextInput > div > div > input { font-size: 16px !important; padding: 10px !important; border-radius: 8px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -54,7 +56,7 @@ CLIENTES_CONFIG = {
 }
 
 # =======================================================
-# 🔗 MOTOR DE DADOS PRINCIPAL
+# 🔗 2. MOTOR DE DADOS PRINCIPAL
 # =======================================================
 @st.cache_resource
 def conectar_banco_seguro():
@@ -104,12 +106,12 @@ def carregar_dados_nuvem():
                     if col_foto: cols_ext.append(col_foto)
                     df_app_clean = df_app[cols_ext].copy()
                     def extrair_dados_app(r):
-                        s = str(r.get(col_status, '')) if col_status else ''
-                        o = str(r.get(col_obs, '')) if col_obs else ''
-                        d = str(r.get(col_detalhes, '')) if col_detalhes else ''
-                        rec = str(r.get(col_receb, '')) if col_receb else ''
-                        f = str(r.get(col_foto, '')) if col_foto else ''
-                        s, o, d, rec, f = [str(x).strip() if str(x).upper() != 'NAN' else '' for x in [s,o,d,rec,f]]
+                        s, o, d, rec, f = [str(r.get(x, '')).strip() for x in [col_status, col_obs, col_detalhes, col_receb, col_foto]]
+                        s = s if s.upper() != 'NAN' else ''
+                        o = o if o.upper() != 'NAN' else ''
+                        d = d if d.upper() != 'NAN' else ''
+                        rec = rec if rec.upper() != 'NAN' else ''
+                        f = f if f.upper() != 'NAN' else ''
                         q = d if d else rec
                         return pd.Series([s, o, q, f])
                     df_app_clean[['APP_STATUS', 'APP_OBS', 'APP_QUEM', 'APP_FOTO']] = df_app_clean.apply(extrair_dados_app, axis=1)
@@ -153,11 +155,9 @@ if not st.session_state.logado:
             if st.button("🚀 Acessar Sistema", type="primary", use_container_width=True):
                 if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
                     st.session_state.logado, st.session_state.cliente = True, u; st.rerun()
-                else: st.error("Usuário ou senha incorretos.")
+                else: st.error("Incorreto")
 else:
-    # =======================================================
     # 🚀 4. PAINEL PRINCIPAL
-    # =======================================================
     df_raw = carregar_dados_nuvem()
     if not df_raw.empty:
         conf = CLIENTES_CONFIG[st.session_state.cliente]
@@ -165,8 +165,7 @@ else:
         hoje_br = datetime.now(FUSO_BR).date()
         
         if not df_cliente.empty:
-            if 'FOTO' in df_cliente.columns:
-                df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if x and str(x).upper() not in ['NAN', 'NONE', ''] else "")
+            df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if x and str(x).upper() not in ['NAN', ''] else "")
 
             def definir_status_real(row):
                 s_db, s_app = str(row.get('STATUS', '')).strip().upper(), str(row.get('APP_STATUS', '')).strip().upper()
@@ -212,6 +211,10 @@ else:
                     except: pass
                 return res
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(tratar_status, axis=1)
+            
+            # --- CORREÇÃO DO ERRO DE VARIÁVEL ---
+            ordem_padrao = ['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
+            col_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
 
             with st.sidebar:
                 st.image(conf["logo"], width=160)
@@ -221,22 +224,21 @@ else:
                 min_d = df_cliente['DATA_OBJ'].dropna().min() if not df_cliente['DATA_OBJ'].dropna().empty else hoje_br
                 max_d = df_cliente['DATA_OBJ'].dropna().max() if not df_cliente['DATA_OBJ'].dropna().empty else hoje_br
                 datas_sel = st.date_input("🗓️ Período:", value=(min_d, max_d), format="DD/MM/YYYY")
-                cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
+                cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True):
-                    col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'FOTO_URL', 'DETALHES'])
+                    col_vis = st.multiselect("Ver:", options=col_disponiveis, default=['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'FOTO_URL', 'DETALHES'])
                 st.divider()
                 n_tot = len(df_cliente)
                 n_ent = len(df_cliente[df_cliente['STATUS_DISPLAY'].str.contains('Entregue')])
                 texto_w = f"*Resumo IGO - {st.session_state.cliente}*\n📦 Total: {n_tot}\n✅ OK: {n_ent}"
-                st.markdown(f'<a href="https://api.whatsapp.com/send?text={urllib.parse.quote(texto_w)}" target="_blank" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:10px; border-radius:8px; font-weight:bold; text-align:center;">📲 Enviar Resumo WhatsApp</div></a>', unsafe_allow_html=True)
+                st.markdown(f'<a href="https://api.whatsapp.com/send?text={urllib.parse.quote(texto_w)}" target="_blank" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:10px; border-radius:8px; font-weight:bold; text-align:center; margin-bottom:15px;">📲 Enviar Resumo WhatsApp</div></a>', unsafe_allow_html=True)
                 csv = df_cliente.to_csv(index=False, sep=';').encode('utf-8-sig')
                 st.download_button("📥 Exportar Relatório (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
                 st.divider()
                 if st.button("🚪 Sair do Sistema", use_container_width=True): st.session_state.logado = False; st.rerun()
 
             df_f = df_cliente.copy()
-            if isinstance(datas_sel, tuple) and len(datas_sel) == 2:
-                df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
+            if isinstance(datas_sel, tuple) and len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
             if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
             st.markdown(f"""<style> [data-testid="stAppViewContainer"] {{ background-color: {"#0e1117" if modo_escuro else "#f0f2f6"} !important; }} .dinamic-text {{ color: {"#f8fafc" if modo_escuro else "#0f172a"} !important; }} </style>""", unsafe_allow_html=True)
@@ -244,11 +246,14 @@ else:
 
             ck = st.columns(5)
             def set_kpi(v): st.session_state.filtro_kpi = v
+            n_fru = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])
+            n_atr = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO')])
+            n_hoj = len(df_f[df_f['DATA_OBJ'] == hoje_br])
             ck[0].button(f"📦 TOTAL\n\n{len(df_f)}", key="k_tot", use_container_width=True, on_click=set_kpi, args=("TODOS",))
             ck[1].button(f"✅ ENTREGUES\n\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])}", key="k_ent", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
-            ck[2].button(f"❌ FRUSTRADAS\n\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])}", key="k_fru", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
-            ck[3].button(f"🚨 ATRASADOS\n\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO')])}", key="k_atr", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
-            ck[4].button(f"📅 HOJE\n\n{len(df_f[df_f['DATA_OBJ'] == hoje_br])}", key="k_hoj", use_container_width=True, on_click=set_kpi, args=("HOJE",))
+            ck[2].button(f"❌ FRUSTRADAS\n\n{n_fru}", key="k_fru", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
+            ck[3].button(f"🚨 ATRASADOS\n\n{n_atr}", key="k_atr", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
+            ck[4].button(f"📅 HOJE\n\n{n_hoj}", key="k_hoj", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
             busca = st.text_input("🔎 Busca Rápida:", placeholder="Pedido, laboratório, cidade...")
             df_grid = df_f.copy()
@@ -256,7 +261,6 @@ else:
             elif st.session_state.filtro_kpi == "FRUSTRADA": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada')]
             elif st.session_state.filtro_kpi == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
             elif st.session_state.filtro_kpi == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
-            
             if busca:
                 mask = df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)
                 df_grid = df_grid[mask]
@@ -266,7 +270,6 @@ else:
                 df_final_grid = df_grid[[c for c in col_vis if c in df_grid.columns]]
                 gb = GridOptionsBuilder.from_dataframe(df_final_grid)
                 gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
-                
                 status_js = JsCode("""
                 function(params) {
                     let v = params.value || '';
@@ -287,8 +290,7 @@ else:
                                 let m = document.createElement('div');
                                 Object.assign(m.style, {position:'fixed', zIndex:'9999999', left:0, top:0, width:'100vw', height:'100vh', backgroundColor:'rgba(0,0,0,0.85)', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', cursor:'zoom-out'});
                                 let i = document.createElement('img'); i.src = params.value; Object.assign(i.style, {maxWidth:'90%', maxHeight:'85%', borderRadius:'8px', boxShadow:'0 4px 20px rgba(0,0,0,0.5)', objectFit:'contain'});
-                                let t = document.createElement('div'); t.innerText = '✖ Clique para fechar'; Object.assign(t.style, {color:'#fff', marginTop:'15px', fontWeight:'bold'});
-                                m.appendChild(i); m.appendChild(t); m.onclick = () => document.body.removeChild(m); document.body.appendChild(m);
+                                m.appendChild(i); m.onclick = () => document.body.removeChild(m); document.body.appendChild(m);
                             };
                             this.eGui.appendChild(b);
                         } else { this.eGui.innerHTML = '<span style="color:#cbd5e1">➖</span>'; }
@@ -299,5 +301,4 @@ else:
                 for col in df_final_grid.columns:
                     if col == 'STATUS': gb.configure_column(col, cellStyle=status_js)
                     elif col == 'FOTO_URL': gb.configure_column(col, headerName="FOTO", cellRenderer=foto_js, width=80)
-                
                 AgGrid(df_final_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', height=550)
