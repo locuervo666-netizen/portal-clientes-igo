@@ -8,7 +8,7 @@ from streamlit_autorefresh import st_autorefresh
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
-# 🎯 ATENÇÃO ROBSON: Cole o "Link direto" do Postimages dentro das aspas abaixo!
+# 🎯 ATENÇÃO ROBSON: Link direto da Logo IGO
 LOGO_IGO = "https://i.postimg.cc/d71mqWDx/IGO-LOGO.png"
 
 # =======================================================
@@ -215,35 +215,57 @@ else:
             ordem_padrao = ['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
             col_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
 
+            # --- PROCESSAMENTO DE FILTROS PARA O SIDEBAR E EXPORTAÇÃO ---
+            min_d = df_cliente['DATA_OBJ'].dropna().min() if not df_cliente['DATA_OBJ'].dropna().empty else hoje_br
+            max_d = df_cliente['DATA_OBJ'].dropna().max() if not df_cliente['DATA_OBJ'].dropna().empty else hoje_br
+            
             with st.sidebar:
                 st.image(conf["logo"], width=160)
                 st.divider()
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
-                min_d = df_cliente['DATA_OBJ'].dropna().min() if not df_cliente['DATA_OBJ'].dropna().empty else hoje_br
-                max_d = df_cliente['DATA_OBJ'].dropna().max() if not df_cliente['DATA_OBJ'].dropna().empty else hoje_br
                 datas_sel = st.date_input("🗓️ Período:", value=(min_d, max_d), format="DD/MM/YYYY")
                 cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True):
                     col_vis = st.multiselect("Ver:", options=col_disponiveis, default=['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'FOTO_URL', 'DETALHES'])
                 st.divider()
-                n_tot = len(df_cliente)
-                n_ent = len(df_cliente[df_cliente['STATUS_DISPLAY'].str.contains('Entregue')])
-                texto_w = f"*Resumo IGO - {st.session_state.cliente}*\n📦 Total: {n_tot}\n✅ OK: {n_ent}"
-                st.markdown(f'<a href="https://api.whatsapp.com/send?text={urllib.parse.quote(texto_w)}" target="_blank" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:10px; border-radius:8px; font-weight:bold; text-align:center; margin-bottom:15px;">📲 Enviar Resumo WhatsApp</div></a>', unsafe_allow_html=True)
-                csv = df_cliente.to_csv(index=False, sep=';').encode('utf-8-sig')
-                st.download_button("📥 Exportar Relatório (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
-                st.divider()
-                if st.button("🚪 Sair do Sistema", use_container_width=True): st.session_state.logado = False; st.rerun()
 
+            # --- APLICAÇÃO DOS FILTROS NO DATAFRAME DE TRABALHO ---
             df_f = df_cliente.copy()
             if isinstance(datas_sel, tuple) and len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
             if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
+            # --- FILTRO POR KPI ---
+            if st.session_state.filtro_kpi == "ENTREGUE": df_f = df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')]
+            elif st.session_state.filtro_kpi == "FRUSTRADA": df_f = df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')]
+            elif st.session_state.filtro_kpi == "ATRASADO": df_f = df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO')]
+            elif st.session_state.filtro_kpi == "HOJE": df_f = df_f[df_f['DATA_OBJ'] == hoje_br]
+
+            # --- BUSCA INTELIGENTE (APLICADA ANTES DO DOWNLOAD) ---
+            busca = st.text_input("🔎 Busca Rápida:", placeholder="Ex: Melo Labs, Centro, Maria...")
+            df_grid = df_f.copy()
+            if busca:
+                mask = df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)
+                df_grid = df_grid[mask]
+
+            # --- SIDEBAR: BOTÕES DE WHATSAPP E EXPORTAÇÃO (AGORA COM DF_GRID FILTRADO) ---
+            with st.sidebar:
+                n_tot_f = len(df_grid)
+                n_ent_f = len(df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue')])
+                texto_w = f"*Resumo IGO - {st.session_state.cliente}*\n📦 Total: {n_tot_f}\n✅ OK: {n_ent_f}"
+                st.markdown(f'<a href="https://api.whatsapp.com/send?text={urllib.parse.quote(texto_w)}" target="_blank" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:10px; border-radius:8px; font-weight:bold; text-align:center; margin-bottom:15px;">📲 Enviar Resumo WhatsApp</div></a>', unsafe_allow_html=True)
+                
+                # EXPORTAÇÃO DINÂMICA: Exporta apenas o que está na tela (df_grid)
+                csv = df_grid.to_csv(index=False, sep=';').encode('utf-8-sig')
+                st.download_button("📥 Exportar Relatório (CSV)", data=csv, file_name=f"Monitoramento_{st.session_state.cliente}.csv", use_container_width=True)
+                
+                st.divider()
+                if st.button("🚪 Sair do Sistema", use_container_width=True): st.session_state.logado = False; st.rerun()
+
             st.markdown(f"""<style> [data-testid="stAppViewContainer"] {{ background-color: {"#0e1117" if modo_escuro else "#f0f2f6"} !important; }} .dinamic-text {{ color: {"#f8fafc" if modo_escuro else "#0f172a"} !important; }} </style>""", unsafe_allow_html=True)
             
             st.markdown(f"""
-            <div class="header-container dinamic-border" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: -15px;">
+            <div class="header-container" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: -15px;">
                 <h2 class="dinamic-text" style="margin: 0; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
                 <div class='sync-status'>🟢 Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}</div>
             </div>
@@ -251,14 +273,14 @@ else:
 
             ck = st.columns(5)
             def set_kpi(v): st.session_state.filtro_kpi = v
-            n_fru = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])
-            n_atr = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO')])
-            n_hoj = len(df_f[df_f['DATA_OBJ'] == hoje_br])
-            ck[0].button(f"📦 TOTAL\n\n{len(df_f)}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
-            ck[1].button(f"✅ ENTREGUES\n\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
-            ck[2].button(f"❌ FRUSTRADAS\n\n{n_fru}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
-            ck[3].button(f"🚨 ATRASADOS\n\n{n_atr}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
-            ck[4].button(f"📅 HOJE\n\n{n_hoj}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
+            n_fru_k = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])
+            n_atr_k = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO')])
+            n_hoj_k = len(df_f[df_f['DATA_OBJ'] == hoje_br])
+            ck[0].button(f"📦 TOTAL\n\n{len(df_f)}", key="k_tot", use_container_width=True, on_click=set_kpi, args=("TODOS",))
+            ck[1].button(f"✅ ENTREGUES\n\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])}", key="k_ent", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
+            ck[2].button(f"❌ FRUSTRADAS\n\n{n_fru_k}", key="k_fru", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
+            ck[3].button(f"🚨 ATRASADOS\n\n{n_atr_k}", key="k_atr", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
+            ck[4].button(f"📅 HOJE\n\n{n_hoj_k}", key="k_hoj", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(f"<div class='dinamic-text' style='font-size:14px; font-weight:800; margin-bottom:10px;'>🎯 Progresso de Hoje</div>", unsafe_allow_html=True)
@@ -270,16 +292,6 @@ else:
                 st.markdown(f"<div class='dinamic-text' style='font-size:12px; margin-top:-10px; text-align:right;'>{c_h} de {t_h} finalizados ({int(tx*100)}%)</div>", unsafe_allow_html=True)
             else: st.info("Nenhum pedido para hoje.")
             st.markdown("<div class='dinamic-border' style='margin-bottom: 15px; margin-top: 15px;'></div>", unsafe_allow_html=True)
-
-            busca = st.text_input("🔎 Busca Rápida:", placeholder="Ex: Melo Labs, Centro, Maria...")
-            df_grid = df_f.copy()
-            if st.session_state.filtro_kpi == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue')]
-            elif st.session_state.filtro_kpi == "FRUSTRADA": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada')]
-            elif st.session_state.filtro_kpi == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
-            elif st.session_state.filtro_kpi == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
-            if busca:
-                mask = df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)
-                df_grid = df_grid[mask]
 
             if not df_grid.empty:
                 df_grid['STATUS'] = df_grid['STATUS_DISPLAY']
@@ -319,4 +331,5 @@ else:
                 for col in df_final_grid.columns:
                     if col == 'STATUS': gb.configure_column(col, cellStyle=status_js)
                     elif col == 'FOTO_URL': gb.configure_column(col, headerName="FOTO", cellRenderer=foto_js, width=80)
+                
                 AgGrid(df_final_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', height=550)
