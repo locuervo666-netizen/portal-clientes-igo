@@ -39,7 +39,7 @@ st.markdown("""
     #MainMenu { display: none !important; }
     footer { display: none !important; }
     
-    /* Configuração da Tela Inteira com fundo BRANCO PURO para não dar diferença com o navegador */
+    /* Configuração da Tela Inteira com fundo BRANCO PURO */
     .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 96% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
@@ -103,7 +103,7 @@ st.markdown("""
     }
     div.st-key-kpi_total button { background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; }
     div.st-key-kpi_entregue button { background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important; }
-    div.st-key-kpi_pend button { background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%) !important; } /* Laranja para Pendentes */
+    div.st-key-kpi_pend button { background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%) !important; }
     div.st-key-kpi_frus button { background: linear-gradient(135deg, #991B1B 0%, #EF4444 100%) !important; }
     div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%) !important; }
     div.st-key-kpi_hoje button { background: linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%) !important; }
@@ -129,38 +129,42 @@ if 'autenticado' not in st.session_state:
 if not st.session_state.autenticado:
     st.markdown("""
         <style>
-        .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; max-width: 400px; margin: auto; }
+        .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; width: 100%; margin: auto; }
         .login-title { color: #0F172A; font-weight: 800; font-size: 22px; margin-top: 15px; letter-spacing: -0.5px; text-align: center; }
         .login-subtitle { color: #64748B; font-size: 14px; margin-bottom: 30px; font-weight: 500; text-align: center; }
         </style>
     """, unsafe_allow_html=True)
     
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
     
-    st.markdown("<div class='login-card'>", unsafe_allow_html=True)
-    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=180)
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("<div class='login-title'>PORTAL CORPORATIVO</div>", unsafe_allow_html=True)
-    st.markdown("<div class='login-subtitle'>Autenticação de Operadores - IGO Logística</div>", unsafe_allow_html=True)
+    # Usando colunas para espremer o card de login no centro da tela
+    col1, col2, col3 = st.columns([1.5, 1, 1.5])
     
-    with st.form("form_login"):
-        usuario = st.text_input("👤 Usuário")
-        senha = st.text_input("🔑 Senha", type="password")
-        st.markdown("<br>", unsafe_allow_html=True)
-        submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
+    with col2:
+        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+        st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=180)
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<div class='login-title'>PORTAL CORPORATIVO</div>", unsafe_allow_html=True)
+        st.markdown("<div class='login-subtitle'>Autenticação de Operadores</div>", unsafe_allow_html=True)
         
-        if submit:
-            logins_autorizados = {
-                "robson.melo": "123",
-                "william.bertoldo": "123"
-            }
-            if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
-                st.session_state.autenticado = True
-                st.rerun()
-            else:
-                st.error("❌ Credenciais inválidas.")
-    st.markdown("</div>", unsafe_allow_html=True)
+        with st.form("form_login"):
+            usuario = st.text_input("👤 Usuário")
+            senha = st.text_input("🔑 Senha", type="password")
+            st.markdown("<br>", unsafe_allow_html=True)
+            submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
+            
+            if submit:
+                logins_autorizados = {
+                    "robson.melo": "123",
+                    "william.bertoldo": "123"
+                }
+                if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
+                    st.session_state.autenticado = True
+                    st.rerun()
+                else:
+                    st.error("❌ Credenciais inválidas.")
+        st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 
@@ -399,6 +403,7 @@ def obter_proximo_id(df):
     except:
         return 100000
 
+# CSS Ajustado: Linhas Alternadas Suaves em Tons de Cinza/Azul Claro
 def obter_css_grid():
     return {
         ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
@@ -407,8 +412,8 @@ def obter_css_grid():
         ".ag-header-icon": {"color": "#0284C7 !important"}, 
         ".ag-cell": {"font-size": "11px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
         ".ag-row-even": {"background-color": "#FFFFFF !important"},
-        ".ag-row-odd": {"background-color": "#F8FAFC !important"},
-        ".ag-row-hover": {"background-color": "#F1F5F9 !important"},
+        ".ag-row-odd": {"background-color": "#F4F6F8 !important"}, /* Azul/Cinza muito suave e discreto */
+        ".ag-row-hover": {"background-color": "#E2E8F0 !important"}, /* Marcador suave no hover */
         ".ag-row-selected": {"background-color": "#E0F2FE !important", "color": "#0369A1 !important"},
         ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
     }
@@ -433,6 +438,27 @@ def calc_status_display(row):
     return res
 
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
+
+# =============================================================================
+# 🎨 3. CABEÇALHO LIMPO
+# =============================================================================
+
+# Cabeçalho Limpo (Logo, Título e Botão Sair)
+col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
+
+with col_logo:
+    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=140)
+    
+with col_title:
+    st.markdown("<h2 style='color: #0F172A; font-weight: 800; margin: 0; text-align: center;'>PAINEL GERENCIAL</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #64748B; margin: 0; text-align: center; font-weight: 600;'>Centro de Controle Operacional - IGO Logística</p>", unsafe_allow_html=True)
+
+with col_logout:
+    if st.button("🚪 Sair", use_container_width=True):
+        st.session_state.autenticado = False
+        st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 # =============================================================================
 # 🖥️ BARRA DE TAREFAS FIXA NO RODAPÉ (TASKBAR)
@@ -1142,7 +1168,12 @@ elif menu == "🔬 Triagem":
                                 pdf.set_line_width(0.3)
                                 pdf.rect(5, 5, 200, 287)
                                 
-                                pdf.set_y(10)
+                                try:
+                                    pdf.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", x=10, y=8, w=35)
+                                except:
+                                    pass
+                                
+                                pdf.set_y(15)
                                 pdf.set_font("Arial", "B", 14)
                                 pdf.set_text_color(15, 23, 42)
                                 pdf.cell(0, 6, f"PROTOCOLO DE ROMANEIO TÉCNICO - IGO LOGISTICA", ln=True, align="C")
@@ -1453,7 +1484,7 @@ elif menu == "⚙️ Rotas":
                     rota_disp = row['ROTA MAPEADA'].replace("---", " ➔ ")
                     with st.container():
                         col_rota, col_del = st.columns([5, 1])
-                        col_rota.markdown(f"<div style='padding:10px; background-color:{bg_app}; border-radius:5px; border: 1px solid {border_c};'><b>📍 {rota_disp}</b></div>", unsafe_allow_html=True)
+                        col_rota.markdown(f"<div style='padding:10px; background-color:#FFFFFF; border-radius:5px; border: 1px solid #E2E8F0;'><b>📍 {rota_disp}</b></div>", unsafe_allow_html=True)
                         if col_del.button("🗑️ Remover", key=f"del_{idx}", use_container_width=True):
                             df_novo = DF_AGENTES.drop(idx)
                             try:
