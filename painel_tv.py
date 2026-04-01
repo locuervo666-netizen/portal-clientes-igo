@@ -90,25 +90,36 @@ def calc_status_display(row):
     return 'Pendente'
 
 # =============================================================================
-# 🎨 3. CSS E ESTILOS
+# 🎨 3. CSS E ESTILOS (AJUSTADO PARA TOPO)
 # =============================================================================
 st.markdown("""
 <style>
+    /* Fundo e remoção de padding padrão do Streamlit no topo */
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
+    [data-testid="stAppViewContainer"] > div:first-child { padding-top: 1rem !important; }
     [data-testid="stHeader"] { background-color: transparent !important; }
     
-    .tv-header { padding: 0px 10px 5px 10px; margin-bottom: 10px; }
-    
-    .ticker-wrap { width: 100%; overflow: hidden; background-color: #1E293B; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 12px 0; margin-bottom: 25px; white-space: nowrap; }
+    /* Ticker (Barra Rolante) - Tencionado ao topo */
+    .ticker-wrap { 
+        width: 100%; overflow: hidden; background-color: #1E293B; border-radius: 8px; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 10px 0; 
+        margin-top: 0px; margin-bottom: 20px; white-space: nowrap; 
+    }
     .ticker { display: inline-block; white-space: nowrap; animation: marquee 35s linear infinite; }
     .ticker-item { font-size: 18px; color: #F8FAFC; font-family: 'Segoe UI', sans-serif; margin-right: 60px; font-weight: 500; }
     .ticker-highlight { color: #38BDF8; font-weight: 800; }
     @keyframes marquee { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
     
-    .metric-card { border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); padding: 25px; height: 160px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid rgba(0,0,0,0.05);}
-    .metric-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;}
-    .metric-value { font-size: 56px; font-weight: 900; font-family: 'Segoe UI', sans-serif; line-height: 1; margin: 5px 0;}
-    .metric-delta { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 6px; display: inline-block; background-color: rgba(255,255,255,0.6);}
+    /* Cartões de Métrica */
+    .metric-card { 
+        border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); 
+        padding: 20px; height: 140px; display: flex; flex-direction: column; 
+        justify-content: space-between; border: 1px solid rgba(0,0,0,0.05);
+        margin-bottom: 5px; /* Reduzido espaço abaixo dos cards */
+    }
+    .metric-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;}
+    .metric-value { font-size: 52px; font-weight: 900; font-family: 'Segoe UI', sans-serif; line-height: 1; margin: 3px 0;}
+    .metric-delta { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; display: inline-block; background-color: rgba(255,255,255,0.6);}
 </style>
 """, unsafe_allow_html=True)
 
@@ -120,12 +131,7 @@ df_raw = carregar_dados_completos(planilha_db)
 hoje_br = datetime.now(FUSO_BR).date()
 hora_atual = datetime.now(FUSO_BR).strftime('%H:%M:%S')
 
-# --- CABEÇALHO COM LOGO DISCRETA ---
-st.markdown(f"""
-<div class="tv-header">
-    <img src="https://i.postimg.cc/x84nnjjq/IGO-LOGO.png" width="65" style="opacity: 0.8;">
-</div>
-""", unsafe_allow_html=True)
+# --- LOGO REMOVIDA DAQUI ---
 
 if df_raw.empty:
     st.info("Aguardando dados da base central...")
@@ -151,7 +157,7 @@ else:
     else:
         html_delta_total = f'<span class="metric-delta" style="color: #059669;">▲ Novo Ciclo</span>'
 
-    # ================== TICKER (BARRA ROLANTE) ==================
+    # ================== 1. TICKER (BARRA ROLANTE) - AGORA NO TOPO ==================
     ticker_items = []
     col_tomador = next((col for col in ['TOMADOR', 'CLIENTE', 'EMPRESA'] if col in df_raw.columns), None)
     if col_tomador and not df_hoje.empty:
@@ -185,11 +191,10 @@ else:
     <div class="ticker-wrap"><div class="ticker">{ticker_content}</div></div>
     """, unsafe_allow_html=True)
 
-    # ================== OS 4 BLOCOS DE MÉTRICAS COM FUNDOS COLORIDOS ==================
+    # ================== 2. OS 4 BLOCOS DE MÉTRICAS ==================
     c1, c2, c3, c4 = st.columns(4)
     
     with c1:
-        # Fundo Cinza Claro Padrão
         st.markdown(f"""
         <div class="metric-card" style="background-color: #F1F5F9;">
             <div class="metric-title" style="color: #475569;">📦 TOTAL DO DIA</div>
@@ -199,7 +204,6 @@ else:
         """, unsafe_allow_html=True)
         
     with c2:
-        # Fundo Azul Claro (Sucesso)
         st.markdown(f"""
         <div class="metric-card" style="background-color: #E0F2FE;">
             <div class="metric-title" style="color: #0369A1;">✓ COLETADOS</div>
@@ -209,7 +213,6 @@ else:
         """, unsafe_allow_html=True)
 
     with c3:
-        # Fundo Amarelo Claro (Atenção/Aguardando)
         st.markdown(f"""
         <div class="metric-card" style="background-color: #FFFBEB;">
             <div class="metric-title" style="color: #B45309;">⏳ RESTANTES</div>
@@ -219,7 +222,6 @@ else:
         """, unsafe_allow_html=True)
         
     with c4:
-        # Fundo Vermelho Claro (Problema)
         st.markdown(f"""
         <div class="metric-card" style="background-color: #FEF2F2;">
             <div class="metric-title" style="color: #B91C1C;">❌ FRUSTRADOS</div>
@@ -228,24 +230,31 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-    # ================== BARRA DE PROGRESSO (BARRINHA FINA) ==================
-    st.markdown("<br>", unsafe_allow_html=True)
+    # ================== 3. BARRA DE PROGRESSO ==================
+    # Espaçamento reduzido antes da barra
     
     total_base_progresso = coletados_hoje + pendentes_hoje
     pct_coletado = (coletados_hoje / total_base_progresso) * 100 if total_base_progresso > 0 else 0
 
     st.markdown(f"""
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;">
-        <span style="color: #0F172A; font-family: sans-serif; font-weight: 800; font-size: 16px;">PROGRESSO DA OPERAÇÃO</span>
-        <span style="color: #0284C7; font-weight: 900; font-size: 18px;">{pct_coletado:.1f}%</span>
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; margin-top: 10px;">
+        <span style="color: #0F172A; font-family: sans-serif; font-weight: 800; font-size: 15px;">PROGRESSO DA OPERAÇÃO</span>
+        <span style="color: #0284C7; font-weight: 900; font-size: 16px;">{pct_coletado:.1f}%</span>
     </div>
-    <div style="width: 100%; height: 12px; background-color: #E2E8F0; border-radius: 10px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+    <div style="width: 100%; height: 10px; background-color: #E2E8F0; border-radius: 10px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
         <div style="width: {pct_coletado}%; height: 100%; background-color: #0284C7; transition: width 1s ease-in-out;"></div>
     </div>
     """, unsafe_allow_html=True)
 
+    # Adicionado um separador visual discreto para o próximo painel
+    st.markdown("<hr style='border: 1px solid #E2E8F0; margin-top: 25px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+
+    # --- ESPAÇO LIVRE ABAIXO PARA NOVOS PAINÉIS ---
+    # st.markdown("### Próximo Painel Aqui...")
+
+
 # --- RODAPÉ DISCRETO ---
-st.markdown("<br><br><br>", unsafe_allow_html=True)
+st.markdown("<br><br>", unsafe_allow_html=True)
 st.markdown(f"""
 <div style="text-align: center; color: #94A3B8; font-size: 10px; font-family: sans-serif; opacity: 0.6;">
     Última sincronização com C.C.O: {hora_atual}
