@@ -26,11 +26,10 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 # 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 BOMBA CSS GLOBAL (Caçador Implacável do Manage App e elementos do Streamlit)
+# 🔥 BOMBA CSS GLOBAL (Caçador Implacável do Manage App, mas preservando o menu lateral e grid)
 st.markdown("""
     <style>
-    /* Oculta topo e rodapé */
-    [data-testid="stHeader"] { display: none !important; }
+    /* Oculta apenas ferramentas indesejadas, preserva o stHeader para a Sidebar e o Fullscreen da Grid funcionarem */
     [data-testid="stToolbar"] { display: none !important; }
     [data-testid="stDecoration"] { display: none !important; }
     [data-testid="stStatusWidget"] { display: none !important; }
@@ -44,8 +43,8 @@ st.markdown("""
     [class*="viewerBadge"] { display: none !important; }
     iframe[src*="badge"] { display: none !important; }
     
-    /* Puxa o conteúdo para cima aproveitando a tela inteira */
-    .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; }
+    /* Ajuste de respiro do topo equilibrado */
+    .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -381,6 +380,20 @@ with st.sidebar:
 
 st.markdown(f"""<style>
 [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c} !important; padding-top: 1rem !important; }}
+
+/* Mantendo o stHeader APENAS para o ícone do Sidebar e Fullscreen funcionarem, matando o resto */
+[data-testid="stToolbar"] {{ display: none !important; }}
+[data-testid="stDecoration"] {{ display: none !important; }}
+[data-testid="stStatusWidget"] {{ display: none !important; }}
+#MainMenu {{ visibility: hidden !important; display: none !important; }}
+footer {{ visibility: hidden !important; display: none !important; }}
+.stAppDeployButton {{ display: none !important; }}
+.stDeployButton {{ display: none !important; }}
+[class^="viewerBadge"] {{ display: none !important; }}
+[class*="viewerBadge"] {{ display: none !important; }}
+iframe[src*="badge"] {{ display: none !important; }}
+
+.block-container {{ padding-top: 2.5rem !important; padding-bottom: 1rem !important; }}
 
 div[role="radiogroup"] label div[data-testid="stRadio-radio"] {{ display: none !important; }}
 .dinamic-text {{ color: {txt_main} !important; font-weight: 800; letter-spacing: -0.5px; }}
@@ -798,10 +811,10 @@ elif menu == "📝 Inserir Pedido Manual":
                         except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# 📥 MÓDULO 2: IMPORTAÇÃO DE LOTES
+# ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
-elif menu == "📥 Importação de Lotes":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
+elif menu == "➕ Importação de Lotes":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
     st.success("🛡️ **AUDITORIA DE DADOS ATIVA:** O sistema avalia padronizações de vários clientes (Airlab, FFW, etc) e adiciona os pacotes à base sem destruir seu histórico do dia.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
