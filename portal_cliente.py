@@ -8,7 +8,7 @@ from streamlit_autorefresh import st_autorefresh
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
-# 🎯 ATENÇÃO ROBSON: Link direto da Logo IGO
+# 🎯 ATENÇÃO ROBSON: Link da Logo IGO
 LOGO_IGO = "https://i.postimg.cc/d71mqWDx/IGO-LOGO.png"
 
 # =======================================================
@@ -212,7 +212,6 @@ else:
                 return res
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(tratar_status, axis=1)
             
-            # --- CORREÇÃO DO ERRO DE VARIÁVEL ---
             ordem_padrao = ['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
             col_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
 
@@ -242,20 +241,40 @@ else:
             if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
             st.markdown(f"""<style> [data-testid="stAppViewContainer"] {{ background-color: {"#0e1117" if modo_escuro else "#f0f2f6"} !important; }} .dinamic-text {{ color: {"#f8fafc" if modo_escuro else "#0f172a"} !important; }} </style>""", unsafe_allow_html=True)
-            st.markdown(f"""<div class="header-container" style="border-bottom:2px solid #e2e8f0; padding-bottom:10px; margin-top:-15px;"><div style="display:flex; align-items:center; gap:15px;"><img src="{conf['logo']}" height="50" style="border-radius:8px;"><h2 class="dinamic-text" style="margin:0; font-weight:900; font-size:22px;">Monitoramento {st.session_state.cliente}</h2></div><div class='sync-status'>🟢 Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
+            
+            # --- HEADER ORIGINAL RESTAURADO ---
+            st.markdown(f"""
+            <div class="header-container dinamic-border" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: -15px;">
+                <h2 class="dinamic-text" style="margin: 0; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
+                <div class='sync-status'>🟢 Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
             ck = st.columns(5)
             def set_kpi(v): st.session_state.filtro_kpi = v
             n_fru = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])
             n_atr = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO')])
             n_hoj = len(df_f[df_f['DATA_OBJ'] == hoje_br])
-            ck[0].button(f"📦 TOTAL\n\n{len(df_f)}", key="k_tot", use_container_width=True, on_click=set_kpi, args=("TODOS",))
-            ck[1].button(f"✅ ENTREGUES\n\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])}", key="k_ent", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
-            ck[2].button(f"❌ FRUSTRADAS\n\n{n_fru}", key="k_fru", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
-            ck[3].button(f"🚨 ATRASADOS\n\n{n_atr}", key="k_atr", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
-            ck[4].button(f"📅 HOJE\n\n{n_hoj}", key="k_hoj", use_container_width=True, on_click=set_kpi, args=("HOJE",))
+            ck[0].button(f"📦 TOTAL\n\n{len(df_f)}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
+            ck[1].button(f"✅ ENTREGUES\n\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
+            ck[2].button(f"❌ FRUSTRADAS\n\n{n_fru}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
+            ck[3].button(f"🚨 ATRASADOS\n\n{n_atr}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
+            ck[4].button(f"📅 HOJE\n\n{n_hoj}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
-            busca = st.text_input("🔎 Busca Rápida:", placeholder="Pedido, laboratório, cidade...")
+            # 📊 PROGRESSO
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f"<div class='dinamic-text' style='font-size:14px; font-weight:800; margin-bottom:10px;'>🎯 Progresso de Hoje</div>", unsafe_allow_html=True)
+            df_hoje_bi = df_cliente[df_cliente['DATA_OBJ'] == hoje_br]
+            if not df_hoje_bi.empty:
+                t_h = len(df_hoje_bi)
+                c_h = len(df_hoje_bi[df_hoje_bi['STATUS_DISPLAY'].str.contains('Entregue|Frustrada')])
+                tx = c_h / t_h if t_h > 0 else 0
+                st.progress(tx)
+                st.markdown(f"<div class='dinamic-text' style='font-size:12px; margin-top:-10px; text-align:right;'>{c_h} de {t_h} finalizados ({int(tx*100)}%)</div>", unsafe_allow_html=True)
+            else: st.info("Nenhum pedido para hoje.")
+            st.markdown("<div class='dinamic-border' style='margin-bottom: 15px; margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+            busca = st.text_input("🔎 Busca Rápida:", placeholder="Ex: Melo Labs, Centro, Maria...")
             df_grid = df_f.copy()
             if st.session_state.filtro_kpi == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue')]
             elif st.session_state.filtro_kpi == "FRUSTRADA": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada')]
@@ -276,6 +295,7 @@ else:
                     if (v.includes('Entregue')) return {'backgroundColor': 'rgba(16, 185, 129, 0.15)', 'color': '#10B981', 'fontWeight': '900'};
                     if (v.includes('Frustrada') || v.includes('ATRASADO')) return {'backgroundColor': 'rgba(239, 68, 68, 0.15)', 'color': '#EF4444', 'fontWeight': '900'};
                     if (v.includes('Em Rota')) return {'backgroundColor': 'rgba(245, 158, 11, 0.15)', 'color': '#F59E0B', 'fontWeight': '900'};
+                    if (v.includes('Coletado') || v.includes('Conferido') || v.includes('Triagem')) return {'backgroundColor': 'rgba(59, 130, 246, 0.15)', 'color': '#3B82F6', 'fontWeight': '900'};
                     return {'fontWeight': 'bold'};
                 }
                 """)
