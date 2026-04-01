@@ -8,11 +8,11 @@ from streamlit_autorefresh import st_autorefresh
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
-# 🎯 LOGO PADRÃO IGO
+# 🎯 ATENÇÃO ROBSON: Link original mantido
 LOGO_IGO = "https://i.postimg.cc/d71mqWDx/IGO-LOGO.png"
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE (INTEGRAL)
 # =======================================================
 st.set_page_config(page_title="Monitoramento IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=60000, limit=None, key="refresh_timer")
@@ -47,15 +47,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 🔐 DICIONÁRIO DE ACESSOS (Atualizado com Labest)
+# 🔐 LOGIN E LOGOS (ATUALIZADO)
 CLIENTES_CONFIG = {
     "GRALAB": {"senha": "123", "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png"},
     "IGO_LOGISTICA": {"senha": "admin", "logo": LOGO_IGO},
-    "LOGISTICA.LABEST": {"senha": "123", "logo": "https://i.postimg.cc/mD8P8pGZ/LABEST-LOGO.png"}
+    "LOGISTICA.LABEST": {"senha": "123", "logo": "https://i.postimg.cc/d71mqWDx/IGO-LOGO.png"} # Ajuste a URL se tiver uma específica para Labest
 }
 
 # =======================================================
-# 🔗 MOTOR DE DADOS PRINCIPAL (LOGICA DE MERGE RESTAURADA)
+# 🔗 MOTOR DE DADOS PRINCIPAL (LOGICA DE MERGE 100% RESTAURADA)
 # =======================================================
 @st.cache_resource
 def conectar_banco_seguro():
@@ -63,17 +63,20 @@ def conectar_banco_seguro():
         caminho_windows = os.path.join(os.path.expanduser("~"), "IGO_Logistica_Sistema")
         cred_win = os.path.join(caminho_windows, "credentials.json")
         token_win = os.path.join(caminho_windows, "token.json")
+        
         if os.path.exists(cred_win) and os.path.exists(token_win):
             return gspread.oauth(credentials_filename=cred_win, authorized_user_filename=token_win)
         elif "google_cred_json" in st.secrets and "google_token_json" in st.secrets:
-            with open("cred_temp.json", "w", encoding="utf-8") as f: f.write(st.secrets["google_cred_json"])
-            with open("token_temp.json", "w", encoding="utf-8") as f: f.write(st.secrets["google_token_json"])
+            with open("cred_temp.json", "w", encoding="utf-8") as f:
+                f.write(st.secrets["google_cred_json"])
+            with open("token_temp.json", "w", encoding="utf-8") as f:
+                f.write(st.secrets["google_token_json"])
             return gspread.oauth(credentials_filename="cred_temp.json", authorized_user_filename="token_temp.json")
         else:
-            st.error("❌ Cofre do Streamlit vazio.")
+            st.error("❌ Cofre do Streamlit vazio. Cole as variáveis google_cred_json e google_token_json no Secrets.")
             return None
     except Exception as e:
-        st.error(f"Erro de Conexão: {e}")
+        st.error(f"Erro de Conexão com o Google: {e}")
         return None
 
 @st.cache_data(ttl=30)
@@ -81,6 +84,7 @@ def carregar_dados_nuvem():
     try:
         gc = conectar_banco_seguro()
         if not gc: return pd.DataFrame()
+            
         planilha = gc.open("DB_IGO_Logistica")
         aba_m = planilha.worksheet("Memoria_Sistema")
         dados_m = aba_m.get_all_values()
@@ -104,21 +108,27 @@ def carregar_dados_nuvem():
                     col_foto = 'FOTO' if 'FOTO' in cols_limpas else ('IMAGEM' if 'IMAGEM' in cols_limpas else None)
                     
                     cols_ext = ['PEDIDO']
-                    if col_status: cols_ext.append(col_status)
-                    if col_obs: cols_ext.append(col_obs)
-                    if col_detalhes: cols_ext.append(col_detalhes)
-                    if col_receb: cols_ext.append(col_receb)
-                    if col_foto: cols_ext.append(col_foto)
+                    if col_status and col_status not in cols_ext: cols_ext.append(col_status)
+                    if col_obs and col_obs not in cols_ext: cols_ext.append(col_obs)
+                    if col_detalhes and col_detalhes not in cols_ext: cols_ext.append(col_detalhes)
+                    if col_receb and col_receb not in cols_ext: cols_ext.append(col_receb)
+                    if col_foto and col_foto not in cols_ext: cols_ext.append(col_foto)
                     
                     df_app_clean = df_app[cols_ext].copy()
                     
                     def extrair_dados_app(r):
-                        s = str(r.get(col_status, '')).strip() if col_status else ''
-                        o = str(r.get(col_obs, '')).strip() if col_obs else ''
-                        d = str(r.get(col_detalhes, '')).strip() if col_detalhes else ''
-                        rec = str(r.get(col_receb, '')).strip() if col_receb else ''
-                        f = str(r.get(col_foto, '')).strip() if col_foto else ''
-                        q = d if (d and d.upper() != 'NAN') else rec
+                        s = str(r.get(col_status, '')) if col_status else ''
+                        o = str(r.get(col_obs, '')) if col_obs else ''
+                        d = str(r.get(col_detalhes, '')) if col_detalhes else ''
+                        rec = str(r.get(col_receb, '')) if col_receb else ''
+                        f = str(r.get(col_foto, '')) if col_foto else ''
+                        
+                        s = s.strip() if s.upper() != 'NAN' else ''
+                        o = o.strip() if o.upper() != 'NAN' else ''
+                        d = d.strip() if d.upper() != 'NAN' else ''
+                        rec = rec.strip() if rec.upper() != 'NAN' else ''
+                        f = f.strip() if f.upper() != 'NAN' else ''
+                        q = d if d else rec
                         return pd.Series([s, o, q, f])
                         
                     df_app_clean[['APP_STATUS', 'APP_OBS', 'APP_QUEM', 'APP_FOTO']] = df_app_clean.apply(extrair_dados_app, axis=1)
@@ -126,18 +136,28 @@ def carregar_dados_nuvem():
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                     
-                    # Merge Inteligente (Individual e Romaneio)
+                    df_app_ind = df_app_clean[~df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)]
+                    df_app_rom = df_app_clean[df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)].copy()
+                    df_app_rom.rename(columns={'PEDIDO': 'ROMANEIO'}, inplace=True)
+                    
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     if 'ROMANEIO' not in df.columns: df['ROMANEIO'] = ""
                     df['ROMANEIO'] = df['ROMANEIO'].astype(str).str.strip()
                     
-                    df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
+                    df = pd.merge(df, df_app_ind, on='PEDIDO', how='left')
+                    
+                    if not df_app_rom.empty:
+                        df = pd.merge(df, df_app_rom, on='ROMANEIO', how='left', suffixes=('', '_R'))
+                        for c in ['APP_STATUS', 'APP_QUEM', 'APP_OBS', 'APP_FOTO']:
+                            if c in df.columns and f"{c}_R" in df.columns:
+                                df[c] = df[f"{c}_R"].replace("", pd.NA).combine_first(df[c].replace("", pd.NA)).fillna("")
                     
                     if 'APP_FOTO' in df.columns:
-                        if 'FOTO' not in df.columns: df['FOTO'] = df['APP_FOTO']
-                        else: df['FOTO'] = df['APP_FOTO'].replace("", pd.NA).combine_first(df['FOTO'].replace("", pd.NA)).fillna("")
-            except Exception as e_app: pass
-            
+                        if 'FOTO' not in df.columns:
+                            df['FOTO'] = df['APP_FOTO']
+                        else:
+                            df['FOTO'] = df['APP_FOTO'].replace("", pd.NA).combine_first(df['FOTO'].replace("", pd.NA)).fillna("")
+            except: pass
             if 'DATA' in df.columns: df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
     except Exception as e: st.error(f"Sincronização offline: {e}")
@@ -150,7 +170,16 @@ if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 # 🔐 3. LOGIN PREMIUM (SaaS)
 # =======================================================
 if not st.session_state.logado:
-    st.markdown("""<style> [data-testid="stAppViewContainer"] { background-color: #f8fafc !important; background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 24px 24px; } </style>""", unsafe_allow_html=True)
+    st.markdown("""
+    <style>
+    [data-testid="stAppViewContainer"] { 
+        background-color: #f8fafc !important; 
+        background-image: radial-gradient(#cbd5e1 1px, transparent 1px); 
+        background-size: 24px 24px; 
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     c1, c2, c3 = st.columns([1, 1.2, 1])
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
@@ -162,23 +191,28 @@ if not st.session_state.logado:
                 <p style="color: #64748b; font-size: 15px; margin-bottom: 25px;">Portal de Monitoramento IGO Logística</p>
             </div>
             """, unsafe_allow_html=True)
+            
             u = st.text_input("👤 Usuário").upper().strip()
             s = st.text_input("🔒 Senha", type="password")
+            st.markdown("<br>", unsafe_allow_html=True)
+            
             if st.button("🚀 Acessar Sistema", type="primary", use_container_width=True):
+                # Validação exata das chaves do dicionário
                 if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
                     st.session_state.logado, st.session_state.cliente = True, u; st.rerun()
-                else: st.error("Usuário ou senha incorretos.")
+                else: 
+                    st.error("Usuário ou senha incorretos.")
 else:
     # =======================================================
-    # 🚀 4. PAINEL PRINCIPAL
+    # 🚀 4. PAINEL PRINCIPAL (CÓDIGO COMPLETO RESTAURADO)
     # =======================================================
     df_raw = carregar_dados_nuvem()
     if not df_raw.empty:
+        # Filtro de cliente: Se for IGO vê tudo, senão filtra pelo TOMADOR
         df_cliente = df_raw if st.session_state.cliente == "IGO_LOGISTICA" else df_raw[df_raw['TOMADOR'] == st.session_state.cliente].copy()
         hoje_br = datetime.now(FUSO_BR).date()
         
         if not df_cliente.empty:
-            # 🖼️ GERAÇÃO DE LINKS DE FOTOS APPSHEET
             if 'FOTO' in df_cliente.columns:
                 df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
 
@@ -189,9 +223,31 @@ else:
                     if any(x in st for x in ['ROTA', 'ENTREGA']): return 4
                     if any(x in st for x in ['CONFERIDO', 'TRIAGEM']): return 3
                     if 'COLETADO' in st: return 2
-                    return 1
+                    if 'PENDENTE' in st: return 1
+                    return 0
                 return s_app if peso(s_app) >= peso(s_db) else s_db
             df_cliente['STATUS_REAL'] = df_cliente.apply(definir_status_real, axis=1)
+
+            def processar_detalhes(row):
+                s = str(row.get('STATUS_REAL', '')).upper()
+                if 'FRUSTRADA' in s:
+                    resp, obs = str(row.get('APP_QUEM', '')).strip(), str(row.get('APP_OBS', '')).strip()
+                    if resp.upper() in ['NAN', 'NONE']: resp = ""
+                    if obs.upper() in ['NAN', 'NONE']: obs = ""
+                    emoji = "📝"
+                    obs_up = obs.upper()
+                    if "FECHADO" in obs_up: emoji = "🔒"
+                    elif "SEM MATERIAL" in obs_up: emoji = "📭"
+                    elif "AUSENTE" in obs_up: emoji = "🚷"
+                    elif "ENDERE" in obs_up or "INCORRETO" in obs_up: emoji = "🗺️"
+                    elif "RECUS" in obs_up: emoji = "🛑"
+                    t_resp = f"🗣️ {resp}" if resp else ""
+                    t_obs = f"{emoji} {obs}" if obs else ""
+                    if t_resp and t_obs: return f"{t_resp} / {t_obs}"
+                    if t_resp: return t_resp
+                    if t_obs: return t_obs
+                return ""
+            df_cliente['DETALHES'] = df_cliente.apply(processar_detalhes, axis=1)
 
             def tratar_status(row):
                 s, previsao = str(row.get('STATUS_REAL', '')).strip().upper(), str(row.get('DATA_LIMITE', '')).strip()
@@ -210,26 +266,33 @@ else:
                 return res
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(tratar_status, axis=1)
 
+            ordem_padrao = ['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
+            colunas_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
+            
+            min_data = df_cliente['DATA_OBJ'].dropna().min() if ('DATA_OBJ' in df_cliente.columns and not df_cliente['DATA_OBJ'].dropna().empty) else hoje_br
+            max_data = df_cliente['DATA_OBJ'].dropna().max() if ('DATA_OBJ' in df_cliente.columns and not df_cliente['DATA_OBJ'].dropna().empty) else hoje_br
+            
             # --- ⚙️ SIDEBAR ---
             with st.sidebar:
+                # Logo muda conforme cliente logado
                 st.image(CLIENTES_CONFIG[st.session_state.cliente]["logo"], width=160)
                 st.divider()
                 modo_escuro = st.toggle("🌙 Modo Noturno", value=False)
                 st.divider()
-                min_data = df_cliente['DATA_OBJ'].dropna().min() if not df_cliente['DATA_OBJ'].dropna().empty else hoje_br
-                max_data = df_cliente['DATA_OBJ'].dropna().max() if not df_cliente['DATA_OBJ'].dropna().empty else hoje_br
-                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), format="DD/MM/YYYY")
+                datas_sel = st.date_input("🗓️ Período:", value=(min_data, max_data), min_value=min_data, max_value=max_data, format="DD/MM/YYYY")
                 cidades_sel = st.multiselect("📍 Cidades:", options=sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
+                with st.popover("⚙️ Personalizar Colunas", use_container_width=True): 
+                    col_vis = st.multiselect("Ver:", options=colunas_disponiveis, default=colunas_disponiveis)
                 st.divider()
                 if st.button("🚪 Sair do Sistema", use_container_width=True): st.session_state.logado = False; st.rerun()
 
-            # --- FILTROS BASE ---
+            # Filtros Base
             df_f = df_cliente.copy()
             if isinstance(datas_sel, tuple) and len(datas_sel) == 2:
                 df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
             if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
-            # --- CÁLCULO DOS KPIs ---
+            # KPIs
             n_tot = len(df_f)
             n_ent = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', na=False)])
             n_frus = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', na=False)])
@@ -238,11 +301,20 @@ else:
 
             # --- CSS DINÂMICO ---
             bg_app = "#0e1117" if modo_escuro else "#f0f2f6"
+            bg_side = "#161b22" if modo_escuro else "#ffffff"
             txt_main = "#f8fafc" if modo_escuro else "#0f172a"
             border_c = "#334155" if modo_escuro else "#e2e8f0"
-            st.markdown(f"<style> [data-testid='stAppViewContainer'] {{ background-color: {bg_app} !important; }} .dinamic-text {{ color: {txt_main} !important; }} .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }} </style>", unsafe_allow_html=True)
+            
+            st.markdown(f"""
+            <style>
+            [data-testid="stAppViewContainer"] {{ background-color: {bg_app} !important; }}
+            [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c}; }}
+            .dinamic-text {{ color: {txt_main} !important; }}
+            .dinamic-border {{ border-bottom: 2px solid {border_c} !important; }}
+            </style>
+            """, unsafe_allow_html=True)
 
-            # --- HEADER ---
+            # --- HEADER DINÂMICO ---
             st.markdown(f"""
             <div class="header-container dinamic-border" style="padding-bottom: 10px; margin-top: -15px;">
                 <div style="display: flex; align-items: center; gap: 15px;">
@@ -261,28 +333,25 @@ else:
             with c4: st.button(f"🚨 ATRASADOS\n\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=click_kpi, args=("ATRASADO",))
             with c5: st.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=click_kpi, args=("HOJE",))
 
-            # --- BUSCA E GRID ---
-            busca = st.text_input("🔎 Busca Rápida:", placeholder="Pedido, laboratório, cidade...")
+            # --- GRID E BUSCA ---
+            busca_inteligente = st.text_input("🔎 Busca Rápida:", placeholder="Pedido, lab, cidade, status...", key="busca_inteligente")
+            
             df_grid = df_f.copy()
             if st.session_state.filtro_kpi == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue', na=False)]
             elif st.session_state.filtro_kpi == "FRUSTRADA": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Frustrada', na=False)]
             elif st.session_state.filtro_kpi == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO', na=False)]
             elif st.session_state.filtro_kpi == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
-            
-            if busca:
-                mask = df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)
-                df_grid = df_grid[mask]
 
-            # =======================================================
-            # 📋 AG-GRID COM MODAL DE FOTO (LÓGICA JS RESTAURADA)
-            # =======================================================
-            if not df_grid.empty:
-                df_grid['STATUS'] = df_grid['STATUS_DISPLAY']
-                cols = ['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'FOTO_URL']
-                df_final = df_grid[[c for c in cols if c in df_grid.columns]]
-                
+            df_grid['STATUS'] = df_grid['STATUS_DISPLAY']
+            df_final = df_grid[[c for c in col_vis if c in df_grid.columns]]
+
+            if busca_inteligente:
+                mask = df_final.astype(str).apply(lambda x: x.str.lower().str.contains(busca_inteligente.lower())).any(axis=1)
+                df_final = df_final[mask]
+
+            if not df_final.empty:
                 gb = GridOptionsBuilder.from_dataframe(df_final)
-                gb.configure_default_column(resizable=True, sortable=True)
+                gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
                 
                 status_jscode = JsCode("""
                 function(params) {
@@ -294,7 +363,7 @@ else:
                 }
                 """)
                 
-                foto_jscode = JsCode("""
+                foto_modal_js = JsCode("""
                 class FotoModalRenderer {
                     init(params) {
                         this.eGui = document.createElement('div');
@@ -306,23 +375,23 @@ else:
                             icon.style.cursor = 'pointer';
                             icon.onclick = function() {
                                 let modal = document.createElement('div');
-                                Object.assign(modal.style, {position:'fixed', zIndex:'9999', left:'0', top:'0', width:'100vw', height:'100vh', backgroundColor:'rgba(0,0,0,0.8)', display:'flex', justifyContent:'center', alignItems:'center', cursor:'zoom-out'});
+                                Object.assign(modal.style, {position:'fixed', zIndex:'99999', left:'0', top:'0', width:'100vw', height:'100vh', backgroundColor:'rgba(0,0,0,0.85)', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', cursor:'zoom-out'});
                                 let img = document.createElement('img');
                                 img.src = val;
-                                Object.assign(img.style, {maxWidth:'90%', maxHeight:'90%', borderRadius:'8px', boxShadow:'0 0 20px rgba(0,0,0,0.5)'});
+                                Object.assign(img.style, {maxWidth:'90%', maxHeight:'85%', borderRadius:'8px', boxShadow:'0 4px 20px rgba(0,0,0,0.5)'});
                                 modal.appendChild(img);
                                 modal.onclick = () => document.body.removeChild(modal);
                                 document.body.appendChild(modal);
                             };
                             this.eGui.appendChild(icon);
-                        } else { this.eGui.innerHTML = '➖'; }
+                        } else { this.eGui.innerHTML = '<span style="color:#cbd5e1">➖</span>'; }
                     }
                     getGui() { return this.eGui; }
                 }
                 """)
+
+                for col in df_final.columns:
+                    if col == 'STATUS': gb.configure_column(col, cellStyle=status_jscode)
+                    elif col == 'FOTO_URL': gb.configure_column(col, headerName="FOTO", cellRenderer=foto_modal_js, width=70)
                 
-                gb.configure_column("STATUS", cellStyle=status_jscode, width=150)
-                gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=foto_jscode, width=80)
-                
-                grid_css = { ".ag-header-cell-text": {"font-size": "12px", "font-weight": "bold"} }
-                AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=grid_css, height=500)
+                AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', height=520)
