@@ -23,39 +23,53 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # =============================================================================
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
-# Alterado para 2 minutos (120000 milissegundos)
+# 🔥 Ajustado para 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
 if not st.session_state.autenticado:
-    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1.5, 1])
+    st.markdown("""
+        <style>
+        [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
+        .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; }
+        .login-title { color: #0F172A; font-weight: 800; font-size: 22px; margin-top: 15px; letter-spacing: -0.5px; }
+        .login-subtitle { color: #64748B; font-size: 14px; margin-bottom: 30px; font-weight: 500; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1.2, 1])
     
     with col2:
-        with st.container(border=True):
-            st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-            st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
-            st.markdown("<p style='color: gray; margin-top: 10px;'>Acesso Restrito ao Painel Operacional</p>", unsafe_allow_html=True)
-            st.markdown("</div><br>", unsafe_allow_html=True)
+        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+        
+        st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=180)
             
-            with st.form("form_login"):
-                usuario = st.text_input("👤 Usuário")
-                senha = st.text_input("🔑 Senha", type="password")
-                submit = st.form_submit_button("Entrar no Sistema", use_container_width=True, type="primary")
+        st.markdown("<div class='login-title'>PORTAL CORPORATIVO</div>", unsafe_allow_html=True)
+        st.markdown("<div class='login-subtitle'>Autenticação de Operadores - IGO Logística</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        with st.form("form_login"):
+            usuario = st.text_input("👤 Usuário")
+            senha = st.text_input("🔑 Senha", type="password")
+            st.markdown("<br>", unsafe_allow_html=True)
+            submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
+            
+            if submit:
+                logins_autorizados = {
+                    "robson.melo": "123",
+                    "william.bertoldo": "123"
+                }
                 
-                if submit:
-                    logins_autorizados = {
-                        "robson.melo": "123",
-                        "william.bertoldo": "123"
-                    }
-                    
-                    if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
-                        st.session_state.autenticado = True
-                        st.rerun()
-                    else:
-                        st.error("❌ Usuário ou senha incorretos.")
+                if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
+                    st.session_state.autenticado = True
+                    st.rerun()
+                else:
+                    st.error("❌ Credenciais inválidas.")
+        st.markdown("</div>", unsafe_allow_html=True)
     
     st.stop()
 
@@ -297,9 +311,8 @@ def obter_proximo_id(df):
 # 🎨 3. INTERFACE E NAVEGAÇÃO (DESIGN CORPORATIVO CLEAN)
 # =============================================================================
 
-# Fundo claro global
 bg_app = "#F8FAFC"        
-bg_side = "#FFFFFF"  # Sidebar Branca (Logo combina perfeitamente)
+bg_side = "#FFFFFF"
 txt_main = "#0F172A"      
 border_c = "#E2E8F0"      
 
@@ -438,7 +451,10 @@ if menu == "📊 Dashboard Operacional":
 
         col_f1, col_f2 = st.columns(2)
         f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
-        f_data = col_f2.date_input("📅 Período de Análise:", value=(df_raw['DATA_OBJ'].min(), hoje_br), format="DD/MM/YYYY")
+        
+        # 🔥 Ajustado: Filtro padrão puxa 3 dias (hoje e os 2 anteriores)
+        data_inicial_padrao = hoje_br - timedelta(days=2)
+        f_data = col_f2.date_input("📅 Período de Análise:", value=(data_inicial_padrao, hoje_br), format="DD/MM/YYYY")
         
         df_f = df_raw.copy()
         if f_cli != "Todos": df_f = df_f[df_f['TOMADOR'] == f_cli]
@@ -465,7 +481,8 @@ if menu == "📊 Dashboard Operacional":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'STATUS_DISPLAY', 'AGENTE_RAW', 'LABORATORIO', 'CIDADE', 'UF', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CEP']
+        # 🔥 Ajustado: Ordem exata das colunas principais e as ocultas
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'AGENTE_RAW', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
         
         if busca:
@@ -482,8 +499,25 @@ if menu == "📊 Dashboard Operacional":
             gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
             gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
             
+            # 🔥 Ajustado: Nomes bonitos nos cabeçalhos da Grid
+            gb.configure_column("DATA", headerName="Data")
+            gb.configure_column("PEDIDO", headerName="Pedido")
+            gb.configure_column("TOMADOR", headerName="Tomador")
+            gb.configure_column("LABORATORIO", headerName="Laboratório")
+            gb.configure_column("CIDADE", headerName="Cidade")
+            gb.configure_column("UF", headerName="UF")
+            gb.configure_column("BAIRRO", headerName="Bairro")
+            gb.configure_column("AGENTE_RAW", headerName="Agente") # Título limpo e bonito
+            gb.configure_column("DATA_LIMITE", headerName="Previsão Entrega")
+            
+            # 🔥 Ajustado: Ocultando as colunas extras por padrão (ficam disponíveis no filtro lateral da Grid)
+            gb.configure_column("ENDERECO", hide=True)
+            gb.configure_column("NUMERO", hide=True)
+            gb.configure_column("CEP", hide=True)
+            gb.configure_column("DATA_ENTREGA", hide=True)
+            
             st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'};} return {'fontWeight':'600', 'color': '#64748B'};}")
-            gb.configure_column("STATUS_DISPLAY", headerName="STATUS", cellStyle=st_js, minWidth=170)
+            gb.configure_column("STATUS_DISPLAY", headerName="Status", cellStyle=st_js, minWidth=170)
             
             img_js = JsCode("""
             class FotoRenderer {
@@ -514,7 +548,7 @@ if menu == "📊 Dashboard Operacional":
                 getGui() { return this.eGui; }
             }
             """)
-            gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=img_js, width=90, minWidth=90)
+            gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=img_js, width=90, minWidth=90)
             
             grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
             
@@ -1295,8 +1329,8 @@ elif menu == "📁 Exportar Relatórios":
 # =============================================================================
 # ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
 # =============================================================================
-elif menu == "⚙️ Matriz de Rotas":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
+elif menu == "⚙️ Configurar Rotas":
+    st.markdown("<h4 class='dinamic-text'>⚙️ Gestão de Agentes e Rotas</h4>", unsafe_allow_html=True)
     
     tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
     
