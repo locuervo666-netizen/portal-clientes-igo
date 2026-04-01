@@ -90,12 +90,21 @@ def calc_status_display(row):
     return 'Pendente'
 
 # =============================================================================
-# 🎨 3. CSS E ESTILOS (FORÇANDO O TOPO EXTREMO)
+# 🎨 3. CSS E ESTILOS (OCULTANDO ELEMENTOS PADRÃO DO STREAMLIT)
 # =============================================================================
 st.markdown("""
 <style>
-    /* Esconde o cabeçalho padrão do Streamlit completamente */
-    [data-testid="stHeader"] { display: none !important; }
+    /* --------------------------------------------------- */
+    /* OCULTAR ELEMENTOS NATIVOS DO STREAMLIT (MENU, RODAPÉ) */
+    /* --------------------------------------------------- */
+    #MainMenu {visibility: hidden !important;}
+    header {visibility: hidden !important;}
+    footer {visibility: hidden !important;}
+    .stDeployButton {display: none !important;}
+    
+    /* Tenta ocultar iframes e botões extras injetados pelo Streamlit Cloud */
+    iframe[src*="manage"] {display: none !important;}
+    [data-testid="manage-app-button"] {display: none !important;}
     
     /* Remove os espaços em branco do container principal */
     .block-container {
@@ -105,7 +114,9 @@ st.markdown("""
     }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     
-    /* Cartões de Métrica */
+    /* --------------------------------------------------- */
+    /* CARTÕES DE MÉTRICA */
+    /* --------------------------------------------------- */
     .metric-card { 
         border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); 
         padding: 20px; height: 140px; display: flex; flex-direction: column; 
@@ -116,7 +127,9 @@ st.markdown("""
     .metric-value { font-size: 52px; font-weight: 900; font-family: 'Segoe UI', sans-serif; line-height: 1; margin: 3px 0;}
     .metric-delta { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; display: inline-block; background-color: rgba(255,255,255,0.6);}
     
-    /* Ticker (Barra Rolante) */
+    /* --------------------------------------------------- */
+    /* TICKER (BARRA ROLANTE) */
+    /* --------------------------------------------------- */
     .ticker-wrap { 
         width: 100%; overflow: hidden; background-color: #1E293B; border-radius: 8px; 
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 10px 0; 
@@ -161,7 +174,7 @@ else:
     else:
         html_delta_total = f'<span class="metric-delta" style="color: #059669;">▲ Novo Ciclo</span>'
 
-    # ================== 1. OS 4 BLOCOS DE MÉTRICAS (AGORA NO TOPO) ==================
+    # ================== 1. OS 4 BLOCOS DE MÉTRICAS ==================
     c1, c2, c3, c4 = st.columns(4)
     
     with c1:
@@ -214,7 +227,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-    # ================== 3. TICKER (BARRA ROLANTE) - AGORA ABAIXO ==================
+    # ================== 3. TICKER (BARRA ROLANTE) ==================
     ticker_items = []
     col_tomador = next((col for col in ['TOMADOR', 'CLIENTE', 'EMPRESA'] if col in df_raw.columns), None)
     if col_tomador and not df_hoje.empty:
@@ -248,7 +261,6 @@ else:
     <div class="ticker-wrap"><div class="ticker">{ticker_content}</div></div>
     """, unsafe_allow_html=True)
 
-    # Divisor sutil para as próximas métricas abaixo
     st.markdown("<hr style='border: 1px solid #E2E8F0; margin-top: 10px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
 # --- RODAPÉ DISCRETO ---
