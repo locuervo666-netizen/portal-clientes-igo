@@ -129,7 +129,7 @@ if 'autenticado' not in st.session_state:
 if not st.session_state.autenticado:
     st.markdown("""
         <style>
-        .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; width: 100%; margin: auto; }
+        .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; max-width: 400px; margin: auto; }
         .login-title { color: #0F172A; font-weight: 800; font-size: 22px; margin-top: 15px; letter-spacing: -0.5px; text-align: center; }
         .login-subtitle { color: #64748B; font-size: 14px; margin-bottom: 30px; font-weight: 500; text-align: center; }
         </style>
@@ -412,8 +412,8 @@ def obter_css_grid():
         ".ag-header-icon": {"color": "#0284C7 !important"}, 
         ".ag-cell": {"font-size": "11px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
         ".ag-row-even": {"background-color": "#FFFFFF !important"},
-        ".ag-row-odd": {"background-color": "#F4F6F8 !important"}, /* Azul/Cinza muito suave e discreto */
-        ".ag-row-hover": {"background-color": "#E2E8F0 !important"}, /* Marcador suave no hover */
+        ".ag-row-odd": {"background-color": "#F4F6F8 !important"}, # Azul/Cinza muito suave e discreto
+        ".ag-row-hover": {"background-color": "#E2E8F0 !important"}, # Marcador suave no hover
         ".ag-row-selected": {"background-color": "#E0F2FE !important", "color": "#0369A1 !important"},
         ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
     }
@@ -464,20 +464,21 @@ st.markdown("<br>", unsafe_allow_html=True)
 # 🖥️ BARRA DE TAREFAS FIXA NO RODAPÉ (TASKBAR)
 # =============================================================================
 menu = st.radio("Navegação:", [
-    "📊 Dashboard", 
-    "📝 Manual", 
-    "📥 Lotes", 
-    "🔬 Triagem", 
-    "📱 Zap", 
-    "📁 Relatórios", 
-    "⚙️ Rotas"
+    "📊 Dashboard Operacional", 
+    "📝 Inserir Pedido Manual", 
+    "📥 Importação de Lotes", 
+    "🔬 Triagem e Romaneio", 
+    "📱 Disparo WhatsApp", 
+    "📁 Exportar Relatórios", 
+    "⚙️ Matriz de Rotas"
 ], horizontal=True, label_visibility="collapsed")
 
+st.markdown("---")
 
 # =============================================================================
 # 🚀 MÓDULO 1: DASHBOARD
 # =============================================================================
-if menu == "📊 Dashboard":
+if menu == "📊 Dashboard Operacional":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -739,15 +740,12 @@ if menu == "📊 Dashboard":
                 st.rerun()
 
     else:
-        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Manual' para começar.")
+        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Inserir Pedido Manual' para começar.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
-elif menu == "📝 Manual":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
-    st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
-    
+elif menu == "📝 Inserir Pedido Manual":
     with st.container(border=True):
         with st.form("form_manual_page", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -806,8 +804,7 @@ elif menu == "📝 Manual":
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
-elif menu == "📥 Lotes":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
+elif menu == "📥 Importação de Lotes":
     st.success("🛡️ **AUDITORIA DE DADOS ATIVA:** O sistema avalia padronizações de vários clientes (Airlab, FFW, etc) e adiciona os pacotes à base sem destruir seu histórico do dia.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
@@ -1002,8 +999,7 @@ elif menu == "📥 Lotes":
 # =============================================================================
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO 
 # =============================================================================
-elif menu == "🔬 Triagem":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🔬 Terminal de Triagem e Expedição</h3></div>", unsafe_allow_html=True)
+elif menu == "🔬 Triagem e Romaneio":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -1169,6 +1165,7 @@ elif menu == "🔬 Triagem":
                                 pdf.rect(5, 5, 200, 287)
                                 
                                 try:
+                                    # Adiciona a Logo da IGO no canto superior esquerdo
                                     pdf.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", x=10, y=8, w=35)
                                 except:
                                     pass
@@ -1268,7 +1265,7 @@ elif menu == "🔬 Triagem":
 # =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
 # =============================================================================
-elif menu == "📱 Zap":
+elif menu == "📱 Disparo WhatsApp":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
     st.markdown("Acione o terminal de comando para injetar o cronograma oficial de rotas no WhatsApp corporativo da equipe.")
     
@@ -1336,7 +1333,7 @@ elif menu == "📱 Zap":
 # =============================================================================
 # 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
 # =============================================================================
-elif menu == "📁 Relatórios":
+elif menu == "📁 Exportar Relatórios":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining e Exportação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
@@ -1394,7 +1391,7 @@ elif menu == "📁 Relatórios":
 # =============================================================================
 # ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
 # =============================================================================
-elif menu == "⚙️ Rotas":
+elif menu == "⚙️ Matriz de Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
     
     tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
