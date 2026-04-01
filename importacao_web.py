@@ -21,40 +21,63 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # =============================================================================
 # 🔗 1. CONFIGURAÇÃO DA PÁGINA E AUTENTICAÇÃO
 # =============================================================================
-# Retiramos a barra lateral do layout inicial
-st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 ANIQUILAÇÃO TOTAL DA NUVEM STREAMLIT E ESTILO PREMIUM DO NOVO MENU
+# 🔥 CSS CIRÚRGICO E TEMA PREMIUM DO PAINEL LATERAL (DOCK FIXO)
 st.markdown("""
     <style>
-    /* Oculta o Cabeçalho Inteiro, Deploy, Menu, Rodapé e Marca d'Água */
-    header { display: none !important; }
-    [data-testid="stHeader"] { display: none !important; }
-    [data-testid="stSidebar"] { display: none !important; }
+    /* Oculta os botões Deploy e Manage App gerados pela nuvem do Streamlit */
+    [data-testid="stToolbar"] { display: none !important; }
     .stAppDeployButton { display: none !important; }
-    footer { display: none !important; }
     [class^="viewerBadge"] { display: none !important; }
-    iframe[src*="badge"] { display: none !important; }
+    footer { display: none !important; }
     
-    /* Puxa o conteúdo para o topo, já que não tem mais cabeçalho */
-    .block-container { padding-top: 1.5rem !important; padding-bottom: 1rem !important; max-width: 96% !important; }
+    /* Configuração de Fundo e Respiro */
+    .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     
-    /* Estilização do Novo Menu Horizontal Premium */
-    div.row-widget.stRadio > div { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px; }
-    div.row-widget.stRadio > div > label { 
-        background-color: #FFFFFF; border: 1px solid #CBD5E1; padding: 10px 18px; border-radius: 8px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s ease;
+    /* ========================================================= */
+    /* 🔥 ESTILIZAÇÃO DO MENU LATERAL FIXO (ESTILO DOCK/OS) 🔥 */
+    /* ========================================================= */
+    [data-testid="stSidebar"] { 
+        background-color: #0F172A !important; /* Fundo Escuro Premium */
+        border-right: 1px solid #1E293B !important;
     }
-    div.row-widget.stRadio > div > label:hover { background-color: #F1F5F9; border-color: #94A3B8; }
-    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p { font-weight: 600; color: #475569; margin: 0; font-size: 14px; }
     
-    /* Aba Ativa (Selecionada) - Azul Premium */
-    div[role="radiogroup"] > label[data-checked="true"] { background-color: #0284C7 !important; border-color: #0369A1 !important; box-shadow: 0 4px 6px rgba(2, 132, 199, 0.2) !important; }
-    div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p { color: #FFFFFF !important; font-weight: 700 !important; }
+    /* Botões de Rádio (Menu) na Barra Lateral */
+    [data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] { gap: 8px !important; }
+    [data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label { 
+        background-color: transparent !important; 
+        border: none !important; 
+        padding: 12px 16px !important; 
+        border-radius: 8px !important; 
+        cursor: pointer !important; 
+        transition: all 0.2s ease-in-out !important;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; } /* Oculta a bolinha do rádio */
+    
+    /* Cor do Texto do Menu Desmarcado */
+    [data-testid="stSidebar"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p { 
+        color: #94A3B8 !important; font-size: 14px !important; font-weight: 600 !important; margin: 0 !important; 
+    }
+    
+    /* Efeito Hover (Passar o Mouse) */
+    [data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label:hover { 
+        background-color: #1E293B !important; 
+    }
+    
+    /* Menu Ativo (Selecionado) - Azul Neon */
+    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] { 
+        background-color: #0284C7 !important; 
+        box-shadow: 0 4px 6px rgba(2, 132, 199, 0.2) !important;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p { 
+        color: #FFFFFF !important; font-weight: 700 !important; 
+    }
 
-    /* Estilo Geral de Textos e Bordas */
+    /* Estilo Geral de Textos e Bordas da Tela Principal */
     .dinamic-text { color: #0F172A !important; font-weight: 800; letter-spacing: -0.5px; }
     .dinamic-border { border-bottom: 2px solid #E2E8F0 !important; margin-bottom: 24px; padding-bottom: 8px; }
     
@@ -71,7 +94,7 @@ st.markdown("""
         color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
     }
 
-    .stButton > button[kind="primary"] { background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; }
+    .stButton > button[kind="primary"] { background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; color: #FFFFFF !important; }
     .stButton > button[kind="primary"]:hover { background: #0369A1 !important; }
     
     [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] { 
@@ -271,6 +294,7 @@ def despachar_para_appsheet(lista_pedidos_dicts):
     except Exception: return False
 
 def padronizar_texto(texto):
+    """Remove acentos e converte para MAIÚSCULAS"""
     if pd.isna(texto) or not texto: return ""
     texto_str = str(texto).strip()
     texto_sem_acento = unicodedata.normalize('NFKD', texto_str).encode('ASCII', 'ignore').decode('utf-8')
@@ -391,38 +415,44 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 
 
 # =============================================================================
-# 🎨 3. NOVO CABEÇALHO E MENU SUPERIOR (A SOLUÇÃO DEFINITIVA)
+# 🎨 3. MENU LATERAL FIXO (DOCK DE NAVEGAÇÃO)
 # =============================================================================
-
-# Cabeçalho com Logo, Título e Botão Sair
-col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
-
-with col_logo:
-    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=140)
+with st.sidebar:
+    st.markdown("<div style='text-align: center; padding-bottom: 20px; padding-top: 10px;'>", unsafe_allow_html=True)
+    # Trocado para fundo transparente se a imagem tiver fundo branco, ou a imagem inteira se adapta bem
+    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=150)
+    st.markdown("</div>", unsafe_allow_html=True)
     
-with col_title:
-    st.markdown("<h2 style='color: #0F172A; font-weight: 800; margin: 0; text-align: center;'>PAINEL GERENCIAL</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #64748B; margin: 0; text-align: center; font-weight: 600;'>Centro de Controle Operacional - IGO Logística</p>", unsafe_allow_html=True)
-
-with col_logout:
-    if st.button("🚪 Sair", use_container_width=True):
+    menu = st.radio("MENU OPERACIONAL", [
+        "📊 Dashboard Operacional", 
+        "📝 Inserir Pedido Manual", 
+        "📥 Importação de Lotes", 
+        "🔬 Triagem e Romaneio", 
+        "📱 Disparo WhatsApp", 
+        "📁 Exportar Relatórios", 
+        "⚙️ Matriz de Rotas"
+    ], label_visibility="collapsed")
+    
+    st.markdown("<div style='margin-top: 50%;'></div>", unsafe_allow_html=True)
+    st.divider()
+    
+    if st.button("🚪 Encerrar Sessão", use_container_width=True, type="secondary"):
         st.session_state.autenticado = False
         st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Menu Horizontal
-menu = st.radio("Navegação:", [
-    "📊 Dashboard Operacional", 
-    "📝 Inserir Pedido Manual", 
-    "📥 Importação de Lotes", 
-    "🔬 Triagem e Romaneio", 
-    "📱 Disparo WhatsApp", 
-    "📁 Exportar Relatórios", 
-    "⚙️ Matriz de Rotas"
-], horizontal=True, label_visibility="collapsed")
-
-st.markdown("---")
+        
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    with st.expander("🛡️ Retenção de Dados (BKP)"):
+        st.markdown("<p style='font-size: 11px; color: #94A3B8;'>Baixe uma cópia física da memória integral.</p>", unsafe_allow_html=True)
+        df_bkp = carregar_dados_completos(planilha_db)
+        if not df_bkp.empty:
+            st.download_button(
+                label="📥 Download Database", 
+                data=gerar_excel_memoria(df_bkp), 
+                file_name=f"BKP_IGO_{datetime.now(FUSO_BR).strftime('%d%m%Y_%H%M')}.xlsx", 
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                use_container_width=True,
+                type="primary"
+            )
 
 # =============================================================================
 # 🚀 MÓDULO 1: DASHBOARD
@@ -436,6 +466,8 @@ if menu == "📊 Dashboard Operacional":
         
         if 'DATA_LIMITE' in df_raw.columns: df_raw['DATA_LIMITE'] = df_raw['DATA_LIMITE'].fillna("").astype(str)
         if 'DATA_ENTREGA' in df_raw.columns: df_raw['DATA_ENTREGA'] = df_raw['DATA_ENTREGA'].fillna("").astype(str)
+
+        st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📊 Painel de Controle e Gestão</h3></div>", unsafe_allow_html=True)
 
         col_f1, col_f2 = st.columns(2)
         f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
@@ -690,6 +722,9 @@ if menu == "📊 Dashboard Operacional":
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
 elif menu == "📝 Inserir Pedido Manual":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
+    st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
+    
     with st.container(border=True):
         with st.form("form_manual_page", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -749,6 +784,7 @@ elif menu == "📝 Inserir Pedido Manual":
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
 elif menu == "📥 Importação de Lotes":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
     st.success("🛡️ **AUDITORIA DE DADOS ATIVA:** O sistema avalia padronizações de vários clientes (Airlab, FFW, etc) e adiciona os pacotes à base sem destruir seu histórico do dia.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
@@ -944,6 +980,7 @@ elif menu == "📥 Importação de Lotes":
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO 
 # =============================================================================
 elif menu == "🔬 Triagem e Romaneio":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🔬 Terminal de Triagem e Expedição</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -1324,20 +1361,6 @@ elif menu == "📁 Exportar Relatórios":
                     st.success(f"Pesquisa concluída! Encontramos uma massa de {len(df_custom)} volumes cruzados com as suas restrições.")
                     st.download_button("📥 Fazer Download do Relatório Cru (Excel)", data=gerar_excel_memoria(df_custom), file_name=f"Pesquisa_Customizada_IGO.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 else: st.warning("Nenhum dado cruzado sob essas métricas foi identificado na nuvem.")
-                
-        st.markdown("---")
-        st.markdown("### 🛡️ Auditoria e Retenção Física")
-        st.markdown("<p style='font-size: 13px; color: #64748B;'>Botão de emergência para download imediato da memória completa e irrestrita do sistema.</p>", unsafe_allow_html=True)
-        if not df_raw.empty:
-            st.download_button(
-                label="📥 Baixar Database em Tempo Real (.xlsx)", 
-                data=gerar_excel_memoria(df_raw), 
-                file_name=f"AUDITORIA_IGO_{datetime.now(FUSO_BR).strftime('%d%m%Y_%H%M')}.xlsx", 
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
-                use_container_width=True,
-                type="secondary"
-            )
-            
     else: st.warning("O banco de dados está vazio.")
 
 # =============================================================================
