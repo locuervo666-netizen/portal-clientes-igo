@@ -26,10 +26,13 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 # 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS SEGURO: Apenas ajustes de fundo e respiro, sem esconder barras do Streamlit
+# 🔥 CSS CIRÚRGICO: Oculta apenas os botões da direita (Deploy/Share/Menu), preservando o menu lateral e o Manage App!
 st.markdown("""
     <style>
-    .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; }
+    [data-testid="stToolbar"] { display: none !important; }
+    .stAppDeployButton { display: none !important; }
+    
+    .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -1069,7 +1072,7 @@ elif menu == "🔬 Triagem e Romaneio":
                                 carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
-            else: st.info("O salão está vazio. Apenas materiais marcados como 'Coletados' chegam à triagem.")
+            else: st.info("O salão está vazio. Apenas materiais marked como 'Coletados' chegam à triagem.")
 
         with t2:
             st.markdown("#### Matriz de Expedição (Romaneio)")
