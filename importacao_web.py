@@ -26,7 +26,7 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS DA NOVA BARRA DE TAREFAS FIXA NO RODAPÉ (ESTILO WINDOWS)
+# 🔥 CSS DA NOVA BARRA DE TAREFAS E TELA EDGE-TO-EDGE
 st.markdown("""
     <style>
     /* Oculta as ferramentas da nuvem do Streamlit */
@@ -39,8 +39,14 @@ st.markdown("""
     #MainMenu { display: none !important; }
     footer { display: none !important; }
     
-    /* Configuração da Tela Inteira com respiro no fundo para a barra não cobrir a Grid */
-    .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 96% !important; }
+    /* Configuração da Tela Inteira (Ocupando 100% das laterais e matando o teto branco) */
+    .block-container { 
+        padding-top: 1.5rem !important; 
+        padding-bottom: 120px !important; 
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        max-width: 100% !important; 
+    }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     
     /* ========================================================= */
@@ -432,46 +438,25 @@ def calc_status_display(row):
 
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
-# =============================================================================
-# 🎨 3. CABEÇALHO LIMPO
-# =============================================================================
-
-# Cabeçalho Limpo (Logo, Título e Botão Sair)
-col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
-
-with col_logo:
-    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=140)
-    
-with col_title:
-    st.markdown("<h2 style='color: #0F172A; font-weight: 800; margin: 0; text-align: center;'>PAINEL GERENCIAL</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #64748B; margin: 0; text-align: center; font-weight: 600;'>Centro de Controle Operacional - IGO Logística</p>", unsafe_allow_html=True)
-
-with col_logout:
-    if st.button("🚪 Sair", use_container_width=True):
-        st.session_state.autenticado = False
-        st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
-
-st.markdown("<br>", unsafe_allow_html=True)
 
 # =============================================================================
 # 🖥️ BARRA DE TAREFAS FIXA NO RODAPÉ (TASKBAR)
 # =============================================================================
 menu = st.radio("Navegação:", [
-    "📊 Dashboard Operacional", 
-    "📝 Inserir Pedido Manual", 
-    "📥 Importação de Lotes", 
-    "🔬 Triagem e Romaneio", 
-    "📱 Disparo WhatsApp", 
-    "📁 Exportar Relatórios", 
-    "⚙️ Matriz de Rotas"
+    "📊 Dashboard", 
+    "📝 Manual", 
+    "📥 Lotes", 
+    "🔬 Triagem", 
+    "📱 Zap", 
+    "📁 Relatórios", 
+    "⚙️ Rotas"
 ], horizontal=True, label_visibility="collapsed")
 
-st.markdown("---")
 
 # =============================================================================
 # 🚀 MÓDULO 1: DASHBOARD
 # =============================================================================
-if menu == "📊 Dashboard Operacional":
+if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -728,12 +713,15 @@ if menu == "📊 Dashboard Operacional":
                 st.rerun()
 
     else:
-        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Inserir Pedido Manual' para começar.")
+        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Manual' para começar.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
-elif menu == "📝 Inserir Pedido Manual":
+elif menu == "📝 Manual":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
+    st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
+    
     with st.container(border=True):
         with st.form("form_manual_page", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -792,7 +780,8 @@ elif menu == "📝 Inserir Pedido Manual":
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
-elif menu == "📥 Importação de Lotes":
+elif menu == "📥 Lotes":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
     st.success("🛡️ **AUDITORIA DE DADOS ATIVA:** O sistema avalia padronizações de vários clientes (Airlab, FFW, etc) e adiciona os pacotes à base sem destruir seu histórico do dia.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
@@ -987,7 +976,8 @@ elif menu == "📥 Importação de Lotes":
 # =============================================================================
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO 
 # =============================================================================
-elif menu == "🔬 Triagem e Romaneio":
+elif menu == "🔬 Triagem":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🔬 Terminal de Triagem e Expedição</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -1290,3 +1280,186 @@ elif menu == "📱 Zap":
                             msg = f"🚚 *ROTA OFICIAL IGO LOGÍSTICA*\n"
                             msg += f"Data: {data_filtro.strftime('%d/%m/%Y')}\n"
                             msg += f"Agente Tático: {str(agente).upper()}\n\n"
+                            msg += f"🧪 *VOLUMES BIOLÓGICOS/TOXICOLÓGICOS ({qtd_pedidos}):*\n\n"
+                            
+                            for i, (_, row) in enumerate(df_agente.iterrows(), 1):
+                                msg += f"*{i}️⃣ Identificador:* {row['PEDIDO']}\n"
+                                msg += f"🏥 *Clínica Solicitante:* {row.get('TOMADOR', '')}\n"
+                                msg += f"🏢 *Base de Captação:* {row.get('LABORATORIO', '')}\n"
+                                msg += f"📍 *Coordenadas:* {row.get('ENDERECO', '')}, {row.get('NUMERO', '')} - {row.get('BAIRRO', '')}, {row.get('CIDADE', '')}\n"
+                                if str(row.get('OBSERVACOES', '')).strip() and str(row.get('OBSERVACOES', '')).upper() != 'NAN':
+                                    msg += f"📝 *Aviso de Rota:* {row['OBSERVACOES']}\n"
+                                msg += "------------------------\n"
+                            
+                            msg += "\nZele pela integridade do material. Dirija com extrema segurança."
+                            
+                            msg_codificada = urllib.parse.quote(msg)
+                            link_whatsapp = f"https://api.whatsapp.com/send?phone={telefone}&text={msg_codificada}"
+                            
+                            st.link_button("📲 Emitir Ordem de Deslocamento Automática", link_whatsapp, type="primary")
+                        else:
+                            st.error(f"⚠️ Barreira de Comunicação: A diretriz de contato numérico do agente '{agente}' está corrompida ou vazia no DB.")
+    else:
+        st.warning("📭 O banco de dados está vazio no momento.")
+
+# =============================================================================
+# 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
+# =============================================================================
+elif menu == "📁 Relatórios":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining e Exportação</h3></div>", unsafe_allow_html=True)
+    df_raw = carregar_dados_completos(planilha_db)
+    
+    if not df_raw.empty:
+        colunas_export = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'DATA_LIMITE']
+        df_export_base = df_raw[[c for c in colunas_export if c in df_raw.columns]].copy()
+        if 'AGENTE_RAW' in df_export_base.columns: df_export_base.rename(columns={'AGENTE_RAW': 'MOTORISTA'}, inplace=True)
+        
+        st.markdown("### ⚡ Auditoria Rápida de Lotes Pré-Configurados")
+        col_rel1, col_rel2, col_rel3 = st.columns(3)
+        
+        df_rj = df_export_base[df_export_base['UF'].str.upper() == 'RJ'] if 'UF' in df_export_base.columns else pd.DataFrame()
+        if 'CIDADE' in df_export_base.columns:
+            df_jf = df_export_base[df_export_base['CIDADE'].str.upper().str.contains('JUIZ DE FORA', na=False)]
+            df_rjjf = pd.concat([df_rj, df_jf]).drop_duplicates(subset=['PEDIDO'])
+        else: df_rjjf = df_rj
+            
+        if not df_rjjf.empty:
+            col_rel1.download_button("📥 Minerar Bloco RJ / JF", data=gerar_excel_memoria(df_rjjf), file_name=f"Datamining_RJ_JF_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        else: col_rel1.button("📥 Minerar Bloco RJ / JF (Zero Ocorrências)", disabled=True, use_container_width=True)
+
+        if 'MOTORISTA' in df_export_base.columns:
+            df_lud = df_export_base[df_export_base['MOTORISTA'].str.lower().str.contains('ludmila|veloz', na=False)]
+            if not df_lud.empty:
+                col_rel2.download_button("📥 Minerar Base Ludmila / Veloz", data=gerar_excel_memoria(df_lud), file_name=f"Datamining_Ludmila_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            else: col_rel2.button("📥 Minerar Base Ludmila / Veloz (Sem Dados)", disabled=True, use_container_width=True)
+        
+        col_rel3.download_button("📥 Extração Completa (Nuvem Integral)", data=gerar_excel_memoria(df_export_base), file_name=f"BKP_Integral_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary", use_container_width=True)
+        
+        st.markdown("---")
+        st.markdown("### 🔍 Motor Analítico Customizável (Pesquisa Cruzada)")
+        with st.form("form_rel_custom"):
+            cf1, cf2 = st.columns(2)
+            c_ag = cf1.text_input("👤 Codinome do Agente:")
+            c_cid = cf2.text_input("🏙️ Raio de Busca (Cidade):")
+            c_uf = cf1.text_input("🗺️ Vetor Estadual (UF):")
+            c_base = cf2.text_input("🏢 Hub Logístico (Tomador/Clínica):")
+            
+            if st.form_submit_button("Executar Pesquisa e Compilar Tabela"):
+                df_custom = df_export_base.copy()
+                if c_ag and 'MOTORISTA' in df_custom.columns: df_custom = df_custom[df_custom['MOTORISTA'].str.upper().str.contains(c_ag.upper(), na=False)]
+                if c_cid and 'CIDADE' in df_custom.columns: df_custom = df_custom[df_custom['CIDADE'].str.upper().str.contains(c_cid.upper(), na=False)]
+                if c_uf and 'UF' in df_custom.columns: df_custom = df_custom[df_custom['UF'].str.upper() == c_uf.upper()]
+                if c_base:
+                    mt = df_custom['TOMADOR'].str.upper().str.contains(c_base.upper(), na=False) if 'TOMADOR' in df_custom.columns else False
+                    ml = df_custom['LABORATORIO'].str.upper().str.contains(c_base.upper(), na=False) if 'LABORATORIO' in df_custom.columns else False
+                    df_custom = df_custom[mt | ml]
+                
+                if not df_custom.empty:
+                    st.success(f"Pesquisa concluída! Encontramos uma massa de {len(df_custom)} volumes cruzados com as suas restrições.")
+                    st.download_button("📥 Fazer Download do Relatório Cru (Excel)", data=gerar_excel_memoria(df_custom), file_name=f"Pesquisa_Customizada_IGO.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                else: st.warning("Nenhum dado cruzado sob essas métricas foi identificado na nuvem.")
+    else: st.warning("O banco de dados está vazio.")
+
+# =============================================================================
+# ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
+# =============================================================================
+elif menu == "⚙️ Rotas":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
+    
+    tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
+    
+    with tab_agente:
+        st.markdown("#### Formulário de Novo Motorista")
+        with st.form("form_novo_agente", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            login_ag = c1.text_input("ID de Login", placeholder="Ex: carlos.rj")
+            nome_ag = c2.text_input("Nome Amigável", placeholder="Ex: CARLOS SILVA")
+            tel_ag = st.text_input("WhatsApp com DDD", placeholder="Ex: 5521999999999")
+            
+            if st.form_submit_button("💾 Salvar Novo Agente", type="primary"):
+                if not login_ag or not nome_ag or not tel_ag: st.error("⚠️ Preencha todos os campos!")
+                else:
+                    tel_limpo = re.sub(r'\D', '', tel_ag)
+                    nova_linha = pd.DataFrame([{"ROTA MAPEADA": "SEM ROTA DEFINIDA", "LOGIN DO AGENTE": login_ag.lower().strip(), "NOME DO AGENTE": nome_ag.upper().strip(), "TELEFONE": tel_limpo}])
+                    df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
+                    try:
+                        aba = planilha_db.worksheet("Agentes")
+                        aba.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                        st.success(f"✅ Agente salvo!")
+                        carregar_dados_agentes.clear()
+                    except Exception as e: st.error(f"Erro: {e}")
+
+    with tab_rota:
+        st.markdown("#### Atrelar Cidade/Bairro a um Motorista")
+        with st.form("form_nova_rota", clear_on_submit=True):
+            c1, c2, c3 = st.columns(3)
+            cid_rota = c1.text_input("Cidade *", placeholder="Ex: SAO PAULO")
+            bai_rota = c2.text_input("Bairro (Opcional)", placeholder="Ex: PINHEIROS")
+            rua_rota = c3.text_input("Endereço (Opcional)", placeholder="Ex: AVENIDA PAULISTA")
+            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+            ag_selecionado = st.selectbox("Selecione o Agente:", logins_disp)
+            
+            if st.form_submit_button("📍 Salvar Nova Rota", type="primary"):
+                if not cid_rota or not ag_selecionado: st.error("⚠️ Cidade e Agente são obrigatórios!")
+                else:
+                    partes = [p for p in [limpar_nome_local_rota(cid_rota), limpar_nome_local_rota(bai_rota), tratar_texto_global(rua_rota)] if p]
+                    rota_str = " ➔ ".join(partes)
+                    dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == ag_selecionado].iloc[0]
+                    nova_linha = pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": ag_selecionado, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])
+                    df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
+                    try:
+                        aba = planilha_db.worksheet("Agentes")
+                        aba.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                        st.success(f"✅ Rota '{rota_str}' atrelada!")
+                        carregar_dados_agentes.clear()
+                    except Exception as e: st.error(f"Erro: {e}")
+
+    with tab_tabela:
+        if not DF_AGENTES.empty:
+            logins_para_filtro = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist())
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_f, _ = st.columns([1, 1])
+            agente_filtro = col_f.selectbox("👤 Selecione o Motorista para gerenciar apenas suas rotas:", logins_para_filtro)
+            
+            st.markdown(f"#### ➕ Adicionar rota rápida para {agente_filtro}")
+            with st.form(f"form_rapido_{agente_filtro}", clear_on_submit=True):
+                ca1, ca2, ca3, ca4 = st.columns([2, 2, 2, 1])
+                r_cid = ca1.text_input("Cidade", key="r_cid")
+                r_bai = ca2.text_input("Bairro (Opç)", key="r_bai")
+                r_rua = ca3.text_input("Endereço (Opç)", key="r_rua")
+                st.markdown("<style>.st-key-btn_add_rapido {margin-top: 28px;}</style>", unsafe_allow_html=True)
+                add_rapido = ca4.form_submit_button("➕ Salvar", use_container_width=True)
+                
+                if add_rapido:
+                    if not r_cid: st.error("A Cidade é obrigatória!")
+                    else:
+                        partes = [p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai), tratar_texto_global(r_rua)] if p]
+                        rota_str = " ➔ ".join(partes)
+                        dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
+                        nova_linha = pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": agente_filtro, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])
+                        df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
+                        try:
+                            planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                            st.success("Rota adicionada!")
+                            carregar_dados_agentes.clear()
+                            st.rerun()
+                        except Exception as e: st.error(f"Erro ao salvar: {e}")
+
+            st.markdown(f"#### 📍 Rotas Atuais")
+            df_ag_filtrado = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].copy()
+            if df_ag_filtrado.empty: st.warning("Nenhuma rota atrelada a este motorista.")
+            else:
+                for idx, row in df_ag_filtrado.iterrows():
+                    rota_disp = row['ROTA MAPEADA'].replace("---", " ➔ ")
+                    with st.container():
+                        col_rota, col_del = st.columns([5, 1])
+                        col_rota.markdown(f"<div style='padding:10px; background-color:{bg_app}; border-radius:5px; border: 1px solid {border_c};'><b>📍 {rota_disp}</b></div>", unsafe_allow_html=True)
+                        if col_del.button("🗑️ Remover", key=f"del_{idx}", use_container_width=True):
+                            df_novo = DF_AGENTES.drop(idx)
+                            try:
+                                aba = planilha_db.worksheet("Agentes")
+                                aba.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                                carregar_dados_agentes.clear()
+                                st.rerun()
+                            except Exception as e: st.error(f"Erro ao remover: {e}")
+        else: st.warning("Nenhum dado encontrado.")
