@@ -21,67 +21,80 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # =============================================================================
 # 🔗 1. CONFIGURAÇÃO DA PÁGINA E AUTENTICAÇÃO
 # =============================================================================
-st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
+# Layout expandido e sem barra lateral inicial
+st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="collapsed")
 
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS CIRÚRGICO E TEMA PREMIUM DO PAINEL LATERAL (DOCK FIXO)
+# 🔥 CSS DA NOVA BARRA DE TAREFAS E LIMPEZA DA NUVEM
 st.markdown("""
     <style>
-    /* Oculta os botões Deploy e Manage App gerados pela nuvem do Streamlit */
+    /* Oculta as ferramentas da nuvem do Streamlit */
     [data-testid="stToolbar"] { display: none !important; }
     .stAppDeployButton { display: none !important; }
+    .stDeployButton { display: none !important; }
     [class^="viewerBadge"] { display: none !important; }
+    [class*="viewerBadge"] { display: none !important; }
+    iframe[src*="badge"] { display: none !important; }
+    #MainMenu { display: none !important; }
     footer { display: none !important; }
     
-    /* Configuração de Fundo e Respiro */
-    .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; }
+    /* Configuração da Tela Inteira */
+    .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; max-width: 96% !important; }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     
     /* ========================================================= */
-    /* 🔥 ESTILIZAÇÃO DO MENU LATERAL FIXO (ESTILO DOCK/OS) 🔥 */
+    /* 🖥️ BARRA DE TAREFAS FIXA (ESTILO WINDOWS/MAC) 🖥️ */
     /* ========================================================= */
-    [data-testid="stSidebar"] { 
-        background-color: #0F172A !important; /* Fundo Escuro Premium */
-        border-right: 1px solid #1E293B !important;
+    div[data-testid="stRadio"] {
+        background-color: #0F172A !important;
+        padding: 10px 20px !important;
+        border-radius: 12px !important;
+        position: sticky !important;
+        top: 10px !important;
+        z-index: 999999 !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3) !important;
+        margin-bottom: 25px !important;
+        border: 1px solid #1E293B !important;
     }
-    
-    /* Botões de Rádio (Menu) na Barra Lateral */
-    [data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] { gap: 8px !important; }
-    [data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label { 
-        background-color: transparent !important; 
-        border: none !important; 
-        padding: 12px 16px !important; 
-        border-radius: 8px !important; 
-        cursor: pointer !important; 
-        transition: all 0.2s ease-in-out !important;
+    div[data-testid="stRadio"] > div {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
     }
-    [data-testid="stSidebar"] div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; } /* Oculta a bolinha do rádio */
-    
-    /* Cor do Texto do Menu Desmarcado */
-    [data-testid="stSidebar"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p { 
-        color: #94A3B8 !important; font-size: 14px !important; font-weight: 600 !important; margin: 0 !important; 
+    div[data-testid="stRadio"] label {
+        background-color: transparent !important;
+        border: 1px solid transparent !important;
+        padding: 10px 18px !important;
+        border-radius: 8px !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
     }
-    
-    /* Efeito Hover (Passar o Mouse) */
-    [data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label:hover { 
-        background-color: #1E293B !important; 
+    div[data-testid="stRadio"] label:hover {
+        background-color: #1E293B !important;
     }
-    
-    /* Menu Ativo (Selecionado) - Azul Neon */
-    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] { 
-        background-color: #0284C7 !important; 
-        box-shadow: 0 4px 6px rgba(2, 132, 199, 0.2) !important;
+    div[data-testid="stRadio"] label p {
+        color: #94A3B8 !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        margin: 0 !important;
     }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p { 
-        color: #FFFFFF !important; font-weight: 700 !important; 
+    div[data-testid="stRadio"] label[data-checked="true"] {
+        background-color: #38BDF8 !important;
+        box-shadow: 0 4px 10px rgba(56, 189, 248, 0.3) !important;
     }
+    div[data-testid="stRadio"] label[data-checked="true"] p {
+        color: #0F172A !important;
+        font-weight: 800 !important;
+    }
+    /* Oculta as bolinhas do rádio para parecerem botões de aplicativo */
+    div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; }
 
-    /* Estilo Geral de Textos e Bordas da Tela Principal */
+    /* Textos e Botões Gerais */
     .dinamic-text { color: #0F172A !important; font-weight: 800; letter-spacing: -0.5px; }
     .dinamic-border { border-bottom: 2px solid #E2E8F0 !important; margin-bottom: 24px; padding-bottom: 8px; }
     
-    /* Botoes de Metricas Padrao (Dashboard) */
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
         border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
@@ -94,7 +107,7 @@ st.markdown("""
         color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
     }
 
-    .stButton > button[kind="primary"] { background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; color: #FFFFFF !important; }
+    .stButton > button[kind="primary"] { background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; color: #FFFFFF !important;}
     .stButton > button[kind="primary"]:hover { background: #0369A1 !important; }
     
     [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] { 
@@ -102,6 +115,9 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+# Esconde completamente a Sidebar original que estava causando problemas
+st.markdown("""<style>[data-testid="stSidebar"] { display: none !important; }</style>""", unsafe_allow_html=True)
 
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
@@ -116,7 +132,6 @@ if not st.session_state.autenticado:
     """, unsafe_allow_html=True)
     
     st.markdown("<br><br><br>", unsafe_allow_html=True)
-    
     st.markdown("<div class='login-card'>", unsafe_allow_html=True)
     st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
     st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=180)
@@ -294,7 +309,6 @@ def despachar_para_appsheet(lista_pedidos_dicts):
     except Exception: return False
 
 def padronizar_texto(texto):
-    """Remove acentos e converte para MAIÚSCULAS"""
     if pd.isna(texto) or not texto: return ""
     texto_str = str(texto).strip()
     texto_sem_acento = unicodedata.normalize('NFKD', texto_str).encode('ASCII', 'ignore').decode('utf-8')
@@ -413,51 +427,45 @@ def calc_status_display(row):
 
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
+# =============================================================================
+# 🎨 3. CABEÇALHO LIMPO E BARRA DE TAREFAS FIXA (TASKBAR)
+# =============================================================================
 
-# =============================================================================
-# 🎨 3. MENU LATERAL FIXO (DOCK DE NAVEGAÇÃO)
-# =============================================================================
-with st.sidebar:
-    st.markdown("<div style='text-align: center; padding-bottom: 20px; padding-top: 10px;'>", unsafe_allow_html=True)
-    # Trocado para fundo transparente se a imagem tiver fundo branco, ou a imagem inteira se adapta bem
-    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=150)
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    menu = st.radio("MENU OPERACIONAL", [
-        "📊 Dashboard Operacional", 
-        "📝 Inserir Pedido Manual", 
-        "📥 Importação de Lotes", 
-        "🔬 Triagem e Romaneio", 
-        "📱 Disparo WhatsApp", 
-        "📁 Exportar Relatórios", 
-        "⚙️ Matriz de Rotas"
-    ], label_visibility="collapsed")
-    
-    st.markdown("<div style='margin-top: 50%;'></div>", unsafe_allow_html=True)
-    st.divider()
-    
-    if st.button("🚪 Encerrar Sessão", use_container_width=True, type="secondary"):
+# Cabeçalho Fixo
+col_logo, col_vazio, col_bkp, col_logout = st.columns([3, 5, 2, 1.5], vertical_alignment="center")
+with col_logo:
+    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=140)
+with col_bkp:
+    df_bkp = carregar_dados_completos(planilha_db)
+    if not df_bkp.empty:
+        st.download_button(
+            label="📥 Backup DB", 
+            data=gerar_excel_memoria(df_bkp), 
+            file_name=f"AUDITORIA_IGO_{datetime.now(FUSO_BR).strftime('%d%m%Y_%H%M')}.xlsx", 
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+            use_container_width=True
+        )
+with col_logout:
+    if st.button("🚪 Sair", use_container_width=True, type="secondary"):
         st.session_state.autenticado = False
         st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
-        
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    with st.expander("🛡️ Retenção de Dados (BKP)"):
-        st.markdown("<p style='font-size: 11px; color: #94A3B8;'>Baixe uma cópia física da memória integral.</p>", unsafe_allow_html=True)
-        df_bkp = carregar_dados_completos(planilha_db)
-        if not df_bkp.empty:
-            st.download_button(
-                label="📥 Download Database", 
-                data=gerar_excel_memoria(df_bkp), 
-                file_name=f"BKP_IGO_{datetime.now(FUSO_BR).strftime('%d%m%Y_%H%M')}.xlsx", 
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
-                use_container_width=True,
-                type="primary"
-            )
+
+# 🖥️ BARRA DE TAREFAS (TASKBAR FIXA)
+menu = st.radio("Navegação:", [
+    "📊 Dashboard", 
+    "📝 Manual", 
+    "📥 Lotes", 
+    "🔬 Triagem", 
+    "📱 Zap", 
+    "📁 Relatórios", 
+    "⚙️ Rotas"
+], horizontal=True, label_visibility="collapsed")
+
 
 # =============================================================================
 # 🚀 MÓDULO 1: DASHBOARD
 # =============================================================================
-if menu == "📊 Dashboard Operacional":
+if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -716,12 +724,12 @@ if menu == "📊 Dashboard Operacional":
                 st.rerun()
 
     else:
-        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Inserir Pedido Manual' para começar.")
+        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Manual' para começar.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
-elif menu == "📝 Inserir Pedido Manual":
+elif menu == "📝 Manual":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
     st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
     
@@ -783,7 +791,7 @@ elif menu == "📝 Inserir Pedido Manual":
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
-elif menu == "📥 Importação de Lotes":
+elif menu == "📥 Lotes":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
     st.success("🛡️ **AUDITORIA DE DADOS ATIVA:** O sistema avalia padronizações de vários clientes (Airlab, FFW, etc) e adiciona os pacotes à base sem destruir seu histórico do dia.")
     
@@ -979,7 +987,7 @@ elif menu == "📥 Importação de Lotes":
 # =============================================================================
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO 
 # =============================================================================
-elif menu == "🔬 Triagem e Romaneio":
+elif menu == "🔬 Triagem":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🔬 Terminal de Triagem e Expedição</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
@@ -1240,7 +1248,7 @@ elif menu == "🔬 Triagem e Romaneio":
 # =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
 # =============================================================================
-elif menu == "📱 Disparo WhatsApp":
+elif menu == "📱 Zap":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
     st.markdown("Acione o terminal de comando para injetar o cronograma oficial de rotas no WhatsApp corporativo da equipe.")
     
@@ -1308,7 +1316,7 @@ elif menu == "📱 Disparo WhatsApp":
 # =============================================================================
 # 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
 # =============================================================================
-elif menu == "📁 Exportar Relatórios":
+elif menu == "📁 Relatórios":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining e Exportação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
@@ -1366,7 +1374,7 @@ elif menu == "📁 Exportar Relatórios":
 # =============================================================================
 # ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
 # =============================================================================
-elif menu == "⚙️ Matriz de Rotas":
+elif menu == "⚙️ Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
     
     tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
