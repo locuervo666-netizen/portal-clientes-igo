@@ -26,7 +26,7 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 # 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 BOMBA CSS GLOBAL (Caçador Implacável do Manage App e elementos do Streamlit)
+# 🔥 BOMBA CSS GLOBAL (Caçador Implacável do Manage App e ajuste de respiro)
 st.markdown("""
     <style>
     /* Oculta topo e rodapé */
@@ -44,8 +44,8 @@ st.markdown("""
     [class*="viewerBadge"] { display: none !important; }
     iframe[src*="badge"] { display: none !important; }
     
-    /* Puxa o conteúdo para cima aproveitando a tela inteira */
-    .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; }
+    /* Ajuste de respiro para não esmagar o título no teto do navegador */
+    .block-container { padding-top: 4rem !important; padding-bottom: 1rem !important; }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -382,6 +382,23 @@ with st.sidebar:
 st.markdown(f"""<style>
 [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c} !important; padding-top: 1rem !important; }}
 
+/* Oculta os botões Deploy e Manage App gerados pela nuvem do Streamlit */
+[data-testid="stHeader"] {{ display: none !important; }}
+[data-testid="stToolbar"] {{ display: none !important; }}
+[data-testid="stDecoration"] {{ display: none !important; }}
+[data-testid="stStatusWidget"] {{ display: none !important; }}
+#MainMenu {{ visibility: hidden !important; display: none !important; }}
+footer {{ visibility: hidden !important; display: none !important; }}
+.viewerBadge_container_link {{ display: none !important; }}
+.viewerBadge_link {{ display: none !important; }}
+.stAppDeployButton {{ display: none !important; }}
+.stDeployButton {{ display: none !important; }}
+[class^="viewerBadge"] {{ display: none !important; }}
+[class*="viewerBadge"] {{ display: none !important; }}
+iframe[src*="badge"] {{ display: none !important; }}
+
+.block-container {{ padding-top: 4rem !important; padding-bottom: 1rem !important; }}
+
 div[role="radiogroup"] label div[data-testid="stRadio-radio"] {{ display: none !important; }}
 .dinamic-text {{ color: {txt_main} !important; font-weight: 800; letter-spacing: -0.5px; }}
 .dinamic-border {{ border-bottom: 2px solid #E2E8F0 !important; margin-bottom: 24px; padding-bottom: 8px; }}
@@ -600,27 +617,8 @@ if menu == "📊 Dashboard Operacional":
         with container_botoes:
             st.markdown("""
                 <style>
-                /* 🔥 BOTÕES DE AÇÃO ABAIXO DA GRID (Compactos e Amigáveis) */
                 div[data-testid="stPopover"] > button, button[kind="secondary"] {
-                    white-space: nowrap !important; 
-                    overflow: hidden !important; 
-                    font-weight: 600 !important; 
-                    font-size: 12px !important; 
-                    border-radius: 6px !important;
-                    height: 32px !important; 
-                    min-height: 32px !important;
-                    padding: 0px 12px !important;
-                    border: 1px solid #CBD5E1 !important;
-                    background-color: #FFFFFF !important;
-                    color: #475569 !important;
-                    transition: all 0.2s ease !important;
-                    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
-                }
-                div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
-                    border-color: #0284C7 !important;
-                    color: #0369A1 !important;
-                    background-color: #F0F9FF !important;
-                    box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
+                    white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 14px !important; border-radius: 6px !important;
                 }
                 </style>
             """, unsafe_allow_html=True)
