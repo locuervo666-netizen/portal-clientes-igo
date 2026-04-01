@@ -26,7 +26,7 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS DA NOVA BARRA DE TAREFAS E TELA EDGE-TO-EDGE
+# 🔥 CSS DA NOVA BARRA DE TAREFAS FIXA NO RODAPÉ E FUNDO 100% BRANCO
 st.markdown("""
     <style>
     /* Oculta as ferramentas da nuvem do Streamlit */
@@ -39,15 +39,9 @@ st.markdown("""
     #MainMenu { display: none !important; }
     footer { display: none !important; }
     
-    /* Configuração da Tela Inteira (Ocupando 100% das laterais e matando o teto branco) */
-    .block-container { 
-        padding-top: 1.5rem !important; 
-        padding-bottom: 120px !important; 
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-        max-width: 100% !important; 
-    }
-    [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
+    /* Configuração da Tela Inteira com fundo BRANCO PURO para não dar diferença com o navegador */
+    .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 96% !important; }
+    [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
     /* ========================================================= */
     /* 🖥️ BARRA DE TAREFAS FIXA NO RODAPÉ (TASKBAR) 🖥️ */
@@ -301,6 +295,8 @@ DF_AGENTES = carregar_dados_agentes(planilha_db)
 FERIADOS_BR = holidays.Brazil()
 CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "MB_CAEP"]
 hoje_br = datetime.now(FUSO_BR).date() 
+bg_app = "#FFFFFF"
+border_c = "#E2E8F0"
 
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts: return False
@@ -319,7 +315,6 @@ def despachar_para_appsheet(lista_pedidos_dicts):
     except Exception: return False
 
 def padronizar_texto(texto):
-    """Remove acentos e converte para MAIÚSCULAS"""
     if pd.isna(texto) or not texto: return ""
     texto_str = str(texto).strip()
     texto_sem_acento = unicodedata.normalize('NFKD', texto_str).encode('ASCII', 'ignore').decode('utf-8')
@@ -437,7 +432,6 @@ def calc_status_display(row):
     return res
 
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
-
 
 # =============================================================================
 # 🖥️ BARRA DE TAREFAS FIXA NO RODAPÉ (TASKBAR)
