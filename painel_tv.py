@@ -90,46 +90,34 @@ def calc_status_display(row):
     return 'Pendente'
 
 # =============================================================================
-# 🎨 3. CSS E ESTILOS (OCULTANDO ELEMENTOS PADRÃO DO STREAMLIT)
+# 🎨 3. CSS E ESTILOS
 # =============================================================================
 st.markdown("""
 <style>
-    /* --------------------------------------------------- */
-    /* OCULTAR ELEMENTOS NATIVOS DO STREAMLIT (MENU, RODAPÉ) */
-    /* --------------------------------------------------- */
+    /* OCULTAR ELEMENTOS NATIVOS DO STREAMLIT */
     #MainMenu {visibility: hidden !important;}
     header {visibility: hidden !important;}
     footer {visibility: hidden !important;}
     .stDeployButton {display: none !important;}
-    
-    /* Tenta ocultar iframes e botões extras injetados pelo Streamlit Cloud */
     iframe[src*="manage"] {display: none !important;}
     [data-testid="manage-app-button"] {display: none !important;}
     
-    /* Remove os espaços em branco do container principal */
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 1rem !important;
-        margin-top: 0 !important;
-    }
+    /* Remove espaços e define fundo */
+    .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; margin-top: 0 !important; }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     
-    /* --------------------------------------------------- */
-    /* CARTÕES DE MÉTRICA */
-    /* --------------------------------------------------- */
+    /* Cartões de Métrica - Ajustados para 5 colunas */
     .metric-card { 
         border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); 
-        padding: 20px; height: 140px; display: flex; flex-direction: column; 
+        padding: 15px; height: 135px; display: flex; flex-direction: column; 
         justify-content: space-between; border: 1px solid rgba(0,0,0,0.05);
         margin-bottom: 10px;
     }
-    .metric-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;}
-    .metric-value { font-size: 52px; font-weight: 900; font-family: 'Segoe UI', sans-serif; line-height: 1; margin: 3px 0;}
-    .metric-delta { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; display: inline-block; background-color: rgba(255,255,255,0.6);}
+    .metric-title { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;}
+    .metric-value { font-size: 44px; font-weight: 900; font-family: 'Segoe UI', sans-serif; line-height: 1; margin: 3px 0;}
+    .metric-delta { font-size: 11px; font-weight: 800; padding: 3px 6px; border-radius: 6px; display: inline-block; background-color: rgba(255,255,255,0.6);}
     
-    /* --------------------------------------------------- */
-    /* TICKER (BARRA ROLANTE) */
-    /* --------------------------------------------------- */
+    /* Ticker (Barra Rolante) */
     .ticker-wrap { 
         width: 100%; overflow: hidden; background-color: #1E293B; border-radius: 8px; 
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 10px 0; 
@@ -158,24 +146,34 @@ else:
     df_hoje = df_raw[df_raw['DATA_OBJ'] == hoje_br].copy()
     df_ontem = df_raw[df_raw['DATA_OBJ'] == (hoje_br - timedelta(days=1))].copy()
     
+    # Métricas do Dia
     total_hoje = len(df_hoje)
     total_ontem = len(df_ontem)
-    
     coletados_hoje = df_hoje['STATUS_DISPLAY'].eq('Coletado').sum()
     frustradas_hoje = df_hoje['STATUS_DISPLAY'].eq('Frustrada').sum()
     pendentes_hoje = total_hoje - coletados_hoje - frustradas_hoje
     if pendentes_hoje < 0: pendentes_hoje = 0
 
+    # Lógica de Atrasados (Olhando para TODA a base, não só hoje)
+    if 'DATA_LIMITE' in df_raw.columns:
+        df_raw['DATA_LIMITE_OBJ'] = pd.to_datetime(df_raw['DATA_LIMITE'], format='%d/%m/%Y', errors='coerce').dt.date
+        atrasados_total = len(df_raw[(df_raw['STATUS_DISPLAY'] == 'Pendente') & (df_raw['DATA_LIMITE_OBJ'] < hoje_br)])
+    elif 'DATA' in df_raw.columns:
+        # Se não houver DATA_LIMITE, usa a DATA de criação do pedido como base de atraso
+        atrasados_total = len(df_raw[(df_raw['STATUS_DISPLAY'] == 'Pendente') & (df_raw['DATA_OBJ'] < hoje_br)])
+    else:
+        atrasados_total = 0
+
     if total_ontem > 0:
         pct_delta_total = ((total_hoje - total_ontem) / total_ontem) * 100
         if pct_delta_total > 0: html_delta_total = f'<span class="metric-delta" style="color: #059669;">▲ +{pct_delta_total:.1f}% vs Ontem</span>'
         elif pct_delta_total < 0: html_delta_total = f'<span class="metric-delta" style="color: #DC2626;">▼ {pct_delta_total:.1f}% vs Ontem</span>'
-        else: html_delta_total = f'<span class="metric-delta" style="color: #475569;">▬ Estável vs Ontem</span>'
+        else: html_delta_total = f'<span class="metric-delta" style="color: #475569;">▬ Estável</span>'
     else:
         html_delta_total = f'<span class="metric-delta" style="color: #059669;">▲ Novo Ciclo</span>'
 
-    # ================== 1. OS 4 BLOCOS DE MÉTRICAS ==================
-    c1, c2, c3, c4 = st.columns(4)
+    # ================== 1. OS 5 BLOCOS DE MÉTRICAS ==================
+    c1, c2, c3, c4, c5 = st.columns(5)
     
     with c1:
         st.markdown(f"""
@@ -206,10 +204,19 @@ else:
         
     with c4:
         st.markdown(f"""
-        <div class="metric-card" style="background-color: #FEF2F2;">
-            <div class="metric-title" style="color: #B91C1C;">❌ FRUSTRADOS</div>
-            <div class="metric-value" style="color: #991B1B;">{frustradas_hoje}</div>
-            <div><span class="metric-delta" style="color: #B91C1C;">Requerem atenção</span></div>
+        <div class="metric-card" style="background-color: #FEF2F2; border: 1px solid #FECACA;">
+            <div class="metric-title" style="color: #B91C1C;">🚨 ATRASADOS</div>
+            <div class="metric-value" style="color: #7F1D1D;">{atrasados_total}</div>
+            <div><span class="metric-delta" style="color: #B91C1C; background-color: #FEE2E2;">SLA Rompido</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c5:
+        st.markdown(f"""
+        <div class="metric-card" style="background-color: #FDF2F8;">
+            <div class="metric-title" style="color: #BE185D;">❌ FRUSTRADOS</div>
+            <div class="metric-value" style="color: #831843;">{frustradas_hoje}</div>
+            <div><span class="metric-delta" style="color: #BE185D;">Requerem atenção</span></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -229,6 +236,11 @@ else:
 
     # ================== 3. TICKER (BARRA ROLANTE) ==================
     ticker_items = []
+    
+    # Alerta Crítico no Ticker se houver atrasados
+    if atrasados_total > 0:
+        ticker_items.append(f"<span class='ticker-item'><span style='color:#EF4444; font-weight:900;'>🚨 ALERTA C.C.O:</span> Temos {atrasados_total} volumes com SLA rompido (Atrasados). Ação imediata necessária!</span>")
+
     col_tomador = next((col for col in ['TOMADOR', 'CLIENTE', 'EMPRESA'] if col in df_raw.columns), None)
     if col_tomador and not df_hoje.empty:
         vol_hoje = df_hoje[col_tomador].value_counts()
@@ -251,7 +263,7 @@ else:
             ticker_items.append(f"<span class='ticker-item'><span class='ticker-highlight'>⚡ DESTAQUE:</span> Motorista {melhor_agente} lidera com {vols_melhor} coletas.</span>")
     
     if frustradas_hoje > 0:
-         ticker_items.append(f"<span class='ticker-item'><span style='color:#EF4444; font-weight:bold;'>🚨 OCORRÊNCIAS:</span> {frustradas_hoje} pedidos frustrados.</span>")
+         ticker_items.append(f"<span class='ticker-item'><span style='color:#EF4444; font-weight:bold;'>⚠️ OCORRÊNCIAS:</span> {frustradas_hoje} pedidos frustrados.</span>")
 
     if not ticker_items: ticker_items = ["<span class='ticker-item'>AGUARDANDO ATUALIZAÇÕES: Operação em andamento...</span>"]
 
