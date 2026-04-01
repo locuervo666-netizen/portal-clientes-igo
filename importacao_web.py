@@ -26,30 +26,40 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 # 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
+# 🔥 BOMBA CSS GLOBAL: Destrói permanentemente o "Manage App", "Deploy" e Menus do Streamlit
+st.markdown("""
+    <style>
+    header {visibility: hidden !important; display: none !important;}
+    #MainMenu {visibility: hidden !important; display: none !important;}
+    footer {visibility: hidden !important; display: none !important;}
+    .stAppDeployButton {display: none !important;}
+    [data-testid="stHeader"] {display: none !important;}
+    [data-testid="stToolbar"] {display: none !important;}
+    [data-testid="stDecoration"] {display: none !important;}
+    [data-testid="stStatusWidget"] {display: none !important;}
+    /* Caçador do botão Manage App na nuvem */
+    div[class^="viewerBadge_container"] {display: none !important;}
+    div[class^="styles_viewerBadge"] {display: none !important;}
+    .viewerBadge_link {display: none !important;}
+    
+    .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; }
+    [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
+    </style>
+""", unsafe_allow_html=True)
+
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
 if not st.session_state.autenticado:
     st.markdown("""
         <style>
-        /* 🔥 ANIQUILA O BOTÃO MANAGE, DEPLOY E QUALQUER RASTRO DO STREAMLIT NA TELA DE LOGIN */
-        [data-testid="stHeader"] { display: none !important; }
-        [data-testid="stToolbar"] { display: none !important; }
-        [data-testid="stDecoration"] { display: none !important; }
-        [data-testid="stStatusWidget"] { display: none !important; }
-        #MainMenu { visibility: hidden !important; display: none !important; }
-        footer { visibility: hidden !important; display: none !important; }
-        .viewerBadge_container_link { display: none !important; }
-        .viewerBadge_link { display: none !important; }
-        
-        .block-container { padding-top: 3rem !important; } 
-        [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
         .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; }
         .login-title { color: #0F172A; font-weight: 800; font-size: 22px; margin-top: 15px; letter-spacing: -0.5px; }
         .login-subtitle { color: #64748B; font-size: 14px; margin-bottom: 30px; font-weight: 500; }
         </style>
     """, unsafe_allow_html=True)
     
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1.2, 1])
     
     with col2:
@@ -322,7 +332,6 @@ def obter_proximo_id(df):
 # 🎨 3. INTERFACE E NAVEGAÇÃO (DESIGN CORPORATIVO CLEAN)
 # =============================================================================
 
-bg_app = "#F8FAFC"        
 bg_side = "#FFFFFF"
 txt_main = "#0F172A"      
 border_c = "#E2E8F0"      
@@ -368,20 +377,7 @@ with st.sidebar:
             )
 
 st.markdown(f"""<style>
-[data-testid="stAppViewContainer"] {{ background-color: {bg_app} !important; }}
 [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c} !important; padding-top: 1rem !important; }}
-
-/* 🔥 ELIMINA O BOTÃO "MANAGE APP", DEPLOY, MENU E RODAPÉ DA TELA PRINCIPAL */
-[data-testid="stHeader"] {{ display: none !important; }}
-[data-testid="stToolbar"] {{ display: none !important; }}
-[data-testid="stDecoration"] {{ display: none !important; }}
-[data-testid="stStatusWidget"] {{ display: none !important; }}
-#MainMenu {{ visibility: hidden !important; display: none !important; }}
-footer {{ visibility: hidden !important; display: none !important; }}
-.viewerBadge_container_link {{ display: none !important; }}
-.viewerBadge_link {{ display: none !important; }}
-
-.block-container {{ padding-top: 2rem !important; padding-bottom: 1rem !important; }}
 
 div[role="radiogroup"] label div[data-testid="stRadio-radio"] {{ display: none !important; }}
 .dinamic-text {{ color: {txt_main} !important; font-weight: 800; letter-spacing: -0.5px; }}
