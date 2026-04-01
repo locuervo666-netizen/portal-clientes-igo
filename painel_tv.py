@@ -9,7 +9,7 @@ from google.oauth2.credentials import Credentials
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =============================================================================
-# 1. CONFIGURAÇÃO DA PÁGINA E AUTO-REFRESH (PÁGINA ÚNICA)
+# 1. CONFIGURAÇÃO DA PÁGINA E AUTO-REFRESH
 # =============================================================================
 st.set_page_config(page_title="C.C.O TV - Urgências", layout="wide", page_icon="📺")
 st_autorefresh(interval=60000, limit=None, key="tv_refresh")
@@ -90,31 +90,25 @@ def calc_status_display(row):
     return 'Pendente'
 
 # =============================================================================
-# 🎨 3. CSS PREMIUM LIGHT
+# 🎨 3. CSS E ESTILOS
 # =============================================================================
 st.markdown("""
 <style>
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     [data-testid="stHeader"] { background-color: transparent !important; }
     
-    .tv-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 0px 10px 15px 10px; border-bottom: 1px solid #E2E8F0; margin-bottom: 20px; }
-    .sync-info { color: #64748B; font-family: 'Segoe UI', sans-serif; font-size: 14px; font-weight: 600; text-align: right;}
-    .sync-time { color: #0F172A; font-size: 18px; font-weight: 800; }
+    .tv-header { padding: 0px 10px 5px 10px; margin-bottom: 10px; }
     
     .ticker-wrap { width: 100%; overflow: hidden; background-color: #1E293B; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 12px 0; margin-bottom: 25px; white-space: nowrap; }
     .ticker { display: inline-block; white-space: nowrap; animation: marquee 35s linear infinite; }
     .ticker-item { font-size: 18px; color: #F8FAFC; font-family: 'Segoe UI', sans-serif; margin-right: 60px; font-weight: 500; }
     .ticker-highlight { color: #38BDF8; font-weight: 800; }
-    .ticker-alert { color: #FBBF24; font-weight: 800; }
     @keyframes marquee { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
     
-    .metric-card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); padding: 25px; height: 160px; display: flex; flex-direction: column; justify-content: space-between; }
-    .metric-title { font-size: 15px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; }
-    .metric-value { font-size: 56px; font-weight: 900; color: #0F172A; font-family: 'Segoe UI', sans-serif; line-height: 1; margin: 5px 0;}
-    .metric-delta { font-size: 14px; font-weight: 700; padding: 4px 10px; border-radius: 6px; display: inline-block;}
-    .delta-up { background-color: #D1FAE5; color: #059669; }
-    .delta-down { background-color: #FEE2E2; color: #DC2626; }
-    .delta-neutral { background-color: #F1F5F9; color: #475569; }
+    .metric-card { border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); padding: 25px; height: 160px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid rgba(0,0,0,0.05);}
+    .metric-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;}
+    .metric-value { font-size: 56px; font-weight: 900; font-family: 'Segoe UI', sans-serif; line-height: 1; margin: 5px 0;}
+    .metric-delta { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 6px; display: inline-block; background-color: rgba(255,255,255,0.6);}
 </style>
 """, unsafe_allow_html=True)
 
@@ -126,11 +120,10 @@ df_raw = carregar_dados_completos(planilha_db)
 hoje_br = datetime.now(FUSO_BR).date()
 hora_atual = datetime.now(FUSO_BR).strftime('%H:%M:%S')
 
-# --- CABEÇALHO ---
+# --- CABEÇALHO COM LOGO DISCRETA ---
 st.markdown(f"""
 <div class="tv-header">
-    <img src="https://i.postimg.cc/x84nnjjq/IGO-LOGO.png" width="100" style="opacity: 0.9;">
-    <div class="sync-info">STATUS C.C.O<br><span class="sync-time">⏱️ ÚLTIMA SINCRONIZAÇÃO: {hora_atual}</span></div>
+    <img src="https://i.postimg.cc/x84nnjjq/IGO-LOGO.png" width="65" style="opacity: 0.8;">
 </div>
 """, unsafe_allow_html=True)
 
@@ -152,11 +145,11 @@ else:
 
     if total_ontem > 0:
         pct_delta_total = ((total_hoje - total_ontem) / total_ontem) * 100
-        if pct_delta_total > 0: html_delta_total = f'<span class="metric-delta delta-up">▲ +{pct_delta_total:.1f}% vs Ontem</span>'
-        elif pct_delta_total < 0: html_delta_total = f'<span class="metric-delta delta-down">▼ {pct_delta_total:.1f}% vs Ontem</span>'
-        else: html_delta_total = f'<span class="metric-delta delta-neutral">▬ Estável vs Ontem</span>'
+        if pct_delta_total > 0: html_delta_total = f'<span class="metric-delta" style="color: #059669;">▲ +{pct_delta_total:.1f}% vs Ontem</span>'
+        elif pct_delta_total < 0: html_delta_total = f'<span class="metric-delta" style="color: #DC2626;">▼ {pct_delta_total:.1f}% vs Ontem</span>'
+        else: html_delta_total = f'<span class="metric-delta" style="color: #475569;">▬ Estável vs Ontem</span>'
     else:
-        html_delta_total = f'<span class="metric-delta delta-up">▲ Novo Ciclo</span>'
+        html_delta_total = f'<span class="metric-delta" style="color: #059669;">▲ Novo Ciclo</span>'
 
     # ================== TICKER (BARRA ROLANTE) ==================
     ticker_items = []
@@ -192,42 +185,46 @@ else:
     <div class="ticker-wrap"><div class="ticker">{ticker_content}</div></div>
     """, unsafe_allow_html=True)
 
-    # ================== OS 4 BLOCOS DE MÉTRICAS ==================
+    # ================== OS 4 BLOCOS DE MÉTRICAS COM FUNDOS COLORIDOS ==================
     c1, c2, c3, c4 = st.columns(4)
     
     with c1:
+        # Fundo Cinza Claro Padrão
         st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">📦 TOTAL DO DIA</div>
-            <div class="metric-value">{total_hoje}</div>
+        <div class="metric-card" style="background-color: #F1F5F9;">
+            <div class="metric-title" style="color: #475569;">📦 TOTAL DO DIA</div>
+            <div class="metric-value" style="color: #0F172A;">{total_hoje}</div>
             <div>{html_delta_total}</div>
         </div>
         """, unsafe_allow_html=True)
         
     with c2:
+        # Fundo Azul Claro (Sucesso)
         st.markdown(f"""
-        <div class="metric-card" style="border-left: 6px solid #0284C7;">
-            <div class="metric-title" style="color: #0284C7;">✓ COLETADOS</div>
-            <div class="metric-value">{coletados_hoje}</div>
-            <div><span class="metric-delta" style="background: #E0F2FE; color: #0369A1;">Garantidos</span></div>
+        <div class="metric-card" style="background-color: #E0F2FE;">
+            <div class="metric-title" style="color: #0369A1;">✓ COLETADOS</div>
+            <div class="metric-value" style="color: #075985;">{coletados_hoje}</div>
+            <div><span class="metric-delta" style="color: #0369A1;">Garantidos</span></div>
         </div>
         """, unsafe_allow_html=True)
 
     with c3:
+        # Fundo Amarelo Claro (Atenção/Aguardando)
         st.markdown(f"""
-        <div class="metric-card" style="border-left: 6px solid #F59E0B;">
-            <div class="metric-title" style="color: #F59E0B;">⏳ RESTANTES</div>
-            <div class="metric-value">{pendentes_hoje}</div>
-            <div><span class="metric-delta" style="background: #FEF3C7; color: #B45309;">Aguardando ação</span></div>
+        <div class="metric-card" style="background-color: #FFFBEB;">
+            <div class="metric-title" style="color: #B45309;">⏳ RESTANTES</div>
+            <div class="metric-value" style="color: #92400E;">{pendentes_hoje}</div>
+            <div><span class="metric-delta" style="color: #B45309;">Aguardando ação</span></div>
         </div>
         """, unsafe_allow_html=True)
         
     with c4:
+        # Fundo Vermelho Claro (Problema)
         st.markdown(f"""
-        <div class="metric-card" style="border-left: 6px solid #EF4444;">
-            <div class="metric-title" style="color: #EF4444;">❌ FRUSTRADOS</div>
-            <div class="metric-value">{frustradas_hoje}</div>
-            <div><span class="metric-delta" style="background: #FEE2E2; color: #B91C1C;">Requerem atenção</span></div>
+        <div class="metric-card" style="background-color: #FEF2F2;">
+            <div class="metric-title" style="color: #B91C1C;">❌ FRUSTRADOS</div>
+            <div class="metric-value" style="color: #991B1B;">{frustradas_hoje}</div>
+            <div><span class="metric-delta" style="color: #B91C1C;">Requerem atenção</span></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -246,3 +243,11 @@ else:
         <div style="width: {pct_coletado}%; height: 100%; background-color: #0284C7; transition: width 1s ease-in-out;"></div>
     </div>
     """, unsafe_allow_html=True)
+
+# --- RODAPÉ DISCRETO ---
+st.markdown("<br><br><br>", unsafe_allow_html=True)
+st.markdown(f"""
+<div style="text-align: center; color: #94A3B8; font-size: 10px; font-family: sans-serif; opacity: 0.6;">
+    Última sincronização com C.C.O: {hora_atual}
+</div>
+""", unsafe_allow_html=True)
