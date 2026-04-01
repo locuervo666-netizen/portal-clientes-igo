@@ -26,25 +26,23 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 # 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS DE PAZ: Deixa a estrutura nativa funcionar, mas oculta a "sujeira" da nuvem
+# 🔥 CSS DE PAZ DEFINITIVA: Oculta a nuvem sem quebrar a responsividade da tela
 st.markdown("""
     <style>
-    /* 1. Torna o cabeçalho invisível mas funcional (para o botão > da sidebar não sumir e a Grid expandir) */
-    [data-testid="stHeader"] { background-color: transparent !important; }
-    
-    /* 2. Aniquila apenas os botões indesejados da direita */
+    /* 1. Aniquila APENAS a barra direita (Deploy, GitHub, 3 pontinhos) */
     [data-testid="stToolbar"] { display: none !important; }
-    .stDeployButton { display: none !important; }
-    #MainMenu { display: none !important; }
+    
+    /* 2. Aniquila a marca d'água "Manage App" do canto inferior */
+    [class^="viewerBadge"] { display: none !important; }
+    
+    /* 3. Oculta o rodapé padrão */
     footer { display: none !important; }
     
-    /* 3. Esconde a marca d'água do Streamlit de forma segura */
-    [class^="viewerBadge"] { display: none !important; }
-    [class*="viewerBadge"] { display: none !important; }
-    
-    /* 4. Ajuste de margem seguro: o Streamlit respira e não "esmaga" nada no teto */
-    .block-container { padding-top: 2.5rem !important; padding-bottom: 1rem !important; }
+    /* 4. Cor de fundo premium */
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
+    
+    /* OBS: O padding-top agressivo foi removido propositalmente para que o botão de Menu (>) 
+       e o botão de fechar a Grid (X) NUNCA MAIS fiquem escondidos debaixo do teto da tela! */
     </style>
 """, unsafe_allow_html=True)
 
