@@ -26,25 +26,25 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 # 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 BOMBA CSS GLOBAL (Caçador Implacável do Manage App, mas preservando o menu lateral e grid)
+# 🔥 BOMBA CSS GLOBAL (Ajustada com bisturi para preservar o botão de abrir/fechar menu)
 st.markdown("""
     <style>
-    /* Oculta apenas ferramentas indesejadas, preserva o stHeader para a Sidebar e o Fullscreen da Grid funcionarem */
+    /* Oculta apenas as ferramentas indesejadas, preservando o Header para a Sidebar funcionar direito */
     [data-testid="stToolbar"] { display: none !important; }
     [data-testid="stDecoration"] { display: none !important; }
     [data-testid="stStatusWidget"] { display: none !important; }
     #MainMenu { visibility: hidden !important; display: none !important; }
     footer { visibility: hidden !important; display: none !important; }
     
-    /* Oculta os botões Deploy e Manage App gerados pela nuvem do Streamlit */
+    /* Caçador Implacável dos botões Deploy e Manage App gerados pela nuvem do Streamlit */
     .stAppDeployButton { display: none !important; }
     .stDeployButton { display: none !important; }
     [class^="viewerBadge"] { display: none !important; }
     [class*="viewerBadge"] { display: none !important; }
     iframe[src*="badge"] { display: none !important; }
     
-    /* Ajuste de respiro do topo equilibrado */
-    .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; }
+    /* Puxa o conteúdo para cima de forma segura */
+    .block-container { padding-top: 2.5rem !important; padding-bottom: 1rem !important; }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -381,7 +381,7 @@ with st.sidebar:
 st.markdown(f"""<style>
 [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c} !important; padding-top: 1rem !important; }}
 
-/* Mantendo o stHeader APENAS para o ícone do Sidebar e Fullscreen funcionarem, matando o resto */
+/* Mantendo os botões Deploy e Manage App escondidos e a barra funcional */
 [data-testid="stToolbar"] {{ display: none !important; }}
 [data-testid="stDecoration"] {{ display: none !important; }}
 [data-testid="stStatusWidget"] {{ display: none !important; }}
@@ -773,7 +773,7 @@ elif menu == "📝 Inserir Pedido Manual":
             
             st.markdown("<br>", unsafe_allow_html=True)
             if st.form_submit_button("🚀 Injetar na Base e Roteirizar", type="primary", use_container_width=True):
-                if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
+                if m_tomador == "Selecione... or not m_cid or not m_lab or not m_rua or not m_bai": 
                     st.error("⚠️ Preencha todos os campos obrigatórios (marcados com *)!")
                 else:
                     with st.spinner("Padronizando textos e salvando na nuvem..."):
