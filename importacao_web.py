@@ -152,11 +152,12 @@ def carregar_dados_completos(_planilha):
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
                     
+                    # 🔥 PROTEÇÃO ABSOLUTA: Garante que QR_CODE sempre exista na memória
+                    if 'QR_CODE' not in df.columns:
+                        df['QR_CODE'] = ""
+                    
                     if 'APP_QR' in df.columns:
-                        if 'QR_CODE' not in df.columns:
-                            df['QR_CODE'] = df['APP_QR']
-                        else:
-                            df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
+                        df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
 
                     def get_true_status(row):
                         s_db = str(row.get('STATUS', '')).strip().upper()
@@ -307,7 +308,7 @@ def obter_proximo_id(df):
         return 100000
 
 # =============================================================================
-# 🎨 3. INTERFACE E NAVEGAÇÃO (DESIGN CORPORATIVO CLEAN)
+# 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM
 # =============================================================================
 
 bg_app = "#F8FAFC"        
@@ -382,7 +383,7 @@ div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownC
     color: #0369A1 !important; font-weight: 700 !important; 
 }}
 
-/* 🔥 BOTÕES DE MÉTRICAS (PADRONIZADOS E CENTRALIZADOS) */
+/* Botoes de Metricas Padrao (Dashboard) */
 div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {{ 
     border-radius: 8px !important; 
     border: none !important; 
@@ -415,7 +416,6 @@ div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_
 }}
 </style>""", unsafe_allow_html=True)
 
-# 🔥 AJUSTES DA GRID (FONTE MENOR)
 def obter_css_grid():
     return {
         ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "6px", "overflow": "hidden"},
@@ -480,7 +480,6 @@ if menu == "📊 Dashboard Operacional":
 
         c1, c2, c3, c4, c5 = st.columns(5)
         def set_kpi(v): st.session_state.filtro_kpi_admin = v
-        # 🔥 Ajuste: \n simples para os botões ficarem perfeitamente centralizados com Flexbox
         c1.button(f"📦 TOTAL\n{n_tot}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
         c2.button(f"✅ ENTREGUES\n{n_ent}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
         c3.button(f"❌ FRUSTRADAS\n{n_frus}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
@@ -496,7 +495,7 @@ if menu == "📊 Dashboard Operacional":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
         
         if busca:
@@ -510,21 +509,17 @@ if menu == "📊 Dashboard Operacional":
 
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
-            
-            # 🔥 AJUSTE DA GRID: filter=False e suppressMenu=True matam o menu sanduíche!
             gb.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
             gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
-            
-            # 🔥 AJUSTE DA GRID: Altura das linhas menor (rowHeight=32)
             gb.configure_grid_options(rowHeight=32, headerHeight=35)
             
             gb.configure_column("DATA", headerName="Data")
-            gb.configure_column("PEDIDO", headerName="Pedido", maxWidth=90) # Pedido Fininho
+            gb.configure_column("PEDIDO", headerName="Pedido", maxWidth=90)
             gb.configure_column("TOMADOR", headerName="Tomador", maxWidth=120)
             gb.configure_column("LABORATORIO", headerName="Laboratório")
-            gb.configure_column("CIDADE", headerName="Cidade")
-            gb.configure_column("UF", headerName="UF", maxWidth=60) # UF Fininha
             gb.configure_column("BAIRRO", headerName="Bairro")
+            gb.configure_column("CIDADE", headerName="Cidade")
+            gb.configure_column("UF", headerName="UF", maxWidth=60)
             gb.configure_column("DATA_LIMITE", headerName="Previsão Entrega")
             gb.configure_column("AGENTE_RAW", headerName="Agente") 
             
@@ -797,7 +792,7 @@ elif menu == "➕ Importação de Lotes":
         txt = st.text_area("📋 Cole os dados da planilha do cliente (Ctrl+V):", height=150, help="Apenas copie as células do Excel e cole direto aqui. O Cérebro IA formata sozinho.")
 
         col_btn1, _ = st.columns([1, 2])
-        if col_btn1.button("🔍 1. Processar Matriz e Roteirizar", type="primary", use_container_width=True):
+        if col_btn1.button("🔍 1. Tratar e Roteirizar", type="primary", use_container_width=True):
             if not txt or tom == "Selecione...": st.warning("Preencha o Tomador e cole os dados!")
             else:
                 if "import_success" in st.session_state:
@@ -992,28 +987,43 @@ elif menu == "🔬 Triagem e Romaneio":
                 
                 if bip_submit and bip_input:
                     termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
-                    df_raw['PED_LIMPO'] = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
                     
-                    if 'QR_CODE' in df_raw.columns:
-                        df_raw['QR_LIMPO'] = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
-                        mask = (df_raw['PED_LIMPO'] == termo) | (df_raw['QR_LIMPO'] == termo)
+                    if not termo:
+                        st.error("❌ QR Code inválido ou em branco.")
                     else:
-                        mask = (df_raw['PED_LIMPO'] == termo)
-                    
-                    if mask.any():
-                        idx = df_raw[mask].index[-1]
-                        status_atual = str(df_raw.at[idx, 'STATUS']).strip().upper()
-                        if status_atual == 'COLETADO':
-                            try:
-                                aba = planilha_db.worksheet("Memoria_Sistema")
-                                aba.update_cell(idx + 2, df_raw.columns.get_loc('STATUS') + 1, 'CONFERIDO')
-                                st.success(f"✅ Pedido {df_raw.at[idx, 'PEDIDO']} VALIDADO COM SUCESSO e liberado para expedição!")
-                                carregar_dados_completos.clear()
-                            except Exception as e: st.error(f"Falha ao registrar auditoria: {e}")
-                        elif status_atual == 'PENDENTE': st.error(f"❌ VIOLAÇÃO DE CADEIA: O código {df_raw.at[idx, 'PEDIDO']} consta como PENDENTE de coleta no aplicativo do agente.")
-                        elif status_atual == 'CONFERIDO': st.warning(f"⚠️ O volume {df_raw.at[idx, 'PEDIDO']} já estava conferido na base.")
-                        else: st.error(f"❌ O volume {df_raw.at[idx, 'PEDIDO']} consta com status impeditivo: {status_atual}.")
-                    else: st.error(f"❌ Assinatura não reconhecida na base de dados: {bip_input}")
+                        df_raw['PED_LIMPO'] = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
+                        
+                        if 'QR_CODE' in df_raw.columns:
+                            df_raw['QR_LIMPO'] = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
+                            mask = (df_raw['PED_LIMPO'] == termo) | (df_raw['QR_LIMPO'] == termo)
+                        else:
+                            mask = (df_raw['PED_LIMPO'] == termo)
+                        
+                        if mask.any():
+                            idx = df_raw[mask].index[-1]
+                            status_atual = str(df_raw.at[idx, 'STATUS']).strip().upper()
+                            if status_atual == 'COLETADO':
+                                try:
+                                    aba = planilha_db.worksheet("Memoria_Sistema")
+                                    dados_aba = aba.get_all_values()
+                                    df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                    
+                                    pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
+                                    mask_nuvem = df_nuvem['PEDIDO'] == pedido_alvo
+                                    
+                                    if mask_nuvem.any():
+                                        df_nuvem.loc[mask_nuvem, 'STATUS'] = 'CONFERIDO'
+                                        aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                        st.success(f"✅ Pedido {pedido_alvo} VALIDADO COM SUCESSO e liberado para expedição!")
+                                        carregar_dados_completos.clear()
+                                    else:
+                                        st.error("❌ Falha de sincronia: Pedido não localizado na nuvem.")
+                                        
+                                except Exception as e: st.error(f"Falha ao registrar auditoria: {e}")
+                            elif status_atual == 'PENDENTE': st.error(f"❌ VIOLAÇÃO DE CADEIA: O código {df_raw.at[idx, 'PEDIDO']} consta como PENDENTE de coleta no aplicativo do agente.")
+                            elif status_atual == 'CONFERIDO': st.warning(f"⚠️ O volume {df_raw.at[idx, 'PEDIDO']} já estava conferido na base.")
+                            else: st.error(f"❌ O volume {df_raw.at[idx, 'PEDIDO']} consta com status impeditivo: {status_atual}.")
+                        else: st.error(f"❌ Assinatura não reconhecida na base de dados: {bip_input}")
             
             st.markdown("---")
             st.markdown("#### Terminal de Validação em Lote (Recurso Manual)")
