@@ -26,13 +26,24 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 # 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS CIRÚRGICO: Oculta apenas os botões da direita (Deploy/Share/Menu), preservando o menu lateral e o Manage App!
+# 🔥 CSS DE PAZ: Deixa a estrutura nativa funcionar, mas oculta a "sujeira" da nuvem
 st.markdown("""
     <style>
-    [data-testid="stToolbar"] { display: none !important; }
-    .stAppDeployButton { display: none !important; }
+    /* 1. Torna o cabeçalho invisível mas funcional (para o botão > da sidebar não sumir e a Grid expandir) */
+    [data-testid="stHeader"] { background-color: transparent !important; }
     
-    .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; }
+    /* 2. Aniquila apenas os botões indesejados da direita */
+    [data-testid="stToolbar"] { display: none !important; }
+    .stDeployButton { display: none !important; }
+    #MainMenu { display: none !important; }
+    footer { display: none !important; }
+    
+    /* 3. Esconde a marca d'água do Streamlit de forma segura */
+    [class^="viewerBadge"] { display: none !important; }
+    [class*="viewerBadge"] { display: none !important; }
+    
+    /* 4. Ajuste de margem seguro: o Streamlit respira e não "esmaga" nada no teto */
+    .block-container { padding-top: 2.5rem !important; padding-bottom: 1rem !important; }
     [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -1072,7 +1083,7 @@ elif menu == "🔬 Triagem e Romaneio":
                                 carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
-            else: st.info("O salão está vazio. Apenas materiais marked como 'Coletados' chegam à triagem.")
+            else: st.info("O salão está vazio. Apenas materiais marcados como 'Coletados' chegam à triagem.")
 
         with t2:
             st.markdown("#### Matriz de Expedição (Romaneio)")
