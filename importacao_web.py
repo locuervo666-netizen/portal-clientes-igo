@@ -21,28 +21,46 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # =============================================================================
 # 🔗 1. CONFIGURAÇÃO DA PÁGINA E AUTENTICAÇÃO
 # =============================================================================
-st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
+# Definindo o layout inicial para não usar a barra lateral
+st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="collapsed")
 
-# 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS DE PAZ DEFINITIVA: Oculta a nuvem sem quebrar a responsividade da tela
-st.markdown("""
+# CSS Limpo e Seguro - Apenas cores e layout, sem tentar esconder elementos nativos à força
+bg_app = "#F8FAFC"        
+txt_main = "#0F172A"      
+border_c = "#E2E8F0" 
+
+st.markdown(f"""
     <style>
-    /* 1. Aniquila APENAS a barra direita (Deploy, GitHub, 3 pontinhos) */
-    [data-testid="stToolbar"] { display: none !important; }
+    [data-testid="stAppViewContainer"] {{ background-color: {bg_app} !important; }}
+    .dinamic-text {{ color: {txt_main} !important; font-weight: 800; letter-spacing: -0.5px; }}
+    .dinamic-border {{ border-bottom: 2px solid #E2E8F0 !important; margin-bottom: 24px; padding-bottom: 8px; }}
     
-    /* 2. Aniquila a marca d'água "Manage App" do canto inferior */
-    [class^="viewerBadge"] { display: none !important; }
+    /* Estilização do Menu Superior Horizontal */
+    div.row-widget.stRadio > div {{ flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 10px; }}
+    div.row-widget.stRadio > div > label {{ 
+        background-color: #FFFFFF; border: 1px solid #CBD5E1; padding: 10px 15px; border-radius: 8px; cursor: pointer;
+    }}
+    div.row-widget.stRadio > div > label:hover {{ background-color: #F1F5F9; }}
+    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ font-weight: 600; color: #334155; margin: 0; }}
+    div[role="radiogroup"] > label[data-checked="true"] {{ background-color: #E0F2FE !important; border-color: #0284C7 !important; }}
+    div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ color: #0369A1 !important; font-weight: 700; }}
     
-    /* 3. Oculta o rodapé padrão */
-    footer { display: none !important; }
-    
-    /* 4. Cor de fundo premium */
-    [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
-    
-    /* OBS: O padding-top agressivo foi removido propositalmente para que o botão de Menu (>) 
-       e o botão de fechar a Grid (X) NUNCA MAIS fiquem escondidos debaixo do teto da tela! */
+    /* Botoes de Metricas Padrao (Dashboard) */
+    div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {{ 
+        border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+    }}
+    div.st-key-kpi_total button {{ background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; }}
+    div.st-key-kpi_entregue button {{ background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important; }}
+    div.st-key-kpi_frus button {{ background: linear-gradient(135deg, #991B1B 0%, #EF4444 100%) !important; }}
+    div.st-key-kpi_atra button {{ background: linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%) !important; }}
+    div.st-key-kpi_hoje button {{ background: linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%) !important; }}
+    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p {{ 
+        color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
+    }}
+    .stButton > button[kind="primary"] {{ background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; }}
+    .stButton > button[kind="primary"]:hover {{ background: #0369A1 !important; }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -52,44 +70,38 @@ if 'autenticado' not in st.session_state:
 if not st.session_state.autenticado:
     st.markdown("""
         <style>
-        .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; }
-        .login-title { color: #0F172A; font-weight: 800; font-size: 22px; margin-top: 15px; letter-spacing: -0.5px; }
-        .login-subtitle { color: #64748B; font-size: 14px; margin-bottom: 30px; font-weight: 500; }
+        .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; max-width: 400px; margin: auto; }
+        .login-title { color: #0F172A; font-weight: 800; font-size: 22px; margin-top: 15px; letter-spacing: -0.5px; text-align: center; }
+        .login-subtitle { color: #64748B; font-size: 14px; margin-bottom: 30px; font-weight: 500; text-align: center; }
         </style>
     """, unsafe_allow_html=True)
     
     st.markdown("<br><br><br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1.2, 1])
     
-    with col2:
-        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
-        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-        
-        st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=180)
-            
-        st.markdown("<div class='login-title'>PORTAL CORPORATIVO</div>", unsafe_allow_html=True)
-        st.markdown("<div class='login-subtitle'>Autenticação de Operadores - IGO Logística</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        with st.form("form_login"):
-            usuario = st.text_input("👤 Usuário")
-            senha = st.text_input("🔑 Senha", type="password")
-            st.markdown("<br>", unsafe_allow_html=True)
-            submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
-            
-            if submit:
-                logins_autorizados = {
-                    "robson.melo": "123",
-                    "william.bertoldo": "123"
-                }
-                
-                if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
-                    st.session_state.autenticado = True
-                    st.rerun()
-                else:
-                    st.error("❌ Credenciais inválidas.")
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<div class='login-card'>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=180)
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<div class='login-title'>PORTAL CORPORATIVO</div>", unsafe_allow_html=True)
+    st.markdown("<div class='login-subtitle'>Autenticação de Operadores - IGO Logística</div>", unsafe_allow_html=True)
     
+    with st.form("form_login"):
+        usuario = st.text_input("👤 Usuário")
+        senha = st.text_input("🔑 Senha", type="password")
+        st.markdown("<br>", unsafe_allow_html=True)
+        submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
+        
+        if submit:
+            logins_autorizados = {
+                "robson.melo": "123",
+                "william.bertoldo": "123"
+            }
+            if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
+                st.session_state.autenticado = True
+                st.rerun()
+            else:
+                st.error("❌ Credenciais inválidas.")
+    st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 
@@ -243,7 +255,6 @@ def despachar_para_appsheet(lista_pedidos_dicts):
     except Exception: return False
 
 def padronizar_texto(texto):
-    """Remove acentos e converte para MAIÚSCULAS"""
     if pd.isna(texto) or not texto: return ""
     texto_str = str(texto).strip()
     texto_sem_acento = unicodedata.normalize('NFKD', texto_str).encode('ASCII', 'ignore').decode('utf-8')
@@ -327,113 +338,6 @@ def obter_proximo_id(df):
     except:
         return 100000
 
-# =============================================================================
-# 🎨 3. INTERFACE E NAVEGAÇÃO (DESIGN CORPORATIVO CLEAN)
-# =============================================================================
-
-bg_side = "#FFFFFF"
-txt_main = "#0F172A"      
-border_c = "#E2E8F0"      
-
-if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
-
-with st.sidebar:
-    st.markdown("<div style='text-align: center; padding-bottom: 10px; padding-top: 10px;'>", unsafe_allow_html=True)
-    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=150)
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
-    
-    menu = st.radio("Navegação:", [
-        "📊 Dashboard Operacional", 
-        "📝 Inserir Pedido Manual", 
-        "📥 Importação de Lotes", 
-        "🔬 Triagem e Romaneio", 
-        "📱 Disparo WhatsApp", 
-        "📁 Exportar Relatórios", 
-        "⚙️ Matriz de Rotas"
-    ], label_visibility="collapsed")
-    
-    st.markdown("<div style='margin-top: 100%;'></div>", unsafe_allow_html=True)
-    st.divider()
-    
-    if st.button("🚪 Sair do Sistema", use_container_width=True, type="secondary"):
-        st.session_state.autenticado = False
-        st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
-        
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    with st.expander("🛡️ Auditoria de Backup"):
-        st.markdown("<p style='font-size: 11px; color: #64748B;'>Gerar cópia física integral da cadeia de dados.</p>", unsafe_allow_html=True)
-        df_bkp = carregar_dados_completos(planilha_db)
-        if not df_bkp.empty:
-            st.download_button(
-                label="📥 Baixar DB (.xlsx)", 
-                data=gerar_excel_memoria(df_bkp), 
-                file_name=f"AUDITORIA_IGO_{datetime.now(FUSO_BR).strftime('%d%m%Y_%H%M')}.xlsx", 
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
-                use_container_width=True,
-                type="primary"
-            )
-
-st.markdown(f"""<style>
-[data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c} !important; padding-top: 1rem !important; }}
-
-div[role="radiogroup"] label div[data-testid="stRadio-radio"] {{ display: none !important; }}
-.dinamic-text {{ color: {txt_main} !important; font-weight: 800; letter-spacing: -0.5px; }}
-.dinamic-border {{ border-bottom: 2px solid #E2E8F0 !important; margin-bottom: 24px; padding-bottom: 8px; }}
-
-div[role="radiogroup"] {{ gap: 4px !important; }}
-div[role="radiogroup"] > label {{ 
-    width: 100% !important; padding: 10px 16px !important; border-radius: 8px !important; 
-    margin: 0 !important; border: none !important; background-color: transparent !important; 
-    cursor: pointer !important; transition: all 0.2s ease-in-out !important;
-}}
-div[role="radiogroup"] > label:hover {{ background-color: #F1F5F9 !important; }}
-div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{ 
-    color: #475569 !important; font-size: 14px !important; font-weight: 600 !important; margin: 0 !important; 
-}}
-div[role="radiogroup"] > label[data-checked="true"] {{ 
-    background-color: #E0F2FE !important; 
-    border-left: 4px solid #0284C7 !important; 
-    border-radius: 0 8px 8px 0 !important;
-}}
-div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownContainer"] p {{ 
-    color: #0369A1 !important; font-weight: 700 !important; 
-}}
-
-/* Botoes de Metricas Padrao (Dashboard) */
-div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {{ 
-    border-radius: 8px !important; 
-    border: none !important; 
-    height: 70px !important; 
-    display: flex !important; 
-    flex-direction: column !important; 
-    justify-content: center !important; 
-    align-items: center !important; 
-    padding: 0px 5px !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-}}
-
-div.st-key-kpi_total button {{ background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; }}
-div.st-key-kpi_entregue button {{ background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important; }}
-div.st-key-kpi_frus button {{ background: linear-gradient(135deg, #991B1B 0%, #EF4444 100%) !important; }}
-div.st-key-kpi_atra button {{ background: linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%) !important; }}
-div.st-key-kpi_hoje button {{ background: linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%) !important; }}
-
-div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p {{ 
-    color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
-}}
-
-.stButton > button[kind="primary"] {{ 
-    background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; 
-}}
-.stButton > button[kind="primary"]:hover {{ background: #0369A1 !important; }}
-
-[data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] {{ 
-    background: #FFFFFF; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); border: 1px solid #E2E8F0; 
-}}
-</style>""", unsafe_allow_html=True)
-
 def obter_css_grid():
     return {
         ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "6px", "overflow": "hidden"},
@@ -466,6 +370,35 @@ def calc_status_display(row):
             if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: res = f"🚨 ATRASADO ({res})"
         except: pass
     return res
+
+if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
+
+# =============================================================================
+# 🎨 3. NOVO MENU SUPERIOR (SUBSTITUINDO A SIDEBAR)
+# =============================================================================
+col_logo, col_menu, col_logout = st.columns([1.5, 7, 1])
+
+with col_logo:
+    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=140)
+
+with col_menu:
+    menu = st.radio("Navegação:", [
+        "📊 Dashboard Operacional", 
+        "📝 Inserir Pedido Manual", 
+        "📥 Importação de Lotes", 
+        "🔬 Triagem e Romaneio", 
+        "📱 Disparo WhatsApp", 
+        "📁 Exportar Relatórios", 
+        "⚙️ Matriz de Rotas"
+    ], horizontal=True, label_visibility="collapsed")
+
+with col_logout:
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🚪 Sair", use_container_width=True):
+        st.session_state.autenticado = False
+        st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
+
+st.divider()
 
 # =============================================================================
 # 🚀 MÓDULO 1: DASHBOARD
@@ -729,7 +662,7 @@ if menu == "📊 Dashboard Operacional":
                 st.rerun()
 
     else:
-        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Novo Pedido Manual' para começar.")
+        st.warning("📭 O banco de dados está vazio no momento. Acesse '📝 Inserir Pedido Manual' para começar.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
