@@ -146,7 +146,7 @@ else:
                 st.image(conf["logo"], width=160)
                 st.divider()
                 modo_noturno = st.toggle("🌙 Modo Noturno")
-                datas_sel = st.date_input("🗓️ Período:", value=(hoje_br - timedelta(days=7), hoje_br))
+                if len(datas_sel) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
                 cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 st.divider()
 
