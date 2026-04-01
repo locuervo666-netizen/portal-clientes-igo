@@ -23,7 +23,6 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # =============================================================================
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
-# 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 if 'autenticado' not in st.session_state:
@@ -224,7 +223,6 @@ def despachar_para_appsheet(lista_pedidos_dicts):
     except Exception: return False
 
 def padronizar_texto(texto):
-    """Remove acentos e converte para MAIÚSCULAS"""
     if pd.isna(texto) or not texto: return ""
     texto_str = str(texto).strip()
     texto_sem_acento = unicodedata.normalize('NFKD', texto_str).encode('ASCII', 'ignore').decode('utf-8')
@@ -309,7 +307,7 @@ def obter_proximo_id(df):
         return 100000
 
 # =============================================================================
-# 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM
+# 🎨 3. INTERFACE E NAVEGAÇÃO (DESIGN CORPORATIVO CLEAN)
 # =============================================================================
 
 bg_app = "#F8FAFC"        
@@ -384,13 +382,28 @@ div[role="radiogroup"] > label[data-checked="true"] div[data-testid="stMarkdownC
     color: #0369A1 !important; font-weight: 700 !important; 
 }}
 
-/* Botoes de Metricas Padrao (Dashboard) */
-div.st-key-kpi_total button {{ background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
-div.st-key-kpi_entregue button {{ background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; box-shadow: 0 2px 4px rgba(16,185,129,0.1); }}
-div.st-key-kpi_frus button {{ background: linear-gradient(135deg, #991B1B 0%, #EF4444 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; box-shadow: 0 2px 4px rgba(239,68,68,0.1); }}
-div.st-key-kpi_atra button {{ background: linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; box-shadow: 0 2px 4px rgba(185,28,28,0.1); }}
-div.st-key-kpi_hoje button {{ background: linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%) !important; height: 75px !important; border-radius: 8px !important; border: none !important; box-shadow: 0 2px 4px rgba(14,165,233,0.1); }}
-div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p {{ color: white !important; font-weight: 800 !important; font-size: 14px !important; margin: 0 !important; }}
+/* 🔥 BOTÕES DE MÉTRICAS (PADRONIZADOS E CENTRALIZADOS) */
+div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {{ 
+    border-radius: 8px !important; 
+    border: none !important; 
+    height: 70px !important; 
+    display: flex !important; 
+    flex-direction: column !important; 
+    justify-content: center !important; 
+    align-items: center !important; 
+    padding: 0px 5px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}}
+
+div.st-key-kpi_total button {{ background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; }}
+div.st-key-kpi_entregue button {{ background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important; }}
+div.st-key-kpi_frus button {{ background: linear-gradient(135deg, #991B1B 0%, #EF4444 100%) !important; }}
+div.st-key-kpi_atra button {{ background: linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%) !important; }}
+div.st-key-kpi_hoje button {{ background: linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%) !important; }}
+
+div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p {{ 
+    color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
+}}
 
 .stButton > button[kind="primary"] {{ 
     background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; 
@@ -402,13 +415,14 @@ div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_
 }}
 </style>""", unsafe_allow_html=True)
 
+# 🔥 AJUSTES DA GRID (FONTE MENOR)
 def obter_css_grid():
     return {
         ".ag-root-wrapper": {"border": f"1px solid {border_c} !important", "border-radius": "6px", "overflow": "hidden"},
         ".ag-header": {"background-color": "#F8FAFC !important", "border-bottom": "1px solid #CBD5E1 !important"},
-        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "700 !important", "font-size": "12px !important"},
+        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "700 !important", "font-size": "11px !important"},
         ".ag-header-icon": {"color": "#0284C7 !important"}, 
-        ".ag-cell": {"font-size": "12px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
+        ".ag-cell": {"font-size": "11px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
         ".ag-row-even": {"background-color": "#FFFFFF !important"},
         ".ag-row-odd": {"background-color": "#F8FAFC !important"},
         ".ag-row-hover": {"background-color": "#F1F5F9 !important"},
@@ -453,7 +467,6 @@ if menu == "📊 Dashboard Operacional":
         col_f1, col_f2 = st.columns(2)
         f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
         
-        # 🔥 Ajustado: Filtro padrão puxa 3 dias (hoje e os 2 anteriores)
         data_inicial_padrao = hoje_br - timedelta(days=2)
         f_data = col_f2.date_input("📅 Período de Análise:", value=(data_inicial_padrao, hoje_br), format="DD/MM/YYYY")
         
@@ -467,11 +480,12 @@ if menu == "📊 Dashboard Operacional":
 
         c1, c2, c3, c4, c5 = st.columns(5)
         def set_kpi(v): st.session_state.filtro_kpi_admin = v
-        c1.button(f"📦 TOTAL\n\n{n_tot}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
-        c2.button(f"✅ ENTREGUES\n\n{n_ent}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
-        c3.button(f"❌ FRUSTRADAS\n\n{n_frus}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
-        c4.button(f"🚨 ATRASADOS\n\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
-        c5.button(f"📅 HOJE\n\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
+        # 🔥 Ajuste: \n simples para os botões ficarem perfeitamente centralizados com Flexbox
+        c1.button(f"📦 TOTAL\n{n_tot}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
+        c2.button(f"✅ ENTREGUES\n{n_ent}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
+        c3.button(f"❌ FRUSTRADAS\n{n_frus}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
+        c4.button(f"🚨 ATRASADOS\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
+        c5.button(f"📅 HOJE\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
         st.markdown("<br>", unsafe_allow_html=True)
         busca = st.text_input("🔎 Busca Rápida de Rastreio (Código, Lab, Cidade...):", placeholder="Digite para filtrar a tabela abaixo...")
@@ -482,8 +496,7 @@ if menu == "📊 Dashboard Operacional":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        # 🔥 Ajustado: Ordem exata das colunas principais e as ocultas (Bairro após Laboratorio, Agente por último)
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
         
         if busca:
@@ -497,17 +510,21 @@ if menu == "📊 Dashboard Operacional":
 
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
-            gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
+            
+            # 🔥 AJUSTE DA GRID: filter=False e suppressMenu=True matam o menu sanduíche!
+            gb.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
             gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
             
-            # 🔥 Ajustado: Largura reduzida para TOMADOR e UF. Nomes amigáveis e ocultação de colunas extras.
+            # 🔥 AJUSTE DA GRID: Altura das linhas menor (rowHeight=32)
+            gb.configure_grid_options(rowHeight=32, headerHeight=35)
+            
             gb.configure_column("DATA", headerName="Data")
-            gb.configure_column("PEDIDO", headerName="Pedido")
+            gb.configure_column("PEDIDO", headerName="Pedido", maxWidth=90) # Pedido Fininho
             gb.configure_column("TOMADOR", headerName="Tomador", maxWidth=120)
             gb.configure_column("LABORATORIO", headerName="Laboratório")
-            gb.configure_column("BAIRRO", headerName="Bairro")
             gb.configure_column("CIDADE", headerName="Cidade")
-            gb.configure_column("UF", headerName="UF", maxWidth=80)
+            gb.configure_column("UF", headerName="UF", maxWidth=60) # UF Fininha
+            gb.configure_column("BAIRRO", headerName="Bairro")
             gb.configure_column("DATA_LIMITE", headerName="Previsão Entrega")
             gb.configure_column("AGENTE_RAW", headerName="Agente") 
             
@@ -548,7 +565,7 @@ if menu == "📊 Dashboard Operacional":
                 getGui() { return this.eGui; }
             }
             """)
-            gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=img_js, width=90, minWidth=90)
+            gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=img_js, width=80, minWidth=80)
             
             grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
             
@@ -772,15 +789,15 @@ elif menu == "➕ Importação de Lotes":
         st.success(st.session_state.import_success)
 
     with st.container(border=True):
-        st.markdown("#### 1. Dados do Lote e Colagem")
+        st.markdown("#### 1. Mapeamento de Planilha e Colagem")
         c1, c2, c3 = st.columns([1, 1, 2])
-        with c1: tom = st.selectbox("🏢 Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-        with c2: dt_c = st.date_input("📅 Data da Coleta:", format="DD/MM/YYYY", value=hoje_br)
+        with c1: tom = st.selectbox("🏢 Tomador Central:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+        with c2: dt_c = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br)
 
-        txt = st.text_area("📋 Cole os dados do Excel aqui (Ctrl+V):", height=150, help="Apenas copie as células do Excel e cole direto aqui. O Cérebro IA formata sozinho.")
+        txt = st.text_area("📋 Cole os dados da planilha do cliente (Ctrl+V):", height=150, help="Apenas copie as células do Excel e cole direto aqui. O Cérebro IA formata sozinho.")
 
         col_btn1, _ = st.columns([1, 2])
-        if col_btn1.button("🔍 1. Tratar e Roteirizar", type="primary", use_container_width=True):
+        if col_btn1.button("🔍 1. Processar Matriz e Roteirizar", type="primary", use_container_width=True):
             if not txt or tom == "Selecione...": st.warning("Preencha o Tomador e cole os dados!")
             else:
                 if "import_success" in st.session_state:
@@ -909,7 +926,8 @@ elif menu == "➕ Importação de Lotes":
             st.success(f"✅ Protocolo validado! {len(df_ok)} pedidos blindados e roteirizados para injeção.")
             
             gb_prev = GridOptionsBuilder.from_dataframe(df_ok)
-            gb_prev.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
+            gb_prev.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
+            gb_prev.configure_grid_options(rowHeight=32, headerHeight=35)
             AgGrid(df_ok, gridOptions=gb_prev.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
             
             st.markdown("<br>", unsafe_allow_html=True)
@@ -1003,8 +1021,8 @@ elif menu == "🔬 Triagem e Romaneio":
             if not df_fila.empty:
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
-                gb_fila.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
-                
+                gb_fila.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
+                gb_fila.configure_grid_options(rowHeight=32, headerHeight=35)
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
                 grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
@@ -1031,7 +1049,7 @@ elif menu == "🔬 Triagem e Romaneio":
                                 st.success(f"🎉 {len(p_ids)} pedidos enviados para o Despacho!")
                                 carregar_dados_completos.clear()
                                 st.rerun()
-                            except Exception as e: st.error(f"Falha de conexão: {e}")
+                            except Exception as e: st.error(f"Erro: {e}")
             else: st.info("O salão está vazio. Apenas materiais marcados como 'Coletados' chegam à triagem.")
 
         with t2:
@@ -1050,8 +1068,8 @@ elif menu == "🔬 Triagem e Romaneio":
                 if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
                 
                 gb = GridOptionsBuilder.from_dataframe(df_conf[colunas_romaneio])
-                gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
-                
+                gb.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
+                gb.configure_grid_options(rowHeight=32, headerHeight=35)
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
                 grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
@@ -1189,7 +1207,8 @@ elif menu == "🔬 Triagem e Romaneio":
                 df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
                 
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
-                gb_hist.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
+                gb_hist.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
+                gb_hist.configure_grid_options(rowHeight=32, headerHeight=35)
                 
                 st_js = JsCode("function(p){let v=p.value||''; if(v.includes('ENTREGUE')){return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'};} if(v.includes('FRUSTRADA') || v.includes('PROBLEMA')){return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'};} if(v.includes('EM ROTA')){return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'};} if(v.includes('CONFERIDO')){return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'};} return {'fontWeight':'600', 'color':'#64748B'};}")
                 gb_hist.configure_column("STATUS", headerName="STATUS", cellStyle=st_js, minWidth=170)
@@ -1210,7 +1229,6 @@ elif menu == "📱 Disparo WhatsApp":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        # 🔥 FIX: format="DD/MM/YYYY" 
         data_filtro = st.date_input("📅 Cronograma da Data:", value=hoje_br, format="DD/MM/YYYY")
         
         df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
@@ -1298,7 +1316,7 @@ elif menu == "📁 Exportar Relatórios":
             df_lud = df_export_base[df_export_base['MOTORISTA'].str.lower().str.contains('ludmila|veloz', na=False)]
             if not df_lud.empty:
                 col_rel2.download_button("📥 Minerar Base Ludmila / Veloz", data=gerar_excel_memoria(df_lud), file_name=f"Datamining_Ludmila_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-            else: col_rel2.button("📥 Minerar Base Ludmila / Veloz (Zero Ocorrências)", disabled=True, use_container_width=True)
+            else: col_rel2.button("📥 Minerar Base Ludmila / Veloz (Sem Dados)", disabled=True, use_container_width=True)
         
         col_rel3.download_button("📥 Extração Completa (Nuvem Integral)", data=gerar_excel_memoria(df_export_base), file_name=f"BKP_Integral_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary", use_container_width=True)
         
