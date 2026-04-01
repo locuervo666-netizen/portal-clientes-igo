@@ -32,8 +32,17 @@ if 'autenticado' not in st.session_state:
 if not st.session_state.autenticado:
     st.markdown("""
         <style>
-        [data-testid="stHeader"] { display: none !important; } /* 🔥 Elimina a barra superior na tela de login */
-        .block-container { padding-top: 3rem !important; } /* 🔥 Puxa a tela de login para cima */
+        /* 🔥 ANIQUILA O BOTÃO MANAGE, DEPLOY E QUALQUER RASTRO DO STREAMLIT NA TELA DE LOGIN */
+        [data-testid="stHeader"] { display: none !important; }
+        [data-testid="stToolbar"] { display: none !important; }
+        [data-testid="stDecoration"] { display: none !important; }
+        [data-testid="stStatusWidget"] { display: none !important; }
+        #MainMenu { visibility: hidden !important; display: none !important; }
+        footer { visibility: hidden !important; display: none !important; }
+        .viewerBadge_container_link { display: none !important; }
+        .viewerBadge_link { display: none !important; }
+        
+        .block-container { padding-top: 3rem !important; } 
         [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
         .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; }
         .login-title { color: #0F172A; font-weight: 800; font-size: 22px; margin-top: 15px; letter-spacing: -0.5px; }
@@ -225,6 +234,7 @@ def despachar_para_appsheet(lista_pedidos_dicts):
     except Exception: return False
 
 def padronizar_texto(texto):
+    """Remove acentos e converte para MAIÚSCULAS"""
     if pd.isna(texto) or not texto: return ""
     texto_str = str(texto).strip()
     texto_sem_acento = unicodedata.normalize('NFKD', texto_str).encode('ASCII', 'ignore').decode('utf-8')
@@ -361,8 +371,16 @@ st.markdown(f"""<style>
 [data-testid="stAppViewContainer"] {{ background-color: {bg_app} !important; }}
 [data-testid="stSidebar"] {{ background-color: {bg_side} !important; border-right: 1px solid {border_c} !important; padding-top: 1rem !important; }}
 
-/* 🔥 OCULTA O BOTÃO "DEPLOY" E PUXA TUDO PARA CIMA */
+/* 🔥 ELIMINA O BOTÃO "MANAGE APP", DEPLOY, MENU E RODAPÉ DA TELA PRINCIPAL */
 [data-testid="stHeader"] {{ display: none !important; }}
+[data-testid="stToolbar"] {{ display: none !important; }}
+[data-testid="stDecoration"] {{ display: none !important; }}
+[data-testid="stStatusWidget"] {{ display: none !important; }}
+#MainMenu {{ visibility: hidden !important; display: none !important; }}
+footer {{ visibility: hidden !important; display: none !important; }}
+.viewerBadge_container_link {{ display: none !important; }}
+.viewerBadge_link {{ display: none !important; }}
+
 .block-container {{ padding-top: 2rem !important; padding-bottom: 1rem !important; }}
 
 div[role="radiogroup"] label div[data-testid="stRadio-radio"] {{ display: none !important; }}
