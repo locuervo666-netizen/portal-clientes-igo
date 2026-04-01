@@ -8,7 +8,7 @@ from streamlit_autorefresh import st_autorefresh
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
-# 🎯 ATENÇÃO ROBSON: Link direto da Logo IGO
+# 🎯 ATENÇÃO ROBSON: Cole o "Link direto" do Postimages dentro das aspas abaixo!
 LOGO_IGO = "https://i.postimg.cc/d71mqWDx/IGO-LOGO.png"
 
 # =======================================================
@@ -212,7 +212,6 @@ else:
                 return res
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(tratar_status, axis=1)
             
-            # --- CONFIGURAÇÃO DE COLUNAS ---
             ordem_padrao = ['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO_URL', 'DETALHES']
             col_disponiveis = [c for c in ordem_padrao if c in df_cliente.columns]
 
@@ -226,7 +225,6 @@ else:
                 datas_sel = st.date_input("🗓️ Período:", value=(min_d, max_d), format="DD/MM/YYYY")
                 cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
                 with st.popover("⚙️ Personalizar Colunas", use_container_width=True):
-                    # CORREÇÃO: Adicionando UF, BAIRRO e DATA_LIMITE na visualização padrão
                     col_vis = st.multiselect("Ver:", options=col_disponiveis, default=['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'FOTO_URL', 'DETALHES'])
                 st.divider()
                 n_tot = len(df_cliente)
@@ -243,26 +241,30 @@ else:
             if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
             st.markdown(f"""<style> [data-testid="stAppViewContainer"] {{ background-color: {"#0e1117" if modo_escuro else "#f0f2f6"} !important; }} .dinamic-text {{ color: {"#f8fafc" if modo_escuro else "#0f172a"} !important; }} </style>""", unsafe_allow_html=True)
-            st.markdown(f"""<div class="header-container" style="border-bottom:2px solid #e2e8f0; padding-bottom:10px; margin-top:-15px;"><h2 class="dinamic-text" style="margin:0; font-weight:900; font-size:22px; letter-spacing:-0.5px;">Monitoramento {st.session_state.cliente}</h2><div class='sync-status'>🟢 Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
+            
+            st.markdown(f"""
+            <div class="header-container dinamic-border" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: -15px;">
+                <h2 class="dinamic-text" style="margin: 0; font-weight: 900; font-size: 22px; letter-spacing: -0.5px;">Monitoramento {st.session_state.cliente}</h2>
+                <div class='sync-status'>🟢 Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
             ck = st.columns(5)
             def set_kpi(v): st.session_state.filtro_kpi = v
             n_fru = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])
             n_atr = len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO')])
             n_hoj = len(df_f[df_f['DATA_OBJ'] == hoje_br])
-            ck[0].button(f"📦 TOTAL\n\n{len(df_f)}", key="k_tot", use_container_width=True, on_click=set_kpi, args=("TODOS",))
-            ck[1].button(f"✅ ENTREGUES\n\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])}", key="k_ent", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
-            ck[2].button(f"❌ FRUSTRADAS\n\n{n_fru}", key="k_fru", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
-            ck[3].button(f"🚨 ATRASADOS\n\n{n_atr}", key="k_atr", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
-            ck[4].button(f"📅 HOJE\n\n{n_hoj}", key="k_hoj", use_container_width=True, on_click=set_kpi, args=("HOJE",))
+            ck[0].button(f"📦 TOTAL\n\n{len(df_f)}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
+            ck[1].button(f"✅ ENTREGUES\n\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
+            ck[2].button(f"❌ FRUSTRADAS\n\n{n_fru}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
+            ck[3].button(f"🚨 ATRASADOS\n\n{n_atr}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
+            ck[4].button(f"📅 HOJE\n\n{n_hoj}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
-            # 📊 PROGRESSO
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(f"<div class='dinamic-text' style='font-size:14px; font-weight:800; margin-bottom:10px;'>🎯 Progresso de Hoje</div>", unsafe_allow_html=True)
             df_hoje_bi = df_cliente[df_cliente['DATA_OBJ'] == hoje_br]
             if not df_hoje_bi.empty:
-                t_h = len(df_hoje_bi)
-                c_h = len(df_hoje_bi[df_hoje_bi['STATUS_DISPLAY'].str.contains('Entregue|Frustrada')])
+                t_h = len(df_hoje_bi); c_h = len(df_hoje_bi[df_hoje_bi['STATUS_DISPLAY'].str.contains('Entregue|Frustrada')])
                 tx = c_h / t_h if t_h > 0 else 0
                 st.progress(tx)
                 st.markdown(f"<div class='dinamic-text' style='font-size:12px; margin-top:-10px; text-align:right;'>{c_h} de {t_h} finalizados ({int(tx*100)}%)</div>", unsafe_allow_html=True)
@@ -317,5 +319,4 @@ else:
                 for col in df_final_grid.columns:
                     if col == 'STATUS': gb.configure_column(col, cellStyle=status_js)
                     elif col == 'FOTO_URL': gb.configure_column(col, headerName="FOTO", cellRenderer=foto_js, width=80)
-                
                 AgGrid(df_final_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', height=550)
