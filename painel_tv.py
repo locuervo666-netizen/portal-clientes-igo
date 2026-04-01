@@ -90,36 +90,42 @@ def calc_status_display(row):
     return 'Pendente'
 
 # =============================================================================
-# 🎨 3. CSS E ESTILOS (AJUSTADO PARA TOPO)
+# 🎨 3. CSS E ESTILOS (FORÇANDO O TOPO EXTREMO)
 # =============================================================================
 st.markdown("""
 <style>
-    /* Fundo e remoção de padding padrão do Streamlit no topo */
-    [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
-    [data-testid="stAppViewContainer"] > div:first-child { padding-top: 1rem !important; }
-    [data-testid="stHeader"] { background-color: transparent !important; }
+    /* Esconde o cabeçalho padrão do Streamlit completamente */
+    [data-testid="stHeader"] { display: none !important; }
     
-    /* Ticker (Barra Rolante) - Tencionado ao topo */
-    .ticker-wrap { 
-        width: 100%; overflow: hidden; background-color: #1E293B; border-radius: 8px; 
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 10px 0; 
-        margin-top: 0px; margin-bottom: 20px; white-space: nowrap; 
+    /* Remove os espaços em branco do container principal */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+        margin-top: 0 !important;
     }
-    .ticker { display: inline-block; white-space: nowrap; animation: marquee 35s linear infinite; }
-    .ticker-item { font-size: 18px; color: #F8FAFC; font-family: 'Segoe UI', sans-serif; margin-right: 60px; font-weight: 500; }
-    .ticker-highlight { color: #38BDF8; font-weight: 800; }
-    @keyframes marquee { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
+    [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
     
     /* Cartões de Métrica */
     .metric-card { 
         border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); 
         padding: 20px; height: 140px; display: flex; flex-direction: column; 
         justify-content: space-between; border: 1px solid rgba(0,0,0,0.05);
-        margin-bottom: 5px; /* Reduzido espaço abaixo dos cards */
+        margin-bottom: 10px;
     }
     .metric-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;}
     .metric-value { font-size: 52px; font-weight: 900; font-family: 'Segoe UI', sans-serif; line-height: 1; margin: 3px 0;}
     .metric-delta { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; display: inline-block; background-color: rgba(255,255,255,0.6);}
+    
+    /* Ticker (Barra Rolante) */
+    .ticker-wrap { 
+        width: 100%; overflow: hidden; background-color: #1E293B; border-radius: 8px; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 10px 0; 
+        margin-top: 15px; margin-bottom: 20px; white-space: nowrap; 
+    }
+    .ticker { display: inline-block; white-space: nowrap; animation: marquee 35s linear infinite; }
+    .ticker-item { font-size: 18px; color: #F8FAFC; font-family: 'Segoe UI', sans-serif; margin-right: 60px; font-weight: 500; }
+    .ticker-highlight { color: #38BDF8; font-weight: 800; }
+    @keyframes marquee { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
 </style>
 """, unsafe_allow_html=True)
 
@@ -130,8 +136,6 @@ planilha_db = conectar_banco()
 df_raw = carregar_dados_completos(planilha_db)
 hoje_br = datetime.now(FUSO_BR).date()
 hora_atual = datetime.now(FUSO_BR).strftime('%H:%M:%S')
-
-# --- LOGO REMOVIDA DAQUI ---
 
 if df_raw.empty:
     st.info("Aguardando dados da base central...")
@@ -157,41 +161,7 @@ else:
     else:
         html_delta_total = f'<span class="metric-delta" style="color: #059669;">▲ Novo Ciclo</span>'
 
-    # ================== 1. TICKER (BARRA ROLANTE) - AGORA NO TOPO ==================
-    ticker_items = []
-    col_tomador = next((col for col in ['TOMADOR', 'CLIENTE', 'EMPRESA'] if col in df_raw.columns), None)
-    if col_tomador and not df_hoje.empty:
-        vol_hoje = df_hoje[col_tomador].value_counts()
-        vol_ontem = df_ontem[col_tomador].value_counts()
-        for t_nome, v_h in vol_hoje.items():
-            v_o = vol_ontem.get(t_nome, 0)
-            if v_o > 0:
-                pct = ((v_h - v_o) / v_o) * 100
-                sinal = "▲" if pct >= 0 else "▼"
-                cor_sinal = "#10B981" if pct >= 0 else "#EF4444"
-                ticker_items.append(f"<span class='ticker-item'>CLIENTE <b>{t_nome}</b>: {v_h} vols (<span style='color:{cor_sinal};'>{sinal} {abs(pct):.0f}%</span>)</span>")
-            else:
-                ticker_items.append(f"<span class='ticker-item'>NOVO VOLUME: <b>{t_nome}</b> com {v_h} pedidos.</span>")
-
-    if not df_hoje.empty and 'AGENTE_RAW' in df_hoje.columns:
-        agentes_coletas = df_hoje[df_hoje['STATUS_DISPLAY'] == 'Coletado']['AGENTE_RAW'].value_counts()
-        if not agentes_coletas.empty:
-            melhor_agente = agentes_coletas.index[0]
-            vols_melhor = agentes_coletas.iloc[0]
-            ticker_items.append(f"<span class='ticker-item'><span class='ticker-highlight'>⚡ DESTAQUE:</span> Motorista {melhor_agente} lidera com {vols_melhor} coletas.</span>")
-    
-    if frustradas_hoje > 0:
-         ticker_items.append(f"<span class='ticker-item'><span style='color:#EF4444; font-weight:bold;'>🚨 OCORRÊNCIAS:</span> {frustradas_hoje} pedidos frustrados.</span>")
-
-    if not ticker_items: ticker_items = ["<span class='ticker-item'>AGUARDANDO ATUALIZAÇÕES: Operação em andamento...</span>"]
-
-    ticker_content = " &nbsp;&nbsp;•&nbsp;&nbsp; ".join(ticker_items)
-    
-    st.markdown(f"""
-    <div class="ticker-wrap"><div class="ticker">{ticker_content}</div></div>
-    """, unsafe_allow_html=True)
-
-    # ================== 2. OS 4 BLOCOS DE MÉTRICAS ==================
+    # ================== 1. OS 4 BLOCOS DE MÉTRICAS (AGORA NO TOPO) ==================
     c1, c2, c3, c4 = st.columns(4)
     
     with c1:
@@ -230,14 +200,12 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-    # ================== 3. BARRA DE PROGRESSO ==================
-    # Espaçamento reduzido antes da barra
-    
+    # ================== 2. BARRA DE PROGRESSO ==================
     total_base_progresso = coletados_hoje + pendentes_hoje
     pct_coletado = (coletados_hoje / total_base_progresso) * 100 if total_base_progresso > 0 else 0
 
     st.markdown(f"""
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; margin-top: 10px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; margin-top: 15px;">
         <span style="color: #0F172A; font-family: sans-serif; font-weight: 800; font-size: 15px;">PROGRESSO DA OPERAÇÃO</span>
         <span style="color: #0284C7; font-weight: 900; font-size: 16px;">{pct_coletado:.1f}%</span>
     </div>
@@ -246,15 +214,45 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-    # Adicionado um separador visual discreto para o próximo painel
-    st.markdown("<hr style='border: 1px solid #E2E8F0; margin-top: 25px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+    # ================== 3. TICKER (BARRA ROLANTE) - AGORA ABAIXO ==================
+    ticker_items = []
+    col_tomador = next((col for col in ['TOMADOR', 'CLIENTE', 'EMPRESA'] if col in df_raw.columns), None)
+    if col_tomador and not df_hoje.empty:
+        vol_hoje = df_hoje[col_tomador].value_counts()
+        vol_ontem = df_ontem[col_tomador].value_counts()
+        for t_nome, v_h in vol_hoje.items():
+            v_o = vol_ontem.get(t_nome, 0)
+            if v_o > 0:
+                pct = ((v_h - v_o) / v_o) * 100
+                sinal = "▲" if pct >= 0 else "▼"
+                cor_sinal = "#10B981" if pct >= 0 else "#EF4444"
+                ticker_items.append(f"<span class='ticker-item'>CLIENTE <b>{t_nome}</b>: {v_h} vols (<span style='color:{cor_sinal};'>{sinal} {abs(pct):.0f}%</span>)</span>")
+            else:
+                ticker_items.append(f"<span class='ticker-item'>NOVO VOLUME: <b>{t_nome}</b> com {v_h} pedidos.</span>")
 
-    # --- ESPAÇO LIVRE ABAIXO PARA NOVOS PAINÉIS ---
-    # st.markdown("### Próximo Painel Aqui...")
+    if not df_hoje.empty and 'AGENTE_RAW' in df_hoje.columns:
+        agentes_coletas = df_hoje[df_hoje['STATUS_DISPLAY'] == 'Coletado']['AGENTE_RAW'].value_counts()
+        if not agentes_coletas.empty:
+            melhor_agente = agentes_coletas.index[0]
+            vols_melhor = agentes_coletas.iloc[0]
+            ticker_items.append(f"<span class='ticker-item'><span class='ticker-highlight'>⚡ DESTAQUE:</span> Motorista {melhor_agente} lidera com {vols_melhor} coletas.</span>")
+    
+    if frustradas_hoje > 0:
+         ticker_items.append(f"<span class='ticker-item'><span style='color:#EF4444; font-weight:bold;'>🚨 OCORRÊNCIAS:</span> {frustradas_hoje} pedidos frustrados.</span>")
 
+    if not ticker_items: ticker_items = ["<span class='ticker-item'>AGUARDANDO ATUALIZAÇÕES: Operação em andamento...</span>"]
+
+    ticker_content = " &nbsp;&nbsp;•&nbsp;&nbsp; ".join(ticker_items)
+    
+    st.markdown(f"""
+    <div class="ticker-wrap"><div class="ticker">{ticker_content}</div></div>
+    """, unsafe_allow_html=True)
+
+    # Divisor sutil para as próximas métricas abaixo
+    st.markdown("<hr style='border: 1px solid #E2E8F0; margin-top: 10px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
 # --- RODAPÉ DISCRETO ---
-st.markdown("<br><br>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
 st.markdown(f"""
 <div style="text-align: center; color: #94A3B8; font-size: 10px; font-family: sans-serif; opacity: 0.6;">
     Última sincronização com C.C.O: {hora_atual}
