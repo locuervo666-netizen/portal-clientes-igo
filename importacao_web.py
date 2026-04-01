@@ -23,7 +23,7 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # =============================================================================
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
-# 🔥 Ajustado para 2 Minutos (120000 milissegundos)
+# 🔥 Atualização a cada 2 Minutos (120000 milissegundos)
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 if 'autenticado' not in st.session_state:
@@ -224,6 +224,7 @@ def despachar_para_appsheet(lista_pedidos_dicts):
     except Exception: return False
 
 def padronizar_texto(texto):
+    """Remove acentos e converte para MAIÚSCULAS"""
     if pd.isna(texto) or not texto: return ""
     texto_str = str(texto).strip()
     texto_sem_acento = unicodedata.normalize('NFKD', texto_str).encode('ASCII', 'ignore').decode('utf-8')
@@ -308,7 +309,7 @@ def obter_proximo_id(df):
         return 100000
 
 # =============================================================================
-# 🎨 3. INTERFACE E NAVEGAÇÃO (DESIGN CORPORATIVO CLEAN)
+# 🎨 3. INTERFACE E NAVEGAÇÃO PREMIUM
 # =============================================================================
 
 bg_app = "#F8FAFC"        
@@ -481,8 +482,8 @@ if menu == "📊 Dashboard Operacional":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        # 🔥 Ajustado: Ordem exata das colunas principais e as ocultas
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'AGENTE_RAW', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
+        # 🔥 Ajustado: Ordem exata das colunas principais e as ocultas (Bairro após Laboratorio, Agente por último)
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
         
         if busca:
@@ -499,18 +500,17 @@ if menu == "📊 Dashboard Operacional":
             gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=150, flex=1)
             gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
             
-            # 🔥 Ajustado: Nomes bonitos nos cabeçalhos da Grid
+            # 🔥 Ajustado: Largura reduzida para TOMADOR e UF. Nomes amigáveis e ocultação de colunas extras.
             gb.configure_column("DATA", headerName="Data")
             gb.configure_column("PEDIDO", headerName="Pedido")
-            gb.configure_column("TOMADOR", headerName="Tomador")
+            gb.configure_column("TOMADOR", headerName="Tomador", maxWidth=120)
             gb.configure_column("LABORATORIO", headerName="Laboratório")
-            gb.configure_column("CIDADE", headerName="Cidade")
-            gb.configure_column("UF", headerName="UF")
             gb.configure_column("BAIRRO", headerName="Bairro")
-            gb.configure_column("AGENTE_RAW", headerName="Agente") # Título limpo e bonito
+            gb.configure_column("CIDADE", headerName="Cidade")
+            gb.configure_column("UF", headerName="UF", maxWidth=80)
             gb.configure_column("DATA_LIMITE", headerName="Previsão Entrega")
+            gb.configure_column("AGENTE_RAW", headerName="Agente") 
             
-            # 🔥 Ajustado: Ocultando as colunas extras por padrão (ficam disponíveis no filtro lateral da Grid)
             gb.configure_column("ENDERECO", hide=True)
             gb.configure_column("NUMERO", hide=True)
             gb.configure_column("CEP", hide=True)
@@ -756,7 +756,7 @@ elif menu == "📝 Inserir Pedido Manual":
                             
                             if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
                             
-                            st.success(f"🎉 Pedido {m_pedido} criado e padronizado com sucesso! Acesse o C.C.O para visualizar.")
+                            st.success(f"🎉 Pedido {m_pedido} criado e padronizado com sucesso! Acesse o Dashboard para visualizar.")
                             carregar_dados_completos.clear()
                         except Exception as e: st.error(f"Erro ao salvar: {e}")
 
@@ -772,15 +772,15 @@ elif menu == "➕ Importação de Lotes":
         st.success(st.session_state.import_success)
 
     with st.container(border=True):
-        st.markdown("#### 1. Mapeamento de Planilha e Colagem")
+        st.markdown("#### 1. Dados do Lote e Colagem")
         c1, c2, c3 = st.columns([1, 1, 2])
-        with c1: tom = st.selectbox("🏢 Tomador Central:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-        with c2: dt_c = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br)
+        with c1: tom = st.selectbox("🏢 Tomador:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+        with c2: dt_c = st.date_input("📅 Data da Coleta:", format="DD/MM/YYYY", value=hoje_br)
 
-        txt = st.text_area("📋 Cole os dados da planilha do cliente (Ctrl+V):", height=150, help="Apenas copie as células do Excel e cole direto aqui. O Cérebro IA formata sozinho.")
+        txt = st.text_area("📋 Cole os dados do Excel aqui (Ctrl+V):", height=150, help="Apenas copie as células do Excel e cole direto aqui. O Cérebro IA formata sozinho.")
 
         col_btn1, _ = st.columns([1, 2])
-        if col_btn1.button("🔍 1. Processar Matriz e Roteirizar", type="primary", use_container_width=True):
+        if col_btn1.button("🔍 1. Tratar e Roteirizar", type="primary", use_container_width=True):
             if not txt or tom == "Selecione...": st.warning("Preencha o Tomador e cole os dados!")
             else:
                 if "import_success" in st.session_state:
@@ -1015,10 +1015,10 @@ elif menu == "🔬 Triagem e Romaneio":
                     if isinstance(selecionados_manuais, pd.DataFrame): tem_selecao = not selecionados_manuais.empty
                     else: tem_selecao = len(selecionados_manuais) > 0
 
-                if st.button("✅ Confirmar Triagem em Lote", type="primary"):
-                    if not tem_selecao: st.warning("⚠️ Assinale as caixas na grade primeiro.")
+                if st.button("✅ Enviar Selecionados para Despacho", type="primary"):
+                    if not tem_selecao: st.warning("⚠️ Selecione os pedidos na tabela acima primeiro!")
                     else:
-                        with st.spinner("Registrando auditoria em massa..."):
+                        with st.spinner("Atualizando pedidos selecionados em lote (Anti-Bloqueio)..."):
                             if isinstance(selecionados_manuais, pd.DataFrame): p_ids = selecionados_manuais['PEDIDO'].astype(str).tolist()
                             else: p_ids = [str(r['PEDIDO']) for r in selecionados_manuais]
                             try:
@@ -1028,7 +1028,7 @@ elif menu == "🔬 Triagem e Romaneio":
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(p_ids)
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'CONFERIDO'
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                st.success(f"🎉 Lote de {len(p_ids)} amostras liberado para a aba de Romaneio!")
+                                st.success(f"🎉 {len(p_ids)} pedidos enviados para o Despacho!")
                                 carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e: st.error(f"Falha de conexão: {e}")
@@ -1210,6 +1210,7 @@ elif menu == "📱 Disparo WhatsApp":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
+        # 🔥 FIX: format="DD/MM/YYYY" 
         data_filtro = st.date_input("📅 Cronograma da Data:", value=hoje_br, format="DD/MM/YYYY")
         
         df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
@@ -1329,8 +1330,8 @@ elif menu == "📁 Exportar Relatórios":
 # =============================================================================
 # ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
 # =============================================================================
-elif menu == "⚙️ Configurar Rotas":
-    st.markdown("<h4 class='dinamic-text'>⚙️ Gestão de Agentes e Rotas</h4>", unsafe_allow_html=True)
+elif menu == "⚙️ Matriz de Rotas":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
     
     tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
     
