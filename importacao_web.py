@@ -26,7 +26,7 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS GLOBAL DA BARRA DE TAREFAS E FUNDO 100% BRANCO
+# 🔥 CSS GLOBAL DA BARRA DE TAREFAS E LIMPEZA DA NUVEM
 st.markdown("""
     <style>
     /* Oculta as ferramentas da nuvem do Streamlit */
@@ -40,7 +40,7 @@ st.markdown("""
     footer { display: none !important; }
     
     /* Configuração da Tela Inteira com fundo BRANCO PURO */
-    .block-container { padding-top: 1.5rem !important; padding-bottom: 120px !important; max-width: 98% !important; }
+    .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 96% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
     /* ========================================================= */
@@ -320,6 +320,8 @@ DF_AGENTES = carregar_dados_agentes(planilha_db)
 FERIADOS_BR = holidays.Brazil()
 CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "MB_CAEP"]
 hoje_br = datetime.now(FUSO_BR).date() 
+bg_app = "#FFFFFF"
+border_c = "#E2E8F0"
 
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts: return False
@@ -436,6 +438,7 @@ def obter_css_grid():
         ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
     }
 
+# 🔥 A PRIORIDADE AGORA É O STATUS REAL (A cor é definida pela ação, o atraso é apenas o texto de alerta)
 def calc_status_display(row):
     status_final = str(row.get('STATUS', '')).strip().upper()
     previsao = str(row.get('DATA_LIMITE', '')).strip()
@@ -451,7 +454,9 @@ def calc_status_display(row):
     
     if '✅' not in res and '🚫' not in res and '❌' not in res and previsao:
         try:
-            if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: res = f"🚨 ATRASADO ({res})"
+            if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: 
+                # Adiciona o aviso de atraso de forma secundária no texto
+                res = f"{res} ⚠️ ATRASADO"
         except: pass
     return res
 
@@ -460,6 +465,8 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 # =============================================================================
 # 🎨 3. CABEÇALHO LIMPO
 # =============================================================================
+
+# Cabeçalho Limpo (Logo, Título e Botão Sair)
 col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
 
 with col_logo:
@@ -572,7 +579,18 @@ if menu == "📊 Dashboard":
             gb.configure_column("NUMERO", hide=True)
             gb.configure_column("CEP", hide=True)
             
-            st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'};} return {'fontWeight':'600', 'color': '#64748B'};}")
+            # 🔥 JS REVISADO: A Cor baseia-se na palavra raiz (Entregue, Coletado, Rota), o 'ATRASADO' só vira vermelho se for puramente Pendente
+            st_js = JsCode("""
+            function(p){
+                let v = p.value || ''; 
+                if(v.includes('Entregue')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
+                if(v.includes('Frustrada') || v.includes('Problema') || v.includes('Cancelado')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
+                if(v.includes('Em Rota')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
+                if(v.includes('Coletado') || v.includes('Conferido')){ return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'}; } 
+                if(v.includes('ATRASADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
+                return {'fontWeight':'600', 'color': '#64748B'};
+            }
+            """)
             gb.configure_column("STATUS_DISPLAY", headerName="Status", cellStyle=st_js, minWidth=170)
             
             img_js = JsCode("""
@@ -823,6 +841,7 @@ elif menu == "📝 Manual":
 # =============================================================================
 elif menu == "📥 Lotes":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
+    st.success("🛡️ **AUDITORIA DE DADOS ATIVA:** O sistema avalia padronizações de vários clientes (Airlab, FFW, etc) e adiciona os pacotes à base sem destruir seu histórico do dia.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
     if "import_success" in st.session_state and st.session_state.import_success:
@@ -1032,13 +1051,17 @@ elif menu == "🔬 Triagem":
                 
                 if bip_submit and bip_input:
                     termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
-                    if not termo: st.error("❌ QR Code inválido ou em branco.")
+                    
+                    if not termo:
+                        st.error("❌ QR Code inválido ou em branco.")
                     else:
                         df_raw['PED_LIMPO'] = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
+                        
                         if 'QR_CODE' in df_raw.columns:
                             df_raw['QR_LIMPO'] = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
                             mask = (df_raw['PED_LIMPO'] == termo) | (df_raw['QR_LIMPO'] == termo)
-                        else: mask = (df_raw['PED_LIMPO'] == termo)
+                        else:
+                            mask = (df_raw['PED_LIMPO'] == termo)
                         
                         if mask.any():
                             idx = df_raw[mask].index[-1]
@@ -1046,15 +1069,20 @@ elif menu == "🔬 Triagem":
                             if status_atual == 'COLETADO':
                                 try:
                                     aba = planilha_db.worksheet("Memoria_Sistema")
-                                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                    dados_aba = aba.get_all_values()
+                                    df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                    
                                     pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
                                     mask_nuvem = df_nuvem['PEDIDO'] == pedido_alvo
+                                    
                                     if mask_nuvem.any():
                                         df_nuvem.loc[mask_nuvem, 'STATUS'] = 'CONFERIDO'
                                         aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                         st.success(f"✅ Pedido {pedido_alvo} VALIDADO COM SUCESSO e liberado para expedição!")
                                         carregar_dados_completos.clear()
-                                    else: st.error("❌ Falha de sincronia: Pedido não localizado na nuvem.")
+                                    else:
+                                        st.error("❌ Falha de sincronia: Pedido não localizado na nuvem.")
+                                        
                                 except Exception as e: st.error(f"Falha ao registrar auditoria: {e}")
                             elif status_atual == 'PENDENTE': st.error(f"❌ VIOLAÇÃO DE CADEIA: O código {df_raw.at[idx, 'PEDIDO']} consta como PENDENTE de coleta no aplicativo do agente.")
                             elif status_atual == 'CONFERIDO': st.warning(f"⚠️ O volume {df_raw.at[idx, 'PEDIDO']} já estava conferido na base.")
@@ -1072,6 +1100,7 @@ elif menu == "🔬 Triagem":
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
                 grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
+                
                 selecionados_manuais = grid_fila_resp['selected_rows']
                 tem_selecao = False
                 if selecionados_manuais is not None:
@@ -1086,8 +1115,10 @@ elif menu == "🔬 Triagem":
                             else: p_ids = [str(r['PEDIDO']) for r in selecionados_manuais]
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
-                                df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'STATUS'] = 'CONFERIDO'
+                                dados_aba = aba.get_all_values()
+                                df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                mascara_pedidos = df_nuvem['PEDIDO'].isin(p_ids)
+                                df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'CONFERIDO'
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 st.success(f"🎉 {len(p_ids)} pedidos enviados para o Despacho!")
                                 carregar_dados_completos.clear()
@@ -1099,11 +1130,13 @@ elif menu == "🔬 Triagem":
             st.markdown("#### Matriz de Expedição (Romaneio)")
             df_conf = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
             if not df_conf.empty:
+                
                 lista_tomadores_conf = sorted(df_conf['TOMADOR'].astype(str).unique().tolist())
                 c_filtro, _ = st.columns([1, 2])
                 tomador_filtro = c_filtro.selectbox("🏢 Blindagem de Carga (Filtro por Tomador):", ["Todos"] + [t for t in lista_tomadores_conf if t.strip()])
                 
-                if tomador_filtro != "Todos": df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
+                if tomador_filtro != "Todos":
+                    df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
                 
                 colunas_romaneio = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']
                 if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
@@ -1114,6 +1147,7 @@ elif menu == "🔬 Triagem":
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
                 grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
+                
                 selecionados = grid_resp['selected_rows']
                 tem_sel_pdf = False
                 if selecionados is not None:
@@ -1129,7 +1163,7 @@ elif menu == "🔬 Triagem":
                 if c_btn.button("🚚 Gerar Doc. Oficial e Despachar", type="primary", use_container_width=True):
                     if not tem_sel_pdf or motorista_escolhido == "Selecione...": st.warning("⚠️ Exigência de Rota: Marque os pacotes e informe o responsável.")
                     else:
-                        with st.spinner("Gerando Protocolo de Entrega (Selo IGO) e injetando no roteiro do motorista..."):
+                        with st.spinner("Gerando Romaneio PDF (Selo IGO) e injetando no roteiro do motorista..."):
                             if isinstance(selecionados, pd.DataFrame): sel_lista = selecionados.to_dict('records')
                             else: sel_lista = selecionados
                             id_romaneio = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
@@ -1137,12 +1171,17 @@ elif menu == "🔬 Triagem":
                             
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
-                                df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                dados_aba = aba.get_all_values()
+                                df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(pedidos_ids)
+                                
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'EM ROTA DE ENTREGA'
                                 df_nuvem.loc[mascara_pedidos, 'ROMANEIO'] = id_romaneio
                                 df_nuvem.loc[mascara_pedidos, 'DATA'] = data_despacho.strftime("%d/%m/%Y")
-                                if 'AGENTE_RAW' in df_nuvem.columns: df_nuvem.loc[mascara_pedidos, 'AGENTE_RAW'] = motorista_escolhido
+                                
+                                if 'AGENTE_RAW' in df_nuvem.columns:
+                                    df_nuvem.loc[mascara_pedidos, 'AGENTE_RAW'] = motorista_escolhido
+                                
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 
                                 base_tomador = sel_lista[0].get('TOMADOR', 'CLIENTE')
@@ -1169,7 +1208,8 @@ elif menu == "🔬 Triagem":
                                         with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file:
                                             out_file.write(response.read())
                                     pdf.image(logo_path, x=10, y=8, w=30) 
-                                except Exception: pass
+                                except Exception:
+                                    pass
                                 
                                 pdf.set_y(15)
                                 pdf.set_font("Arial", "B", 14)
@@ -1246,6 +1286,7 @@ elif menu == "🔬 Triagem":
             
             if not df_hist.empty:
                 df_hist = df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])
+                
                 colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
                 df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
                 
@@ -1253,7 +1294,17 @@ elif menu == "🔬 Triagem":
                 gb_hist.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
                 gb_hist.configure_grid_options(rowHeight=32, headerHeight=35)
                 
-                st_js = JsCode("function(p){let v=p.value||''; if(v.includes('ENTREGUE')){return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'};} if(v.includes('FRUSTRADA') || v.includes('PROBLEMA')){return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'};} if(v.includes('EM ROTA')){return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'};} if(v.includes('CONFERIDO')){return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'};} return {'fontWeight':'600', 'color':'#64748B'};}")
+                st_js = JsCode("""
+                function(p){
+                    let v = p.value || ''; 
+                    if(v.includes('Entregue')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
+                    if(v.includes('Frustrada') || v.includes('Problema') || v.includes('Cancelado')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
+                    if(v.includes('Em Rota')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
+                    if(v.includes('Coletado') || v.includes('Conferido')){ return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'}; } 
+                    if(v.includes('ATRASADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
+                    return {'fontWeight':'600', 'color': '#64748B'};
+                }
+                """)
                 gb_hist.configure_column("STATUS", headerName="STATUS", cellStyle=st_js, minWidth=170)
                 
                 AgGrid(df_hist_show, gridOptions=gb_hist.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
@@ -1273,6 +1324,7 @@ elif menu == "📱 Zap":
     
     if not df_raw.empty:
         data_filtro = st.date_input("📅 Cronograma da Data:", value=hoje_br, format="DD/MM/YYYY")
+        
         df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
         
         if df_pendentes.empty:
