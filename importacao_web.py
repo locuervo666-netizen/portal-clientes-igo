@@ -8,6 +8,7 @@ import holidays
 import os
 import tempfile
 import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta, timezone
 import random
 import gspread
@@ -21,12 +22,11 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # =============================================================================
 # 🔗 1. CONFIGURAÇÃO DA PÁGINA E AUTENTICAÇÃO
 # =============================================================================
-# Layout expandido e sem barra lateral
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="collapsed")
 
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS DA NOVA BARRA DE TAREFAS FIXA NO RODAPÉ E FUNDO 100% BRANCO
+# 🔥 CSS GLOBAL DA BARRA DE TAREFAS E LIMPEZA DA NUVEM
 st.markdown("""
     <style>
     /* Oculta as ferramentas da nuvem do Streamlit */
@@ -91,7 +91,6 @@ st.markdown("""
         color: #0F172A !important;
         font-weight: 800 !important;
     }
-    /* Oculta as bolinhas do rádio para parecerem botões de aplicativo */
     div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; }
 
     /* Textos e Botões Gerais */
@@ -120,51 +119,61 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Esconde completamente a Sidebar original
 st.markdown("""<style>[data-testid="stSidebar"] { display: none !important; }</style>""", unsafe_allow_html=True)
 
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
+# =============================================================================
+# 🔐 TELA DE LOGIN (ESTILO ERP PROFISSIONAL)
+# =============================================================================
 if not st.session_state.autenticado:
     st.markdown("""
         <style>
-        .login-card { background: #FFFFFF; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; max-width: 400px; margin: auto; }
-        .login-title { color: #0F172A; font-weight: 800; font-size: 22px; margin-top: 15px; letter-spacing: -0.5px; text-align: center; }
-        .login-subtitle { color: #64748B; font-size: 14px; margin-bottom: 30px; font-weight: 500; text-align: center; }
+        /* Transformando o formulário em um Card Centralizado Perfeito */
+        [data-testid="stForm"] {
+            background: #FFFFFF;
+            padding: 40px 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+            border: 1px solid #E2E8F0;
+            max-width: 380px !important;
+            margin: 8vh auto !important; /* Centraliza no meio da tela no desktop e celular */
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .login-title { color: #0F172A; font-weight: 800; font-size: 20px; margin-top: 15px; letter-spacing: -0.5px; }
+        .login-subtitle { color: #64748B; font-size: 13px; font-weight: 500; }
         </style>
     """, unsafe_allow_html=True)
     
-    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
-    
-    # Usando colunas para espremer o card de login no centro da tela
-    col1, col2, col3 = st.columns([1.5, 1, 1.5])
-    
-    with col2:
-        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
-        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-        st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=180)
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("<div class='login-title'>PORTAL CORPORATIVO</div>", unsafe_allow_html=True)
-        st.markdown("<div class='login-subtitle'>Autenticação de Operadores</div>", unsafe_allow_html=True)
+    with st.form("form_login"):
+        st.markdown("""
+            <div class="login-header">
+                <img src="https://i.postimg.cc/x84nnjjq/IGO-LOGO.png" width="160">
+                <div class="login-title">PORTAL CORPORATIVO</div>
+                <div class="login-subtitle">Autenticação de Operadores</div>
+            </div>
+        """, unsafe_allow_html=True)
         
-        with st.form("form_login"):
-            usuario = st.text_input("👤 Usuário")
-            senha = st.text_input("🔑 Senha", type="password")
-            st.markdown("<br>", unsafe_allow_html=True)
-            submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
-            
-            if submit:
-                logins_autorizados = {
-                    "robson.melo": "123",
-                    "william.bertoldo": "123"
-                }
-                if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
-                    st.session_state.autenticado = True
-                    st.rerun()
-                else:
-                    st.error("❌ Credenciais inválidas.")
-        st.markdown("</div>", unsafe_allow_html=True)
+        usuario = st.text_input("👤 Usuário")
+        senha = st.text_input("🔑 Senha", type="password")
+        st.markdown("<br>", unsafe_allow_html=True)
+        submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
+        
+        if submit:
+            logins_autorizados = {
+                "robson.melo": "123",
+                "william.bertoldo": "123"
+            }
+            if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
+                st.session_state.autenticado = True
+                st.rerun()
+            else:
+                st.error("❌ Credenciais inválidas.")
+    
     st.stop()
 
 
@@ -403,7 +412,7 @@ def obter_proximo_id(df):
     except:
         return 100000
 
-# CSS Ajustado: Linhas Alternadas Suaves em Tons de Cinza/Azul Claro
+# CSS Ajustado: Linhas Alternadas Suaves em Tons de Cinza/Azul Claro e Brancas
 def obter_css_grid():
     return {
         ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
@@ -412,7 +421,7 @@ def obter_css_grid():
         ".ag-header-icon": {"color": "#0284C7 !important"}, 
         ".ag-cell": {"font-size": "11px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
         ".ag-row-even": {"background-color": "#FFFFFF !important"},
-        ".ag-row-odd": {"background-color": "#F4F6F8 !important"}, # Azul/Cinza muito suave e discreto
+        ".ag-row-odd": {"background-color": "#F8FAFC !important"}, # Azul/Cinza muito sutil (Slate Ice)
         ".ag-row-hover": {"background-color": "#E2E8F0 !important"}, # Marcador suave no hover
         ".ag-row-selected": {"background-color": "#E0F2FE !important", "color": "#0369A1 !important"},
         ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
@@ -464,21 +473,20 @@ st.markdown("<br>", unsafe_allow_html=True)
 # 🖥️ BARRA DE TAREFAS FIXA NO RODAPÉ (TASKBAR)
 # =============================================================================
 menu = st.radio("Navegação:", [
-    "📊 Dashboard Operacional", 
-    "📝 Inserir Pedido Manual", 
-    "📥 Importação de Lotes", 
-    "🔬 Triagem e Romaneio", 
-    "📱 Disparo WhatsApp", 
-    "📁 Exportar Relatórios", 
-    "⚙️ Matriz de Rotas"
+    "📊 Dashboard", 
+    "📝 Manual", 
+    "📥 Lotes", 
+    "🔬 Triagem", 
+    "📱 Zap", 
+    "📁 Relatórios", 
+    "⚙️ Rotas"
 ], horizontal=True, label_visibility="collapsed")
 
-st.markdown("---")
 
 # =============================================================================
 # 🚀 MÓDULO 1: DASHBOARD
 # =============================================================================
-if menu == "📊 Dashboard Operacional":
+if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -740,12 +748,12 @@ if menu == "📊 Dashboard Operacional":
                 st.rerun()
 
     else:
-        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Inserir Pedido Manual' para começar.")
+        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Manual' para começar.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
-elif menu == "📝 Inserir Pedido Manual":
+elif menu == "📝 Manual":
     with st.container(border=True):
         with st.form("form_manual_page", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -804,7 +812,7 @@ elif menu == "📝 Inserir Pedido Manual":
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
-elif menu == "📥 Importação de Lotes":
+elif menu == "📥 Lotes":
     st.success("🛡️ **AUDITORIA DE DADOS ATIVA:** O sistema avalia padronizações de vários clientes (Airlab, FFW, etc) e adiciona os pacotes à base sem destruir seu histórico do dia.")
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
@@ -999,7 +1007,7 @@ elif menu == "📥 Importação de Lotes":
 # =============================================================================
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO 
 # =============================================================================
-elif menu == "🔬 Triagem e Romaneio":
+elif menu == "🔬 Triagem":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -1164,10 +1172,15 @@ elif menu == "🔬 Triagem e Romaneio":
                                 pdf.set_line_width(0.3)
                                 pdf.rect(5, 5, 200, 287)
                                 
+                                # 🔥 Download Seguro da Logo para o PDF
                                 try:
-                                    # Adiciona a Logo da IGO no canto superior esquerdo
-                                    pdf.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", x=10, y=8, w=35)
-                                except:
+                                    logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
+                                    if not os.path.exists(logo_path):
+                                        req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
+                                        with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file:
+                                            out_file.write(response.read())
+                                    pdf.image(logo_path, x=10, y=8, w=30) # Logo pequena e discreta no canto esquerdo
+                                except Exception:
                                     pass
                                 
                                 pdf.set_y(15)
@@ -1265,7 +1278,7 @@ elif menu == "🔬 Triagem e Romaneio":
 # =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
 # =============================================================================
-elif menu == "📱 Disparo WhatsApp":
+elif menu == "📱 Zap":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
     st.markdown("Acione o terminal de comando para injetar o cronograma oficial de rotas no WhatsApp corporativo da equipe.")
     
@@ -1333,7 +1346,7 @@ elif menu == "📱 Disparo WhatsApp":
 # =============================================================================
 # 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
 # =============================================================================
-elif menu == "📁 Exportar Relatórios":
+elif menu == "📁 Relatórios":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining e Exportação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
@@ -1391,7 +1404,7 @@ elif menu == "📁 Exportar Relatórios":
 # =============================================================================
 # ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
 # =============================================================================
-elif menu == "⚙️ Matriz de Rotas":
+elif menu == "⚙️ Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
     
     tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
