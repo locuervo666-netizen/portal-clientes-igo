@@ -430,7 +430,6 @@ def obter_proximo_id(df):
     except:
         return 100000
 
-# CSS Ajustado: Linhas Alternadas Suaves em Tons de Cinza/Azul Claro e Brancas
 def obter_css_grid():
     return {
         ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
@@ -439,13 +438,12 @@ def obter_css_grid():
         ".ag-header-icon": {"color": "#0284C7 !important"}, 
         ".ag-cell": {"font-size": "11px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
         ".ag-row-even": {"background-color": "#FFFFFF !important"},
-        ".ag-row-odd": {"background-color": "#F8FAFC !important"},
-        ".ag-row-hover": {"background-color": "#E2E8F0 !important"},
+        ".ag-row-odd": {"background-color": "#F8FAFC !important"}, 
+        ".ag-row-hover": {"background-color": "#E2E8F0 !important"}, 
         ".ag-row-selected": {"background-color": "#E0F2FE !important", "color": "#0369A1 !important"},
         ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
     }
 
-# 🔥 A PRIORIDADE AGORA É O STATUS REAL
 def calc_status_display(row):
     status_final = str(row.get('STATUS', '')).strip().upper()
     previsao = str(row.get('DATA_LIMITE', '')).strip()
@@ -692,6 +690,7 @@ if menu == "📊 Dashboard":
                                             if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
                                                 mascara_app = df_app['PEDIDO'].isin(p_ids)
                                                 df_app.loc[mascara_app, 'STATUS'] = status_limpo
+                                                # Carimba a data no AppSheet também durante a baixa manual
                                                 if 'DATA_ENTREGA' in df_app.columns:
                                                     if status_limpo == "ENTREGUE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                                     elif status_limpo == "PENDENTE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = ""
@@ -744,6 +743,7 @@ if menu == "📊 Dashboard":
                                 st.rerun()
                             except Exception as e: st.error(f"Erro ao clonar: {e}")
 
+            # 🔥 BUG CORRIGIDO: A TROCA DE MOTORISTA NÃO ALTERA MAIS A DATA DE CRIAÇÃO DO PEDIDO
             with col_b4.popover("🔄 Trocar Motorista", use_container_width=True):
                 if not tem_sel: st.warning("Selecione na Grid primeiro!")
                 else:
@@ -752,7 +752,6 @@ if menu == "📊 Dashboard":
                     else:
                         logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                         novo_mot = st.selectbox("Novo Agente (Digite para buscar):", logins_disp)
-                        nova_data_troca = st.date_input("Nova Data do Pedido (SLA NÃO muda):", format="DD/MM/YYYY", value=hoje_br)
                         
                         if st.button("Confirmar Troca", type="primary", use_container_width=True):
                             with st.spinner("Trocando motorista..."):
@@ -766,7 +765,6 @@ if menu == "📊 Dashboard":
                                         if mask.any():
                                             df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
                                             df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
-                                            df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
                                             l_app = df_nuvem[mask].iloc[0]
                                             lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
                                     aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
@@ -787,7 +785,6 @@ elif menu == "📝 Manual":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
     st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
     
-    # Inicializa o session_state para os campos de endereço
     if 'm_rua' not in st.session_state: st.session_state['m_rua'] = ""
     if 'm_bai' not in st.session_state: st.session_state['m_bai'] = ""
     if 'm_cid' not in st.session_state: st.session_state['m_cid'] = ""
