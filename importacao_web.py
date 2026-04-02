@@ -234,6 +234,7 @@ def carregar_dados_completos(_planilha):
                     
                     cols_to_extract = ['PEDIDO', 'STATUS', 'OBSERVACOES']
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
+                    if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
                     
                     col_qr_app = None
                     for c in ['QR_CODE', 'QRCODE', 'QR', 'CODIGO']:
@@ -244,6 +245,7 @@ def carregar_dados_completos(_planilha):
                     
                     df_app_clean = df_app[[c for c in cols_to_extract if c in df_app.columns]].copy()
                     rename_map = {'STATUS': 'APP_STATUS', 'OBSERVACOES': 'APP_OBS', 'FOTO': 'APP_FOTO'}
+                    if 'DATA_ENTREGA' in df_app.columns: rename_map['DATA_ENTREGA'] = 'APP_DATA_ENTREGA'
                     if col_qr_app: rename_map[col_qr_app] = 'APP_QR'
                     df_app_clean.rename(columns=rename_map, inplace=True)
                     
@@ -280,6 +282,21 @@ def carregar_dados_completos(_planilha):
                     
                     df['STATUS'] = df.apply(get_true_status, axis=1)
                     
+                    def get_true_data_entrega(row):
+                        d_db = str(row.get('DATA_ENTREGA', '')).strip()
+                        s_final = str(row.get('STATUS', '')).strip().upper()
+                        
+                        # Se veio entregue do App e tem a data lá capturada, damos prioridade à data do App
+                        if s_final in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA'] and 'APP_DATA_ENTREGA' in row:
+                            d_app = str(row.get('APP_DATA_ENTREGA', '')).strip()
+                            if d_app and d_app.upper() != 'NAN':
+                                return d_app
+                        
+                        return d_db if d_db.upper() != 'NAN' else ""
+                        
+                    if 'DATA_ENTREGA' in df.columns or 'APP_DATA_ENTREGA' in df.columns:
+                        df['DATA_ENTREGA'] = df.apply(get_true_data_entrega, axis=1)
+
                     def get_true_foto(row):
                         f_db = str(row.get('FOTO', '')).strip()
                         f_app = str(row.get('APP_FOTO', '')).strip()
@@ -559,11 +576,11 @@ if menu == "📊 Dashboard":
             gb.configure_column("UF", headerName="UF", maxWidth=60)
             gb.configure_column("DATA_LIMITE", headerName="Previsão Entrega")
             gb.configure_column("AGENTE_RAW", headerName="Agente") 
+            gb.configure_column("DATA_ENTREGA", headerName="Data Real Entrega", maxWidth=110) # 🔥 Data de entrega agora 100% visível!
             
             gb.configure_column("ENDERECO", hide=True)
             gb.configure_column("NUMERO", hide=True)
             gb.configure_column("CEP", hide=True)
-            gb.configure_column("DATA_ENTREGA", hide=True)
             
             st_js = JsCode("function(p){let v=p.value||''; if(v.includes('Entregue')){return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'};} if(v.includes('ATRASADO') || v.includes('Frustrada')){return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'};} if(v.includes('Em Rota')){return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'};} if(v.includes('Coletado') || v.includes('Conferido')){return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'};} return {'fontWeight':'600', 'color': '#64748B'};}")
             gb.configure_column("STATUS_DISPLAY", headerName="Status", cellStyle=st_js, minWidth=170)
@@ -1186,7 +1203,7 @@ elif menu == "🔬 Triagem":
                                 pdf.set_y(15)
                                 pdf.set_font("Arial", "B", 14)
                                 pdf.set_text_color(15, 23, 42)
-                                pdf.cell(0, 6, f"PROTOCOLO DE ROMANEIO TÉCNICO - IGO LOGISTICA", ln=True, align="C")
+                                pdf.cell(0, 6, f"PROTOCOLO DE ENTREGA - IGO LOGISTICA", ln=True, align="C") # 🔥 Título Novo!
                                 
                                 pdf.set_font("Arial", "B", 10)
                                 pdf.set_text_color(2, 132, 199) 
@@ -1194,7 +1211,7 @@ elif menu == "🔬 Triagem":
                                 
                                 pdf.set_font("Arial", "", 8)
                                 pdf.set_text_color(100, 116, 139) 
-                                pdf.cell(0, 4, f"Agente Designado: {motorista_escolhido.upper()}   |   Data do Embarque: {data_despacho.strftime('%d/%m/%Y')}", ln=True, align="C")
+                                pdf.cell(0, 4, f"Data do Embarque: {data_despacho.strftime('%d/%m/%Y')}", ln=True, align="C") # 🔥 ID do Agente removido!
                                 
                                 pdf.ln(3)
                                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
