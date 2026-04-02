@@ -26,7 +26,7 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS GLOBAL DA BARRA DE TAREFAS E LIMPEZA DA NUVEM
+# 🔥 CSS GLOBAL DA BARRA DE TAREFAS E FUNDO 100% BRANCO
 st.markdown("""
     <style>
     /* Oculta as ferramentas da nuvem do Streamlit */
@@ -40,7 +40,7 @@ st.markdown("""
     footer { display: none !important; }
     
     /* Configuração da Tela Inteira com fundo BRANCO PURO */
-    .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 96% !important; }
+    .block-container { padding-top: 1.5rem !important; padding-bottom: 120px !important; max-width: 98% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
     /* ========================================================= */
@@ -130,7 +130,6 @@ if 'autenticado' not in st.session_state:
 if not st.session_state.autenticado:
     st.markdown("""
         <style>
-        /* Transformando o formulário em um Card Centralizado Perfeito */
         [data-testid="stForm"] {
             background: #FFFFFF;
             padding: 40px 30px;
@@ -138,12 +137,9 @@ if not st.session_state.autenticado:
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
             border: 1px solid #E2E8F0;
             max-width: 380px !important;
-            margin: 8vh auto !important; /* Centraliza no meio da tela no desktop e celular */
+            margin: 8vh auto !important; 
         }
-        .login-header {
-            text-align: center;
-            margin-bottom: 25px;
-        }
+        .login-header { text-align: center; margin-bottom: 25px; }
         .login-title { color: #0F172A; font-weight: 800; font-size: 20px; margin-top: 15px; letter-spacing: -0.5px; }
         .login-subtitle { color: #64748B; font-size: 13px; font-weight: 500; }
         </style>
@@ -173,7 +169,6 @@ if not st.session_state.autenticado:
                 st.rerun()
             else:
                 st.error("❌ Credenciais inválidas.")
-    
     st.stop()
 
 
@@ -286,7 +281,6 @@ def carregar_dados_completos(_planilha):
                         d_db = str(row.get('DATA_ENTREGA', '')).strip()
                         s_final = str(row.get('STATUS', '')).strip().upper()
                         
-                        # Se veio entregue do App e tem a data lá capturada, damos prioridade à data do App
                         if s_final in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA'] and 'APP_DATA_ENTREGA' in row:
                             d_app = str(row.get('APP_DATA_ENTREGA', '')).strip()
                             if d_app and d_app.upper() != 'NAN':
@@ -326,8 +320,6 @@ DF_AGENTES = carregar_dados_agentes(planilha_db)
 FERIADOS_BR = holidays.Brazil()
 CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "MB_CAEP"]
 hoje_br = datetime.now(FUSO_BR).date() 
-bg_app = "#FFFFFF"
-border_c = "#E2E8F0"
 
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts: return False
@@ -468,8 +460,6 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 # =============================================================================
 # 🎨 3. CABEÇALHO LIMPO
 # =============================================================================
-
-# Cabeçalho Limpo (Logo, Título e Botão Sair)
 col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
 
 with col_logo:
@@ -576,7 +566,7 @@ if menu == "📊 Dashboard":
             gb.configure_column("UF", headerName="UF", maxWidth=60)
             gb.configure_column("DATA_LIMITE", headerName="Previsão Entrega")
             gb.configure_column("AGENTE_RAW", headerName="Agente") 
-            gb.configure_column("DATA_ENTREGA", headerName="Data Real Entrega", maxWidth=110) # 🔥 Data de entrega agora 100% visível!
+            gb.configure_column("DATA_ENTREGA", headerName="Data Real Entrega", maxWidth=110)
             
             gb.configure_column("ENDERECO", hide=True)
             gb.configure_column("NUMERO", hide=True)
@@ -679,6 +669,10 @@ if menu == "📊 Dashboard":
                                             if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
                                                 mascara_app = df_app['PEDIDO'].isin(p_ids)
                                                 df_app.loc[mascara_app, 'STATUS'] = status_limpo
+                                                # Carimba a data no AppSheet também durante a baixa manual
+                                                if 'DATA_ENTREGA' in df_app.columns:
+                                                    if status_limpo == "ENTREGUE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
+                                                    elif status_limpo == "PENDENTE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = ""
                                                 aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
                                     except: pass 
                                     st.success("Atualizado!")
@@ -764,13 +758,11 @@ if menu == "📊 Dashboard":
                 carregar_dados_completos.clear()
                 st.rerun()
 
-    else:
-        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Manual' para começar.")
-
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
 elif menu == "📝 Manual":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
     with st.container(border=True):
         with st.form("form_manual_page", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -830,7 +822,7 @@ elif menu == "📝 Manual":
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
 elif menu == "📥 Lotes":
-    st.success("🛡️ **AUDITORIA DE DADOS ATIVA:** O sistema avalia padronizações de vários clientes (Airlab, FFW, etc) e adiciona os pacotes à base sem destruir seu histórico do dia.")
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
     
     if "df_preview" not in st.session_state: st.session_state.df_preview = pd.DataFrame()
     if "import_success" in st.session_state and st.session_state.import_success:
@@ -1025,6 +1017,7 @@ elif menu == "📥 Lotes":
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO 
 # =============================================================================
 elif menu == "🔬 Triagem":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🔬 Terminal de Triagem e Expedição</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -1039,17 +1032,13 @@ elif menu == "🔬 Triagem":
                 
                 if bip_submit and bip_input:
                     termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
-                    
-                    if not termo:
-                        st.error("❌ QR Code inválido ou em branco.")
+                    if not termo: st.error("❌ QR Code inválido ou em branco.")
                     else:
                         df_raw['PED_LIMPO'] = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
-                        
                         if 'QR_CODE' in df_raw.columns:
                             df_raw['QR_LIMPO'] = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
                             mask = (df_raw['PED_LIMPO'] == termo) | (df_raw['QR_LIMPO'] == termo)
-                        else:
-                            mask = (df_raw['PED_LIMPO'] == termo)
+                        else: mask = (df_raw['PED_LIMPO'] == termo)
                         
                         if mask.any():
                             idx = df_raw[mask].index[-1]
@@ -1057,20 +1046,15 @@ elif menu == "🔬 Triagem":
                             if status_atual == 'COLETADO':
                                 try:
                                     aba = planilha_db.worksheet("Memoria_Sistema")
-                                    dados_aba = aba.get_all_values()
-                                    df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                    
+                                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
                                     pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
                                     mask_nuvem = df_nuvem['PEDIDO'] == pedido_alvo
-                                    
                                     if mask_nuvem.any():
                                         df_nuvem.loc[mask_nuvem, 'STATUS'] = 'CONFERIDO'
                                         aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                         st.success(f"✅ Pedido {pedido_alvo} VALIDADO COM SUCESSO e liberado para expedição!")
                                         carregar_dados_completos.clear()
-                                    else:
-                                        st.error("❌ Falha de sincronia: Pedido não localizado na nuvem.")
-                                        
+                                    else: st.error("❌ Falha de sincronia: Pedido não localizado na nuvem.")
                                 except Exception as e: st.error(f"Falha ao registrar auditoria: {e}")
                             elif status_atual == 'PENDENTE': st.error(f"❌ VIOLAÇÃO DE CADEIA: O código {df_raw.at[idx, 'PEDIDO']} consta como PENDENTE de coleta no aplicativo do agente.")
                             elif status_atual == 'CONFERIDO': st.warning(f"⚠️ O volume {df_raw.at[idx, 'PEDIDO']} já estava conferido na base.")
@@ -1088,7 +1072,6 @@ elif menu == "🔬 Triagem":
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
                 grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
-                
                 selecionados_manuais = grid_fila_resp['selected_rows']
                 tem_selecao = False
                 if selecionados_manuais is not None:
@@ -1103,10 +1086,8 @@ elif menu == "🔬 Triagem":
                             else: p_ids = [str(r['PEDIDO']) for r in selecionados_manuais]
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
-                                dados_aba = aba.get_all_values()
-                                df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                mascara_pedidos = df_nuvem['PEDIDO'].isin(p_ids)
-                                df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'CONFERIDO'
+                                df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'STATUS'] = 'CONFERIDO'
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 st.success(f"🎉 {len(p_ids)} pedidos enviados para o Despacho!")
                                 carregar_dados_completos.clear()
@@ -1118,13 +1099,11 @@ elif menu == "🔬 Triagem":
             st.markdown("#### Matriz de Expedição (Romaneio)")
             df_conf = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
             if not df_conf.empty:
-                
                 lista_tomadores_conf = sorted(df_conf['TOMADOR'].astype(str).unique().tolist())
                 c_filtro, _ = st.columns([1, 2])
                 tomador_filtro = c_filtro.selectbox("🏢 Blindagem de Carga (Filtro por Tomador):", ["Todos"] + [t for t in lista_tomadores_conf if t.strip()])
                 
-                if tomador_filtro != "Todos":
-                    df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
+                if tomador_filtro != "Todos": df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
                 
                 colunas_romaneio = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']
                 if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
@@ -1135,7 +1114,6 @@ elif menu == "🔬 Triagem":
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
                 grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
-                
                 selecionados = grid_resp['selected_rows']
                 tem_sel_pdf = False
                 if selecionados is not None:
@@ -1151,7 +1129,7 @@ elif menu == "🔬 Triagem":
                 if c_btn.button("🚚 Gerar Doc. Oficial e Despachar", type="primary", use_container_width=True):
                     if not tem_sel_pdf or motorista_escolhido == "Selecione...": st.warning("⚠️ Exigência de Rota: Marque os pacotes e informe o responsável.")
                     else:
-                        with st.spinner("Gerando Romaneio PDF (Selo IGO) e injetando no roteiro do motorista..."):
+                        with st.spinner("Gerando Protocolo de Entrega (Selo IGO) e injetando no roteiro do motorista..."):
                             if isinstance(selecionados, pd.DataFrame): sel_lista = selecionados.to_dict('records')
                             else: sel_lista = selecionados
                             id_romaneio = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
@@ -1159,17 +1137,12 @@ elif menu == "🔬 Triagem":
                             
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
-                                dados_aba = aba.get_all_values()
-                                df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(pedidos_ids)
-                                
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'EM ROTA DE ENTREGA'
                                 df_nuvem.loc[mascara_pedidos, 'ROMANEIO'] = id_romaneio
                                 df_nuvem.loc[mascara_pedidos, 'DATA'] = data_despacho.strftime("%d/%m/%Y")
-                                
-                                if 'AGENTE_RAW' in df_nuvem.columns:
-                                    df_nuvem.loc[mascara_pedidos, 'AGENTE_RAW'] = motorista_escolhido
-                                
+                                if 'AGENTE_RAW' in df_nuvem.columns: df_nuvem.loc[mascara_pedidos, 'AGENTE_RAW'] = motorista_escolhido
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 
                                 base_tomador = sel_lista[0].get('TOMADOR', 'CLIENTE')
@@ -1189,21 +1162,19 @@ elif menu == "🔬 Triagem":
                                 pdf.set_line_width(0.3)
                                 pdf.rect(5, 5, 200, 287)
                                 
-                                # 🔥 Download Seguro da Logo para o PDF
                                 try:
                                     logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
                                     if not os.path.exists(logo_path):
                                         req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
                                         with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file:
                                             out_file.write(response.read())
-                                    pdf.image(logo_path, x=10, y=8, w=30) # Logo pequena e discreta no canto esquerdo
-                                except Exception:
-                                    pass
+                                    pdf.image(logo_path, x=10, y=8, w=30) 
+                                except Exception: pass
                                 
                                 pdf.set_y(15)
                                 pdf.set_font("Arial", "B", 14)
                                 pdf.set_text_color(15, 23, 42)
-                                pdf.cell(0, 6, f"PROTOCOLO DE ENTREGA - IGO LOGISTICA", ln=True, align="C") # 🔥 Título Novo!
+                                pdf.cell(0, 6, f"PROTOCOLO DE ENTREGA - IGO LOGISTICA", ln=True, align="C") 
                                 
                                 pdf.set_font("Arial", "B", 10)
                                 pdf.set_text_color(2, 132, 199) 
@@ -1211,7 +1182,7 @@ elif menu == "🔬 Triagem":
                                 
                                 pdf.set_font("Arial", "", 8)
                                 pdf.set_text_color(100, 116, 139) 
-                                pdf.cell(0, 4, f"Data do Embarque: {data_despacho.strftime('%d/%m/%Y')}", ln=True, align="C") # 🔥 ID do Agente removido!
+                                pdf.cell(0, 4, f"Data do Embarque: {data_despacho.strftime('%d/%m/%Y')}", ln=True, align="C")
                                 
                                 pdf.ln(3)
                                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
@@ -1275,7 +1246,6 @@ elif menu == "🔬 Triagem":
             
             if not df_hist.empty:
                 df_hist = df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])
-                
                 colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
                 df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
                 
@@ -1303,7 +1273,6 @@ elif menu == "📱 Zap":
     
     if not df_raw.empty:
         data_filtro = st.date_input("📅 Cronograma da Data:", value=hoje_br, format="DD/MM/YYYY")
-        
         df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
         
         if df_pendentes.empty:
