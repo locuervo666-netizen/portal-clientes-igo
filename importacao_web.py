@@ -220,6 +220,10 @@ def carregar_dados_completos(_planilha):
         if len(dados_m) > 1:
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
+            
+            # 🔥 ESCUDO ANTI-CRASH: Remove colunas duplicadas que causam o ValueError
+            df = df.loc[:, ~df.columns.duplicated()].copy()
+            
             try:
                 aba_app = _planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
@@ -227,6 +231,9 @@ def carregar_dados_completos(_planilha):
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
                     cols_limpas = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
                     df_app.columns = cols_limpas
+                    
+                    # 🔥 ESCUDO ANTI-CRASH no AppSheet também
+                    df_app = df_app.loc[:, ~df_app.columns.duplicated()].copy()
                     
                     cols_to_extract = ['PEDIDO', 'STATUS', 'OBSERVACOES']
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
@@ -676,6 +683,7 @@ if menu == "📊 Dashboard":
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     dados_aba = aba.get_all_values()
                                     df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                    df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                     for pid in p_ids:
                                         mask = df_nuvem['PEDIDO'] == pid
                                         df_nuvem.loc[mask, 'STATUS'] = status_limpo
@@ -687,10 +695,10 @@ if menu == "📊 Dashboard":
                                         dados_app = aba_app.get_all_values()
                                         if len(dados_app) > 1:
                                             df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
+                                            df_app = df_app.loc[:, ~df_app.columns.duplicated()].copy()
                                             if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
                                                 mascara_app = df_app['PEDIDO'].isin(p_ids)
                                                 df_app.loc[mascara_app, 'STATUS'] = status_limpo
-                                                # Carimba a data no AppSheet também durante a baixa manual
                                                 if 'DATA_ENTREGA' in df_app.columns:
                                                     if status_limpo == "ENTREGUE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                                     elif status_limpo == "PENDENTE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = ""
@@ -715,6 +723,7 @@ if menu == "📊 Dashboard":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                 prox_id = obter_proximo_id(df_nuvem)
                                 clones_para_app = []
                                 for pid in p_ids:
@@ -743,7 +752,6 @@ if menu == "📊 Dashboard":
                                 st.rerun()
                             except Exception as e: st.error(f"Erro ao clonar: {e}")
 
-            # 🔥 BUG CORRIGIDO: A TROCA DE MOTORISTA NÃO ALTERA MAIS A DATA DE CRIAÇÃO DO PEDIDO
             with col_b4.popover("🔄 Trocar Motorista", use_container_width=True):
                 if not tem_sel: st.warning("Selecione na Grid primeiro!")
                 else:
@@ -759,6 +767,7 @@ if menu == "📊 Dashboard":
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     dados_aba = aba.get_all_values()
                                     df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                    df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                     lista_app_troca = []
                                     for pid in p_ids:
                                         mask = df_nuvem['PEDIDO'] == pid
@@ -850,6 +859,7 @@ elif menu == "📝 Manual":
                         aba_memoria = planilha_db.worksheet("Memoria_Sistema")
                         dados_atuais = aba_memoria.get_all_values()
                         df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
+                        df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                         
                         m_pedido = str(obter_proximo_id(df_nuvem))
                         
@@ -1039,6 +1049,7 @@ elif menu == "📥 Lotes":
                         aba = planilha_db.worksheet("Memoria_Sistema")
                         atuais = aba.get_all_values()
                         df_up = pd.DataFrame(atuais[1:], columns=atuais[0]) if len(atuais) > 1 else pd.DataFrame()
+                        df_up = df_up.loc[:, ~df_up.columns.duplicated()].copy()
                         
                         prox_id = obter_proximo_id(df_up)
                         
@@ -1110,6 +1121,7 @@ elif menu == "🔬 Triagem":
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     dados_aba = aba.get_all_values()
                                     df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                    df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                     
                                     pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
                                     mask_nuvem = df_nuvem['PEDIDO'] == pedido_alvo
@@ -1156,6 +1168,7 @@ elif menu == "🔬 Triagem":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(p_ids)
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'CONFERIDO'
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
@@ -1212,6 +1225,7 @@ elif menu == "🔬 Triagem":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(pedidos_ids)
                                 
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'EM ROTA DE ENTREGA'
