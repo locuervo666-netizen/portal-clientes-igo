@@ -9,7 +9,6 @@ import os
 import tempfile
 import urllib.parse
 import urllib.request
-import requests
 from datetime import datetime, timedelta, timezone
 import random
 import gspread
@@ -220,10 +219,6 @@ def carregar_dados_completos(_planilha):
         if len(dados_m) > 1:
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
-            
-            # 🔥 ESCUDO ANTI-CRASH: Remove colunas duplicadas que causam o ValueError
-            df = df.loc[:, ~df.columns.duplicated()].copy()
-            
             try:
                 aba_app = _planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
@@ -231,9 +226,6 @@ def carregar_dados_completos(_planilha):
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
                     cols_limpas = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
                     df_app.columns = cols_limpas
-                    
-                    # 🔥 ESCUDO ANTI-CRASH no AppSheet também
-                    df_app = df_app.loc[:, ~df_app.columns.duplicated()].copy()
                     
                     cols_to_extract = ['PEDIDO', 'STATUS', 'OBSERVACOES']
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
@@ -288,13 +280,7 @@ def carregar_dados_completos(_planilha):
                     def get_true_data_entrega(row):
                         d_db = str(row.get('DATA_ENTREGA', '')).strip()
                         s_final = str(row.get('STATUS', '')).strip().upper()
-                        rom_id = str(row.get('ROMANEIO', '')).strip()
                         
-                        if rom_id in rom_dict:
-                            d_rom = str(rom_dict[rom_id].get('APP_DATA_ENTREGA', '')).strip()
-                            if d_rom and d_rom.upper() != 'NAN':
-                                return d_rom
-
                         if s_final in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA'] and 'APP_DATA_ENTREGA' in row:
                             d_app = str(row.get('APP_DATA_ENTREGA', '')).strip()
                             if d_app and d_app.upper() != 'NAN':
@@ -437,6 +423,7 @@ def obter_proximo_id(df):
     except:
         return 100000
 
+# CSS Ajustado: Linhas Alternadas Suaves em Tons de Cinza/Azul Claro e Brancas
 def obter_css_grid():
     return {
         ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
@@ -445,12 +432,13 @@ def obter_css_grid():
         ".ag-header-icon": {"color": "#0284C7 !important"}, 
         ".ag-cell": {"font-size": "11px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
         ".ag-row-even": {"background-color": "#FFFFFF !important"},
-        ".ag-row-odd": {"background-color": "#F8FAFC !important"}, 
-        ".ag-row-hover": {"background-color": "#E2E8F0 !important"}, 
+        ".ag-row-odd": {"background-color": "#F8FAFC !important"}, # Azul/Cinza muito sutil (Slate Ice)
+        ".ag-row-hover": {"background-color": "#E2E8F0 !important"}, # Marcador suave no hover
         ".ag-row-selected": {"background-color": "#E0F2FE !important", "color": "#0369A1 !important"},
         ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
     }
 
+# 🔥 A PRIORIDADE AGORA É O STATUS REAL (A cor é definida pela ação, o atraso é apenas o texto de alerta)
 def calc_status_display(row):
     status_final = str(row.get('STATUS', '')).strip().upper()
     previsao = str(row.get('DATA_LIMITE', '')).strip()
@@ -467,6 +455,7 @@ def calc_status_display(row):
     if '✅' not in res and '🚫' not in res and '❌' not in res and previsao:
         try:
             if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: 
+                # Adiciona o aviso de atraso de forma secundária no texto
                 res = f"{res} ⚠️ ATRASADO"
         except: pass
     return res
@@ -590,6 +579,7 @@ if menu == "📊 Dashboard":
             gb.configure_column("NUMERO", hide=True)
             gb.configure_column("CEP", hide=True)
             
+            # 🔥 JS REVISADO: A Cor baseia-se na palavra raiz (Entregue, Coletado, Rota), o 'ATRASADO' só vira vermelho se for puramente Pendente
             st_js = JsCode("""
             function(p){
                 let v = p.value || ''; 
@@ -683,7 +673,6 @@ if menu == "📊 Dashboard":
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     dados_aba = aba.get_all_values()
                                     df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                    df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                     for pid in p_ids:
                                         mask = df_nuvem['PEDIDO'] == pid
                                         df_nuvem.loc[mask, 'STATUS'] = status_limpo
@@ -695,10 +684,10 @@ if menu == "📊 Dashboard":
                                         dados_app = aba_app.get_all_values()
                                         if len(dados_app) > 1:
                                             df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
-                                            df_app = df_app.loc[:, ~df_app.columns.duplicated()].copy()
                                             if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
                                                 mascara_app = df_app['PEDIDO'].isin(p_ids)
                                                 df_app.loc[mascara_app, 'STATUS'] = status_limpo
+                                                # Carimba a data no AppSheet também durante a baixa manual
                                                 if 'DATA_ENTREGA' in df_app.columns:
                                                     if status_limpo == "ENTREGUE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                                     elif status_limpo == "PENDENTE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = ""
@@ -723,7 +712,6 @@ if menu == "📊 Dashboard":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                 prox_id = obter_proximo_id(df_nuvem)
                                 clones_para_app = []
                                 for pid in p_ids:
@@ -760,6 +748,7 @@ if menu == "📊 Dashboard":
                     else:
                         logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                         novo_mot = st.selectbox("Novo Agente (Digite para buscar):", logins_disp)
+                        nova_data_troca = st.date_input("Nova Data do Pedido (SLA NÃO muda):", format="DD/MM/YYYY", value=hoje_br)
                         
                         if st.button("Confirmar Troca", type="primary", use_container_width=True):
                             with st.spinner("Trocando motorista..."):
@@ -767,13 +756,13 @@ if menu == "📊 Dashboard":
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     dados_aba = aba.get_all_values()
                                     df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                    df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                     lista_app_troca = []
                                     for pid in p_ids:
                                         mask = df_nuvem['PEDIDO'] == pid
                                         if mask.any():
                                             df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
                                             df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
+                                            df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
                                             l_app = df_nuvem[mask].iloc[0]
                                             lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
                                     aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
@@ -788,102 +777,64 @@ if menu == "📊 Dashboard":
                 st.rerun()
 
 # =============================================================================
-# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL (COM VIA CEP INTEGRADO)
+# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
 elif menu == "📝 Manual":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
-    st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
-    
-    if 'm_rua' not in st.session_state: st.session_state['m_rua'] = ""
-    if 'm_bai' not in st.session_state: st.session_state['m_bai'] = ""
-    if 'm_cid' not in st.session_state: st.session_state['m_cid'] = ""
-    if 'm_uf' not in st.session_state: st.session_state['m_uf'] = ""
-
     with st.container(border=True):
-        st.markdown("#### 📍 Busca Inteligente de Endereço")
-        cc1, cc2, cc3 = st.columns([2, 1, 3], vertical_alignment="bottom")
-        cep_input = cc1.text_input("Digite o CEP (Apenas números)", max_chars=9)
-        
-        if cc2.button("🔍 Buscar CEP", use_container_width=True):
-            cep_limpo = re.sub(r'\D', '', cep_input)
-            if len(cep_limpo) == 8:
-                try:
-                    resp = requests.get(f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
-                    if "erro" not in resp:
-                        st.session_state['m_rua'] = padronizar_texto(resp.get("logradouro", ""))
-                        st.session_state['m_bai'] = padronizar_texto(resp.get("bairro", ""))
-                        st.session_state['m_cid'] = padronizar_texto(resp.get("localidade", ""))
-                        st.session_state['m_uf'] = padronizar_texto(resp.get("uf", ""))
-                        st.rerun()
-                    else:
-                        st.error("❌ CEP não encontrado na base dos Correios.")
-                except Exception as e:
-                    st.error(f"Erro na API de CEP: {e}")
-            else:
-                st.warning("⚠️ Digite um CEP válido com 8 dígitos.")
-        
-        st.markdown("---")
-        
-        col1, col2 = st.columns(2)
-        m_tomador = col1.selectbox("Laboratório Solicitante (Tomador) *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-        m_data = col2.date_input("Data do Pedido *", format="DD/MM/YYYY", value=hoje_br)
-        
-        m_lab = st.text_input("Ponto de Coleta (Clínica/Posto) *")
-        m_rua = st.text_input("Logradouro *", value=st.session_state['m_rua'])
-        
-        col3, col4, col5 = st.columns([2, 2, 1])
-        m_bai = col3.text_input("Bairro *", value=st.session_state['m_bai'])
-        m_cid = col4.text_input("Cidade *", value=st.session_state['m_cid'])
-        m_uf = col5.text_input("UF *", value=st.session_state['m_uf'])
-        
-        logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-        m_agente_escolha = st.selectbox("Agente Designado (Busque ou deixe Automático):", ["Automático (Por Rota)"] + logins_disp)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🚀 Injetar na Base e Roteirizar", type="primary", use_container_width=True):
-            if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
-                st.error("⚠️ Preencha todos os campos obrigatórios (marcados com *)!")
-            else:
-                with st.spinner("Padronizando textos e salvando na nuvem..."):
-                    lab_limpo = padronizar_texto(m_lab)
-                    rua_limpa = padronizar_texto(m_rua)
-                    bai_limpo = padronizar_texto(m_bai)
-                    cid_limpa = padronizar_texto(m_cid)
-                    uf_limpa = padronizar_texto(m_uf)
-                    
-                    m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES) if m_agente_escolha == "Automático (Por Rota)" else m_agente_escolha
-                    m_prazo = calcular_sla_dias(uf_limpa, cid_limpa)
-                    m_limite = calcular_data_limite(m_data.strftime("%d/%m/%Y"), m_prazo)
-                    
-                    try:
-                        aba_memoria = planilha_db.worksheet("Memoria_Sistema")
-                        dados_atuais = aba_memoria.get_all_values()
-                        df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
-                        df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
+        with st.form("form_manual_page", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            m_tomador = col1.selectbox("Laboratório Solicitante (Tomador) *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+            m_data = col2.date_input("Data do Pedido *", format="DD/MM/YYYY", value=hoje_br)
+            
+            m_lab = st.text_input("Ponto de Coleta (Clínica/Posto) *")
+            m_rua = st.text_input("Logradouro *")
+            
+            col3, col4 = st.columns(2)
+            m_bai = col3.text_input("Bairro *")
+            m_cid = col4.text_input("Cidade *")
+            
+            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+            m_agente_escolha = st.selectbox("Agente Designado (Busque ou deixe Automático):", ["Automático (Por Rota)"] + logins_disp)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.form_submit_button("🚀 Injetar na Base e Roteirizar", type="primary", use_container_width=True):
+                if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
+                    st.error("⚠️ Preencha todos os campos obrigatórios (marcados com *)!")
+                else:
+                    with st.spinner("Padronizando textos e salvando na nuvem..."):
+                        lab_limpo = padronizar_texto(m_lab)
+                        rua_limpa = padronizar_texto(m_rua)
+                        bai_limpo = padronizar_texto(m_bai)
+                        cid_limpa = padronizar_texto(m_cid)
                         
-                        m_pedido = str(obter_proximo_id(df_nuvem))
+                        m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES) if m_agente_escolha == "Automático (Por Rota)" else m_agente_escolha
+                        m_prazo = calcular_sla_dias("SP", cid_limpa)
+                        m_limite = calcular_data_limite(m_data.strftime("%d/%m/%Y"), m_prazo)
                         
-                        novo_ped = pd.DataFrame([{
-                            'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 
-                            'LABORATORIO': lab_limpo, 'ENDERECO': rua_limpa, 'NUMERO': "", 'BAIRRO': bai_limpo, 
-                            'CIDADE': cid_limpa, 'UF': uf_limpa, 'CEP': cep_input, 'STATUS': 'PENDENTE', 
-                            'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 
-                            'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""
-                        }])
-                        
-                        df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
-                        aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
-                        
-                        if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
-                        
-                        st.success(f"🎉 Pedido {m_pedido} criado e padronizado com sucesso! Acesse o Dashboard para visualizar.")
-                        
-                        st.session_state['m_rua'] = ""
-                        st.session_state['m_bai'] = ""
-                        st.session_state['m_cid'] = ""
-                        st.session_state['m_uf'] = ""
-                        carregar_dados_completos.clear()
-                    except Exception as e: st.error(f"Erro ao salvar: {e}")
+                        try:
+                            aba_memoria = planilha_db.worksheet("Memoria_Sistema")
+                            dados_atuais = aba_memoria.get_all_values()
+                            df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
+                            
+                            m_pedido = str(obter_proximo_id(df_nuvem))
+                            
+                            novo_ped = pd.DataFrame([{
+                                'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 
+                                'LABORATORIO': lab_limpo, 'ENDERECO': rua_limpa, 'NUMERO': "", 'BAIRRO': bai_limpo, 
+                                'CIDADE': cid_limpa, 'UF': "SP", 'CEP': "", 'STATUS': 'PENDENTE', 
+                                'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 
+                                'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""
+                            }])
+                            
+                            df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
+                            aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
+                            
+                            if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
+                            
+                            st.success(f"🎉 Pedido {m_pedido} criado e padronizado com sucesso! Acesse o Dashboard para visualizar.")
+                            carregar_dados_completos.clear()
+                        except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
@@ -1049,7 +1000,6 @@ elif menu == "📥 Lotes":
                         aba = planilha_db.worksheet("Memoria_Sistema")
                         atuais = aba.get_all_values()
                         df_up = pd.DataFrame(atuais[1:], columns=atuais[0]) if len(atuais) > 1 else pd.DataFrame()
-                        df_up = df_up.loc[:, ~df_up.columns.duplicated()].copy()
                         
                         prox_id = obter_proximo_id(df_up)
                         
@@ -1121,7 +1071,6 @@ elif menu == "🔬 Triagem":
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     dados_aba = aba.get_all_values()
                                     df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                    df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                     
                                     pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
                                     mask_nuvem = df_nuvem['PEDIDO'] == pedido_alvo
@@ -1168,7 +1117,6 @@ elif menu == "🔬 Triagem":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(p_ids)
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'CONFERIDO'
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
@@ -1225,7 +1173,6 @@ elif menu == "🔬 Triagem":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(pedidos_ids)
                                 
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'EM ROTA DE ENTREGA'
@@ -1442,7 +1389,7 @@ elif menu == "📁 Relatórios":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        colunas_export = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'DATA_ENTREGA', 'AGENTE_RAW', 'DATA_LIMITE']
+        colunas_export = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'DATA_LIMITE']
         df_export_base = df_raw[[c for c in colunas_export if c in df_raw.columns]].copy()
         if 'AGENTE_RAW' in df_export_base.columns: df_export_base.rename(columns={'AGENTE_RAW': 'MOTORISTA'}, inplace=True)
         
