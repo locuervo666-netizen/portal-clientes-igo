@@ -788,12 +788,19 @@ if menu == "📊 Dashboard":
                 st.rerun()
 
 # =============================================================================
-# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL (COM VIA CEP INTEGRADO)
+# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL (COM VIA CEP INTEGRADO) E ESCUDO
 # =============================================================================
 elif menu == "📝 Manual":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
     st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
     
+    # 🔥 ESCUDO DE PROTEÇÃO PARA LIMPAR TEXTOS
+    def limpar_entrada(texto):
+        if pd.isna(texto) or texto is None:
+            return ""
+        t = str(texto).replace('\n', ' ').replace('\r', ' ').replace('"', '').replace("'", "").replace(';', ',')
+        return padronizar_texto(t.strip())
+
     if 'm_rua' not in st.session_state: st.session_state['m_rua'] = ""
     if 'm_bai' not in st.session_state: st.session_state['m_bai'] = ""
     if 'm_cid' not in st.session_state: st.session_state['m_cid'] = ""
@@ -810,10 +817,10 @@ elif menu == "📝 Manual":
                 try:
                     resp = requests.get(f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
                     if "erro" not in resp:
-                        st.session_state['m_rua'] = padronizar_texto(resp.get("logradouro", ""))
-                        st.session_state['m_bai'] = padronizar_texto(resp.get("bairro", ""))
-                        st.session_state['m_cid'] = padronizar_texto(resp.get("localidade", ""))
-                        st.session_state['m_uf'] = padronizar_texto(resp.get("uf", ""))
+                        st.session_state['m_rua'] = limpar_entrada(resp.get("logradouro", ""))
+                        st.session_state['m_bai'] = limpar_entrada(resp.get("bairro", ""))
+                        st.session_state['m_cid'] = limpar_entrada(resp.get("localidade", ""))
+                        st.session_state['m_uf'] = limpar_entrada(resp.get("uf", ""))
                         st.rerun()
                     else:
                         st.error("❌ CEP não encontrado na base dos Correios.")
@@ -845,11 +852,13 @@ elif menu == "📝 Manual":
                 st.error("⚠️ Preencha todos os campos obrigatórios (marcados com *)!")
             else:
                 with st.spinner("Padronizando textos e salvando na nuvem..."):
-                    lab_limpo = padronizar_texto(m_lab)
-                    rua_limpa = padronizar_texto(m_rua)
-                    bai_limpo = padronizar_texto(m_bai)
-                    cid_limpa = padronizar_texto(m_cid)
-                    uf_limpa = padronizar_texto(m_uf)
+                    # 🔥 APLICANDO O ESCUDO EM TODAS AS ENTRADAS MANUAIS ANTES DE SALVAR
+                    lab_limpo = limpar_entrada(m_lab)
+                    rua_limpa = limpar_entrada(m_rua)
+                    bai_limpo = limpar_entrada(m_bai)
+                    cid_limpa = limpar_entrada(m_cid)
+                    uf_limpa = limpar_entrada(m_uf)
+                    cep_final_limpo = limpar_entrada(cep_input)
                     
                     m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES) if m_agente_escolha == "Automático (Por Rota)" else m_agente_escolha
                     m_prazo = calcular_sla_dias(uf_limpa, cid_limpa)
@@ -864,11 +873,23 @@ elif menu == "📝 Manual":
                         m_pedido = str(obter_proximo_id(df_nuvem))
                         
                         novo_ped = pd.DataFrame([{
-                            'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 
-                            'LABORATORIO': lab_limpo, 'ENDERECO': rua_limpa, 'NUMERO': "", 'BAIRRO': bai_limpo, 
-                            'CIDADE': cid_limpa, 'UF': uf_limpa, 'CEP': cep_input, 'STATUS': 'PENDENTE', 
-                            'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 
-                            'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""
+                            'DATA': m_data.strftime("%d/%m/%Y"), 
+                            'PEDIDO': m_pedido, 
+                            'TOMADOR': m_tomador, 
+                            'LABORATORIO': lab_limpo, 
+                            'ENDERECO': rua_limpa, 
+                            'NUMERO': "", 
+                            'BAIRRO': bai_limpo, 
+                            'CIDADE': cid_limpa, 
+                            'UF': uf_limpa, 
+                            'CEP': cep_final_limpo, # Garantindo o CEP limpo 
+                            'STATUS': 'PENDENTE', 
+                            'AGENTE_RAW': m_agente, 
+                            'PRAZO_DIAS': m_prazo, 
+                            'DATA_LIMITE': m_limite, 
+                            'DATA_ENTREGA': "", 
+                            'FOTO': "", 
+                            'ROMANEIO': ""
                         }])
                         
                         df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
