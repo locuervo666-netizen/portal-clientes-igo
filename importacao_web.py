@@ -429,11 +429,15 @@ def gerar_excel_memoria(df):
                 worksheet.set_column(i, i, min(tamanho, 40))
     return output.getvalue()
 
+# 🔥 CORREÇÃO 1: Trava de Segurança no Número do Pedido
 def obter_proximo_id(df):
     if df is None or df.empty or 'PEDIDO' not in df.columns: return 100000
     try:
-        nums = df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().astype(int)
-        return int(nums.max()) + 1 if not nums.empty else 100000
+        # Extrai APENAS números reais (entre 5 e 7 dígitos) para evitar pegar lixo de 15 dígitos
+        nums = df['PEDIDO'].astype(str).str.extract(r'^(\d{5,7})$')[0].dropna().astype(int)
+        if not nums.empty:
+            return int(nums.max()) + 1
+        return 100000
     except:
         return 100000
 
@@ -564,8 +568,10 @@ if menu == "📊 Dashboard":
             mask = df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)
             df_grid = df_grid[mask]
 
-        # 🔥 PREVENÇÃO CONTRA BUGS DE LINHAS VAZIAS DA PLANILHA (BLINDA O AGGRID)
-        df_grid = df_grid.fillna("").astype(str)
+        # 🔥 CORREÇÃO 2: SANITIZAÇÃO EXTREMA PARA BLINDAR A GRID CONTRA APAGÕES INVISÍVEIS
+        df_grid = df_grid.fillna("")
+        for c in df_grid.columns:
+            df_grid[c] = df_grid[c].astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
 
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
         
@@ -637,7 +643,8 @@ if menu == "📊 Dashboard":
             """)
             gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=img_js, width=80, minWidth=80)
             
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
+            # Adicionando KEY explícita para evitar falha no Streamlit
+            grid_response = AgGrid(df_grid, gridOptions=gb.build(), key="grid_dashboard", allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -791,13 +798,12 @@ if menu == "📊 Dashboard":
                 st.rerun()
 
 # =============================================================================
-# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL (COM VIA CEP INTEGRADO) E ESCUDO
+# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL (COM VIA CEP INTEGRADO)
 # =============================================================================
 elif menu == "📝 Manual":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
     st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
     
-    # 🔥 ESCUDO DE PROTEÇÃO PARA LIMPAR TEXTOS
     def limpar_entrada(texto):
         if pd.isna(texto) or texto is None:
             return ""
@@ -855,7 +861,6 @@ elif menu == "📝 Manual":
                 st.error("⚠️ Preencha todos os campos obrigatórios (marcados com *)!")
             else:
                 with st.spinner("Padronizando textos e salvando na nuvem..."):
-                    # 🔥 APLICANDO O ESCUDO EM TODAS AS ENTRADAS MANUAIS ANTES DE SALVAR
                     lab_limpo = limpar_entrada(m_lab)
                     rua_limpa = limpar_entrada(m_rua)
                     bai_limpo = limpar_entrada(m_bai)
@@ -1169,16 +1174,17 @@ elif menu == "🔬 Triagem":
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
-
-                # 🔥 BLINDAGEM AGGRID PARA TRIAGEM
-                df_fila = df_fila.fillna("").astype(str)
+                
+                # 🔥 SANITIZAÇÃO DA GRID TRIAGEM
+                df_fila = df_fila.fillna("")
+                for c in df_fila.columns: df_fila[c] = df_fila[c].astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
 
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
                 gb_fila.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
                 gb_fila.configure_grid_options(rowHeight=32, headerHeight=35)
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
-                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
+                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), key="grid_triagem", theme='alpine', custom_css=obter_css_grid(), height=350, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
                 
                 selecionados_manuais = grid_fila_resp['selected_rows']
                 tem_selecao = False
@@ -1221,15 +1227,16 @@ elif menu == "🔬 Triagem":
                 colunas_romaneio = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']
                 if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
                 
-                # 🔥 BLINDAGEM AGGRID PARA ROMANEIO
-                df_conf_show = df_conf[colunas_romaneio].fillna("").astype(str)
+                # 🔥 SANITIZAÇÃO DA GRID ROMANEIO
+                df_conf_show = df_conf[colunas_romaneio].fillna("")
+                for c in df_conf_show.columns: df_conf_show[c] = df_conf_show[c].astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
 
                 gb = GridOptionsBuilder.from_dataframe(df_conf_show)
                 gb.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
                 gb.configure_grid_options(rowHeight=32, headerHeight=35)
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
-                grid_resp = AgGrid(df_conf_show, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
+                grid_resp = AgGrid(df_conf_show, gridOptions=gb.build(), key="grid_romaneio", theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
                 
                 selecionados = grid_resp['selected_rows']
                 tem_sel_pdf = False
@@ -1374,8 +1381,9 @@ elif menu == "🔬 Triagem":
                 colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
                 df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
                 
-                # 🔥 BLINDAGEM AGGRID PARA HISTÓRICO
-                df_hist_show = df_hist_show.fillna("").astype(str)
+                # 🔥 SANITIZAÇÃO DA GRID DE HISTÓRICO
+                df_hist_show = df_hist_show.fillna("")
+                for c in df_hist_show.columns: df_hist_show[c] = df_hist_show[c].astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
 
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
                 gb_hist.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
@@ -1394,7 +1402,7 @@ elif menu == "🔬 Triagem":
                 """)
                 gb_hist.configure_column("STATUS", headerName="STATUS", cellStyle=st_js, minWidth=170)
                 
-                AgGrid(df_hist_show, gridOptions=gb_hist.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
+                AgGrid(df_hist_show, gridOptions=gb_hist.build(), key="grid_historico", allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
             else:
                 st.warning("O arquivo histórico de varreduras está temporariamente em branco.")
                 
@@ -1532,7 +1540,7 @@ elif menu == "📁 Relatórios":
 elif menu == "⚙️ Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
     
-    # 🔥 AQUI ENTRA A NOVA ABA ADMIN (Zerar Banco)
+    # 🔥 A NOVA ABA DE ADMINISTRAÇÃO (Limpeza de Banco)
     tab_agente, tab_rota, tab_tabela, tab_admin = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico", "⚠️ Área Administrativa"])
     
     with tab_agente:
@@ -1631,35 +1639,32 @@ elif menu == "⚙️ Rotas":
                             except Exception as e: st.error(f"Erro ao remover: {e}")
         else: st.warning("Nenhum dado encontrado.")
 
-    # 🔥 NOVA ABA ADMIN: ZERAR BANCO PARA PRODUÇÃO
+    # 🔥 A NOVA ABA PARA LIMPAR O BANCO SEM DEIXAR LIXO OU BUGAR A GRID
     with tab_admin:
         st.markdown("#### 💣 Zerar Banco de Dados (Início de Produção)")
-        st.warning("Atenção: Esta ação apagará TODOS os pedidos do sistema (na base de memória e no AppSheet), mantendo apenas os cabeçalhos. **Não afeta o cadastro de motoristas ou rotas.**")
+        st.warning("Atenção: Esta ação apagará TODOS os pedidos do sistema (na base de memória e no AppSheet), mantendo apenas os cabeçalhos intocados. **Isso NÃO afeta o cadastro de motoristas ou rotas.**")
         
         senha_reset = st.text_input("🔑 Digite a Senha de Administrador:", type="password", key="senha_reset_db")
         
         if st.button("🚨 CONFIRMAR LIMPEZA GERAL DO BANCO", type="primary"):
             if senha_reset == "123":
-                with st.spinner("Limpando bases de dados de forma segura..."):
+                with st.spinner("Limpando bases de dados de forma segura e preservando a estrutura..."):
                     try:
-                        # 1. Limpa Memoria_Sistema mantendo o cabeçalho
                         aba_memoria = planilha_db.worksheet("Memoria_Sistema")
                         headers_memoria = aba_memoria.get_all_values()[0]
                         aba_memoria.clear()
                         aba_memoria.update("A1", [headers_memoria])
                         
-                        # 2. Limpa App_Tarefas mantendo o cabeçalho
                         try:
                             aba_app = planilha_db.worksheet("App_Tarefas")
                             headers_app = aba_app.get_all_values()[0]
                             aba_app.clear()
                             aba_app.update("A1", [headers_app])
                         except Exception as e_app:
-                            st.warning(f"Memória apagada, mas houve um erro ao limpar a aba do AppSheet: {e_app}")
+                            st.warning(f"A memória principal foi apagada, mas houve um erro ao limpar o AppSheet: {e_app}")
                         
-                        # Limpa o cache do sistema e reinicia
                         carregar_dados_completos.clear()
-                        st.success("Banco de dados zerado com sucesso! A grid agora está limpa, sem fantasmas, pronta para rodar em produção.")
+                        st.success("🎉 Banco de dados zerado com sucesso! A grid agora está limpa, sem fantasmas invisíveis, e pronta para rodar em produção.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao tentar zerar o banco de dados: {e}")
