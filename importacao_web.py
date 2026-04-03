@@ -92,7 +92,10 @@ st.markdown("""
         color: #0F172A !important;
         font-weight: 800 !important;
     }
-    div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; }
+    /* 🔥 FIX DO CSS DO MENU: Força a bolinha a sumir independente da atualização do Streamlit */
+    div[role="radiogroup"] > label > div:first-of-type { display: none !important; }
+    div[data-testid="stRadio"] div[role="radio"] { display: none !important; }
+    div[data-testid="stRadio"] input[type="radio"] { display: none !important; }
 
     /* Textos e Botões Gerais */
     .dinamic-text { color: #0F172A !important; font-weight: 800; letter-spacing: -0.5px; }
@@ -221,7 +224,6 @@ def carregar_dados_completos(_planilha):
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
             
-            # 🔥 ESCUDO ANTI-CRASH: Remove colunas duplicadas que causam o ValueError
             df = df.loc[:, ~df.columns.duplicated()].copy()
             
             try:
@@ -232,7 +234,6 @@ def carregar_dados_completos(_planilha):
                     cols_limpas = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
                     df_app.columns = cols_limpas
                     
-                    # 🔥 ESCUDO ANTI-CRASH no AppSheet também
                     df_app = df_app.loc[:, ~df_app.columns.duplicated()].copy()
                     
                     cols_to_extract = ['PEDIDO', 'STATUS', 'OBSERVACOES']
@@ -334,8 +335,6 @@ DF_AGENTES = carregar_dados_agentes(planilha_db)
 FERIADOS_BR = holidays.Brazil()
 CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "MB_CAEP"]
 hoje_br = datetime.now(FUSO_BR).date() 
-bg_app = "#FFFFFF"
-border_c = "#E2E8F0"
 
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts: return False
@@ -429,11 +428,9 @@ def gerar_excel_memoria(df):
                 worksheet.set_column(i, i, min(tamanho, 40))
     return output.getvalue()
 
-# 🔥 CORREÇÃO 1: Trava de Segurança no Número do Pedido
 def obter_proximo_id(df):
     if df is None or df.empty or 'PEDIDO' not in df.columns: return 100000
     try:
-        # Extrai APENAS números reais (entre 5 e 7 dígitos) para evitar pegar lixo de 15 dígitos
         nums = df['PEDIDO'].astype(str).str.extract(r'^(\d{5,7})$')[0].dropna().astype(int)
         if not nums.empty:
             return int(nums.max()) + 1
@@ -480,8 +477,6 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 # =============================================================================
 # 🎨 3. CABEÇALHO LIMPO
 # =============================================================================
-
-# Cabeçalho Limpo (Logo, Título e Botão Sair)
 col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
 
 with col_logo:
@@ -568,10 +563,9 @@ if menu == "📊 Dashboard":
             mask = df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)
             df_grid = df_grid[mask]
 
-        # 🔥 CORREÇÃO 2: SANITIZAÇÃO EXTREMA PARA BLINDAR A GRID CONTRA APAGÕES INVISÍVEIS
-        df_grid = df_grid.fillna("")
+        # 🔥 A BLINDAGEM ABSOLUTA DA GRID: Transforma tudo em texto limpo
         for c in df_grid.columns:
-            df_grid[c] = df_grid[c].astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
+            df_grid[c] = df_grid[c].fillna("").astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
 
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
         
@@ -643,8 +637,8 @@ if menu == "📊 Dashboard":
             """)
             gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=img_js, width=80, minWidth=80)
             
-            # Adicionando KEY explícita para evitar falha no Streamlit
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), key="grid_dashboard", allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
+            # 🔥 Removida a 'key' do AgGrid que estava forçando o sumiço do componente
+            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -1174,17 +1168,15 @@ elif menu == "🔬 Triagem":
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
-                
-                # 🔥 SANITIZAÇÃO DA GRID TRIAGEM
-                df_fila = df_fila.fillna("")
-                for c in df_fila.columns: df_fila[c] = df_fila[c].astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
+
+                for c in df_fila.columns: df_fila[c] = df_fila[c].fillna("").astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
 
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
                 gb_fila.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
                 gb_fila.configure_grid_options(rowHeight=32, headerHeight=35)
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
-                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), key="grid_triagem", theme='alpine', custom_css=obter_css_grid(), height=350, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
+                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
                 
                 selecionados_manuais = grid_fila_resp['selected_rows']
                 tem_selecao = False
@@ -1227,16 +1219,15 @@ elif menu == "🔬 Triagem":
                 colunas_romaneio = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']
                 if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
                 
-                # 🔥 SANITIZAÇÃO DA GRID ROMANEIO
-                df_conf_show = df_conf[colunas_romaneio].fillna("")
-                for c in df_conf_show.columns: df_conf_show[c] = df_conf_show[c].astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
+                df_conf_show = df_conf[colunas_romaneio].copy()
+                for c in df_conf_show.columns: df_conf_show[c] = df_conf_show[c].fillna("").astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
 
                 gb = GridOptionsBuilder.from_dataframe(df_conf_show)
                 gb.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
                 gb.configure_grid_options(rowHeight=32, headerHeight=35)
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
-                grid_resp = AgGrid(df_conf_show, gridOptions=gb.build(), key="grid_romaneio", theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
+                grid_resp = AgGrid(df_conf_show, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
                 
                 selecionados = grid_resp['selected_rows']
                 tem_sel_pdf = False
@@ -1381,9 +1372,7 @@ elif menu == "🔬 Triagem":
                 colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
                 df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
                 
-                # 🔥 SANITIZAÇÃO DA GRID DE HISTÓRICO
-                df_hist_show = df_hist_show.fillna("")
-                for c in df_hist_show.columns: df_hist_show[c] = df_hist_show[c].astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
+                for c in df_hist_show.columns: df_hist_show[c] = df_hist_show[c].fillna("").astype(str).replace(['nan', 'None', 'NaT', '<NA>'], '')
 
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
                 gb_hist.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
@@ -1402,7 +1391,7 @@ elif menu == "🔬 Triagem":
                 """)
                 gb_hist.configure_column("STATUS", headerName="STATUS", cellStyle=st_js, minWidth=170)
                 
-                AgGrid(df_hist_show, gridOptions=gb_hist.build(), key="grid_historico", allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
+                AgGrid(df_hist_show, gridOptions=gb_hist.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
             else:
                 st.warning("O arquivo histórico de varreduras está temporariamente em branco.")
                 
@@ -1540,7 +1529,6 @@ elif menu == "📁 Relatórios":
 elif menu == "⚙️ Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
     
-    # 🔥 A NOVA ABA DE ADMINISTRAÇÃO (Limpeza de Banco)
     tab_agente, tab_rota, tab_tabela, tab_admin = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico", "⚠️ Área Administrativa"])
     
     with tab_agente:
@@ -1639,7 +1627,6 @@ elif menu == "⚙️ Rotas":
                             except Exception as e: st.error(f"Erro ao remover: {e}")
         else: st.warning("Nenhum dado encontrado.")
 
-    # 🔥 A NOVA ABA PARA LIMPAR O BANCO SEM DEIXAR LIXO OU BUGAR A GRID
     with tab_admin:
         st.markdown("#### 💣 Zerar Banco de Dados (Início de Produção)")
         st.warning("Atenção: Esta ação apagará TODOS os pedidos do sistema (na base de memória e no AppSheet), mantendo apenas os cabeçalhos intocados. **Isso NÃO afeta o cadastro de motoristas ou rotas.**")
