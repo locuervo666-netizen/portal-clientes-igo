@@ -564,6 +564,9 @@ if menu == "📊 Dashboard":
             mask = df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)
             df_grid = df_grid[mask]
 
+        # 🔥 PREVENÇÃO CONTRA BUGS DE LINHAS VAZIAS DA PLANILHA (BLINDA O AGGRID)
+        df_grid = df_grid.fillna("").astype(str)
+
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
         
         container_botoes = st.container()
@@ -882,7 +885,7 @@ elif menu == "📝 Manual":
                             'BAIRRO': bai_limpo, 
                             'CIDADE': cid_limpa, 
                             'UF': uf_limpa, 
-                            'CEP': cep_final_limpo, # Garantindo o CEP limpo 
+                            'CEP': cep_final_limpo, 
                             'STATUS': 'PENDENTE', 
                             'AGENTE_RAW': m_agente, 
                             'PRAZO_DIAS': m_prazo, 
@@ -1166,6 +1169,10 @@ elif menu == "🔬 Triagem":
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
+
+                # 🔥 BLINDAGEM AGGRID PARA TRIAGEM
+                df_fila = df_fila.fillna("").astype(str)
+
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
                 gb_fila.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
                 gb_fila.configure_grid_options(rowHeight=32, headerHeight=35)
@@ -1214,12 +1221,15 @@ elif menu == "🔬 Triagem":
                 colunas_romaneio = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']
                 if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
                 
-                gb = GridOptionsBuilder.from_dataframe(df_conf[colunas_romaneio])
+                # 🔥 BLINDAGEM AGGRID PARA ROMANEIO
+                df_conf_show = df_conf[colunas_romaneio].fillna("").astype(str)
+
+                gb = GridOptionsBuilder.from_dataframe(df_conf_show)
                 gb.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
                 gb.configure_grid_options(rowHeight=32, headerHeight=35)
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
                 
-                grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
+                grid_resp = AgGrid(df_conf_show, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
                 
                 selecionados = grid_resp['selected_rows']
                 tem_sel_pdf = False
@@ -1364,6 +1374,9 @@ elif menu == "🔬 Triagem":
                 colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
                 df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
                 
+                # 🔥 BLINDAGEM AGGRID PARA HISTÓRICO
+                df_hist_show = df_hist_show.fillna("").astype(str)
+
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
                 gb_hist.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
                 gb_hist.configure_grid_options(rowHeight=32, headerHeight=35)
@@ -1519,7 +1532,8 @@ elif menu == "📁 Relatórios":
 elif menu == "⚙️ Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
     
-    tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
+    # 🔥 AQUI ENTRA A NOVA ABA ADMIN (Zerar Banco)
+    tab_agente, tab_rota, tab_tabela, tab_admin = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico", "⚠️ Área Administrativa"])
     
     with tab_agente:
         st.markdown("#### Formulário de Novo Motorista")
@@ -1616,3 +1630,38 @@ elif menu == "⚙️ Rotas":
                                 st.rerun()
                             except Exception as e: st.error(f"Erro ao remover: {e}")
         else: st.warning("Nenhum dado encontrado.")
+
+    # 🔥 NOVA ABA ADMIN: ZERAR BANCO PARA PRODUÇÃO
+    with tab_admin:
+        st.markdown("#### 💣 Zerar Banco de Dados (Início de Produção)")
+        st.warning("Atenção: Esta ação apagará TODOS os pedidos do sistema (na base de memória e no AppSheet), mantendo apenas os cabeçalhos. **Não afeta o cadastro de motoristas ou rotas.**")
+        
+        senha_reset = st.text_input("🔑 Digite a Senha de Administrador:", type="password", key="senha_reset_db")
+        
+        if st.button("🚨 CONFIRMAR LIMPEZA GERAL DO BANCO", type="primary"):
+            if senha_reset == "123":
+                with st.spinner("Limpando bases de dados de forma segura..."):
+                    try:
+                        # 1. Limpa Memoria_Sistema mantendo o cabeçalho
+                        aba_memoria = planilha_db.worksheet("Memoria_Sistema")
+                        headers_memoria = aba_memoria.get_all_values()[0]
+                        aba_memoria.clear()
+                        aba_memoria.update("A1", [headers_memoria])
+                        
+                        # 2. Limpa App_Tarefas mantendo o cabeçalho
+                        try:
+                            aba_app = planilha_db.worksheet("App_Tarefas")
+                            headers_app = aba_app.get_all_values()[0]
+                            aba_app.clear()
+                            aba_app.update("A1", [headers_app])
+                        except Exception as e_app:
+                            st.warning(f"Memória apagada, mas houve um erro ao limpar a aba do AppSheet: {e_app}")
+                        
+                        # Limpa o cache do sistema e reinicia
+                        carregar_dados_completos.clear()
+                        st.success("Banco de dados zerado com sucesso! A grid agora está limpa, sem fantasmas, pronta para rodar em produção.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao tentar zerar o banco de dados: {e}")
+            elif senha_reset != "":
+                st.error("❌ Senha incorreta! Acesso negado à limpeza do banco.")
