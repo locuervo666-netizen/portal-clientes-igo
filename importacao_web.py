@@ -109,30 +109,6 @@ def carregar_dados_agentes(_planilha):
     except: pass
     return pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
 
-# 🔥 O TRATAMENTO DE CHOQUE (Remove a Coluna Fantasma 'DATA_ENTREGAA' e previne duplicados)
-def limpar_cabecalhos(colunas):
-    novas = []
-    for c in colunas:
-        c_limpo = str(c).strip().upper()
-        if c_limpo in ['DATA_ENTREGAA', 'DATA_ENTREG']: c_limpo = 'DATA_ENTREGA'
-        base = c_limpo
-        i = 1
-        while c_limpo in novas:
-            c_limpo = f"{base}_{i}"
-            i += 1
-        novas.append(c_limpo)
-    return novas
-
-def atualizar_planilha_memoria(df_atualizada, worksheet):
-    colunas_padrao = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO']
-    df_atualizada.columns = limpar_cabecalhos(df_atualizada.columns)
-    for col in colunas_padrao:
-        if col not in df_atualizada.columns: df_atualizada[col] = ""
-    extra_cols = [c for c in df_atualizada.columns if c not in colunas_padrao and str(c).strip() != "" and "UNNAMED" not in str(c).upper()]
-    df_final = df_atualizada[colunas_padrao + extra_cols]
-    worksheet.clear()
-    worksheet.update("A1", [df_final.columns.tolist()] + df_final.fillna("").astype(str).values.tolist())
-
 @st.cache_data(ttl=20)
 def carregar_dados_completos(_planilha):
     if not _planilha: return pd.DataFrame()
@@ -141,14 +117,16 @@ def carregar_dados_completos(_planilha):
         dados_m = aba_m.get_all_values()
         if len(dados_m) > 1:
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
-            df.columns = limpar_cabecalhos(df.columns)
-            df = df.loc[:, df.columns.notna() & (df.columns != "") & (~df.columns.str.contains("UNNAMED"))]
+            df.columns = [str(c).strip().upper() for c in df.columns]
+            
             try:
                 aba_app = _planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
                 if len(dados_app) > 1:
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
-                    df_app.columns = limpar_cabecalhos(df_app.columns)
+                    cols_limpas = [str(c).upper().strip() for c in df_app.columns]
+                    df_app.columns = cols_limpas
+                    
                     cols_to_extract = ['PEDIDO', 'STATUS', 'OBSERVACOES']
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
                     if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
@@ -167,6 +145,7 @@ def carregar_dados_completos(_planilha):
                     
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
+                    
                     if 'APP_QR' in df.columns:
                         if 'QR_CODE' not in df.columns: df['QR_CODE'] = df['APP_QR']
                         else: df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
@@ -322,7 +301,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 menu = st.radio("Navegação:", ["📊 Dashboard", "📝 Manual", "📥 Lotes", "🔬 Triagem", "📱 Zap", "📁 Relatórios", "⚙️ Rotas"], horizontal=True, label_visibility="collapsed")
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (GRID PREMIUM DE VOLTA E BLINDADA)
+# 🚀 MÓDULO 1: DASHBOARD (GRID PREMIUM COM CHECKBOX RESTAURADA E BLINDADA)
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -375,18 +354,18 @@ if menu == "📊 Dashboard":
         for col in colunas_mostrar:
             if col not in df_grid.columns: df_grid[col] = ""
                 
-        # 🔥 A VACINA DE TITÂNIO: Limpa os nulos e reseta o index matematicamente para o AgGrid NUNCA mais dar crash silencioso
+        # 🔥 A VACINA FINAL: Limpa rigorosamente tudo para a AgGrid ler sem piscar.
         df_grid = df_grid[colunas_mostrar].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "")
-        df_grid = df_grid.reset_index(drop=True)
         
-        if busca: df_grid = df_grid[df_grid.apply(lambda x: busca.upper() in x.str.upper().values, axis=1)].reset_index(drop=True)
+        if busca: df_grid = df_grid[df_grid.apply(lambda x: busca.upper() in x.str.upper().values, axis=1)]
+        df_grid = df_grid.reset_index(drop=True)
 
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
         
         container_botoes = st.container()
         container_grid = st.container()
 
-        # 🔥 A GRID PREMIUM VOLTOU À VIDA (Mas agora blindada contra o Excel)
+        # 🔥 A GRID PREMIUM VOLTOU À VIDA (Com checkboxes, cor e foto)
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
             gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=120)
@@ -448,7 +427,16 @@ if menu == "📊 Dashboard":
             """)
             gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=img_js, width=80)
             
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.SELECTION_CHANGED)
+            grid_response = AgGrid(
+                df_grid, 
+                gridOptions=gb.build(), 
+                allow_unsafe_jscode=True, 
+                theme='alpine', 
+                custom_css=obter_css_grid(), 
+                height=550, 
+                fit_columns_on_grid_load=False, 
+                update_mode=GridUpdateMode.SELECTION_CHANGED
+            )
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -476,7 +464,6 @@ if menu == "📊 Dashboard":
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                                 for pid in p_ids:
                                     mask = df_nuvem['PEDIDO'] == pid
                                     if 'STATUS' not in df_nuvem.columns: df_nuvem['STATUS'] = ""
@@ -484,17 +471,18 @@ if menu == "📊 Dashboard":
                                     df_nuvem.loc[mask, 'STATUS'] = status_limpo
                                     if status_limpo == "ENTREGUE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                     elif status_limpo == "PENDENTE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
-                                atualizar_planilha_memoria(df_nuvem, aba)
+                                aba.clear()
+                                aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 try:
                                     aba_app = planilha_db.worksheet("App_Tarefas")
                                     df_app = pd.DataFrame(aba_app.get_all_values()[1:], columns=aba_app.get_all_values()[0])
-                                    df_app.columns = limpar_cabecalhos(df_app.columns)
                                     if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
                                         mascara_app = df_app['PEDIDO'].isin(p_ids)
                                         df_app.loc[mascara_app, 'STATUS'] = status_limpo
                                         if 'DATA_ENTREGA' not in df_app.columns: df_app['DATA_ENTREGA'] = ""
                                         if status_limpo == "ENTREGUE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                         elif status_limpo == "PENDENTE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = ""
+                                        aba_app.clear()
                                         aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
                                 except: pass 
                                 st.success("Atualizado!"); carregar_dados_completos.clear(); st.rerun()
@@ -511,7 +499,6 @@ if menu == "📊 Dashboard":
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                                 prox_id = obter_proximo_id(df_nuvem)
                                 clones_app = []
                                 for pid in p_ids:
@@ -526,7 +513,8 @@ if menu == "📊 Dashboard":
                                         df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
                                         if str(l_orig.get('AGENTE_RAW','')).strip():
                                             clones_app.append({'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'], 'ENDERECO': l_orig.get('ENDERECO',''), 'NUMERO': l_orig.get('NUMERO',''), 'BAIRRO': l_orig.get('BAIRRO',''), 'CIDADE': l_orig.get('CIDADE',''), 'CEP': l_orig.get('CEP',''), 'LABORATORIO': l_orig.get('LABORATORIO',''), 'TOMADOR': l_orig.get('TOMADOR','')})
-                                atualizar_planilha_memoria(df_nuvem, aba)
+                                aba.clear()
+                                aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 if clones_app: despachar_para_appsheet(clones_app)
                                 st.success("Clonado com SUCESSO!"); carregar_dados_completos.clear(); st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
@@ -541,7 +529,6 @@ if menu == "📊 Dashboard":
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                                 lista_app_troca = []
                                 for pid in p_ids:
                                     mask = df_nuvem['PEDIDO'] == pid
@@ -549,20 +536,22 @@ if menu == "📊 Dashboard":
                                         df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot; df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
                                         l_app = df_nuvem[mask].iloc[0]
                                         lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
-                                atualizar_planilha_memoria(df_nuvem, aba)
+                                aba.clear()
+                                aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 despachar_para_appsheet(lista_app_troca)
                                 st.success("Trocado!"); carregar_dados_completos.clear(); st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
 
             if col_b5.button("🔄 Atualizar Painel", use_container_width=True):
                 carregar_dados_completos.clear(); st.rerun()
+    else:
+        st.warning("O banco de dados está vazio. Vá para a aba Manual.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
 elif menu == "📝 Manual":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
-    
     if 'm_rua' not in st.session_state: st.session_state['m_rua'] = ""
     if 'm_bai' not in st.session_state: st.session_state['m_bai'] = ""
     if 'm_cid' not in st.session_state: st.session_state['m_cid'] = ""
@@ -616,11 +605,11 @@ elif menu == "📝 Manual":
                         try:
                             aba_memoria = planilha_db.worksheet("Memoria_Sistema")
                             df_nuvem = pd.DataFrame(aba_memoria.get_all_values()[1:], columns=aba_memoria.get_all_values()[0]) if len(aba_memoria.get_all_values()) > 1 else pd.DataFrame()
-                            df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                             m_pedido = str(obter_proximo_id(df_nuvem))
                             novo_ped = pd.DataFrame([{'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 'LABORATORIO': lab_limpo, 'ENDERECO': rua_limpa, 'NUMERO': "", 'BAIRRO': bai_limpo, 'CIDADE': cid_limpa, 'UF': uf_limpa, 'CEP': cep_input, 'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""}])
                             df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
-                            atualizar_planilha_memoria(df_atual, aba_memoria)
+                            aba_memoria.clear()
+                            aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
                             if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
                             st.success(f"Pedido {m_pedido} criado!")
                             st.session_state['m_rua'] = ""; st.session_state['m_bai'] = ""; st.session_state['m_cid'] = ""; st.session_state['m_uf'] = ""
@@ -653,7 +642,6 @@ elif menu == "📥 Lotes":
                     
                     df_limpo = df_raw_import.iloc[idx_h+1:].copy()
                     df_limpo.columns = [str(c).strip() for c in df_raw_import.iloc[idx_h].values]
-                    df_limpo.columns = limpar_cabecalhos(df_limpo.columns)
                     for col in df_limpo.columns: df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
                     
                     mapa = {}
@@ -727,7 +715,6 @@ elif menu == "📥 Lotes":
                     try:
                         aba = planilha_db.worksheet("Memoria_Sistema")
                         df_up = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0]) if len(aba.get_all_values()) > 1 else pd.DataFrame()
-                        df_up.columns = limpar_cabecalhos(df_up.columns)
                         prox_id = obter_proximo_id(df_up)
                         for idx, row in df_final.iterrows():
                             if not str(row['PEDIDO']).strip() or str(row['PEDIDO']).upper() == 'NAN': 
@@ -737,7 +724,8 @@ elif menu == "📥 Lotes":
                         df_final['DATA_LIMITE'] = df_final.apply(lambda r: calcular_data_limite(r['DATA'], int(r['PRAZO_DIAS'])), axis=1)
                         df_final['STATUS'], df_final['DATA_ENTREGA'], df_final['FOTO'], df_final['ROMANEIO'] = 'PENDENTE', '', '', ''
                         df_up = pd.concat([df_up, df_final], ignore_index=True) if not df_up.empty else df_final
-                        atualizar_planilha_memoria(df_up, aba)
+                        aba.clear()
+                        aba.update("A1", [df_up.columns.tolist()] + df_up.fillna("").astype(str).values.tolist())
                         
                         lista_app = [{'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'], 'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'], 'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'], 'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'], 'TOMADOR': r['TOMADOR']} for _, r in df_final.iterrows() if str(r.get('AGENTE_RAW','')).strip()]
                         if lista_app: despachar_para_appsheet(lista_app)
@@ -770,9 +758,9 @@ elif menu == "🔬 Triagem":
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                                 df_nuvem.loc[df_nuvem['PEDIDO'] == str(df_raw.at[idx, 'PEDIDO']), 'STATUS'] = 'CONFERIDO'
-                                atualizar_planilha_memoria(df_nuvem, aba)
+                                aba.clear()
+                                aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 st.success(f"✅ Pedido {df_raw.at[idx, 'PEDIDO']} VALIDADO!"); carregar_dados_completos.clear()
                             except: st.error("Falha.")
                         else: st.error(f"Status incorreto: {str(df_raw.at[idx, 'STATUS']).strip().upper()}")
@@ -785,7 +773,6 @@ elif menu == "🔬 Triagem":
                 for col in colunas_fila:
                     if col not in df_fila.columns: df_fila[col] = ""
                 
-                # 🔥 VACINA APLICADA NA TRIAGEM (Remove erro de Index)
                 df_fila = df_fila[colunas_fila].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "").reset_index(drop=True)
                 
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
@@ -797,9 +784,10 @@ elif menu == "🔬 Triagem":
                     p_ids = [str(r['PEDIDO']) for r in (sel_m.to_dict('records') if isinstance(sel_m, pd.DataFrame) else sel_m)]
                     aba = planilha_db.worksheet("Memoria_Sistema")
                     df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                    df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                     df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'STATUS'] = 'CONFERIDO'
-                    atualizar_planilha_memoria(df_nuvem, aba); st.success("Enviados!"); carregar_dados_completos.clear(); st.rerun()
+                    aba.clear()
+                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                    st.success("Enviados!"); carregar_dados_completos.clear(); st.rerun()
 
         with t2:
             df_conf = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
@@ -813,7 +801,6 @@ elif menu == "🔬 Triagem":
                 for col in colunas_romaneio:
                     if col not in df_conf.columns: df_conf[col] = ""
                 
-                # 🔥 VACINA APLICADA NO ROMANEIO (Remove erro de Index)
                 df_conf = df_conf[colunas_romaneio].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "").reset_index(drop=True)
                 
                 gb = GridOptionsBuilder.from_dataframe(df_conf)
@@ -829,13 +816,13 @@ elif menu == "🔬 Triagem":
                     id_rom = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
                     aba = planilha_db.worksheet("Memoria_Sistema")
                     df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                    df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                     mask = df_nuvem['PEDIDO'].isin([str(r['PEDIDO']) for r in sel_lista])
                     df_nuvem.loc[mask, 'STATUS'] = 'EM ROTA DE ENTREGA'
                     df_nuvem.loc[mask, 'ROMANEIO'] = id_rom
                     df_nuvem.loc[mask, 'DATA'] = data_despacho.strftime("%d/%m/%Y")
                     if 'AGENTE_RAW' in df_nuvem.columns: df_nuvem.loc[mask, 'AGENTE_RAW'] = motorista_escolhido
-                    atualizar_planilha_memoria(df_nuvem, aba)
+                    aba.clear()
+                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                     
                     despachar_para_appsheet([{'PEDIDO': id_rom, 'MOTORISTA': motorista_escolhido, 'ENDERECO': "LOTE", 'NUMERO': str(len(sel_lista)), 'BAIRRO': sel_lista[0].get('TOMADOR', ''), 'CIDADE': sel_lista[0].get('CIDADE', ''), 'CEP': "-", 'LABORATORIO': f"LOTE {len(sel_lista)} PEDIDOS", 'TOMADOR': sel_lista[0].get('TOMADOR', ''), 'ROMANEIO': id_rom}])
                     
@@ -852,10 +839,7 @@ elif menu == "🔬 Triagem":
                 colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
                 for col in colunas_hist:
                     if col not in df_hist.columns: df_hist[col] = ""
-                
-                # 🔥 VACINA APLICADA NO HISTÓRICO (Remove erro de Index)
                 df_hist_show = df_hist[colunas_hist].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "").reset_index(drop=True)
-                
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
                 AgGrid(df_hist_show, gridOptions=gb_hist.build(), theme='alpine', custom_css=obter_css_grid(), height=400)
 
