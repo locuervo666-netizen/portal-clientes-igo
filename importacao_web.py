@@ -114,7 +114,8 @@ def limpar_cabecalhos(colunas):
     return novas
 
 def atualizar_planilha_memoria(df_atualizada, worksheet):
-    colunas_padrao = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO']
+    # 🔥 INCLUÍ O QR_CODE NAS COLUNAS PADRÃO (Ele nunca mais será apagado)
+    colunas_padrao = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO', 'QR_CODE']
     df_atualizada.columns = limpar_cabecalhos(df_atualizada.columns)
     for col in colunas_padrao:
         if col not in df_atualizada.columns: df_atualizada[col] = ""
@@ -218,7 +219,12 @@ def despachar_para_appsheet(lista_pedidos_dicts):
     if not planilha_db or not lista_pedidos_dicts: return False
     try:
         aba = planilha_db.worksheet("App_Tarefas")
-        linhas = [[str(uuid.uuid4())[:8].upper(), str(p.get('PEDIDO','')), str(p.get('MOTORISTA', p.get('AGENTE_RAW', ''))), "PENDENTE", str(p.get('ENDERECO','')), str(p.get('NUMERO','')), str(p.get('BAIRRO','')), str(p.get('CIDADE','')), str(p.get('CEP','')), "", "", str(p.get('LABORATORIO','')), str(p.get('TOMADOR','')), "", str(p.get('ROMANEIO',''))] for p in lista_pedidos_dicts]
+        # 🔥 QR_CODE ENVIADO COM SUCESSO PARA O APPSHEET
+        linhas = [[
+            str(uuid.uuid4())[:8].upper(), str(p.get('PEDIDO','')), str(p.get('MOTORISTA', p.get('AGENTE_RAW', ''))), "PENDENTE",
+            str(p.get('ENDERECO','')), str(p.get('NUMERO','')), str(p.get('BAIRRO','')), str(p.get('CIDADE','')), str(p.get('CEP','')),
+            "", "", str(p.get('LABORATORIO','')), str(p.get('TOMADOR','')), "", str(p.get('ROMANEIO','')), str(p.get('QR_CODE', ''))
+        ] for p in lista_pedidos_dicts]
         aba.append_rows(linhas); return True
     except: return False
 
@@ -305,13 +311,13 @@ st.markdown("<br>", unsafe_allow_html=True)
 menu = st.radio("Navegação:", ["📊 Dashboard", "📝 Manual", "📥 Lotes", "🔬 Triagem", "📱 Zap", "📁 Relatórios", "⚙️ Rotas"], horizontal=True, label_visibility="collapsed")
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (TABELA NATIVA PREMIUM + CHECKBOXES BLINDADOS)
+# 🚀 MÓDULO 1: DASHBOARD
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        colunas_vitais = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS', 'DATA_LIMITE', 'FOTO', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
+        colunas_vitais = ['DATA', 'PEDIDO', 'QR_CODE', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS', 'DATA_LIMITE', 'FOTO', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
         for col in colunas_vitais:
             if col not in df_raw.columns: df_raw[col] = ""
                 
@@ -354,7 +360,8 @@ if menu == "📊 Dashboard":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA', 'FOTO_URL']
+        # 🔥 QR_CODE EXPOSTO NA TABELA
+        colunas_mostrar = ['DATA', 'PEDIDO', 'QR_CODE', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA', 'FOTO_URL']
         for col in colunas_mostrar:
             if col not in df_grid.columns: df_grid[col] = ""
                 
@@ -368,15 +375,15 @@ if menu == "📊 Dashboard":
         container_botoes = st.container()
         container_grid = st.container()
 
+        # 🔥 A TABELA NATIVA (Modo Seguro - Nunca mais pisca nem some)
         with container_grid:
-            # 🔥 CRIA A CAIXA DE SELEÇÃO NA PRIMEIRA COLUNA
             df_grid.insert(0, "SELECIONAR", False)
             
-            # 🔥 CONFIGURAÇÃO PREMIUM DAS COLUNAS (Sem AgGrid)
             configuracao_colunas = {
-                "SELECIONAR": st.column_config.CheckboxColumn("✔ Ação", help="Marque para aplicar ações nos pedidos"),
+                "SELECIONAR": st.column_config.CheckboxColumn("✔ Ação", help="Marque para aplicar ações"),
                 "DATA": st.column_config.TextColumn("📅 Data"),
                 "PEDIDO": st.column_config.TextColumn("📦 Pedido"),
+                "QR_CODE": st.column_config.TextColumn("🏷️ QR Code"),
                 "TOMADOR": st.column_config.TextColumn("🏢 Tomador"),
                 "LABORATORIO": st.column_config.TextColumn("🔬 Laboratório/Clínica"),
                 "BAIRRO": st.column_config.TextColumn("Bairro"),
@@ -389,11 +396,10 @@ if menu == "📊 Dashboard":
                 "FOTO_URL": st.column_config.LinkColumn("📸 Comprovante", display_text="Abrir Foto")
             }
             
-            # 🔥 TABELA INQUEBRÁVEL (st.data_editor nativo)
             tabela_renderizada = st.data_editor(
                 df_grid,
                 column_config=configuracao_colunas,
-                disabled=colunas_mostrar, # Trava a edição do texto, liberta apenas o Checkbox
+                disabled=colunas_mostrar,
                 hide_index=True,
                 use_container_width=True,
                 height=500
@@ -462,13 +468,13 @@ if menu == "📊 Dashboard":
                                         l_orig = df_nuvem[df_nuvem['PEDIDO'] == pid].iloc[0].copy()
                                         novo_id = str(prox_id); prox_id += 1
                                         l_orig['PEDIDO'] = novo_id; l_orig['DATA'] = clone_data.strftime("%d/%m/%Y")
-                                        l_orig['STATUS'] = "PENDENTE"; l_orig['DATA_ENTREGA'] = ""; l_orig['FOTO'] = ""; l_orig['ROMANEIO'] = ""
+                                        l_orig['STATUS'] = "PENDENTE"; l_orig['DATA_ENTREGA'] = ""; l_orig['FOTO'] = ""; l_orig['ROMANEIO'] = ""; l_orig['QR_CODE'] = ""
                                         if clone_mot != "Manter Original": l_orig['AGENTE_RAW'] = clone_mot
                                         prazo = calcular_sla_dias(l_orig.get('UF', 'SP'), l_orig.get('CIDADE', ''))
                                         l_orig['PRAZO_DIAS'] = prazo; l_orig['DATA_LIMITE'] = calcular_data_limite(l_orig['DATA'], prazo)
                                         df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
                                         if str(l_orig.get('AGENTE_RAW','')).strip():
-                                            clones_app.append({'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'], 'ENDERECO': l_orig.get('ENDERECO',''), 'NUMERO': l_orig.get('NUMERO',''), 'BAIRRO': l_orig.get('BAIRRO',''), 'CIDADE': l_orig.get('CIDADE',''), 'CEP': l_orig.get('CEP',''), 'LABORATORIO': l_orig.get('LABORATORIO',''), 'TOMADOR': l_orig.get('TOMADOR','')})
+                                            clones_app.append({'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'], 'ENDERECO': l_orig.get('ENDERECO',''), 'NUMERO': l_orig.get('NUMERO',''), 'BAIRRO': l_orig.get('BAIRRO',''), 'CIDADE': l_orig.get('CIDADE',''), 'CEP': l_orig.get('CEP',''), 'LABORATORIO': l_orig.get('LABORATORIO',''), 'TOMADOR': l_orig.get('TOMADOR',''), 'QR_CODE': ''})
                                 atualizar_planilha_memoria(df_nuvem, aba)
                                 if clones_app: despachar_para_appsheet(clones_app)
                                 st.success("Clonado com SUCESSO!"); carregar_dados_completos.clear(); st.rerun()
@@ -491,7 +497,7 @@ if menu == "📊 Dashboard":
                                     if mask.any():
                                         df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot; df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
                                         l_app = df_nuvem[mask].iloc[0]
-                                        lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
+                                        lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR',''), 'QR_CODE': l_app.get('QR_CODE','')})
                                 atualizar_planilha_memoria(df_nuvem, aba)
                                 despachar_para_appsheet(lista_app_troca)
                                 st.success("Trocado!"); carregar_dados_completos.clear(); st.rerun()
@@ -562,7 +568,7 @@ elif menu == "📝 Manual":
                             df_nuvem = pd.DataFrame(aba_memoria.get_all_values()[1:], columns=aba_memoria.get_all_values()[0]) if len(aba_memoria.get_all_values()) > 1 else pd.DataFrame()
                             df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                             m_pedido = str(obter_proximo_id(df_nuvem))
-                            novo_ped = pd.DataFrame([{'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 'LABORATORIO': lab_limpo, 'ENDERECO': rua_limpa, 'NUMERO': "", 'BAIRRO': bai_limpo, 'CIDADE': cid_limpa, 'UF': uf_limpa, 'CEP': cep_input, 'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""}])
+                            novo_ped = pd.DataFrame([{'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 'LABORATORIO': lab_limpo, 'ENDERECO': rua_limpa, 'NUMERO': "", 'BAIRRO': bai_limpo, 'CIDADE': cid_limpa, 'UF': uf_limpa, 'CEP': cep_input, 'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': "", 'QR_CODE': ""}])
                             df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
                             atualizar_planilha_memoria(df_atual, aba_memoria)
                             if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
@@ -612,9 +618,10 @@ elif menu == "📥 Lotes":
                         elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa[c] = 'CIDADE'
                         elif any(x in cl for x in ['ESTADO', 'UF']): mapa[c] = 'UF'
                         elif 'CEP' in cl: mapa[c] = 'CEP'
+                        elif any(x in cl for x in ['QR', 'QRCODE', 'ENVELOPE']): mapa[c] = 'QR_CODE'
                     df_limpo.rename(columns=mapa, inplace=True)
                     
-                    for c in ['PEDIDO', 'LABORATORIO', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
+                    for c in ['PEDIDO', 'LABORATORIO', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'QR_CODE']:
                         if c not in df_limpo.columns: df_limpo[c] = ""
                     
                     for idx, row in df_limpo.iterrows():
@@ -631,7 +638,7 @@ elif menu == "📥 Lotes":
                     df_limpo['TOMADOR'] = tom; df_limpo['DATA'] = dt_c.strftime("%d/%m/%Y")
                     df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
                     df_limpo = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""]
-                    st.session_state.df_preview = df_limpo[['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
+                    st.session_state.df_preview = df_limpo[['DATA', 'TOMADOR', 'PEDIDO', 'QR_CODE', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
                     st.rerun()
                 except Exception as e: st.error(f"Erro: {e}")
 
@@ -657,7 +664,7 @@ elif menu == "📥 Lotes":
                     if not todas_corrigidas: st.warning("Preencha todos.")
                     st.rerun()
         else:
-            colunas_prev = ['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']
+            colunas_prev = ['DATA', 'TOMADOR', 'PEDIDO', 'QR_CODE', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']
             for col in colunas_prev:
                 if col not in df_ok.columns: df_ok[col] = ""
             
@@ -682,7 +689,7 @@ elif menu == "📥 Lotes":
                         df_up = pd.concat([df_up, df_final], ignore_index=True) if not df_up.empty else df_final
                         atualizar_planilha_memoria(df_up, aba)
                         
-                        lista_app = [{'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'], 'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'], 'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'], 'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'], 'TOMADOR': r['TOMADOR']} for _, r in df_final.iterrows() if str(r.get('AGENTE_RAW','')).strip()]
+                        lista_app = [{'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'], 'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'], 'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'], 'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'], 'TOMADOR': r['TOMADOR'], 'QR_CODE': r['QR_CODE']} for _, r in df_final.iterrows() if str(r.get('AGENTE_RAW','')).strip()]
                         if lista_app: despachar_para_appsheet(lista_app)
                         st.session_state.df_preview = pd.DataFrame(); carregar_dados_completos.clear(); st.rerun()
                     except Exception as e: st.error(f"Erro: {e}")
@@ -724,7 +731,7 @@ elif menu == "🔬 Triagem":
             st.markdown("---")
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
-                colunas_fila = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']
+                colunas_fila = ['DATA', 'PEDIDO', 'QR_CODE', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']
                 for col in colunas_fila:
                     if col not in df_fila.columns: df_fila[col] = ""
                 
@@ -748,8 +755,7 @@ elif menu == "🔬 Triagem":
                 tomador_filtro = c_filtro.selectbox("Filtro por Tomador:", ["Todos"] + sorted(df_conf['TOMADOR'].astype(str).unique().tolist()))
                 if tomador_filtro != "Todos": df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
                 
-                colunas_romaneio = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']
-                if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
+                colunas_romaneio = ['DATA', 'PEDIDO', 'QR_CODE', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']
                 for col in colunas_romaneio:
                     if col not in df_conf.columns: df_conf[col] = ""
                 
@@ -775,7 +781,7 @@ elif menu == "🔬 Triagem":
                     if 'AGENTE_RAW' in df_nuvem.columns: df_nuvem.loc[mask, 'AGENTE_RAW'] = motorista_escolhido
                     atualizar_planilha_memoria(df_nuvem, aba)
                     
-                    despachar_para_appsheet([{'PEDIDO': id_rom, 'MOTORISTA': motorista_escolhido, 'ENDERECO': "LOTE", 'NUMERO': str(len(sel_lista)), 'BAIRRO': sel_lista[0].get('TOMADOR', ''), 'CIDADE': sel_lista[0].get('CIDADE', ''), 'CEP': "-", 'LABORATORIO': f"LOTE {len(sel_lista)} PEDIDOS", 'TOMADOR': sel_lista[0].get('TOMADOR', ''), 'ROMANEIO': id_rom}])
+                    despachar_para_appsheet([{'PEDIDO': id_rom, 'MOTORISTA': motorista_escolhido, 'ENDERECO': "LOTE", 'NUMERO': str(len(sel_lista)), 'BAIRRO': sel_lista[0].get('TOMADOR', ''), 'CIDADE': sel_lista[0].get('CIDADE', ''), 'CEP': "-", 'LABORATORIO': f"LOTE {len(sel_lista)} PEDIDOS", 'TOMADOR': sel_lista[0].get('TOMADOR', ''), 'ROMANEIO': id_rom, 'QR_CODE': ''}])
                     
                     pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", "B", 14); pdf.cell(0, 10, "PROTOCOLO DE ENTREGA", ln=True, align="C")
                     pdf.set_font("Arial", "", 10); pdf.cell(0, 10, f"LOTE: {id_rom}", ln=True, align="C")
@@ -787,7 +793,7 @@ elif menu == "🔬 Triagem":
         with t3:
             df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper().isin(['CONFERIDO', 'EM ROTA DE ENTREGA', 'ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO'])].copy()
             if not df_hist.empty:
-                colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
+                colunas_hist = ['DATA', 'PEDIDO', 'QR_CODE', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
                 for col in colunas_hist:
                     if col not in df_hist.columns: df_hist[col] = ""
                 df_hist_show = df_hist[colunas_hist].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "").reset_index(drop=True)
@@ -825,7 +831,7 @@ elif menu == "📁 Relatórios":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining e Exportação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     if not df_raw.empty:
-        colunas_export = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'DATA_ENTREGA', 'AGENTE_RAW', 'DATA_LIMITE']
+        colunas_export = ['DATA', 'PEDIDO', 'QR_CODE', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'DATA_ENTREGA', 'AGENTE_RAW', 'DATA_LIMITE']
         for col in colunas_export:
             if col not in df_raw.columns: df_raw[col] = ""
         df_export_base = df_raw[colunas_export].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "").copy()
