@@ -496,7 +496,7 @@ if menu == "📊 Dashboard":
             
             configuracao_colunas = {
                 "SELECIONAR": st.column_config.CheckboxColumn("✔ Ação", default=False),
-                "FOTO_URL": st.column_config.LinkColumn("📸 Comprovante", display_text="Abrir Foto"),
+                "FOTO_URL": st.column_config.LinkColumn("📸 Comprovante", display_text="🔗 Link"),
                 "STATUS_DISPLAY": st.column_config.TextColumn("📌 Status Operacional")
             }
             
@@ -525,7 +525,23 @@ if menu == "📊 Dashboard":
                 </style>
             """, unsafe_allow_html=True)
             
-            col_b2, col_b3, col_b4, col_b5 = st.columns([1.5, 1.5, 1.5, 1.5])
+            col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
+            
+            # 🔥 NOVO BOTÃO FLUTUANTE PARA VER FOTO DENTRO DO SISTEMA
+            with col_b1.popover("📸 Ver Comprovante", use_container_width=True):
+                if not tem_sel: 
+                    st.warning("Marque a caixinha do pedido na tabela abaixo primeiro!")
+                else:
+                    fotos = df_grid[df_grid['PEDIDO'].isin(p_ids)]['FOTO_URL'].tolist()
+                    fotos_validas = [f for f in fotos if f.strip()]
+                    
+                    if not fotos_validas:
+                        st.info("Nenhum comprovante fotográfico encontrado para a sua seleção.")
+                    else:
+                        st.markdown(f"**Exibindo {len(fotos_validas)} comprovante(s):**")
+                        for url in fotos_validas:
+                            st.image(url, use_container_width=True)
+                            st.markdown("---")
             
             with col_b2.popover("📲 Dar Baixa Manual", use_container_width=True):
                 if not tem_sel: st.warning("Marque o(s) pedido(s) na tabela abaixo primeiro!")
@@ -896,7 +912,6 @@ elif menu == "📥 Lotes":
         else:
             st.success(f"✅ Protocolo validado! {len(df_ok)} pedidos blindados e roteirizados para injeção.")
             
-            # Tabela Nativa de Preview
             st.dataframe(df_ok, hide_index=True, use_container_width=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
@@ -1006,7 +1021,6 @@ elif menu == "🔬 Triagem":
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']].fillna("").astype(str)
                 df_fila.insert(0, "SELECIONAR", False)
                 
-                # Tabela Nativa com Checkboxes
                 tabela_fila = st.data_editor(
                     df_fila, 
                     hide_index=True, 
@@ -1051,7 +1065,6 @@ elif menu == "🔬 Triagem":
                 df_conf = df_conf[colunas_romaneio].fillna("").astype(str)
                 df_conf.insert(0, "SELECIONAR", False)
                 
-                # Tabela Nativa
                 tabela_conf = st.data_editor(
                     df_conf,
                     hide_index=True,
@@ -1191,7 +1204,6 @@ elif menu == "🔬 Triagem":
                 colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
                 df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
                 
-                # Tabela Nativa de Histórico
                 st.dataframe(df_hist_show, hide_index=True, use_container_width=True)
             else:
                 st.warning("O arquivo histórico de varreduras está temporariamente em branco.")
