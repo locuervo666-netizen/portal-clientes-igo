@@ -431,7 +431,7 @@ if planilha_db is None:
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (A VOLTA DA FERRARI - AGGRID BLINDADA)
+# 🚀 MÓDULO 1: DASHBOARD (A FERRARI - AGGRID SEGURA)
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -496,12 +496,12 @@ if menu == "📊 Dashboard":
         container_botoes = st.container()
         container_grid = st.container()
 
-        # 🔥 A FERRARI: AGGRID COM MINIATURA DE FOTO E MODAL
+        # 🔥 A FERRARI: AGGRID EM MODO SEGURO
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
             gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=120)
             gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
-            gb.configure_grid_options(rowHeight=38, headerHeight=38) # Linhas mais altas para a miniatura
+            gb.configure_grid_options(rowHeight=40, headerHeight=38) # Linhas mais altas para a miniatura da foto
             
             gb.configure_column("DATA", headerName="Data", width=100)
             gb.configure_column("PEDIDO", headerName="Pedido", width=110)
@@ -529,44 +529,21 @@ if menu == "📊 Dashboard":
             """)
             gb.configure_column("STATUS_DISPLAY", headerName="Status", cellStyle=st_js, width=170)
             
-            # 🔥 A MÁGICA DA FOTO: Miniatura na célula + Clique que abre no meio da tela
+            # 🔥 MODO SEGURO: Apenas desenha a miniatura, sem scripts agressivos
             img_js = JsCode("""
             class FotoRenderer {
                 init(params) {
                     this.eGui = document.createElement('div');
-                    this.eGui.style.textAlign = 'center';
-                    this.eGui.style.height = '100%';
                     this.eGui.style.display = 'flex';
                     this.eGui.style.alignItems = 'center';
                     this.eGui.style.justifyContent = 'center';
+                    this.eGui.style.height = '100%';
                     
                     let val = params.value ? String(params.value) : '';
                     if (val.includes('http')) {
-                        // Renderiza a miniatura da foto
-                        this.eGui.innerHTML = `<img src="${val}" style="height: 28px; width: 28px; object-fit: cover; border-radius: 4px; cursor: zoom-in; box-shadow: 0 1px 3px rgba(0,0,0,0.3);" title="Clique para ampliar">`;
-                        
-                        // Ao clicar, abre o modal gigante na tela
-                        this.eGui.onclick = () => {
-                            let modal = document.createElement('div');
-                            modal.style.position = 'fixed'; modal.style.zIndex = '999999';
-                            modal.style.left = '0'; modal.style.top = '0'; modal.style.width = '100vw'; modal.style.height = '100vh';
-                            modal.style.backgroundColor = 'rgba(15,23,42,0.95)';
-                            modal.style.display = 'flex'; modal.style.flexDirection = 'column'; modal.style.justifyContent = 'center'; modal.style.alignItems = 'center'; modal.style.cursor = 'zoom-out';
-                            
-                            let img = document.createElement('img');
-                            img.src = val; 
-                            img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '12px'; img.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.8)';
-                            
-                            let txt = document.createElement('div');
-                            txt.innerText = '✖ Fechar Imagem'; 
-                            txt.style.color = '#ffffff'; txt.style.marginTop = '20px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontWeight = 'bold'; txt.style.padding = '10px 20px'; txt.style.background = 'rgba(255,255,255,0.1)'; txt.style.borderRadius = '20px';
-                            
-                            modal.appendChild(img); modal.appendChild(txt);
-                            modal.onclick = () => { document.body.removeChild(modal); };
-                            document.body.appendChild(modal);
-                        };
+                        this.eGui.innerHTML = '<img src="' + val + '" style="height:32px; width:32px; object-fit:cover; border-radius:4px; border:1px solid #CBD5E1;" title="Selecione a linha e clique em Ver Comprovante abaixo">';
                     } else {
-                        this.eGui.innerHTML = `<span style="color: #CBD5E1;">-</span>`;
+                        this.eGui.innerHTML = '<span style="color: #CBD5E1; font-weight: bold;">-</span>';
                     }
                 }
                 getGui() { return this.eGui; }
@@ -599,7 +576,23 @@ if menu == "📊 Dashboard":
                 </style>
             """, unsafe_allow_html=True)
             
-            col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns([1.5, 1.5, 1.5, 1.5, 1.5])
+            col_b1, col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns(6)
+            
+            # 🔥 BOTÃO FLUTUANTE PARA VER A FOTO GIGANTE (SEGURO E NATIVO)
+            with col_b1.popover("📸 Ver Comprovante no Painel", use_container_width=True):
+                if not tem_sel: 
+                    st.warning("Marque a caixinha de um pedido na tabela acima primeiro!")
+                else:
+                    fotos = df_grid[df_grid['PEDIDO'].isin(p_ids)]['FOTO_URL'].tolist()
+                    fotos_validas = [f for f in fotos if f.strip() and f.upper() != 'NAN']
+                    
+                    if not fotos_validas:
+                        st.info("Nenhum comprovante fotográfico encontrado para a sua seleção.")
+                    else:
+                        st.markdown(f"**Exibindo {len(fotos_validas)} comprovante(s):**")
+                        for url in fotos_validas:
+                            st.image(url, use_container_width=True)
+                            st.markdown("---")
             
             with col_b2.popover("📲 Dar Baixa Manual", use_container_width=True):
                 if not tem_sel: st.warning("Selecione na tabela primeiro!")
@@ -725,7 +718,7 @@ if menu == "📊 Dashboard":
                 carregar_dados_completos.clear()
                 st.rerun()
                 
-            # 🔥 BOTÃO DE LIMPEZA (MASTER DELETE) PARA VOCÊ NUNCA MAIS MEXER NO EXCEL
+            # 🔥 BOTÃO DE LIMPEZA (MASTER DELETE)
             with col_b6.popover("🗑️ Excluir Pedido", use_container_width=True):
                 if not tem_sel: st.warning("Selecione na tabela primeiro!")
                 else:
