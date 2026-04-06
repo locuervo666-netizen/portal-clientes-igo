@@ -15,7 +15,6 @@ import random
 import gspread
 import uuid
 from streamlit_autorefresh import st_autorefresh
-from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, GridUpdateMode
 from fpdf import FPDF
 
 FUSO_BR = timezone(timedelta(hours=-3))
@@ -73,8 +72,11 @@ st.markdown("""
     .stButton > button[kind="primary"] { background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; color: #FFFFFF !important;}
     .stButton > button[kind="primary"]:hover { background: #0369A1 !important; }
     
-    .painel-inspecao {
-        background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 25px; margin-top: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    .ficha-lateral {
+        background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); height: 100%;
+    }
+    .ficha-placeholder {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #94A3B8; text-align: center; padding: 40px 20px; border: 2px dashed #E2E8F0; border-radius: 12px; background-color: #F8FAFC;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -121,6 +123,7 @@ if not st.session_state.autenticado:
             else:
                 st.error("❌ Credenciais inválidas.")
     st.stop()
+
 
 # =============================================================================
 # 🔗 2. CONEXÃO COM A NUVEM E CÉREBRO DE DADOS
@@ -391,19 +394,6 @@ def calc_status_display(row):
         except: pass
     return res
 
-def obter_css_grid():
-    return {
-        ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "8px", "overflow": "hidden", "box-shadow": "0 4px 6px -1px rgba(0, 0, 0, 0.05)"},
-        ".ag-header": {"background-color": "#F8FAFC !important", "border-bottom": "1px solid #CBD5E1 !important"},
-        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "700 !important", "font-size": "11px !important"},
-        ".ag-cell": {"font-size": "12px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
-        ".ag-row-even": {"background-color": "#FFFFFF !important"},
-        ".ag-row-odd": {"background-color": "#F8FAFC !important"},
-        ".ag-row-hover": {"background-color": "#E2E8F0 !important"},
-        ".ag-row-selected": {"background-color": "#E0F2FE !important", "color": "#0369A1 !important"},
-        ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "700"}
-    }
-
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
 # =============================================================================
@@ -433,7 +423,7 @@ if planilha_db is None:
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (AGGRID COM PAINEL DE INSPEÇÃO)
+# 🚀 MÓDULO 1: DASHBOARD (ARQUITETURA MASTER-DETAIL / CAIXA LATERAL)
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -481,12 +471,11 @@ if menu == "📊 Dashboard":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        # 🔥 TEXTO SEGURO DA FOTO PARA NÃO DERRUBAR A AGGRID
-        df_grid['FOTO_STATUS'] = df_grid['FOTO_URL'].apply(lambda x: '🟢 Foto Salva' if x else '⚪ Sem Foto')
+        df_grid['FOTO_INDICADOR'] = df_grid['FOTO_URL'].apply(lambda x: '📸 Sim' if x else '❌ Não')
 
-        colunas_mostrar = ['DATA', 'PEDIDO', 'QR_CODE', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'FOTO_STATUS', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'FOTO_INDICADOR', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
-        df_grid = df_grid[df_grid['PEDIDO'].astype(str).str.strip() != ""] # Filtro Desinfetante de fantasmas
+        df_grid = df_grid[df_grid['PEDIDO'].astype(str).str.strip() != ""] 
         df_grid = df_grid.fillna("").astype(str).replace(["nan", "NaN", "None", "<NA>"], "")
         
         if busca:
@@ -495,78 +484,66 @@ if menu == "📊 Dashboard":
 
         df_grid = df_grid.reset_index(drop=True)
 
-        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Marque um pedido para ver a Foto e as Ações.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Marque a caixinha do pedido para abrir a Ficha Lateral.</p>", unsafe_allow_html=True)
         
-        container_grid = st.container()
+        # 🔥 ARQUITETURA CAIXA LATERAL (Master-Detail)
+        col_tabela, col_ficha = st.columns([7, 3])
 
-        # 🔥 AGGRID SEGURA (Sem Modal Javascript)
-        with container_grid:
-            gb = GridOptionsBuilder.from_dataframe(df_grid)
-            gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=120)
-            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
-            gb.configure_grid_options(rowHeight=35, headerHeight=35)
+        with col_tabela:
+            df_grid.insert(0, "SELECAO", False)
             
-            gb.configure_column("DATA", headerName="Data", width=100)
-            gb.configure_column("PEDIDO", headerName="Pedido", width=110)
-            gb.configure_column("QR_CODE", headerName="QR Code", width=110)
-            gb.configure_column("TOMADOR", headerName="Tomador", width=130)
-            gb.configure_column("LABORATORIO", headerName="Laboratório", minWidth=200, flex=1)
-            gb.configure_column("BAIRRO", headerName="Bairro", minWidth=150)
-            gb.configure_column("CIDADE", headerName="Cidade", minWidth=150)
-            gb.configure_column("UF", headerName="UF", width=80)
-            gb.configure_column("FOTO_STATUS", headerName="Comprovante", width=120)
-            gb.configure_column("DATA_LIMITE", headerName="Previsão", width=110)
-            gb.configure_column("AGENTE_RAW", headerName="Agente", width=120) 
-            gb.configure_column("DATA_ENTREGA", headerName="Data Real Entrega", width=150)
-            
-            # Cores de Status
-            st_js = JsCode("""
-            function(p){
-                let v = p.value ? String(p.value).toUpperCase() : ''; 
-                if(v.includes('ENTREGUE')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
-                if(v.includes('FRUSTRADA') || v.includes('PROBLEMA') || v.includes('CANCELADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
-                if(v.includes('EM ROTA')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
-                if(v.includes('COLETADO') || v.includes('CONFERIDO')){ return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'}; } 
-                if(v.includes('ATRASADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
-                return {'fontWeight':'600', 'color': '#64748B'};
+            config_cols = {
+                "SELECAO": st.column_config.CheckboxColumn("✔ Abrir Ficha", default=False),
+                "STATUS_DISPLAY": st.column_config.TextColumn("Status Operacional"),
+                "FOTO_INDICADOR": st.column_config.TextColumn("Foto")
             }
-            """)
-            gb.configure_column("STATUS_DISPLAY", headerName="Status", cellStyle=st_js, width=170)
             
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=450, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.SELECTION_CHANGED)
+            tabela_renderizada = st.data_editor(
+                df_grid,
+                column_config=config_cols,
+                disabled=[c for c in df_grid.columns if c != "SELECAO"],
+                hide_index=True,
+                use_container_width=True,
+                height=650
+            )
             
-            selecionados = grid_response['selected_rows']
-            tem_sel = False
-            if selecionados is not None:
-                if isinstance(selecionados, pd.DataFrame): tem_sel = not selecionados.empty
-                else: tem_sel = len(selecionados) > 0
-                
-            if tem_sel:
-                if isinstance(selecionados, pd.DataFrame): p_ids = selecionados['PEDIDO'].astype(str).tolist()
-                else: p_ids = [str(r['PEDIDO']) for r in selecionados]
-            else: p_ids = []
+            linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECAO"]]
+            p_ids = linhas_selecionadas["PEDIDO"].tolist() if not linhas_selecionadas.empty else []
+            tem_sel = len(p_ids) > 0
 
-        # 🔥 O ESTÚDIO DE INSPEÇÃO (FOTO GIGANTE + BOTÕES ABAIXO DA AGGRID)
-        if tem_sel:
-            st.markdown("<div class='painel-inspecao'>", unsafe_allow_html=True)
-            st.markdown(f"<h3 style='margin-top:0; color:#0369A1;'>🔍 Inspeção do Pedido: {', '.join(p_ids)}</h3>", unsafe_allow_html=True)
-            
-            col_img, col_act = st.columns([1.5, 2])
-            
-            with col_img:
-                st.markdown("**📸 Comprovante de Entrega**")
+        # 🔥 A CAIXA LATERAL (Ficha do Pedido e Foto)
+        with col_ficha:
+            if not tem_sel:
+                st.markdown("""
+                <div class='ficha-placeholder'>
+                    <span style='font-size: 40px;'>👈</span>
+                    <h3>Caixa Lateral</h3>
+                    <p>Selecione um pedido na tabela ao lado para visualizar o comprovante fotográfico e os botões de ação.</p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("<div class='ficha-lateral'>", unsafe_allow_html=True)
+                pedido_alvo = p_ids[0] # Pega o primeiro pedido selecionado para detalhe
+                st.markdown(f"<h3 style='margin-top:0; color:#0369A1;'>Pedido: {pedido_alvo}</h3>", unsafe_allow_html=True)
+                
+                # Se selecionou vários, avisa:
+                if len(p_ids) > 1:
+                    st.warning(f"⚠️ Você selecionou {len(p_ids)} pedidos. As ações abaixo afetarão TODOS os pedidos marcados.")
+
+                st.markdown("---")
+                st.markdown("#### 📸 Comprovante Fotográfico")
+                
                 fotos = df_f[df_f['PEDIDO'].isin(p_ids)]['FOTO_URL'].tolist()
                 fotos_validas = [f for f in fotos if str(f).strip() and str(f).upper() != 'NAN']
                 
                 if not fotos_validas:
-                    st.info("O Agente ainda não anexou nenhuma foto para este pedido no aplicativo.")
+                    st.info("Nenhuma foto anexada pelo Agente.")
                 else:
                     for url in fotos_validas:
                         st.image(url, use_container_width=True)
-                        st.markdown("---")
-            
-            with col_act:
-                st.markdown("**⚡ Comandos do Operador**")
+                
+                st.markdown("---")
+                st.markdown("#### ⚡ Ações do Sistema")
                 
                 st.markdown("""
                 <style>
@@ -694,8 +671,7 @@ if menu == "📊 Dashboard":
                                 except Exception as e: st.error(f"Erro: {e}")
                         else: st.error("Senha incorreta.")
                 
-                st.button("🔄 Atualizar Dados", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
-
+                st.button("🔄 Atualizar Grid", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
             st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.warning("O banco de dados está vazio ou a aba Memoria_Sistema não foi encontrada. Vá para a aba Manual.")
