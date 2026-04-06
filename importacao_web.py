@@ -15,7 +15,6 @@ import random
 import gspread
 import uuid
 from streamlit_autorefresh import st_autorefresh
-from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, GridUpdateMode
 from fpdf import FPDF
 
 FUSO_BR = timezone(timedelta(hours=-3))
@@ -38,7 +37,7 @@ st.markdown("""
     #MainMenu { display: none !important; }
     footer { display: none !important; }
     
-    .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 98% !important; }
+    .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 96% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
     div[data-testid="stRadio"] {
@@ -72,6 +71,10 @@ st.markdown("""
 
     .stButton > button[kind="primary"] { background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; color: #FFFFFF !important;}
     .stButton > button[kind="primary"]:hover { background: #0369A1 !important; }
+    
+    [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] { 
+        background: #FFFFFF; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); border: 1px solid #E2E8F0; 
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -368,6 +371,7 @@ def obter_proximo_id(df):
     except:
         return 100000
 
+# 🔥 A PRIORIDADE AGORA É O STATUS REAL (EMOJIS NATIVOS)
 def calc_status_display(row):
     status_final = str(row.get('STATUS', '')).strip().upper()
     previsao = str(row.get('DATA_LIMITE', '')).strip()
@@ -387,19 +391,6 @@ def calc_status_display(row):
                 res = f"{res} ⚠️ ATRASADO"
         except: pass
     return res
-
-def obter_css_grid():
-    return {
-        ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
-        ".ag-header": {"background-color": "#F8FAFC !important", "border-bottom": "1px solid #CBD5E1 !important"},
-        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "700 !important", "font-size": "11px !important"},
-        ".ag-cell": {"font-size": "11px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
-        ".ag-row-even": {"background-color": "#FFFFFF !important"},
-        ".ag-row-odd": {"background-color": "#F8FAFC !important"},
-        ".ag-row-hover": {"background-color": "#E2E8F0 !important"},
-        ".ag-row-selected": {"background-color": "#E0F2FE !important", "color": "#0369A1 !important"},
-        ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
-    }
 
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
@@ -438,7 +429,7 @@ menu = st.radio("Navegação:", [
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (COM AGGRID E FILTRO DESINFETANTE)
+# 🚀 MÓDULO 1: DASHBOARD (NATIVO - À PROVA DE FALHAS)
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -486,10 +477,8 @@ if menu == "📊 Dashboard":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        # 🔥 1. O FILTRO DESINFETANTE: Derrete as linhas fantasmas e limpa a base antes do AgGrid ler
-        colunas_mostrar = ['DATA', 'PEDIDO', 'QR_CODE', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'DATA_ENTREGA']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'DATA_ENTREGA']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
-        df_grid = df_grid[df_grid['PEDIDO'].astype(str).str.strip() != ""] # Mata as linhas sem pedido
         df_grid = df_grid.fillna("").astype(str).replace(["nan", "NaN", "None"], "")
         
         if busca:
@@ -501,81 +490,29 @@ if menu == "📊 Dashboard":
         container_botoes = st.container()
         container_grid = st.container()
 
-        # 🔥 3. A VOLTA DA FERRARI (AgGrid Configurado com Modal de Foto)
+        # 🔥 TABELA NATIVA: Zero Javascript, Carrega Rápido, Não Quebra
         with container_grid:
-            gb = GridOptionsBuilder.from_dataframe(df_grid)
-            gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=120)
-            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
-            gb.configure_grid_options(rowHeight=32, headerHeight=35)
+            df_grid.insert(0, "SELECIONAR", False)
             
-            gb.configure_column("DATA", headerName="Data", width=100)
-            gb.configure_column("PEDIDO", headerName="Pedido", width=110)
-            gb.configure_column("QR_CODE", headerName="QR Code", width=110)
-            gb.configure_column("TOMADOR", headerName="Tomador", width=130)
-            gb.configure_column("LABORATORIO", headerName="Laboratório", minWidth=200, flex=1)
-            gb.configure_column("BAIRRO", headerName="Bairro", minWidth=150)
-            gb.configure_column("CIDADE", headerName="Cidade", minWidth=150)
-            gb.configure_column("UF", headerName="UF", width=80)
-            gb.configure_column("DATA_LIMITE", headerName="Previsão", width=110)
-            gb.configure_column("AGENTE_RAW", headerName="Agente", width=120) 
-            gb.configure_column("DATA_ENTREGA", headerName="Data Real Entrega", width=150)
-            
-            st_js = JsCode("""
-            function(p){
-                let v = p.value ? String(p.value).toUpperCase() : ''; 
-                if(v.includes('ENTREGUE')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
-                if(v.includes('FRUSTRADA') || v.includes('PROBLEMA') || v.includes('CANCELADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
-                if(v.includes('EM ROTA')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
-                if(v.includes('COLETADO') || v.includes('CONFERIDO')){ return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'}; } 
-                if(v.includes('ATRASADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
-                return {'fontWeight':'600', 'color': '#64748B'};
+            # 🔥 OPÇÃO 3: VOLTAMOS PARA O LINK SEGURO (MAS COM VISUAL MELHORADO)
+            configuracao_colunas = {
+                "SELECIONAR": st.column_config.CheckboxColumn("✔ Ação", default=False),
+                "FOTO_URL": st.column_config.LinkColumn("📸 Comprovante", display_text="📸 Ver Foto"),
+                "STATUS_DISPLAY": st.column_config.TextColumn("📌 Status Operacional")
             }
-            """)
-            gb.configure_column("STATUS_DISPLAY", headerName="Status", cellStyle=st_js, width=170)
             
-            img_js = JsCode("""
-            class FotoRenderer {
-                init(params) {
-                    this.eGui = document.createElement('div');
-                    this.eGui.style.textAlign = 'center';
-                    let val = params.value ? String(params.value) : '';
-                    if (val.includes('http')) {
-                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 16px;" title="Ver Comprovante">📸</span>';
-                        this.eGui.onclick = () => {
-                            let modal = document.createElement('div');
-                            modal.style.position = 'fixed'; modal.style.zIndex = '999999';
-                            modal.style.left = '0'; modal.style.top = '0'; modal.style.width = '100vw'; modal.style.height = '100vh';
-                            modal.style.backgroundColor = 'rgba(15,23,42,0.9)';
-                            modal.style.display = 'flex'; modal.style.flexDirection = 'column'; modal.style.justifyContent = 'center'; modal.style.alignItems = 'center'; modal.style.cursor = 'zoom-out';
-                            let img = document.createElement('img');
-                            img.src = val; 
-                            img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '8px'; img.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
-                            let txt = document.createElement('div');
-                            txt.innerText = '✖ Fechar Visualização'; 
-                            txt.style.color = '#ffffff'; txt.style.marginTop = '20px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontWeight = 'bold'; txt.style.padding = '8px 16px'; txt.style.background = 'rgba(255,255,255,0.1)'; txt.style.borderRadius = '20px';
-                            modal.appendChild(img); modal.appendChild(txt);
-                            modal.onclick = () => { document.body.removeChild(modal); };
-                            document.body.appendChild(modal);
-                        };
-                    }
-                }
-                getGui() { return this.eGui; }
-            }
-            """)
-            gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=img_js, width=80)
+            tabela_renderizada = st.data_editor(
+                df_grid,
+                column_config=configuracao_colunas,
+                disabled=[c for c in df_grid.columns if c != "SELECIONAR"],
+                hide_index=True,
+                use_container_width=True,
+                height=500
+            )
             
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.SELECTION_CHANGED)
-            
-            selecionados = grid_response['selected_rows']
-            tem_sel = False
-            if selecionados is not None:
-                if isinstance(selecionados, pd.DataFrame): tem_sel = not selecionados.empty
-                else: tem_sel = len(selecionados) > 0
-                
-            if tem_sel:
-                if isinstance(selecionados, pd.DataFrame): p_ids = selecionados['PEDIDO'].astype(str).tolist()
-                else: p_ids = [str(r['PEDIDO']) for r in selecionados]
-            else: p_ids = []
+            linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
+            p_ids = linhas_selecionadas["PEDIDO"].tolist() if not linhas_selecionadas.empty else []
+            tem_sel = len(p_ids) > 0
 
         with container_botoes:
             st.markdown("""
@@ -589,9 +526,25 @@ if menu == "📊 Dashboard":
                 </style>
             """, unsafe_allow_html=True)
             
-            col_b1, col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns(6)
+            col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
             
-            with col_b1.popover("📲 Dar Baixa Manual", use_container_width=True):
+            # 🔥 BOTÃO FLUTUANTE PARA VER FOTO GIGANTE DENTRO DO SISTEMA SEM ABRIR ABA NOVA
+            with col_b1.popover("📸 Ver Comprovante no Painel", use_container_width=True):
+                if not tem_sel: 
+                    st.warning("Marque a caixinha do pedido na tabela abaixo primeiro!")
+                else:
+                    fotos = df_grid[df_grid['PEDIDO'].isin(p_ids)]['FOTO_URL'].tolist()
+                    fotos_validas = [f for f in fotos if f.strip() and f.upper() != 'NAN']
+                    
+                    if not fotos_validas:
+                        st.info("Nenhum comprovante fotográfico encontrado para a sua seleção.")
+                    else:
+                        st.markdown(f"**Exibindo {len(fotos_validas)} comprovante(s):**")
+                        for url in fotos_validas:
+                            st.image(url, use_container_width=True)
+                            st.markdown("---")
+            
+            with col_b2.popover("📲 Dar Baixa Manual", use_container_width=True):
                 if not tem_sel: st.warning("Marque o(s) pedido(s) na tabela abaixo primeiro!")
                 else:
                     status_baixa = st.selectbox("Novo Status:", ["ENTREGUE ✅", "PROBLEMA 🚨", "CANCELADO ❌", "PENDENTE ⏳"])
@@ -637,7 +590,7 @@ if menu == "📊 Dashboard":
                                     st.rerun()
                                 except Exception as e: st.error(f"Erro: {e}")
 
-            with col_b2.popover("👯 Clonar Pedidos", use_container_width=True):
+            with col_b3.popover("👯 Clonar Pedidos", use_container_width=True):
                 if not tem_sel: st.warning("Marque o(s) pedido(s) na tabela abaixo primeiro!")
                 else:
                     st.markdown(f"**Duplicar {len(p_ids)} pedidos selecionados**")
@@ -679,7 +632,7 @@ if menu == "📊 Dashboard":
                                 st.rerun()
                             except Exception as e: st.error(f"Erro ao clonar: {e}")
 
-            with col_b3.popover("🔄 Trocar Motorista", use_container_width=True):
+            with col_b4.popover("🔄 Trocar Motorista", use_container_width=True):
                 if not tem_sel: st.warning("Marque o(s) pedido(s) na tabela abaixo primeiro!")
                 else:
                     tem_entregue = df_grid[df_grid['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
@@ -711,46 +664,9 @@ if menu == "📊 Dashboard":
                                     st.rerun()
                                 except Exception as e: st.error(f"Erro: {e}")
 
-            if col_b4.button("🔄 Atualizar Painel", use_container_width=True):
+            if col_b5.button("🔄 Atualizar Painel", use_container_width=True):
                 carregar_dados_completos.clear()
                 st.rerun()
-
-            # 🔥 2. O BOTÃO MASTER DE EXCLUSÃO PARA NUNCA MAIS ABRIR O EXCEL
-            with col_b6.popover("🗑️ Excluir Pedido", use_container_width=True):
-                if not tem_sel: st.warning("Marque o(s) pedido(s) na tabela abaixo primeiro!")
-                else:
-                    st.error(f"⚠️ ATENÇÃO: Você está prestes a apagar **{len(p_ids)}** pedido(s) PERMANENTEMENTE do banco de dados e do AppSheet. Essa ação não pode ser desfeita.")
-                    senha_del = st.text_input("🔑 Digite a senha de Exclusão Master:", type="password")
-                    if st.button("Confirmar Exclusão Definitiva", type="primary", use_container_width=True):
-                        if senha_del == "123":
-                            with st.spinner("Excluindo da nuvem..."):
-                                try:
-                                    aba = planilha_db.worksheet("Memoria_Sistema")
-                                    dados_aba = aba.get_all_values()
-                                    df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                    df_nuvem = df_nuvem[~df_nuvem['PEDIDO'].isin(p_ids)]
-                                    aba.clear()
-                                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    
-                                    try:
-                                        aba_app = planilha_db.worksheet("App_Tarefas")
-                                        dados_app = aba_app.get_all_values()
-                                        if len(dados_app) > 1:
-                                            df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
-                                            if 'PEDIDO' in df_app.columns:
-                                                df_app = df_app[~df_app['PEDIDO'].isin(p_ids)]
-                                                aba_app.clear()
-                                                aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
-                                    except: pass 
-                                    
-                                    st.success(f"Pedidos apagados com sucesso!")
-                                    carregar_dados_completos.clear()
-                                    st.rerun()
-                                except Exception as e: st.error(f"Erro ao excluir: {e}")
-                        else:
-                            st.error("Senha incorreta.")
-    else:
-        st.warning("O banco de dados está vazio ou a aba Memoria_Sistema não foi encontrada. Vá para a aba Manual.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL (COM VIA CEP INTEGRADO)
