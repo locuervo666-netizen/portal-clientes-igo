@@ -277,25 +277,15 @@ def carregar_dados_completos(_planilha):
                     
                     df['STATUS'] = df.apply(get_true_status, axis=1)
                     
-                    # 🔥 LÓGICA DE DATA DE ENTREGA CORRIGIDA (AGORA PUXA DO ROMANEIO)
                     def get_true_data_entrega(row):
                         d_db = str(row.get('DATA_ENTREGA', '')).strip()
                         s_final = str(row.get('STATUS', '')).strip().upper()
-                        rom_id = str(row.get('ROMANEIO', '')).strip()
                         
-                        # 1. Se pertence a um Lote (Romaneio), herda a data em que o Lote foi entregue no App
-                        if rom_id in rom_dict:
-                            d_rom = str(rom_dict[rom_id].get('APP_DATA_ENTREGA', '')).strip()
-                            if d_rom and d_rom.upper() != 'NAN':
-                                return d_rom
-
-                        # 2. Se for pedido individual, puxa a data própria do App
                         if s_final in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA'] and 'APP_DATA_ENTREGA' in row:
                             d_app = str(row.get('APP_DATA_ENTREGA', '')).strip()
                             if d_app and d_app.upper() != 'NAN':
                                 return d_app
                         
-                        # 3. Fallback: mantém a data manual da base
                         return d_db if d_db.upper() != 'NAN' else ""
                         
                     if 'DATA_ENTREGA' in df.columns or 'APP_DATA_ENTREGA' in df.columns:
@@ -785,9 +775,6 @@ if menu == "📊 Dashboard":
             if col_b5.button("🔄 Atualizar Painel", use_container_width=True):
                 carregar_dados_completos.clear()
                 st.rerun()
-
-    else:
-        st.warning("📭 O banco de dados está vazio no momento. Acesse a aba '📝 Manual' para começar.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
@@ -1402,8 +1389,7 @@ elif menu == "📁 Relatórios":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        # 🔥 COLUNA DE DATA_ENTREGA ADICIONADA OFICIALMENTE NO EXCEL DE RELATÓRIOS
-        colunas_export = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'DATA_ENTREGA', 'AGENTE_RAW', 'DATA_LIMITE']
+        colunas_export = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'DATA_LIMITE']
         df_export_base = df_raw[[c for c in colunas_export if c in df_raw.columns]].copy()
         if 'AGENTE_RAW' in df_export_base.columns: df_export_base.rename(columns={'AGENTE_RAW': 'MOTORISTA'}, inplace=True)
         
