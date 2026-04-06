@@ -84,26 +84,25 @@ if not st.session_state.autenticado:
     st.stop()
 
 # =============================================================================
-# 🔗 2. CONEXÃO ANCORADA BLINDADA
+# 🔗 2. CONEXÃO RESTAURADA AO BANCO ORIGINAL
 # =============================================================================
 @st.cache_resource
 def conectar_banco():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    SHEET_KEY = "1r754gu4JJ2XcKGtCSSYWFH8fa-ekjN4qi3awHaNVzlk"
     try:
         caminho_windows = r"C:\Users\elcic\IGO_Logistica_Sistema"
         if os.path.exists(os.path.join(caminho_windows, "credentials.json")):
             gc = gspread.oauth(credentials_filename=os.path.join(caminho_windows, "credentials.json"), authorized_user_filename=os.path.join(caminho_windows, "token.json"))
-            try: return gc.open_by_key(SHEET_KEY)
-            except: return gc.open("DB_IGO_Logistica")
+            return gc.open("DB_IGO_Logistica")
         elif "google_token_json" in st.secrets:
             import json
             from google.oauth2.credentials import Credentials
             gc = gspread.authorize(Credentials.from_authorized_user_info(json.loads(st.secrets["google_token_json"]), scopes))
-            try: return gc.open_by_key(SHEET_KEY)
-            except: return gc.open("DB_IGO_Logistica")
+            return gc.open("DB_IGO_Logistica")
         return None
-    except: return None
+    except Exception as e:
+        st.error(f"Erro Crítico de Conexão: Não foi possível abrir DB_IGO_Logistica. Detalhe: {e}")
+        return None
 
 def limpar_cabecalhos(colunas):
     novas = []
@@ -130,19 +129,17 @@ def atualizar_planilha_memoria(df_atualizada, worksheet):
 def carregar_dados_agentes(_planilha):
     if not _planilha: return pd.DataFrame()
     try:
-        # 🔥 AMORTECEDOR: Se não achar a aba, cria vazio em vez de tela vermelha
         aba = _planilha.worksheet("Agentes")
         dados = aba.get_all_values()
         if len(dados) > 1: return pd.DataFrame(dados[1:], columns=dados[0])
     except Exception as e: 
-        st.warning("⚠️ Aba 'Agentes' não encontrada. Usando base vazia temporariamente.")
+        pass
     return pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
 
 @st.cache_data(ttl=20)
 def carregar_dados_completos(_planilha):
     if not _planilha: return pd.DataFrame()
     try:
-        # 🔥 AMORTECEDOR: Blindagem contra tela vermelha
         aba_m = _planilha.worksheet("Memoria_Sistema")
         dados_m = aba_m.get_all_values()
         if len(dados_m) > 1:
@@ -213,7 +210,6 @@ def carregar_dados_completos(_planilha):
             if 'DATA' in df.columns: df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
     except Exception as e:
-        # 🔥 AMORTECEDOR: Avisa o erro sem tela vermelha
         pass
     return pd.DataFrame()
 
@@ -326,9 +322,8 @@ with col_logout:
 st.markdown("<br>", unsafe_allow_html=True)
 menu = st.radio("Navegação:", ["📊 Dashboard", "📝 Manual", "📥 Lotes", "🔬 Triagem", "📱 Zap", "📁 Relatórios", "⚙️ Rotas"], horizontal=True, label_visibility="collapsed")
 
-# Se o banco falhar, não exibe o Dashboard, apenas avisa.
 if planilha_db is None:
-    st.error("🚨 CONEXÃO COM O GOOGLE SHEETS FALHOU! Verifique as credenciais ou se o arquivo foi apagado.")
+    st.error("🚨 FALHA CRÍTICA: Não foi possível conectar ao Google Sheets. Verifique o seu arquivo credentials.json.")
     st.stop()
 
 # =============================================================================
