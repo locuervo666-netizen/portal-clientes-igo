@@ -15,6 +15,7 @@ import random
 import gspread
 import uuid
 from streamlit_autorefresh import st_autorefresh
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, GridUpdateMode
 from fpdf import FPDF
 
 FUSO_BR = timezone(timedelta(hours=-3))
@@ -118,9 +119,9 @@ if not st.session_state.autenticado:
             logins_autorizados = {"robson.melo": "123", "william.bertoldo": "123"}
             if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
                 st.session_state.autenticado = True; st.rerun()
-            else: st.error("❌ Credenciais inválidas.")
+            else: 
+                st.error("❌ Credenciais inválidas.")
     st.stop()
-
 
 # =============================================================================
 # 🔗 2. CONEXÃO COM A NUVEM E CÉREBRO DE DADOS
@@ -143,31 +144,37 @@ def conectar_banco():
             gc = gspread.authorize(creds)
             return gc.open("DB_IGO_Logistica")
         return None
-    except: return None
+    except: 
+        return None
 
 def atualizar_planilha_memoria(df_atualizada, worksheet):
     colunas_padrao = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO']
     df_atualizada.columns = [str(c).strip().upper().replace('DATA_ENTREGAA', 'DATA_ENTREGA').replace('DATA_ENTREG', 'DATA_ENTREGA') for c in df_atualizada.columns]
     df_atualizada = df_atualizada.loc[:, ~df_atualizada.columns.duplicated()].copy()
     for col in colunas_padrao:
-        if col not in df_atualizada.columns: df_atualizada[col] = ""
+        if col not in df_atualizada.columns: 
+            df_atualizada[col] = ""
     extra_cols = [c for c in df_atualizada.columns if c not in colunas_padrao and str(c).strip() != "" and "UNNAMED" not in str(c).upper()]
     df_final = df_atualizada[colunas_padrao + extra_cols]
     worksheet.clear()
     worksheet.update("A1", [df_final.columns.tolist()] + df_final.fillna("").astype(str).values.tolist())
 
 def carregar_dados_agentes(_planilha):
-    if not _planilha: return pd.DataFrame()
+    if not _planilha: 
+        return pd.DataFrame()
     try:
         aba = _planilha.worksheet("Agentes")
         dados = aba.get_all_values()
-        if len(dados) > 1: return pd.DataFrame(dados[1:], columns=dados[0])
-    except: pass
+        if len(dados) > 1: 
+            return pd.DataFrame(dados[1:], columns=dados[0])
+    except: 
+        pass
     return pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
 
 @st.cache_data(ttl=20)
 def carregar_dados_completos(_planilha):
-    if not _planilha: return pd.DataFrame()
+    if not _planilha: 
+        return pd.DataFrame()
     try:
         aba_m = _planilha.worksheet("Memoria_Sistema")
         dados_m = aba_m.get_all_values()
@@ -187,15 +194,21 @@ def carregar_dados_completos(_planilha):
                     df_app = df_app.loc[:, ~df_app.columns.duplicated()].copy()
                     
                     cols_to_extract = ['PEDIDO', 'STATUS', 'OBSERVACOES']
-                    if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
-                    if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
+                    if 'FOTO' in df_app.columns: 
+                        cols_to_extract.append('FOTO')
+                    if 'DATA_ENTREGA' in df_app.columns: 
+                        cols_to_extract.append('DATA_ENTREGA')
                     col_qr_app = next((c for c in ['QR_CODE', 'QRCODE', 'QR', 'CODIGO'] if c in df_app.columns), None)
-                    if col_qr_app: cols_to_extract.append(col_qr_app)
+                    if col_qr_app: 
+                        cols_to_extract.append(col_qr_app)
                     
                     df_app_clean = df_app[[c for c in cols_to_extract if c in df_app.columns]].copy()
                     rename_map = {'STATUS': 'APP_STATUS', 'OBSERVACOES': 'APP_OBS', 'FOTO': 'APP_FOTO'}
-                    if 'DATA_ENTREGA' in df_app.columns: rename_map['DATA_ENTREGA'] = 'APP_DATA_ENTREGA'
-                    if col_qr_app: rename_map[col_qr_app] = 'APP_QR'
+                    if 'DATA_ENTREGA' in df_app.columns: 
+                        rename_map['DATA_ENTREGA'] = 'APP_DATA_ENTREGA'
+                    if col_qr_app: 
+                        rename_map[col_qr_app] = 'APP_QR'
+                    
                     df_app_clean.rename(columns=rename_map, inplace=True)
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
@@ -207,8 +220,10 @@ def carregar_dados_completos(_planilha):
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
                     
                     if 'APP_QR' in df.columns:
-                        if 'QR_CODE' not in df.columns: df['QR_CODE'] = df['APP_QR']
-                        else: df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
+                        if 'QR_CODE' not in df.columns: 
+                            df['QR_CODE'] = df['APP_QR']
+                        else: 
+                            df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
 
                     def get_true_status(row):
                         s_db, s_app = str(row.get('STATUS', '')).strip().upper(), str(row.get('APP_STATUS', '')).strip().upper()
@@ -247,12 +262,14 @@ def carregar_dados_completos(_planilha):
                         
                     if 'APP_FOTO' in df.columns or len(rom_dict) > 0: 
                         df['FOTO'] = df.apply(get_true_foto, axis=1)
-            except: pass
+            except: 
+                pass
             
             if 'DATA' in df.columns: 
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
-    except: pass
+    except: 
+        pass
     
     return pd.DataFrame()
 
@@ -263,12 +280,15 @@ CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVAT
 hoje_br = datetime.now(FUSO_BR).date() 
 
 def despachar_para_appsheet(lista_pedidos_dicts):
-    if not planilha_db or not lista_pedidos_dicts: return False
+    if not planilha_db or not lista_pedidos_dicts: 
+        return False
     try:
         aba = planilha_db.worksheet("App_Tarefas")
         linhas = [[str(uuid.uuid4())[:8].upper(), str(p.get('PEDIDO','')), str(p.get('MOTORISTA', p.get('AGENTE_RAW', ''))), "PENDENTE", str(p.get('ENDERECO','')), str(p.get('NUMERO','')), str(p.get('BAIRRO','')), str(p.get('CIDADE','')), str(p.get('CEP','')), "", "", str(p.get('LABORATORIO','')), str(p.get('TOMADOR','')), "", str(p.get('ROMANEIO',''))] for p in lista_pedidos_dicts]
-        aba.append_rows(linhas); return True
-    except: return False
+        aba.append_rows(linhas)
+        return True
+    except: 
+        return False
 
 def padronizar_texto(texto):
     if pd.isna(texto) or not texto: return ""
@@ -280,7 +300,8 @@ def tratar_texto_global(texto):
     if t in ['0', '0.0', 'NAN', 'NONE', 'NAT']: return ""
     return t[:-2] if t.endswith('.0') else t
 
-def limpar_nome_local_rota(texto): return tratar_texto_global(texto).split('/')[0].split('-')[0].strip()
+def limpar_nome_local_rota(texto): 
+    return tratar_texto_global(texto).split('/')[0].split('-')[0].strip()
 
 def obter_login_agente(cidade, bairro, laboratorio, endereco="", base_rotas_df=pd.DataFrame()):
     if base_rotas_df.empty: return ""
@@ -305,7 +326,8 @@ def calcular_data_limite(data_ini, prazo):
             dt += timedelta(days=1)
             if dt.weekday() < 5 and dt not in FERIADOS_BR: add += 1
         return dt.strftime("%d/%m/%Y")
-    except: return data_ini
+    except: 
+        return data_ini
 
 def gerar_excel_memoria(df):
     output = io.BytesIO()
@@ -318,7 +340,22 @@ def obter_proximo_id(df):
     try:
         nums = df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().astype(int)
         return int(nums.max()) + 1 if not nums.empty else 100000
-    except: return 100000
+    except: 
+        return 100000
+
+# CSS DA NOSSA GRID PREMIUM
+def obter_css_grid():
+    return {
+        ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
+        ".ag-header": {"background-color": "#F8FAFC !important", "border-bottom": "1px solid #CBD5E1 !important"},
+        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "700 !important", "font-size": "11px !important"},
+        ".ag-cell": {"font-size": "11px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
+        ".ag-row-even": {"background-color": "#FFFFFF !important"},
+        ".ag-row-odd": {"background-color": "#F8FAFC !important"},
+        ".ag-row-hover": {"background-color": "#E2E8F0 !important"},
+        ".ag-row-selected": {"background-color": "#E0F2FE !important", "color": "#0369A1 !important"},
+        ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
+    }
 
 def calc_status_display(row):
     status_final = str(row.get('STATUS', '')).strip().upper()
@@ -334,17 +371,21 @@ def calc_status_display(row):
     
     if res not in ['✅ Entregue', '🚫 Cancelado', '❌ Frustrada'] and previsao:
         try:
-            if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: res = f"{res} (⚠️ ATRASADO)"
-        except: pass
+            if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: 
+                res = f"{res} (⚠️ ATRASADO)"
+        except: 
+            pass
     return res
 
-if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
+if 'filtro_kpi_admin' not in st.session_state: 
+    st.session_state.filtro_kpi_admin = "TODOS"
 
 # =============================================================================
-# 🎨 3. CABEÇALHO LIMPO
+# 🎨 3. CABEÇALHO LIMPO E NAVEGAÇÃO
 # =============================================================================
 col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
-with col_logo: st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=140)
+with col_logo: 
+    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=140)
 with col_title:
     st.markdown("<h2 style='color: #0F172A; font-weight: 800; margin: 0; text-align: center;'>PAINEL GERENCIAL</h2>", unsafe_allow_html=True)
     st.markdown("<p style='color: #64748B; margin: 0; text-align: center; font-weight: 600;'>Centro de Controle Operacional - IGO Logística</p>", unsafe_allow_html=True)
@@ -355,15 +396,12 @@ with col_logout:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# =============================================================================
-# 🖥️ BARRA DE TAREFAS FIXA NO RODAPÉ (TASKBAR)
-# =============================================================================
 menu = st.radio("Navegação:", [
     "📊 Dashboard", "📝 Manual", "📥 Lotes", "🔬 Triagem", "📱 Zap", "📁 Relatórios", "⚙️ Rotas"
 ], horizontal=True, label_visibility="collapsed")
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (NOVA TABELA INQUEBRÁVEL)
+# 🚀 MÓDULO 1: DASHBOARD (COM AGGRID PREMIUM 100% BLINDADA)
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -371,7 +409,8 @@ if menu == "📊 Dashboard":
     if not df_raw.empty:
         colunas_vitais = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS', 'DATA_LIMITE', 'FOTO', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
         for col in colunas_vitais:
-            if col not in df_raw.columns: df_raw[col] = ""
+            if col not in df_raw.columns: 
+                df_raw[col] = ""
                 
         df_raw['FOTO_URL'] = df_raw['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
@@ -382,8 +421,10 @@ if menu == "📊 Dashboard":
         f_data = col_f2.date_input("📅 Período de Análise:", value=(data_inicial_padrao, hoje_br), format="DD/MM/YYYY")
         
         df_f = df_raw.copy()
-        if f_cli != "Todos": df_f = df_f[df_f['TOMADOR'] == f_cli]
-        if isinstance(f_data, tuple) and len(f_data) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= f_data[0]) & (df_f['DATA_OBJ'] <= f_data[1])]
+        if f_cli != "Todos": 
+            df_f = df_f[df_f['TOMADOR'] == f_cli]
+        if isinstance(f_data, tuple) and len(f_data) == 2: 
+            df_f = df_f[(df_f['DATA_OBJ'] >= f_data[0]) & (df_f['DATA_OBJ'] <= f_data[1])]
 
         n_tot = len(df_f)
         n_ent = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', case=False)])
@@ -413,9 +454,12 @@ if menu == "📊 Dashboard":
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA', 'FOTO_URL']
+        
         for col in colunas_mostrar:
-            if col not in df_grid.columns: df_grid[col] = ""
+            if col not in df_grid.columns: 
+                df_grid[col] = ""
                 
+        # 🔥 A VACINA DE TITÂNIO: Transforma toda a matriz em texto puro, matando os 'NaN' que davam erro no AgGrid.
         df_grid = df_grid[colunas_mostrar].fillna("").astype(str)
         
         if busca:
@@ -427,27 +471,94 @@ if menu == "📊 Dashboard":
         container_botoes = st.container()
         container_grid = st.container()
 
-        # 🔥 TABELA NATIVA DO STREAMLIT: Impossível de quebrar, com caixas de seleção
         with container_grid:
-            df_grid.insert(0, "✔", False) # Adiciona coluna de Checkbox
+            gb = GridOptionsBuilder.from_dataframe(df_grid)
+            gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=120)
+            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
+            gb.configure_grid_options(rowHeight=32, headerHeight=35)
             
-            config_tabela = {
-                "✔": st.column_config.CheckboxColumn("Selecione", default=False),
-                "FOTO_URL": st.column_config.LinkColumn("📸 Link da Foto", display_text="Abrir Imagem")
+            gb.configure_column("DATA", headerName="Data", width=100)
+            gb.configure_column("PEDIDO", headerName="Pedido", width=110)
+            gb.configure_column("TOMADOR", headerName="Tomador", width=130)
+            gb.configure_column("LABORATORIO", headerName="Laboratório", minWidth=200, flex=1)
+            gb.configure_column("BAIRRO", headerName="Bairro", minWidth=150)
+            gb.configure_column("CIDADE", headerName="Cidade", minWidth=150)
+            gb.configure_column("UF", headerName="UF", width=80)
+            gb.configure_column("DATA_LIMITE", headerName="Previsão", width=110)
+            gb.configure_column("AGENTE_RAW", headerName="Agente", width=120) 
+            gb.configure_column("DATA_ENTREGA", headerName="Data Entrega", width=150)
+            
+            # 🔥 O JAVASCRIPT BLINDADO (Agora é imune a falhas)
+            st_js = JsCode("""
+            function(p){
+                let v = String(p.value || '').toUpperCase(); 
+                if(v.includes('ENTREGUE')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
+                if(v.includes('FRUSTRADA') || v.includes('PROBLEMA') || v.includes('CANCELADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
+                if(v.includes('EM ROTA')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
+                if(v.includes('COLETADO') || v.includes('CONFERIDO')){ return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'}; } 
+                if(v.includes('ATRASADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
+                return {'fontWeight':'600', 'color': '#64748B'};
             }
+            """)
+            gb.configure_column("STATUS_DISPLAY", headerName="Status", cellStyle=st_js, width=170)
             
-            tabela_editada = st.data_editor(
-                df_grid,
-                hide_index=True,
-                column_config=config_tabela,
-                disabled=colunas_mostrar, # Trava a edição de todas as colunas exceto o Checkbox
-                use_container_width=True,
-                height=500
+            img_js = JsCode("""
+            class FotoRenderer {
+                init(params) {
+                    this.eGui = document.createElement('div');
+                    this.eGui.style.textAlign = 'center';
+                    let val = String(params.value || '');
+                    if (val.includes('http')) {
+                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 16px;" title="Ver Comprovante">📸</span>';
+                        this.eGui.onclick = () => {
+                            let modal = document.createElement('div');
+                            modal.style.position = 'fixed'; modal.style.zIndex = '999999';
+                            modal.style.left = '0'; modal.style.top = '0'; modal.style.width = '100vw'; modal.style.height = '100vh';
+                            modal.style.backgroundColor = 'rgba(15,23,42,0.9)';
+                            modal.style.display = 'flex'; modal.style.flexDirection = 'column'; modal.style.justifyContent = 'center'; modal.style.alignItems = 'center'; modal.style.cursor = 'zoom-out';
+                            let img = document.createElement('img');
+                            img.src = val; 
+                            img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '8px'; img.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
+                            let txt = document.createElement('div');
+                            txt.innerText = '✖ Fechar Visualização'; 
+                            txt.style.color = '#ffffff'; txt.style.marginTop = '20px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontWeight = 'bold'; txt.style.padding = '8px 16px'; txt.style.background = 'rgba(255,255,255,0.1)'; txt.style.borderRadius = '20px';
+                            modal.appendChild(img); modal.appendChild(txt);
+                            modal.onclick = () => { document.body.removeChild(modal); };
+                            document.body.appendChild(modal);
+                        };
+                    }
+                }
+                getGui() { return this.eGui; }
+            }
+            """)
+            gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=img_js, width=80)
+            
+            grid_response = AgGrid(
+                df_grid, 
+                gridOptions=gb.build(), 
+                allow_unsafe_jscode=True,
+                theme='alpine', 
+                custom_css=obter_css_grid(), 
+                height=550, 
+                fit_columns_on_grid_load=False, 
+                update_mode=GridUpdateMode.SELECTION_CHANGED
             )
             
-            linhas_selecionadas = tabela_editada[tabela_editada["✔"]]
-            tem_sel = not linhas_selecionadas.empty
-            p_ids = linhas_selecionadas["PEDIDO"].tolist() if tem_sel else []
+            selecionados = grid_response['selected_rows']
+            tem_sel = False
+            if selecionados is not None:
+                if isinstance(selecionados, pd.DataFrame): 
+                    tem_sel = not selecionados.empty
+                else: 
+                    tem_sel = len(selecionados) > 0
+                
+            if tem_sel:
+                if isinstance(selecionados, pd.DataFrame): 
+                    p_ids = selecionados['PEDIDO'].astype(str).tolist()
+                else: 
+                    p_ids = [str(r['PEDIDO']) for r in selecionados]
+            else: 
+                p_ids = []
 
         with container_botoes:
             st.markdown("""<style>div[data-testid="stPopover"] > button, button[kind="secondary"] { border-radius: 6px !important; height: 32px !important; min-height: 32px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; }</style>""", unsafe_allow_html=True)
@@ -709,8 +820,8 @@ elif menu == "📥 Lotes":
                 if col not in df_ok.columns: df_ok[col] = ""
             df_ok = df_ok[colunas_prev].fillna("").astype(str)
             
-            # 🔥 MODO NATIVO: st.dataframe
-            st.dataframe(df_ok, hide_index=True, use_container_width=True)
+            gb_prev = GridOptionsBuilder.from_dataframe(df_ok)
+            AgGrid(df_ok, gridOptions=gb_prev.build(), theme='alpine', custom_css=obter_css_grid(), height=400)
             
             if st.button("🚀 3. INJETAR LOTE", type="primary"):
                 with st.spinner("Injetando..."):
@@ -777,13 +888,13 @@ elif menu == "🔬 Triagem":
                     if col not in df_fila.columns: df_fila[col] = ""
                 df_fila = df_fila[colunas_fila].fillna("").astype(str)
                 
-                # 🔥 MODO NATIVO: st.data_editor
-                df_fila.insert(0, "✔", False)
-                tabela_fila = st.data_editor(df_fila, hide_index=True, disabled=colunas_fila, use_container_width=True)
-                sel_m = tabela_fila[tabela_fila["✔"]]
+                gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
+                gb_fila.configure_selection('multiple', use_checkbox=True)
+                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350)
+                sel_m = grid_fila_resp['selected_rows']
                 
-                if st.button("✅ Enviar Selecionados", type="primary") and not sel_m.empty:
-                    p_ids = sel_m["PEDIDO"].tolist()
+                if st.button("✅ Enviar Selecionados", type="primary") and sel_m is not None and len(sel_m) > 0:
+                    p_ids = [str(r['PEDIDO']) for r in (sel_m.to_dict('records') if isinstance(sel_m, pd.DataFrame) else sel_m)]
                     aba = planilha_db.worksheet("Memoria_Sistema")
                     df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
                     df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
@@ -803,17 +914,16 @@ elif menu == "🔬 Triagem":
                     if col not in df_conf.columns: df_conf[col] = ""
                 df_conf = df_conf[colunas_romaneio].fillna("").astype(str)
                 
-                # 🔥 MODO NATIVO: st.data_editor
-                df_conf.insert(0, "✔", False)
-                tabela_conf = st.data_editor(df_conf, hide_index=True, disabled=colunas_romaneio, use_container_width=True)
-                sel = tabela_conf[tabela_conf["✔"]]
+                gb = GridOptionsBuilder.from_dataframe(df_conf)
+                gb.configure_selection('multiple', use_checkbox=True)
+                grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300)
+                sel = grid_resp['selected_rows']
                 
                 c_mot, c_data, c_btn = st.columns([2, 1, 2])
                 motorista_escolhido = c_mot.selectbox("Responsável:", ["Selecione..."] + sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else ["Selecione..."])
                 data_despacho = c_data.date_input("Data:", value=hoje_br)
-                
-                if c_btn.button("🚚 Gerar e Despachar", type="primary") and not sel.empty and motorista_escolhido != "Selecione...":
-                    sel_lista = sel.to_dict('records')
+                if c_btn.button("🚚 Gerar e Despachar", type="primary") and sel is not None and len(sel) > 0 and motorista_escolhido != "Selecione...":
+                    sel_lista = sel.to_dict('records') if isinstance(sel, pd.DataFrame) else sel
                     id_rom = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
                     aba = planilha_db.worksheet("Memoria_Sistema")
                     df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
@@ -841,11 +951,11 @@ elif menu == "🔬 Triagem":
                 for col in colunas_hist:
                     if col not in df_hist.columns: df_hist[col] = ""
                 df_hist_show = df_hist[colunas_hist].fillna("").astype(str)
-                # 🔥 MODO NATIVO: st.dataframe
-                st.dataframe(df_hist_show, hide_index=True, use_container_width=True)
+                gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
+                AgGrid(df_hist_show, gridOptions=gb_hist.build(), theme='alpine', custom_css=obter_css_grid(), height=400)
 
 # =============================================================================
-# 📱 MÓDULO EXTRA: DISPARO WHATSAPP
+# 📱 MÓDULO EXTRA: DISPARO WHATSAPP E RELATÓRIOS
 # =============================================================================
 elif menu == "📱 Zap":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
@@ -863,15 +973,12 @@ elif menu == "📱 Zap":
                 df_ag = df_ag.fillna("").astype(str)
                 tel = dict_tels.get(str(ag).strip().lower(), "")
                 with st.expander(f"Agente: {ag} | Volumes: {len(df_ag)}"):
-                    st.dataframe(df_ag[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True, use_container_width=True)
+                    st.dataframe(df_ag[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']])
                     if tel:
                         msg = f"🚚 *ROTA IGO*\nData: {data_f.strftime('%d/%m/%Y')}\n\n"
                         for i, (_, r) in enumerate(df_ag.iterrows(), 1): msg += f"*{i}*: {r['PEDIDO']} - {r['LABORATORIO']} ({r['CIDADE']})\n"
                         st.link_button("📲 Enviar Rota", f"https://api.whatsapp.com/send?phone={tel}&text={urllib.parse.quote(msg)}", type="primary")
 
-# =============================================================================
-# 📁 RELATÓRIOS (RESTAURADO E EXPANDIDO)
-# =============================================================================
 elif menu == "📁 Relatórios":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining e Exportação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
@@ -917,7 +1024,7 @@ elif menu == "📁 Relatórios":
                 else: st.warning("Nada encontrado.")
 
 # =============================================================================
-# ⚙️ MÓDULO 5: ROTAS (RESTAURADO COMPLETAMENTE)
+# ⚙️ MÓDULO 5: ROTAS
 # =============================================================================
 elif menu == "⚙️ Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
