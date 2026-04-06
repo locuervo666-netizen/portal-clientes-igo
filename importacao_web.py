@@ -205,7 +205,7 @@ def conectar_banco():
 # 🔥 FUNÇÃO DE TITÂNIO: Impede colunas bagunçadas no Google Sheets
 def atualizar_planilha_memoria(df_atualizada, worksheet):
     colunas_padrao = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO']
-    df_atualizada.columns = [str(c).strip().upper() for c in df_atualizada.columns]
+    df_atualizada.columns = [str(c).strip().upper().replace('DATA_ENTREGAA', 'DATA_ENTREGA').replace('DATA_ENTREG', 'DATA_ENTREGA') for c in df_atualizada.columns]
     df_atualizada = df_atualizada.loc[:, ~df_atualizada.columns.duplicated()].copy()
     
     for col in colunas_padrao:
@@ -235,7 +235,9 @@ def carregar_dados_completos(_planilha):
         dados_m = aba_m.get_all_values()
         if len(dados_m) > 1:
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
-            df.columns = df.columns.str.strip().str.upper() 
+            
+            # 🔥 AUTO-CORRETOR DE DIGITAÇÃO E PROTEÇÃO DE DUPLICIDADE
+            df.columns = [str(c).strip().upper().replace('DATA_ENTREGAA', 'DATA_ENTREGA').replace('DATA_ENTREG', 'DATA_ENTREGA') for c in df.columns]
             df = df.loc[:, ~df.columns.duplicated()].copy()
             
             try:
@@ -464,7 +466,6 @@ def obter_css_grid():
         ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
     }
 
-# 🔥 A PRIORIDADE AGORA É O STATUS REAL
 def calc_status_display(row):
     status_final = str(row.get('STATUS', '')).strip().upper()
     previsao = str(row.get('DATA_LIMITE', '')).strip()
@@ -490,7 +491,6 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 # =============================================================================
 # 🎨 3. CABEÇALHO LIMPO
 # =============================================================================
-
 col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
 
 with col_logo:
@@ -529,7 +529,6 @@ if menu == "📊 Dashboard":
     
     if not df_raw.empty:
         # 🔥 ESCUDO ANTI-QUEBRA DE COLUNAS VITAIS PARA O DASHBOARD
-        # Se o sistema não encontrar a coluna na planilha, ele cria ela vazia em memória.
         colunas_vitais = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS', 'DATA_LIMITE', 'FOTO', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
         for col in colunas_vitais:
             if col not in df_raw.columns:
@@ -579,15 +578,15 @@ if menu == "📊 Dashboard":
         
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
         
-        # 🔥 ESCUDO FINAL DA GRID: Garante que as colunas existam na hora de filtrar
+        # 🔥 ESCUDO FINAL DA GRID: Garante que as colunas existam na hora de filtrar e blinda contra valores nulos
         for col in colunas_mostrar:
             if col not in df_grid.columns:
                 df_grid[col] = ""
                 
-        df_grid = df_grid[colunas_mostrar]
+        df_grid = df_grid[colunas_mostrar].fillna("").astype(str)
         
         if busca:
-            mask = df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)
+            mask = df_grid.apply(lambda x: busca.upper() in x.str.upper().values, axis=1)
             df_grid = df_grid[mask]
 
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
@@ -618,7 +617,7 @@ if menu == "📊 Dashboard":
             
             st_js = JsCode("""
             function(p){
-                let v = p.value || ''; 
+                let v = String(p.value || ''); 
                 if(v.includes('Entregue')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
                 if(v.includes('Frustrada') || v.includes('Problema') || v.includes('Cancelado')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
                 if(v.includes('Em Rota')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
@@ -634,8 +633,8 @@ if menu == "📊 Dashboard":
                 init(params) {
                     this.eGui = document.createElement('div');
                     this.eGui.style.textAlign = 'center';
-                    let val = params.value;
-                    if (val && val !== '' && val !== 'nan' && val !== 'None' && val.includes('http')) {
+                    let val = String(params.value || '');
+                    if (val.includes('http')) {
                         this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 16px;" title="Ver Comprovante">📸</span>';
                         this.eGui.onclick = () => {
                             let modal = document.createElement('div');
@@ -727,7 +726,7 @@ if menu == "📊 Dashboard":
                                             if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
                                                 mascara_app = df_app['PEDIDO'].isin(p_ids)
                                                 df_app.loc[mascara_app, 'STATUS'] = status_limpo
-                                                if 'DATA_ENTREGA' not in df_app.columns: df_app['DATA_ENTREGA'] = ""
+                                                if 'DATA_ENTREGA' in df_app.columns: df_app['DATA_ENTREGA'] = ""
                                                 if status_limpo == "ENTREGUE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                                 elif status_limpo == "PENDENTE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = ""
                                                 aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
@@ -1066,7 +1065,7 @@ elif menu == "📥 Lotes":
             for col in colunas_prev:
                 if col not in df_ok.columns:
                     df_ok[col] = ""
-            df_ok = df_ok[colunas_prev]
+            df_ok = df_ok[colunas_prev].fillna("").astype(str)
             
             gb_prev = GridOptionsBuilder.from_dataframe(df_ok)
             gb_prev.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
@@ -1179,11 +1178,11 @@ elif menu == "🔬 Triagem":
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
                 colunas_fila = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']
-                # 🔥 ESCUDO ANTI-QUEBRA DE COLUNAS VITAIS NA TRIAGEM
+                # 🔥 ESCUDO ANTI-QUEBRA DE COLUNAS VITAIS NA TRIAGEM MANUAL
                 for col in colunas_fila:
                     if col not in df_fila.columns:
                         df_fila[col] = ""
-                df_fila = df_fila[colunas_fila]
+                df_fila = df_fila[colunas_fila].fillna("").astype(str)
                 
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
                 gb_fila.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
@@ -1237,7 +1236,7 @@ elif menu == "🔬 Triagem":
                 for col in colunas_romaneio:
                     if col not in df_conf.columns:
                         df_conf[col] = ""
-                df_conf = df_conf[colunas_romaneio]
+                df_conf = df_conf[colunas_romaneio].fillna("").astype(str)
                 
                 gb = GridOptionsBuilder.from_dataframe(df_conf)
                 gb.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
@@ -1392,7 +1391,7 @@ elif menu == "🔬 Triagem":
                 for col in colunas_hist:
                     if col not in df_hist.columns:
                         df_hist[col] = ""
-                df_hist_show = df_hist[colunas_hist]
+                df_hist_show = df_hist[colunas_hist].fillna("").astype(str)
                 
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
                 gb_hist.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
@@ -1400,7 +1399,7 @@ elif menu == "🔬 Triagem":
                 
                 st_js = JsCode("""
                 function(p){
-                    let v = p.value || ''; 
+                    let v = String(p.value || ''); 
                     if(v.includes('Entregue')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
                     if(v.includes('Frustrada') || v.includes('Problema') || v.includes('Cancelado')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
                     if(v.includes('Em Rota')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
