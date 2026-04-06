@@ -37,7 +37,7 @@ st.markdown("""
     #MainMenu { display: none !important; }
     footer { display: none !important; }
     
-    .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 98% !important; }
+    .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 96% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
     div[data-testid="stRadio"] {
@@ -72,11 +72,8 @@ st.markdown("""
     .stButton > button[kind="primary"] { background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; color: #FFFFFF !important;}
     .stButton > button[kind="primary"]:hover { background: #0369A1 !important; }
     
-    .ficha-lateral {
-        background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); height: 100%;
-    }
-    .ficha-placeholder {
-        display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #94A3B8; text-align: center; padding: 40px 20px; border: 2px dashed #E2E8F0; border-radius: 12px; background-color: #F8FAFC;
+    [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] { 
+        background: #FFFFFF; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); border: 1px solid #E2E8F0; 
     }
     </style>
 """, unsafe_allow_html=True)
@@ -374,6 +371,7 @@ def obter_proximo_id(df):
     except:
         return 100000
 
+# 🔥 A PRIORIDADE AGORA É O STATUS REAL (EMOJIS NATIVOS)
 def calc_status_display(row):
     status_final = str(row.get('STATUS', '')).strip().upper()
     previsao = str(row.get('DATA_LIMITE', '')).strip()
@@ -423,7 +421,7 @@ if planilha_db is None:
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (ARQUITETURA MASTER-DETAIL / CAIXA LATERAL)
+# 🚀 MÓDULO 1: DASHBOARD (NOVA ARQUITETURA BLINDADA - BOTÕES NO TOPO)
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -473,7 +471,7 @@ if menu == "📊 Dashboard":
         
         df_grid['FOTO_INDICADOR'] = df_grid['FOTO_URL'].apply(lambda x: '📸 Sim' if x else '❌ Não')
 
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'FOTO_INDICADOR', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'FOTO_INDICADOR', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
         df_grid = df_grid[df_grid['PEDIDO'].astype(str).str.strip() != ""] 
         df_grid = df_grid.fillna("").astype(str).replace(["nan", "NaN", "None", "<NA>"], "")
@@ -484,75 +482,54 @@ if menu == "📊 Dashboard":
 
         df_grid = df_grid.reset_index(drop=True)
 
-        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Marque a caixinha do pedido para abrir a Ficha Lateral.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Marque a caixinha do pedido para gerenciar ou inspecionar a foto.</p>", unsafe_allow_html=True)
         
-        # 🔥 ARQUITETURA CAIXA LATERAL (Master-Detail)
-        col_tabela, col_ficha = st.columns([7, 3])
+        # 🔥 CONTAINERS DE LAYOUT
+        container_botoes = st.container()
+        container_grid = st.container()
+        container_foto = st.container()
 
-        with col_tabela:
+        # 🔥 A GRID (Ocupando a Tela Toda, 100% Nativa e Blindada)
+        with container_grid:
             df_grid.insert(0, "SELECAO", False)
             
-            config_cols = {
-                "SELECAO": st.column_config.CheckboxColumn("✔ Abrir Ficha", default=False),
-                "STATUS_DISPLAY": st.column_config.TextColumn("Status Operacional"),
-                "FOTO_INDICADOR": st.column_config.TextColumn("Foto")
+            configuracao_colunas = {
+                "SELECAO": st.column_config.CheckboxColumn("✔ Ação", default=False),
+                "STATUS_DISPLAY": st.column_config.TextColumn("📌 Status Operacional"),
+                "FOTO_INDICADOR": st.column_config.TextColumn("📸 Foto", help="Se constar como 'Sim', marque a caixa ao lado para a foto aparecer automaticamente aqui embaixo.")
             }
             
             tabela_renderizada = st.data_editor(
                 df_grid,
-                column_config=config_cols,
+                column_config=configuracao_colunas,
                 disabled=[c for c in df_grid.columns if c != "SELECAO"],
                 hide_index=True,
                 use_container_width=True,
-                height=650
+                height=450
             )
             
             linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECAO"]]
             p_ids = linhas_selecionadas["PEDIDO"].tolist() if not linhas_selecionadas.empty else []
             tem_sel = len(p_ids) > 0
 
-        # 🔥 A CAIXA LATERAL (Ficha do Pedido e Foto)
-        with col_ficha:
-            if not tem_sel:
-                st.markdown("""
-                <div class='ficha-placeholder'>
-                    <span style='font-size: 40px;'>👈</span>
-                    <h3>Caixa Lateral</h3>
-                    <p>Selecione um pedido na tabela ao lado para visualizar o comprovante fotográfico e os botões de ação.</p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown("<div class='ficha-lateral'>", unsafe_allow_html=True)
-                pedido_alvo = p_ids[0] # Pega o primeiro pedido selecionado para detalhe
-                st.markdown(f"<h3 style='margin-top:0; color:#0369A1;'>Pedido: {pedido_alvo}</h3>", unsafe_allow_html=True)
-                
-                # Se selecionou vários, avisa:
-                if len(p_ids) > 1:
-                    st.warning(f"⚠️ Você selecionou {len(p_ids)} pedidos. As ações abaixo afetarão TODOS os pedidos marcados.")
-
-                st.markdown("---")
-                st.markdown("#### 📸 Comprovante Fotográfico")
-                
-                fotos = df_f[df_f['PEDIDO'].isin(p_ids)]['FOTO_URL'].tolist()
-                fotos_validas = [f for f in fotos if str(f).strip() and str(f).upper() != 'NAN']
-                
-                if not fotos_validas:
-                    st.info("Nenhuma foto anexada pelo Agente.")
-                else:
-                    for url in fotos_validas:
-                        st.image(url, use_container_width=True)
-                
-                st.markdown("---")
-                st.markdown("#### ⚡ Ações do Sistema")
-                
-                st.markdown("""
+        # 🔥 OS BOTÕES FIXOS EM CIMA (Logo abaixo dos Blocos KPI)
+        with container_botoes:
+            st.markdown("""
                 <style>
-                div[data-testid="stPopover"] > button { width: 100% !important; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 10px; font-weight: 600; color: #334155; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-                div[data-testid="stPopover"] > button:hover { border-color: #0284C7; color: #0284C7; background: #F0F9FF; }
+                div[data-testid="stPopover"] > button, button[kind="secondary"] {
+                    white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 15px;
+                }
+                div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
+                    border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
+                }
                 </style>
-                """, unsafe_allow_html=True)
-                
-                with st.popover("📲 Dar Baixa Manual de Status", use_container_width=True):
+            """, unsafe_allow_html=True)
+            
+            col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
+            
+            with col_b1.popover("📲 Dar Baixa Manual", use_container_width=True):
+                if not tem_sel: st.warning("Selecione um pedido na tabela abaixo primeiro!")
+                else:
                     status_baixa = st.selectbox("Novo Status:", ["ENTREGUE ✅", "PROBLEMA 🚨", "CANCELADO ❌", "PENDENTE ⏳"])
                     data_baixa = st.date_input("Data da Ocorrência:", format="DD/MM/YYYY", value=hoje_br)
                     tem_entregue = df_f[df_f['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
@@ -594,32 +571,9 @@ if menu == "📊 Dashboard":
                                     carregar_dados_completos.clear(); st.rerun()
                                 except Exception as e: st.error(f"Erro: {e}")
 
-                with st.popover("🔄 Trocar de Motorista", use_container_width=True):
-                    tem_entregue = df_f[df_f['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
-                    if tem_entregue: st.error("⚠️ Não é possível trocar motorista de pedidos já ENTREGUES.")
-                    else:
-                        logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-                        novo_mot = st.selectbox("Novo Agente:", logins_disp)
-                        nova_data_troca = st.date_input("Nova Data do Pedido:", format="DD/MM/YYYY", value=hoje_br)
-                        if st.button("Confirmar Troca", type="primary", use_container_width=True):
-                            with st.spinner("Trocando motorista..."):
-                                try:
-                                    aba = planilha_db.worksheet("Memoria_Sistema")
-                                    dados_aba = aba.get_all_values()
-                                    df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
-                                    lista_app_troca = []
-                                    for pid in p_ids:
-                                        mask = df_nuvem['PEDIDO'] == pid
-                                        if mask.any():
-                                            df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot; df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"; df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
-                                            l_app = df_nuvem[mask].iloc[0]
-                                            lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
-                                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    despachar_para_appsheet(lista_app_troca)
-                                    st.success("Trocado!"); carregar_dados_completos.clear(); st.rerun()
-                                except Exception as e: st.error(f"Erro: {e}")
-                
-                with st.popover("👯 Clonar Pedidos", use_container_width=True):
+            with col_b2.popover("👯 Clonar Pedidos", use_container_width=True):
+                if not tem_sel: st.warning("Selecione um pedido na tabela abaixo primeiro!")
+                else:
                     clone_data = st.date_input("Nova Data de Embarque:", format="DD/MM/YYYY", value=hoje_br)
                     logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                     clone_mot = st.selectbox("Agente Designado:", ["Manter Original"] + logins_disp)
@@ -647,7 +601,36 @@ if menu == "📊 Dashboard":
                                 st.success("Clonado!"); carregar_dados_completos.clear(); st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
 
-                with st.popover("🗑️ Excluir Definitivamente", use_container_width=True):
+            with col_b3.popover("🔄 Trocar de Motorista", use_container_width=True):
+                if not tem_sel: st.warning("Selecione um pedido na tabela abaixo primeiro!")
+                else:
+                    tem_entregue = df_f[df_f['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
+                    if tem_entregue: st.error("⚠️ Não é possível trocar motorista de pedidos já ENTREGUES.")
+                    else:
+                        logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                        novo_mot = st.selectbox("Novo Agente:", logins_disp)
+                        nova_data_troca = st.date_input("Nova Data do Pedido:", format="DD/MM/YYYY", value=hoje_br)
+                        if st.button("Confirmar Troca", type="primary", use_container_width=True):
+                            with st.spinner("Trocando motorista..."):
+                                try:
+                                    aba = planilha_db.worksheet("Memoria_Sistema")
+                                    dados_aba = aba.get_all_values()
+                                    df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                    lista_app_troca = []
+                                    for pid in p_ids:
+                                        mask = df_nuvem['PEDIDO'] == pid
+                                        if mask.any():
+                                            df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot; df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"; df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
+                                            l_app = df_nuvem[mask].iloc[0]
+                                            lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
+                                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                    despachar_para_appsheet(lista_app_troca)
+                                    st.success("Trocado!"); carregar_dados_completos.clear(); st.rerun()
+                                except Exception as e: st.error(f"Erro: {e}")
+
+            with col_b4.popover("🗑️ Excluir Definitivamente", use_container_width=True):
+                if not tem_sel: st.warning("Selecione um pedido na tabela abaixo primeiro!")
+                else:
                     st.error("⚠️ Atenção: Exclusão permanente.")
                     senha_del = st.text_input("🔑 Senha Master:", type="password")
                     if st.button("Confirmar Exclusão", type="primary", use_container_width=True):
@@ -670,9 +653,26 @@ if menu == "📊 Dashboard":
                                     st.success(f"Apagados!"); carregar_dados_completos.clear(); st.rerun()
                                 except Exception as e: st.error(f"Erro: {e}")
                         else: st.error("Senha incorreta.")
-                
-                st.button("🔄 Atualizar Grid", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
-            st.markdown("</div>", unsafe_allow_html=True)
+            
+            col_b5.button("🔄 Atualizar Painel", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
+
+        # 🔥 O ESTÚDIO FOTOGRÁFICO: APENAS QUANDO VOCÊ SELECIONA UMA LINHA, A FOTO ABRE EMBAIXO!
+        with container_foto:
+            if tem_sel:
+                with st.container(border=True):
+                    st.markdown(f"<h4 style='margin-top:0; color:#0369A1;'>📸 Inspeção Fotográfica - Pedido(s): {', '.join(p_ids)}</h4>", unsafe_allow_html=True)
+                    
+                    fotos = df_f[df_f['PEDIDO'].isin(p_ids)]['FOTO_URL'].tolist()
+                    fotos_validas = [f for f in fotos if str(f).strip() and str(f).upper() != 'NAN']
+                    
+                    if not fotos_validas:
+                        st.info("Nenhuma foto foi anexada pelo agente para os pedidos selecionados.")
+                    else:
+                        # Se tiver mais de uma foto selecionada, ele divide em colunas. Se for uma só, ela fica grande no meio.
+                        cols_fotos = st.columns(len(fotos_validas) if len(fotos_validas) <= 3 else 3)
+                        for i, url in enumerate(fotos_validas):
+                            with cols_fotos[i % 3]:
+                                st.image(url, use_container_width=True)
     else:
         st.warning("O banco de dados está vazio ou a aba Memoria_Sistema não foi encontrada. Vá para a aba Manual.")
 
