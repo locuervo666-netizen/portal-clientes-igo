@@ -15,7 +15,6 @@ import random
 import gspread
 import uuid
 from streamlit_autorefresh import st_autorefresh
-from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, GridUpdateMode
 from fpdf import FPDF
 
 FUSO_BR = timezone(timedelta(hours=-3))
@@ -27,10 +26,8 @@ st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon
 
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS GLOBAL DA BARRA DE TAREFAS E LIMPEZA DA NUVEM
 st.markdown("""
     <style>
-    /* Oculta as ferramentas da nuvem do Streamlit */
     [data-testid="stToolbar"] { display: none !important; }
     .stAppDeployButton { display: none !important; }
     .stDeployButton { display: none !important; }
@@ -40,61 +37,22 @@ st.markdown("""
     #MainMenu { display: none !important; }
     footer { display: none !important; }
     
-    /* Configuração da Tela Inteira com fundo BRANCO PURO */
     .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 96% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
-    /* ========================================================= */
-    /* 🖥️ BARRA DE TAREFAS FIXA NO RODAPÉ (TASKBAR) 🖥️ */
-    /* ========================================================= */
     div[data-testid="stRadio"] {
-        position: fixed !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        width: 100vw !important;
-        background-color: #0F172A !important;
-        padding: 12px 0px !important;
-        z-index: 999999 !important;
-        box-shadow: 0px -10px 25px -5px rgba(0, 0, 0, 0.3) !important;
-        border-top: 1px solid #1E293B !important;
-        margin: 0 !important;
+        position: fixed !important; bottom: 0 !important; left: 0 !important; width: 100vw !important;
+        background-color: #0F172A !important; padding: 12px 0px !important; z-index: 999999 !important;
+        box-shadow: 0px -10px 25px -5px rgba(0, 0, 0, 0.3) !important; border-top: 1px solid #1E293B !important; margin: 0 !important;
     }
-    div[data-testid="stRadio"] > div {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 10px;
-    }
-    div[data-testid="stRadio"] label {
-        background-color: transparent !important;
-        border: 1px solid transparent !important;
-        padding: 8px 20px !important;
-        border-radius: 8px !important;
-        cursor: pointer !important;
-        transition: all 0.2s ease !important;
-        margin: 0 !important;
-    }
-    div[data-testid="stRadio"] label:hover {
-        background-color: #1E293B !important;
-    }
-    div[data-testid="stRadio"] label p {
-        color: #94A3B8 !important;
-        font-weight: 600 !important;
-        font-size: 14px !important;
-        margin: 0 !important;
-    }
-    div[data-testid="stRadio"] label[data-checked="true"] {
-        background-color: #38BDF8 !important;
-        box-shadow: 0 0 10px rgba(56, 189, 248, 0.4) !important;
-    }
-    div[data-testid="stRadio"] label[data-checked="true"] p {
-        color: #0F172A !important;
-        font-weight: 800 !important;
-    }
+    div[data-testid="stRadio"] > div { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 10px; }
+    div[data-testid="stRadio"] label { background-color: transparent !important; border: 1px solid transparent !important; padding: 8px 20px !important; border-radius: 8px !important; cursor: pointer !important; transition: all 0.2s ease !important; margin: 0 !important; }
+    div[data-testid="stRadio"] label:hover { background-color: #1E293B !important; }
+    div[data-testid="stRadio"] label p { color: #94A3B8 !important; font-weight: 600 !important; font-size: 14px !important; margin: 0 !important; }
+    div[data-testid="stRadio"] label[data-checked="true"] { background-color: #38BDF8 !important; box-shadow: 0 0 10px rgba(56, 189, 248, 0.4) !important; }
+    div[data-testid="stRadio"] label[data-checked="true"] p { color: #0F172A !important; font-weight: 800 !important; }
     div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; }
 
-    /* Textos e Botões Gerais */
     .dinamic-text { color: #0F172A !important; font-weight: 800; letter-spacing: -0.5px; }
     .dinamic-border { border-bottom: 2px solid #E2E8F0 !important; margin-bottom: 24px; padding-bottom: 8px; }
     
@@ -126,19 +84,13 @@ if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
 # =============================================================================
-# 🔐 TELA DE LOGIN (ESTILO ERP PROFISSIONAL)
+# 🔐 TELA DE LOGIN
 # =============================================================================
 if not st.session_state.autenticado:
     st.markdown("""
         <style>
         [data-testid="stForm"] {
-            background: #FFFFFF;
-            padding: 40px 30px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
-            border: 1px solid #E2E8F0;
-            max-width: 380px !important;
-            margin: 8vh auto !important; 
+            background: #FFFFFF; padding: 40px 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08); border: 1px solid #E2E8F0; max-width: 380px !important; margin: 8vh auto !important; 
         }
         .login-header { text-align: center; margin-bottom: 25px; }
         .login-title { color: #0F172A; font-weight: 800; font-size: 20px; margin-top: 15px; letter-spacing: -0.5px; }
@@ -161,10 +113,7 @@ if not st.session_state.autenticado:
         submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
         
         if submit:
-            logins_autorizados = {
-                "robson.melo": "123",
-                "william.bertoldo": "123"
-            }
+            logins_autorizados = {"robson.melo": "123", "william.bertoldo": "123"}
             if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
                 st.session_state.autenticado = True
                 st.rerun()
@@ -327,8 +276,6 @@ DF_AGENTES = carregar_dados_agentes(planilha_db)
 FERIADOS_BR = holidays.Brazil()
 CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "MB_CAEP"]
 hoje_br = datetime.now(FUSO_BR).date() 
-bg_app = "#FFFFFF"
-border_c = "#E2E8F0"
 
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts: return False
@@ -377,13 +324,7 @@ def obter_login_agente(cidade, bairro, laboratorio, endereco="", base_rotas_df=p
     lab = tratar_texto_global(laboratorio)
     end = tratar_texto_global(endereco)
     
-    chaves = [
-        f"{cid}---{bai}---{end}",
-        f"{cid}---{bai}---{lab}",
-        f"{cid}---{lab}",
-        f"{cid}---{bai}",
-        cid
-    ]
+    chaves = [f"{cid}---{bai}---{end}", f"{cid}---{bai}---{lab}", f"{cid}---{lab}", f"{cid}---{bai}", cid]
     
     for c in chaves:
         if c in rotas_dict: 
@@ -430,22 +371,7 @@ def obter_proximo_id(df):
     except:
         return 100000
 
-# CSS Ajustado: Linhas Alternadas Suaves em Tons de Cinza/Azul Claro e Brancas
-def obter_css_grid():
-    return {
-        ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
-        ".ag-header": {"background-color": "#F8FAFC !important", "border-bottom": "1px solid #CBD5E1 !important"},
-        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "700 !important", "font-size": "11px !important"},
-        ".ag-header-icon": {"color": "#0284C7 !important"}, 
-        ".ag-cell": {"font-size": "11px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
-        ".ag-row-even": {"background-color": "#FFFFFF !important"},
-        ".ag-row-odd": {"background-color": "#F8FAFC !important"},
-        ".ag-row-hover": {"background-color": "#E2E8F0 !important"},
-        ".ag-row-selected": {"background-color": "#E0F2FE !important", "color": "#0369A1 !important"},
-        ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
-    }
-
-# 🔥 A PRIORIDADE AGORA É O STATUS REAL
+# 🔥 A PRIORIDADE AGORA É O STATUS REAL (EMOJIS NATIVOS)
 def calc_status_display(row):
     status_final = str(row.get('STATUS', '')).strip().upper()
     previsao = str(row.get('DATA_LIMITE', '')).strip()
@@ -472,7 +398,6 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 # 🎨 3. CABEÇALHO LIMPO
 # =============================================================================
 
-# Cabeçalho Limpo (Logo, Título e Botão Sair)
 col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
 
 with col_logo:
@@ -504,7 +429,7 @@ menu = st.radio("Navegação:", [
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD
+# 🚀 MÓDULO 1: DASHBOARD (NATIVO - À PROVA DE FALHAS)
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -552,8 +477,9 @@ if menu == "📊 Dashboard":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'DATA_ENTREGA']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
+        df_grid = df_grid.fillna("").astype(str).replace(["nan", "NaN", "None"], "")
         
         if busca:
             mask = df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)
@@ -564,83 +490,28 @@ if menu == "📊 Dashboard":
         container_botoes = st.container()
         container_grid = st.container()
 
+        # 🔥 TABELA NATIVA: Zero Javascript, Carrega Rápido, Não Quebra
         with container_grid:
-            gb = GridOptionsBuilder.from_dataframe(df_grid)
-            gb.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
-            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
-            gb.configure_grid_options(rowHeight=32, headerHeight=35)
+            df_grid.insert(0, "SELECIONAR", False)
             
-            gb.configure_column("DATA", headerName="Data")
-            gb.configure_column("PEDIDO", headerName="Pedido", maxWidth=90)
-            gb.configure_column("TOMADOR", headerName="Tomador", maxWidth=120)
-            gb.configure_column("LABORATORIO", headerName="Laboratório")
-            gb.configure_column("BAIRRO", headerName="Bairro")
-            gb.configure_column("CIDADE", headerName="Cidade")
-            gb.configure_column("UF", headerName="UF", maxWidth=60)
-            gb.configure_column("DATA_LIMITE", headerName="Previsão Entrega")
-            gb.configure_column("AGENTE_RAW", headerName="Agente") 
-            gb.configure_column("DATA_ENTREGA", headerName="Data Real Entrega", maxWidth=110)
-            
-            gb.configure_column("ENDERECO", hide=True)
-            gb.configure_column("NUMERO", hide=True)
-            gb.configure_column("CEP", hide=True)
-            
-            st_js = JsCode("""
-            function(p){
-                let v = p.value || ''; 
-                if(v.includes('Entregue')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
-                if(v.includes('Frustrada') || v.includes('Problema') || v.includes('Cancelado')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
-                if(v.includes('Em Rota')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
-                if(v.includes('Coletado') || v.includes('Conferido')){ return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'}; } 
-                if(v.includes('ATRASADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
-                return {'fontWeight':'600', 'color': '#64748B'};
+            configuracao_colunas = {
+                "SELECIONAR": st.column_config.CheckboxColumn("✔ Ação", default=False),
+                "FOTO_URL": st.column_config.LinkColumn("📸 Comprovante", display_text="Abrir Foto"),
+                "STATUS_DISPLAY": st.column_config.TextColumn("📌 Status Operacional")
             }
-            """)
-            gb.configure_column("STATUS_DISPLAY", headerName="Status", cellStyle=st_js, minWidth=170)
             
-            img_js = JsCode("""
-            class FotoRenderer {
-                init(params) {
-                    this.eGui = document.createElement('div');
-                    this.eGui.style.textAlign = 'center';
-                    let val = params.value;
-                    if (val && val !== '' && val !== 'nan' && val !== 'None' && val.includes('http')) {
-                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 16px;" title="Ver Comprovante">📸</span>';
-                        this.eGui.onclick = () => {
-                            let modal = document.createElement('div');
-                            modal.style.position = 'fixed'; modal.style.zIndex = '999999';
-                            modal.style.left = '0'; modal.style.top = '0'; modal.style.width = '100vw'; modal.style.height = '100vh';
-                            modal.style.backgroundColor = 'rgba(15,23,42,0.9)';
-                            modal.style.display = 'flex'; modal.style.flexDirection = 'column'; modal.style.justifyContent = 'center'; modal.style.alignItems = 'center'; modal.style.cursor = 'zoom-out';
-                            let img = document.createElement('img');
-                            img.src = val; 
-                            img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '8px'; img.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
-                            let txt = document.createElement('div');
-                            txt.innerText = '✖ Fechar Visualização'; 
-                            txt.style.color = '#ffffff'; txt.style.marginTop = '20px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontWeight = 'bold'; txt.style.padding = '8px 16px'; txt.style.background = 'rgba(255,255,255,0.1)'; txt.style.borderRadius = '20px';
-                            modal.appendChild(img); modal.appendChild(txt);
-                            modal.onclick = () => { document.body.removeChild(modal); };
-                            document.body.appendChild(modal);
-                        };
-                    }
-                }
-                getGui() { return this.eGui; }
-            }
-            """)
-            gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=img_js, width=80, minWidth=80)
+            tabela_renderizada = st.data_editor(
+                df_grid,
+                column_config=configuracao_colunas,
+                disabled=[c for c in df_grid.columns if c != "SELECIONAR"],
+                hide_index=True,
+                use_container_width=True,
+                height=500
+            )
             
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
-            
-            selecionados = grid_response['selected_rows']
-            tem_sel = False
-            if selecionados is not None:
-                if isinstance(selecionados, pd.DataFrame): tem_sel = not selecionados.empty
-                else: tem_sel = len(selecionados) > 0
-                
-            if tem_sel:
-                if isinstance(selecionados, pd.DataFrame): p_ids = selecionados['PEDIDO'].astype(str).tolist()
-                else: p_ids = [str(r['PEDIDO']) for r in selecionados]
-            else: p_ids = []
+            linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
+            p_ids = linhas_selecionadas["PEDIDO"].tolist() if not linhas_selecionadas.empty else []
+            tem_sel = len(p_ids) > 0
 
         with container_botoes:
             st.markdown("""
@@ -657,7 +528,7 @@ if menu == "📊 Dashboard":
             col_b2, col_b3, col_b4, col_b5 = st.columns([1.5, 1.5, 1.5, 1.5])
             
             with col_b2.popover("📲 Dar Baixa Manual", use_container_width=True):
-                if not tem_sel: st.warning("Selecione na Grid primeiro!")
+                if not tem_sel: st.warning("Marque o(s) pedido(s) na tabela abaixo primeiro!")
                 else:
                     status_baixa = st.selectbox("Novo Status:", ["ENTREGUE ✅", "PROBLEMA 🚨", "CANCELADO ❌", "PENDENTE ⏳"])
                     data_baixa = st.date_input("Data da Ocorrência:", format="DD/MM/YYYY", value=hoje_br)
@@ -703,7 +574,7 @@ if menu == "📊 Dashboard":
                                 except Exception as e: st.error(f"Erro: {e}")
 
             with col_b3.popover("👯 Clonar Pedidos", use_container_width=True):
-                if not tem_sel: st.warning("Selecione na Grid primeiro!")
+                if not tem_sel: st.warning("Marque o(s) pedido(s) na tabela abaixo primeiro!")
                 else:
                     st.markdown(f"**Duplicar {len(p_ids)} pedidos selecionados**")
                     clone_data = st.date_input("Nova Data do Pedido:", format="DD/MM/YYYY", value=hoje_br)
@@ -745,7 +616,7 @@ if menu == "📊 Dashboard":
                             except Exception as e: st.error(f"Erro ao clonar: {e}")
 
             with col_b4.popover("🔄 Trocar Motorista", use_container_width=True):
-                if not tem_sel: st.warning("Selecione na Grid primeiro!")
+                if not tem_sel: st.warning("Marque o(s) pedido(s) na tabela abaixo primeiro!")
                 else:
                     tem_entregue = df_grid[df_grid['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
                     if tem_entregue: st.error("⚠️ Não é possível trocar motorista de pedidos já ENTREGUES.")
@@ -787,7 +658,6 @@ elif menu == "📝 Manual":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
     st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente para proteger a cadeia de dados.**")
     
-    # Inicializa o session_state para os campos de endereço
     if 'm_rua' not in st.session_state: st.session_state['m_rua'] = ""
     if 'm_bai' not in st.session_state: st.session_state['m_bai'] = ""
     if 'm_cid' not in st.session_state: st.session_state['m_cid'] = ""
@@ -895,7 +765,7 @@ elif menu == "📥 Lotes":
         with c1: tom = st.selectbox("🏢 Tomador Central:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
         with c2: dt_c = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br)
 
-        txt = st.text_area("📋 Cole os dados da planilha do cliente (Ctrl+V):", height=150, help="Apenas copie as células do Excel e cole direto aqui. O Cérebro IA formata sozinho.")
+        txt = st.text_area("📋 Cole os dados da planilha do cliente (Ctrl+V):", height=150, help="Apenas copie as células do Excel e cole direto aqui.")
 
         col_btn1, _ = st.columns([1, 2])
         if col_btn1.button("🔍 1. Processar Matriz e Roteirizar", type="primary", use_container_width=True):
@@ -1026,10 +896,8 @@ elif menu == "📥 Lotes":
         else:
             st.success(f"✅ Protocolo validado! {len(df_ok)} pedidos blindados e roteirizados para injeção.")
             
-            gb_prev = GridOptionsBuilder.from_dataframe(df_ok)
-            gb_prev.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
-            gb_prev.configure_grid_options(rowHeight=32, headerHeight=35)
-            AgGrid(df_ok, gridOptions=gb_prev.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
+            # Tabela Nativa de Preview
+            st.dataframe(df_ok, hide_index=True, use_container_width=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
             col_btn2, _ = st.columns([1, 2])
@@ -1126,8 +994,8 @@ elif menu == "🔬 Triagem":
                                         st.error("❌ Falha de sincronia: Pedido não localizado na nuvem.")
                                         
                                 except Exception as e: st.error(f"Falha ao registrar auditoria: {e}")
-                            elif status_atual == 'PENDENTE': st.error(f"❌ VIOLAÇÃO DE CADEIA: O código {df_raw.at[idx, 'PEDIDO']} consta como PENDENTE de coleta no aplicativo do agente.")
-                            elif status_atual == 'CONFERIDO': st.warning(f"⚠️ O volume {df_raw.at[idx, 'PEDIDO']} já estava conferido na base.")
+                            elif status_atual == 'PENDENTE': st.error(f"❌ VIOLAÇÃO DE CADEIA: O código {df_raw.at[idx, 'PEDIDO']} consta como PENDENTE de coleta.")
+                            elif status_atual == 'CONFERIDO': st.warning(f"⚠️ O volume {df_raw.at[idx, 'PEDIDO']} já estava conferido.")
                             else: st.error(f"❌ O volume {df_raw.at[idx, 'PEDIDO']} consta com status impeditivo: {status_atual}.")
                         else: st.error(f"❌ Assinatura não reconhecida na base de dados: {bip_input}")
             
@@ -1135,26 +1003,25 @@ elif menu == "🔬 Triagem":
             st.markdown("#### Terminal de Validação em Lote (Recurso Manual)")
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
-                df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
-                gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
-                gb_fila.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
-                gb_fila.configure_grid_options(rowHeight=32, headerHeight=35)
-                gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+                df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']].fillna("").astype(str)
+                df_fila.insert(0, "SELECIONAR", False)
                 
-                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=350, key='grid_fila_manual', fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
+                # Tabela Nativa com Checkboxes
+                tabela_fila = st.data_editor(
+                    df_fila, 
+                    hide_index=True, 
+                    disabled=[c for c in df_fila.columns if c != "SELECIONAR"], 
+                    use_container_width=True
+                )
                 
-                selecionados_manuais = grid_fila_resp['selected_rows']
-                tem_selecao = False
-                if selecionados_manuais is not None:
-                    if isinstance(selecionados_manuais, pd.DataFrame): tem_selecao = not selecionados_manuais.empty
-                    else: tem_selecao = len(selecionados_manuais) > 0
+                selecionados_manuais = tabela_fila[tabela_fila["SELECIONAR"]]
+                tem_selecao = not selecionados_manuais.empty
 
                 if st.button("✅ Enviar Selecionados para Despacho", type="primary"):
-                    if not tem_selecao: st.warning("⚠️ Selecione os pedidos na tabela acima primeiro!")
+                    if not tem_selecao: st.warning("⚠️ Marque os pedidos na tabela acima primeiro!")
                     else:
-                        with st.spinner("Atualizando pedidos selecionados em lote (Anti-Bloqueio)..."):
-                            if isinstance(selecionados_manuais, pd.DataFrame): p_ids = selecionados_manuais['PEDIDO'].astype(str).tolist()
-                            else: p_ids = [str(r['PEDIDO']) for r in selecionados_manuais]
+                        with st.spinner("Atualizando pedidos selecionados em lote..."):
+                            p_ids = selecionados_manuais['PEDIDO'].astype(str).tolist()
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
@@ -1181,20 +1048,19 @@ elif menu == "🔬 Triagem":
                     df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
                 
                 colunas_romaneio = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']
-                if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
+                df_conf = df_conf[colunas_romaneio].fillna("").astype(str)
+                df_conf.insert(0, "SELECIONAR", False)
                 
-                gb = GridOptionsBuilder.from_dataframe(df_conf[colunas_romaneio])
-                gb.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
-                gb.configure_grid_options(rowHeight=32, headerHeight=35)
-                gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+                # Tabela Nativa
+                tabela_conf = st.data_editor(
+                    df_conf,
+                    hide_index=True,
+                    disabled=[c for c in df_conf.columns if c != "SELECIONAR"],
+                    use_container_width=True
+                )
                 
-                grid_resp = AgGrid(df_conf, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED)
-                
-                selecionados = grid_resp['selected_rows']
-                tem_sel_pdf = False
-                if selecionados is not None:
-                    if isinstance(selecionados, pd.DataFrame): tem_sel_pdf = not selecionados.empty
-                    else: tem_sel_pdf = len(selecionados) > 0
+                selecionados = tabela_conf[tabela_conf["SELECIONAR"]]
+                tem_sel_pdf = not selecionados.empty
                 
                 st.markdown("---")
                 c_mot, c_data, c_btn = st.columns([2, 1, 2])
@@ -1206,8 +1072,7 @@ elif menu == "🔬 Triagem":
                     if not tem_sel_pdf or motorista_escolhido == "Selecione...": st.warning("⚠️ Exigência de Rota: Marque os pacotes e informe o responsável.")
                     else:
                         with st.spinner("Gerando Romaneio PDF (Selo IGO) e injetando no roteiro do motorista..."):
-                            if isinstance(selecionados, pd.DataFrame): sel_lista = selecionados.to_dict('records')
-                            else: sel_lista = selecionados
+                            sel_lista = selecionados.to_dict('records')
                             id_romaneio = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
                             pedidos_ids = [str(r['PEDIDO']) for r in sel_lista]
                             
@@ -1275,8 +1140,7 @@ elif menu == "🔬 Triagem":
                                 pdf.set_font("Arial", "B", 7)
                                 pdf.cell(10, 5, "ITEM", 1, 0, "C", True)
                                 pdf.cell(25, 5, "PEDIDO", 1, 0, "C", True)
-                                pdf.cell(30, 5, "ID CLIENTE", 1, 0, "C", True) 
-                                pdf.cell(80, 5, "PONTO DE COLETA / LABORATÓRIO", 1, 0, "C", True)
+                                pdf.cell(110, 5, "PONTO DE COLETA / LABORATÓRIO", 1, 0, "C", True)
                                 pdf.cell(35, 5, "CIDADE", 1, 0, "C", True)
                                 pdf.cell(10, 5, "UF", 1, 1, "C", True)
                                 
@@ -1288,13 +1152,9 @@ elif menu == "🔬 Triagem":
                                     if fill: pdf.set_fill_color(241, 245, 249) 
                                     else: pdf.set_fill_color(255, 255, 255)
                                     
-                                    qr_val = str(item.get('QR_CODE', ''))
-                                    if qr_val.upper() == 'NAN' or not qr_val: qr_val = "-"
-                                    
                                     pdf.cell(10, 5, str(idx), 1, 0, "C", True)
                                     pdf.cell(25, 5, str(item.get('PEDIDO','')), 1, 0, "C", True)
-                                    pdf.cell(30, 5, qr_val, 1, 0, "C", True)
-                                    pdf.cell(80, 5, str(item.get('LABORATORIO',''))[:48], 1, 0, "L", True)
+                                    pdf.cell(110, 5, str(item.get('LABORATORIO',''))[:65], 1, 0, "L", True)
                                     pdf.cell(35, 5, str(item.get('CIDADE',''))[:22], 1, 0, "L", True)
                                     pdf.cell(10, 5, str(item.get('UF','')), 1, 1, "C", True)
                                     
@@ -1328,28 +1188,11 @@ elif menu == "🔬 Triagem":
             
             if not df_hist.empty:
                 df_hist = df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])
-                
                 colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
                 df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
                 
-                gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
-                gb_hist.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
-                gb_hist.configure_grid_options(rowHeight=32, headerHeight=35)
-                
-                st_js = JsCode("""
-                function(p){
-                    let v = p.value || ''; 
-                    if(v.includes('Entregue')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
-                    if(v.includes('Frustrada') || v.includes('Problema') || v.includes('Cancelado')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
-                    if(v.includes('Em Rota')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
-                    if(v.includes('Coletado') || v.includes('Conferido')){ return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'}; } 
-                    if(v.includes('ATRASADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
-                    return {'fontWeight':'600', 'color': '#64748B'};
-                }
-                """)
-                gb_hist.configure_column("STATUS", headerName="STATUS", cellStyle=st_js, minWidth=170)
-                
-                AgGrid(df_hist_show, gridOptions=gb_hist.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
+                # Tabela Nativa de Histórico
+                st.dataframe(df_hist_show, hide_index=True, use_container_width=True)
             else:
                 st.warning("O arquivo histórico de varreduras está temporariamente em branco.")
                 
