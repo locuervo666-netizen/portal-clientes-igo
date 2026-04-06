@@ -15,7 +15,7 @@ import random
 import gspread
 import uuid
 from streamlit_autorefresh import st_autorefresh
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, GridUpdateMode
 from fpdf import FPDF
 
 FUSO_BR = timezone(timedelta(hours=-3))
@@ -182,7 +182,8 @@ def carregar_dados_completos(_planilha):
                 dados_app = aba_app.get_all_values()
                 if len(dados_app) > 1:
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
-                    df_app.columns = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
+                    cols_limpas = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
+                    df_app.columns = cols_limpas
                     df_app = df_app.loc[:, ~df_app.columns.duplicated()].copy()
                     
                     cols_to_extract = ['PEDIDO', 'STATUS', 'OBSERVACOES']
@@ -315,7 +316,6 @@ def obter_proximo_id(df):
         return int(nums.max()) + 1 if not nums.empty else 100000
     except: return 100000
 
-# CSS MODO DE SEGURANÇA: Grid Limpa e Crua
 def obter_css_grid():
     return {
         ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
@@ -368,7 +368,7 @@ menu = st.radio("Navegação:", [
 ], horizontal=True, label_visibility="collapsed")
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (GRID EM MODO SEGURO)
+# 🚀 MÓDULO 1: DASHBOARD
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -378,6 +378,7 @@ if menu == "📊 Dashboard":
         for col in colunas_vitais:
             if col not in df_raw.columns: df_raw[col] = ""
                 
+        df_raw['FOTO_URL'] = df_raw['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         
         col_f1, col_f2 = st.columns(2)
@@ -415,12 +416,12 @@ if menu == "📊 Dashboard":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO', 'AGENTE_RAW', 'DATA_ENTREGA']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
         
         for col in colunas_mostrar:
             if col not in df_grid.columns: df_grid[col] = ""
                 
-        # 🔥 VACINA ANTI-CRASH: Força toda a base a virar texto limpo. Impede o "NaN" de destruir a Grid.
+        # 🔥 VACINA ANTI-CRASH: Converte tudo para string e elimina os "buracos" que derrubam a tela.
         df_grid = df_grid[colunas_mostrar].fillna("").astype(str)
         
         if busca:
@@ -448,11 +449,56 @@ if menu == "📊 Dashboard":
             gb.configure_column("DATA_LIMITE", headerName="Previsão")
             gb.configure_column("AGENTE_RAW", headerName="Agente") 
             gb.configure_column("DATA_ENTREGA", headerName="Data Real Entrega", maxWidth=120)
-            gb.configure_column("STATUS_DISPLAY", headerName="Status", minWidth=150)
-            gb.configure_column("FOTO", headerName="Foto Link")
             
-            # 🔥 GRID PURA SEM JAVASCRIPT
-            grid_response = AgGrid(df_grid, gridOptions=gb.build(), theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.SELECTION_CHANGED)
+            gb.configure_column("ENDERECO", hide=True)
+            gb.configure_column("NUMERO", hide=True)
+            gb.configure_column("CEP", hide=True)
+            
+            st_js = JsCode("""
+            function(p){
+                let v = String(p.value || ''); 
+                if(v.includes('Entregue')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
+                if(v.includes('Frustrada') || v.includes('Problema') || v.includes('Cancelado')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
+                if(v.includes('Em Rota')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
+                if(v.includes('Coletado') || v.includes('Conferido')){ return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'}; } 
+                if(v.includes('ATRASADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
+                return {'fontWeight':'600', 'color': '#64748B'};
+            }
+            """)
+            gb.configure_column("STATUS_DISPLAY", headerName="Status", cellStyle=st_js, minWidth=150)
+            
+            img_js = JsCode("""
+            class FotoRenderer {
+                init(params) {
+                    this.eGui = document.createElement('div');
+                    this.eGui.style.textAlign = 'center';
+                    let val = String(params.value || '');
+                    if (val.includes('http')) {
+                        this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 16px;" title="Ver Comprovante">📸</span>';
+                        this.eGui.onclick = () => {
+                            let modal = document.createElement('div');
+                            modal.style.position = 'fixed'; modal.style.zIndex = '999999';
+                            modal.style.left = '0'; modal.style.top = '0'; modal.style.width = '100vw'; modal.style.height = '100vh';
+                            modal.style.backgroundColor = 'rgba(15,23,42,0.9)';
+                            modal.style.display = 'flex'; modal.style.flexDirection = 'column'; modal.style.justifyContent = 'center'; modal.style.alignItems = 'center'; modal.style.cursor = 'zoom-out';
+                            let img = document.createElement('img');
+                            img.src = val; 
+                            img.style.maxWidth = '90%'; img.style.maxHeight = '85%'; img.style.borderRadius = '8px'; img.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
+                            let txt = document.createElement('div');
+                            txt.innerText = '✖ Fechar Visualização'; 
+                            txt.style.color = '#ffffff'; txt.style.marginTop = '20px'; txt.style.fontFamily = 'sans-serif'; txt.style.fontWeight = 'bold'; txt.style.padding = '8px 16px'; txt.style.background = 'rgba(255,255,255,0.1)'; txt.style.borderRadius = '20px';
+                            modal.appendChild(img); modal.appendChild(txt);
+                            modal.onclick = () => { document.body.removeChild(modal); };
+                            document.body.appendChild(modal);
+                        };
+                    }
+                }
+                getGui() { return this.eGui; }
+            }
+            """)
+            gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=img_js, width=80, minWidth=80)
+            
+            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.SELECTION_CHANGED)
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -856,30 +902,163 @@ elif menu == "🔬 Triagem":
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP E RELATÓRIOS
 # =============================================================================
 elif menu == "📱 Zap":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     if not df_raw.empty:
         data_f = st.date_input("Data:", value=hoje_br, format="DD/MM/YYYY")
         df_p = df_raw[(df_raw['DATA_OBJ'] == data_f) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')]
         if not df_p.empty:
             ags = [a for a in df_p['AGENTE_RAW'].dropna().unique() if str(a).strip()]
+            dict_tels = {str(r.get('LOGIN DO AGENTE','')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE',''))) for _, r in DF_AGENTES.iterrows()} if not DF_AGENTES.empty else {}
             for ag in ags:
                 df_ag = df_p[df_p['AGENTE_RAW'] == ag].copy()
-                for c in ['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'ENDERECO', 'NUMERO', 'BAIRRO']:
+                for c in ['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'ENDERECO', 'NUMERO', 'BAIRRO', 'OBSERVACOES']:
                     if c not in df_ag.columns: df_ag[c] = ""
                 df_ag = df_ag.fillna("").astype(str)
-                with st.expander(f"Agente: {ag}"):
+                tel = dict_tels.get(str(ag).strip().lower(), "")
+                with st.expander(f"Agente: {ag} | Volumes: {len(df_ag)}"):
                     st.dataframe(df_ag[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']])
+                    if tel:
+                        msg = f"🚚 *ROTA IGO*\nData: {data_f.strftime('%d/%m/%Y')}\n\n"
+                        for i, (_, r) in enumerate(df_ag.iterrows(), 1): msg += f"*{i}*: {r['PEDIDO']} - {r['LABORATORIO']} ({r['CIDADE']})\n"
+                        st.link_button("📲 Enviar", f"https://api.whatsapp.com/send?phone={tel}&text={urllib.parse.quote(msg)}", type="primary")
 
 elif menu == "📁 Relatórios":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     if not df_raw.empty:
         colunas_export = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'DATA_ENTREGA', 'AGENTE_RAW', 'DATA_LIMITE']
         for col in colunas_export:
             if col not in df_raw.columns: df_raw[col] = ""
         df_export_base = df_raw[colunas_export].fillna("").astype(str).copy()
-        st.download_button("📥 Extração Completa", data=gerar_excel_memoria(df_export_base), file_name=f"BKP_{hoje_br}.xlsx")
+        if 'AGENTE_RAW' in df_export_base.columns: df_export_base.rename(columns={'AGENTE_RAW': 'MOTORISTA'}, inplace=True)
+        
+        st.markdown("### ⚡ Extração Rápida")
+        col_r1, col_r2, col_r3 = st.columns(3)
+        
+        df_rj = df_export_base[df_export_base['UF'].str.upper() == 'RJ'] if 'UF' in df_export_base.columns else pd.DataFrame()
+        df_jf = df_export_base[df_export_base['CIDADE'].str.upper().str.contains('JUIZ DE FORA', na=False)] if 'CIDADE' in df_export_base.columns else pd.DataFrame()
+        df_rjjf = pd.concat([df_rj, df_jf]).drop_duplicates(subset=['PEDIDO']) if not df_rj.empty or not df_jf.empty else pd.DataFrame()
+        
+        if not df_rjjf.empty: col_r1.download_button("📥 Bloco RJ / JF", gerar_excel_memoria(df_rjjf), f"RJ_JF_{hoje_br}.xlsx")
+        else: col_r1.button("📥 Bloco RJ / JF (Vazio)", disabled=True)
 
+        df_lud = df_export_base[df_export_base['MOTORISTA'].str.lower().str.contains('ludmila|veloz', na=False)] if 'MOTORISTA' in df_export_base.columns else pd.DataFrame()
+        if not df_lud.empty: col_r2.download_button("📥 Ludmila / Veloz", gerar_excel_memoria(df_lud), f"Ludmila_{hoje_br}.xlsx")
+        else: col_r2.button("📥 Ludmila / Veloz (Vazio)", disabled=True)
+        
+        col_r3.download_button("📥 Extração Completa", gerar_excel_memoria(df_export_base), f"BKP_Total_{hoje_br}.xlsx", type="primary")
+        
+        st.markdown("---")
+        st.markdown("### 🔍 Pesquisa Customizada")
+        with st.form("form_custom"):
+            c1, c2 = st.columns(2)
+            c_ag, c_cid = c1.text_input("Agente:"), c2.text_input("Cidade:")
+            c_uf, c_base = c1.text_input("UF:"), c2.text_input("Hub (Tomador/Lab):")
+            if st.form_submit_button("Pesquisar"):
+                df_c = df_export_base.copy()
+                if c_ag and 'MOTORISTA' in df_c.columns: df_c = df_c[df_c['MOTORISTA'].str.upper().str.contains(c_ag.upper(), na=False)]
+                if c_cid and 'CIDADE' in df_c.columns: df_c = df_c[df_c['CIDADE'].str.upper().str.contains(c_cid.upper(), na=False)]
+                if c_uf and 'UF' in df_c.columns: df_c = df_c[df_c['UF'].str.upper() == c_uf.upper()]
+                if c_base:
+                    mt = df_c['TOMADOR'].str.upper().str.contains(c_base.upper(), na=False) if 'TOMADOR' in df_c.columns else False
+                    ml = df_c['LABORATORIO'].str.upper().str.contains(c_base.upper(), na=False) if 'LABORATORIO' in df_c.columns else False
+                    df_c = df_c[mt | ml]
+                if not df_c.empty: st.download_button("📥 Baixar Pesquisa", gerar_excel_memoria(df_c), "Pesquisa.xlsx")
+                else: st.warning("Nada encontrado.")
+
+# =============================================================================
+# ⚙️ MÓDULO 5: ROTAS E AGENTES (RESTAURADO E BLINDADO)
+# =============================================================================
 elif menu == "⚙️ Rotas":
-    st.info("Utilize as abas acima para gerenciar a operação.")
-    if not DF_AGENTES.empty: st.dataframe(DF_AGENTES)
-    else: st.warning("Nenhum dado encontrado.")
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
+    
+    tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
+    
+    with tab_agente:
+        st.markdown("#### Formulário de Novo Motorista")
+        with st.form("form_novo_agente", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            login_ag = c1.text_input("ID de Login", placeholder="Ex: carlos.rj")
+            nome_ag = c2.text_input("Nome Amigável", placeholder="Ex: CARLOS SILVA")
+            tel_ag = st.text_input("WhatsApp com DDD", placeholder="Ex: 5521999999999")
+            
+            if st.form_submit_button("💾 Salvar Novo Agente", type="primary"):
+                if not login_ag or not nome_ag or not tel_ag: st.error("⚠️ Preencha todos os campos!")
+                else:
+                    tel_limpo = re.sub(r'\D', '', tel_ag)
+                    nova_linha = pd.DataFrame([{"ROTA MAPEADA": "SEM ROTA DEFINIDA", "LOGIN DO AGENTE": login_ag.lower().strip(), "NOME DO AGENTE": nome_ag.upper().strip(), "TELEFONE": tel_limpo}])
+                    df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
+                    try:
+                        aba = planilha_db.worksheet("Agentes")
+                        aba.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                        st.success(f"✅ Agente salvo!"); carregar_dados_agentes.clear()
+                    except Exception as e: st.error(f"Erro: {e}")
+
+    with tab_rota:
+        st.markdown("#### Atrelar Cidade/Bairro a um Motorista")
+        with st.form("form_nova_rota", clear_on_submit=True):
+            c1, c2, c3 = st.columns(3)
+            cid_rota = c1.text_input("Cidade *", placeholder="Ex: SAO PAULO")
+            bai_rota = c2.text_input("Bairro (Opcional)", placeholder="Ex: PINHEIROS")
+            rua_rota = c3.text_input("Endereço (Opcional)", placeholder="Ex: AVENIDA PAULISTA")
+            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+            ag_selecionado = st.selectbox("Selecione o Agente:", logins_disp)
+            
+            if st.form_submit_button("📍 Salvar Nova Rota", type="primary"):
+                if not cid_rota or not ag_selecionado: st.error("⚠️ Cidade e Agente são obrigatórios!")
+                else:
+                    partes = [p for p in [limpar_nome_local_rota(cid_rota), limpar_nome_local_rota(bai_rota), tratar_texto_global(rua_rota)] if p]
+                    rota_str = " ➔ ".join(partes)
+                    dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == ag_selecionado].iloc[0]
+                    nova_linha = pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": ag_selecionado, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])
+                    df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
+                    try:
+                        aba = planilha_db.worksheet("Agentes")
+                        aba.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                        st.success(f"✅ Rota '{rota_str}' atrelada!"); carregar_dados_agentes.clear()
+                    except Exception as e: st.error(f"Erro: {e}")
+
+    with tab_tabela:
+        if not DF_AGENTES.empty:
+            logins_para_filtro = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist())
+            col_f, _ = st.columns([1, 1])
+            agente_filtro = col_f.selectbox("👤 Selecione o Motorista:", logins_para_filtro)
+            
+            st.markdown(f"#### ➕ Adicionar rota rápida para {agente_filtro}")
+            with st.form(f"form_rapido_{agente_filtro}", clear_on_submit=True):
+                ca1, ca2, ca3, ca4 = st.columns([2, 2, 2, 1])
+                r_cid = ca1.text_input("Cidade", key="r_cid")
+                r_bai = ca2.text_input("Bairro (Opç)", key="r_bai")
+                r_rua = ca3.text_input("Endereço (Opç)", key="r_rua")
+                st.markdown("<style>.st-key-btn_add_rapido {margin-top: 28px;}</style>", unsafe_allow_html=True)
+                
+                if ca4.form_submit_button("➕ Salvar", use_container_width=True):
+                    if not r_cid: st.error("A Cidade é obrigatória!")
+                    else:
+                        partes = [p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai), tratar_texto_global(r_rua)] if p]
+                        rota_str = " ➔ ".join(partes)
+                        dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
+                        nova_linha = pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": agente_filtro, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])
+                        df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
+                        try:
+                            planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                            st.success("Rota adicionada!"); carregar_dados_agentes.clear(); st.rerun()
+                        except Exception as e: st.error(f"Erro: {e}")
+
+            st.markdown(f"#### 📍 Rotas Atuais")
+            df_ag_filtrado = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].copy()
+            if df_ag_filtrado.empty: st.warning("Nenhuma rota atrelada.")
+            else:
+                for idx, row in df_ag_filtrado.iterrows():
+                    rota_disp = row['ROTA MAPEADA'].replace("---", " ➔ ")
+                    with st.container():
+                        col_rota, col_del = st.columns([5, 1])
+                        col_rota.markdown(f"<div style='padding:10px; background-color:#FFFFFF; border-radius:5px; border: 1px solid #E2E8F0;'><b>📍 {rota_disp}</b></div>", unsafe_allow_html=True)
+                        if col_del.button("🗑️ Remover", key=f"del_{idx}", use_container_width=True):
+                            df_novo = DF_AGENTES.drop(idx)
+                            try:
+                                planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                                carregar_dados_agentes.clear(); st.rerun()
+                            except Exception as e: st.error(f"Erro ao remover: {e}")
+        else: st.warning("Nenhum dado encontrado.")
