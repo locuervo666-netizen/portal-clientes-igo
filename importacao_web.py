@@ -449,6 +449,7 @@ def obter_proximo_id(df):
     except:
         return 100000
 
+# CSS Ajustado: Linhas Alternadas Suaves em Tons de Cinza/Azul Claro e Brancas
 def obter_css_grid():
     return {
         ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
@@ -463,6 +464,7 @@ def obter_css_grid():
         ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
     }
 
+# 🔥 A PRIORIDADE AGORA É O STATUS REAL
 def calc_status_display(row):
     status_final = str(row.get('STATUS', '')).strip().upper()
     previsao = str(row.get('DATA_LIMITE', '')).strip()
@@ -526,6 +528,13 @@ if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
+        # 🔥 ESCUDO ANTI-QUEBRA DE COLUNAS VITAIS PARA O DASHBOARD
+        # Se o sistema não encontrar a coluna na planilha, ele cria ela vazia em memória.
+        colunas_vitais = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS', 'DATA_LIMITE', 'FOTO', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
+        for col in colunas_vitais:
+            if col not in df_raw.columns:
+                df_raw[col] = ""
+                
         df_raw['FOTO_URL'] = df_raw['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         
@@ -569,7 +578,13 @@ if menu == "📊 Dashboard":
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'FOTO_URL', 'AGENTE_RAW', 'ENDERECO', 'NUMERO', 'CEP', 'DATA_ENTREGA']
-        df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]]
+        
+        # 🔥 ESCUDO FINAL DA GRID: Garante que as colunas existam na hora de filtrar
+        for col in colunas_mostrar:
+            if col not in df_grid.columns:
+                df_grid[col] = ""
+                
+        df_grid = df_grid[colunas_mostrar]
         
         if busca:
             mask = df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)
@@ -694,8 +709,11 @@ if menu == "📊 Dashboard":
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     dados_aba = aba.get_all_values()
                                     df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                    df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                     for pid in p_ids:
                                         mask = df_nuvem['PEDIDO'] == pid
+                                        if 'STATUS' not in df_nuvem.columns: df_nuvem['STATUS'] = ""
+                                        if 'DATA_ENTREGA' not in df_nuvem.columns: df_nuvem['DATA_ENTREGA'] = ""
                                         df_nuvem.loc[mask, 'STATUS'] = status_limpo
                                         if status_limpo == "ENTREGUE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                         elif status_limpo == "PENDENTE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
@@ -709,9 +727,9 @@ if menu == "📊 Dashboard":
                                             if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
                                                 mascara_app = df_app['PEDIDO'].isin(p_ids)
                                                 df_app.loc[mascara_app, 'STATUS'] = status_limpo
-                                                if 'DATA_ENTREGA' in df_app.columns:
-                                                    if status_limpo == "ENTREGUE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
-                                                    elif status_limpo == "PENDENTE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = ""
+                                                if 'DATA_ENTREGA' not in df_app.columns: df_app['DATA_ENTREGA'] = ""
+                                                if status_limpo == "ENTREGUE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
+                                                elif status_limpo == "PENDENTE": df_app.loc[mascara_app, 'DATA_ENTREGA'] = ""
                                                 aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
                                     except: pass 
                                     st.success("Atualizado!")
@@ -733,6 +751,7 @@ if menu == "📊 Dashboard":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                 prox_id = obter_proximo_id(df_nuvem)
                                 clones_para_app = []
                                 for pid in p_ids:
@@ -776,6 +795,7 @@ if menu == "📊 Dashboard":
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     dados_aba = aba.get_all_values()
                                     df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                    df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                     lista_app_troca = []
                                     for pid in p_ids:
                                         mask = df_nuvem['PEDIDO'] == pid
@@ -867,6 +887,7 @@ elif menu == "📝 Manual":
                         aba_memoria = planilha_db.worksheet("Memoria_Sistema")
                         dados_atuais = aba_memoria.get_all_values()
                         df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
+                        df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                         
                         m_pedido = str(obter_proximo_id(df_nuvem))
                         
@@ -1040,6 +1061,13 @@ elif menu == "📥 Lotes":
         else:
             st.success(f"✅ Protocolo validado! {len(df_ok)} pedidos blindados e roteirizados para injeção.")
             
+            # 🔥 ESCUDO ANTI-QUEBRA DE COLUNAS VITAIS NO PREVIEW DE LOTES
+            colunas_prev = ['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']
+            for col in colunas_prev:
+                if col not in df_ok.columns:
+                    df_ok[col] = ""
+            df_ok = df_ok[colunas_prev]
+            
             gb_prev = GridOptionsBuilder.from_dataframe(df_ok)
             gb_prev.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
             gb_prev.configure_grid_options(rowHeight=32, headerHeight=35)
@@ -1056,6 +1084,7 @@ elif menu == "📥 Lotes":
                         aba = planilha_db.worksheet("Memoria_Sistema")
                         atuais = aba.get_all_values()
                         df_up = pd.DataFrame(atuais[1:], columns=atuais[0]) if len(atuais) > 1 else pd.DataFrame()
+                        df_up = df_up.loc[:, ~df_up.columns.duplicated()].copy()
                         
                         prox_id = obter_proximo_id(df_up)
                         
@@ -1126,6 +1155,7 @@ elif menu == "🔬 Triagem":
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     dados_aba = aba.get_all_values()
                                     df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                    df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                     
                                     pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
                                     mask_nuvem = df_nuvem['PEDIDO'] == pedido_alvo
@@ -1148,7 +1178,13 @@ elif menu == "🔬 Triagem":
             st.markdown("#### Terminal de Validação em Lote (Recurso Manual)")
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
-                df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']]
+                colunas_fila = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']
+                # 🔥 ESCUDO ANTI-QUEBRA DE COLUNAS VITAIS NA TRIAGEM
+                for col in colunas_fila:
+                    if col not in df_fila.columns:
+                        df_fila[col] = ""
+                df_fila = df_fila[colunas_fila]
+                
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
                 gb_fila.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
                 gb_fila.configure_grid_options(rowHeight=32, headerHeight=35)
@@ -1172,6 +1208,7 @@ elif menu == "🔬 Triagem":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(p_ids)
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'CONFERIDO'
                                 atualizar_planilha_memoria(df_nuvem, aba)
@@ -1196,7 +1233,13 @@ elif menu == "🔬 Triagem":
                 colunas_romaneio = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF']
                 if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
                 
-                gb = GridOptionsBuilder.from_dataframe(df_conf[colunas_romaneio])
+                # 🔥 ESCUDO ANTI-QUEBRA DE COLUNAS VITAIS NO ROMANEIO
+                for col in colunas_romaneio:
+                    if col not in df_conf.columns:
+                        df_conf[col] = ""
+                df_conf = df_conf[colunas_romaneio]
+                
+                gb = GridOptionsBuilder.from_dataframe(df_conf)
                 gb.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
                 gb.configure_grid_options(rowHeight=32, headerHeight=35)
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
@@ -1228,6 +1271,7 @@ elif menu == "🔬 Triagem":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_aba = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_aba[1:], columns=dados_aba[0])
+                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
                                 mascara_pedidos = df_nuvem['PEDIDO'].isin(pedidos_ids)
                                 
                                 df_nuvem.loc[mascara_pedidos, 'STATUS'] = 'EM ROTA DE ENTREGA'
@@ -1343,7 +1387,12 @@ elif menu == "🔬 Triagem":
                 df_hist = df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])
                 
                 colunas_hist = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']
-                df_hist_show = df_hist[[c for c in colunas_hist if c in df_hist.columns]]
+                
+                # 🔥 ESCUDO ANTI-QUEBRA DE COLUNAS VITAIS NO HISTORICO
+                for col in colunas_hist:
+                    if col not in df_hist.columns:
+                        df_hist[col] = ""
+                df_hist_show = df_hist[colunas_hist]
                 
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
                 gb_hist.configure_default_column(resizable=True, sortable=True, filter=False, suppressMenu=True, minWidth=150, flex=1)
@@ -1403,7 +1452,14 @@ elif menu == "📱 Zap":
                             dict_telefones[login] = tel_limpo
 
                 for agente in sorted(agentes_com_rota):
-                    df_agente = df_pendentes[df_pendentes['AGENTE_RAW'] == agente]
+                    df_agente = df_pendentes[df_pendentes['AGENTE_RAW'] == agente].copy()
+                    
+                    # 🔥 ESCUDO ANTI-QUEBRA DE COLUNAS VITAIS NO ZAP
+                    colunas_zap = ['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'ENDERECO', 'NUMERO', 'BAIRRO', 'OBSERVACOES']
+                    for col in colunas_zap:
+                        if col not in df_agente.columns:
+                            df_agente[col] = ""
+
                     qtd_pedidos = len(df_agente)
                     telefone = dict_telefones.get(str(agente).strip().lower(), "")
                     
@@ -1445,7 +1501,13 @@ elif menu == "📁 Relatórios":
     
     if not df_raw.empty:
         colunas_export = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'DATA_ENTREGA', 'AGENTE_RAW', 'DATA_LIMITE']
-        df_export_base = df_raw[[c for c in colunas_export if c in df_raw.columns]].copy()
+        
+        # 🔥 ESCUDO ANTI-QUEBRA DE COLUNAS VITAIS NO RELATORIO
+        for col in colunas_export:
+            if col not in df_raw.columns:
+                df_raw[col] = ""
+                
+        df_export_base = df_raw[colunas_export].copy()
         if 'AGENTE_RAW' in df_export_base.columns: df_export_base.rename(columns={'AGENTE_RAW': 'MOTORISTA'}, inplace=True)
         
         st.markdown("### ⚡ Auditoria Rápida de Lotes Pré-Configurados")
