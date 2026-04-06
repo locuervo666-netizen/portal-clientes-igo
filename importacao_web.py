@@ -494,9 +494,10 @@ if menu == "📊 Dashboard":
         with container_grid:
             df_grid.insert(0, "SELECIONAR", False)
             
+            # 🔥 OPÇÃO 2 APLICADA: TROCADO O LINK PELA COLUNA NATIVA DE IMAGEM
             configuracao_colunas = {
                 "SELECIONAR": st.column_config.CheckboxColumn("✔ Ação", default=False),
-                "FOTO_URL": st.column_config.LinkColumn("📸 Comprovante", display_text="🔗 Link"),
+                "FOTO_URL": st.column_config.ImageColumn("📸 Comprovante"),
                 "STATUS_DISPLAY": st.column_config.TextColumn("📌 Status Operacional")
             }
             
@@ -527,7 +528,7 @@ if menu == "📊 Dashboard":
             
             col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
             
-            # 🔥 NOVO BOTÃO FLUTUANTE PARA VER FOTO DENTRO DO SISTEMA
+            # 🔥 BOTÃO FLUTUANTE PARA VER FOTO GIGANTE DENTRO DO SISTEMA (PLANO B E COMPLEMENTO)
             with col_b1.popover("📸 Ver Comprovante", use_container_width=True):
                 if not tem_sel: 
                     st.warning("Marque a caixinha do pedido na tabela abaixo primeiro!")
