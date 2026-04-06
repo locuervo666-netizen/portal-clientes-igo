@@ -21,10 +21,9 @@ from fpdf import FPDF
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =============================================================================
-# 🔗 1. CONFIGURAÇÃO DA PÁGINA E AUTENTICAÇÃO
+# 🔗 1. CONFIGURAÇÃO DA PÁGINA
 # =============================================================================
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="collapsed")
-
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 st.markdown("""
@@ -32,13 +31,9 @@ st.markdown("""
     [data-testid="stToolbar"] { display: none !important; }
     .stAppDeployButton { display: none !important; }
     .stDeployButton { display: none !important; }
-    [class^="viewerBadge"] { display: none !important; }
-    [class*="viewerBadge"] { display: none !important; }
-    iframe[src*="badge"] { display: none !important; }
     #MainMenu { display: none !important; }
     footer { display: none !important; }
-    
-    .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 96% !important; }
+    .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 98% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
     div[data-testid="stRadio"] {
@@ -56,10 +51,6 @@ st.markdown("""
 
     .dinamic-text { color: #0F172A !important; font-weight: 800; letter-spacing: -0.5px; }
     .dinamic-border { border-bottom: 2px solid #E2E8F0 !important; margin-bottom: 24px; padding-bottom: 8px; }
-    
-    div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
-        border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-    }
     div.st-key-kpi_total button { background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; }
     div.st-key-kpi_entregue button { background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important; }
     div.st-key-kpi_pend button { background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%) !important; }
@@ -69,20 +60,22 @@ st.markdown("""
     div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_pend button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
         color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
     }
+    div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
+        border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+    }
     .stButton > button[kind="primary"] { background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; color: #FFFFFF !important;}
-    .stButton > button[kind="primary"]:hover { background: #0369A1 !important; }
-    [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] { background: #FFFFFF; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); border: 1px solid #E2E8F0; }
     </style>
 """, unsafe_allow_html=True)
+st.markdown("""<style>[data-testid="stSidebar"] { display: none !important; }</style>""", unsafe_allow_html=True)
 
 if 'autenticado' not in st.session_state: st.session_state.autenticado = False
 
 if not st.session_state.autenticado:
     st.markdown("""<style>[data-testid="stForm"] { background: #FFFFFF; padding: 40px 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08); border: 1px solid #E2E8F0; max-width: 380px !important; margin: 8vh auto !important; }</style>""", unsafe_allow_html=True)
     with st.form("form_login"):
-        st.markdown("""<div style="text-align: center; margin-bottom: 25px;"><img src="https://i.postimg.cc/x84nnjjq/IGO-LOGO.png" width="160"><div style="color: #0F172A; font-weight: 800; font-size: 20px; margin-top: 15px;">PORTAL CORPORATIVO</div><div style="color: #64748B; font-size: 13px;">Autenticação de Operadores</div></div>""", unsafe_allow_html=True)
-        usuario = st.text_input("👤 Usuário")
-        senha = st.text_input("🔑 Senha", type="password")
+        st.markdown("""<div style="text-align: center; margin-bottom: 25px;"><img src="https://i.postimg.cc/x84nnjjq/IGO-LOGO.png" width="160"><div style="color: #0F172A; font-weight: 800; font-size: 20px; margin-top: 15px;">PORTAL CORPORATIVO</div><div style="color: #64748B; font-size: 13px;">Autenticação Segura</div></div>""", unsafe_allow_html=True)
+        usuario = st.text_input("👤 Utilizador")
+        senha = st.text_input("🔑 Palavra-passe", type="password")
         submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
         if submit:
             if usuario in ["robson.melo", "william.bertoldo"] and senha == "123":
@@ -107,17 +100,6 @@ def conectar_banco():
         return None
     except: return None
 
-def atualizar_planilha_memoria(df_atualizada, worksheet):
-    colunas_padrao = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO']
-    df_atualizada.columns = [str(c).strip().upper().replace('DATA_ENTREGAA', 'DATA_ENTREGA').replace('DATA_ENTREG', 'DATA_ENTREGA') for c in df_atualizada.columns]
-    df_atualizada = df_atualizada.loc[:, ~df_atualizada.columns.duplicated()].copy()
-    for col in colunas_padrao:
-        if col not in df_atualizada.columns: df_atualizada[col] = ""
-    extra_cols = [c for c in df_atualizada.columns if c not in colunas_padrao and str(c).strip() != "" and "UNNAMED" not in str(c).upper()]
-    df_final = df_atualizada[colunas_padrao + extra_cols]
-    worksheet.clear()
-    worksheet.update("A1", [df_final.columns.tolist()] + df_final.fillna("").astype(str).values.tolist())
-
 def carregar_dados_agentes(_planilha):
     if not _planilha: return pd.DataFrame()
     try:
@@ -127,6 +109,30 @@ def carregar_dados_agentes(_planilha):
     except: pass
     return pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
 
+# 🔥 O TRATAMENTO DE CHOQUE (Remove a Coluna Fantasma 'DATA_ENTREGAA' e previne duplicados)
+def limpar_cabecalhos(colunas):
+    novas = []
+    for c in colunas:
+        c_limpo = str(c).strip().upper()
+        if c_limpo in ['DATA_ENTREGAA', 'DATA_ENTREG']: c_limpo = 'DATA_ENTREGA'
+        base = c_limpo
+        i = 1
+        while c_limpo in novas:
+            c_limpo = f"{base}_{i}"
+            i += 1
+        novas.append(c_limpo)
+    return novas
+
+def atualizar_planilha_memoria(df_atualizada, worksheet):
+    colunas_padrao = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO']
+    df_atualizada.columns = limpar_cabecalhos(df_atualizada.columns)
+    for col in colunas_padrao:
+        if col not in df_atualizada.columns: df_atualizada[col] = ""
+    extra_cols = [c for c in df_atualizada.columns if c not in colunas_padrao and str(c).strip() != "" and "UNNAMED" not in str(c).upper()]
+    df_final = df_atualizada[colunas_padrao + extra_cols]
+    worksheet.clear()
+    worksheet.update("A1", [df_final.columns.tolist()] + df_final.fillna("").astype(str).values.tolist())
+
 @st.cache_data(ttl=20)
 def carregar_dados_completos(_planilha):
     if not _planilha: return pd.DataFrame()
@@ -135,19 +141,14 @@ def carregar_dados_completos(_planilha):
         dados_m = aba_m.get_all_values()
         if len(dados_m) > 1:
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
-            df.columns = [str(c).strip().upper().replace('DATA_ENTREGAA', 'DATA_ENTREGA').replace('DATA_ENTREG', 'DATA_ENTREGA') for c in df.columns]
-            df = df.loc[:, ~df.columns.duplicated()].copy()
+            df.columns = limpar_cabecalhos(df.columns)
             df = df.loc[:, df.columns.notna() & (df.columns != "") & (~df.columns.str.contains("UNNAMED"))]
-            
             try:
                 aba_app = _planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
                 if len(dados_app) > 1:
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
-                    cols_limpas = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
-                    df_app.columns = cols_limpas
-                    df_app = df_app.loc[:, ~df_app.columns.duplicated()].copy()
-                    
+                    df_app.columns = limpar_cabecalhos(df_app.columns)
                     cols_to_extract = ['PEDIDO', 'STATUS', 'OBSERVACOES']
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
                     if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
@@ -155,8 +156,7 @@ def carregar_dados_completos(_planilha):
                     if col_qr_app: cols_to_extract.append(col_qr_app)
                     
                     df_app_clean = df_app[[c for c in cols_to_extract if c in df_app.columns]].copy()
-                    rename_map = {'STATUS': 'APP_STATUS', 'OBSERVACOES': 'APP_OBS', 'FOTO': 'APP_FOTO'}
-                    if 'DATA_ENTREGA' in df_app.columns: rename_map['DATA_ENTREGA'] = 'APP_DATA_ENTREGA'
+                    rename_map = {'STATUS': 'APP_STATUS', 'OBSERVACOES': 'APP_OBS', 'FOTO': 'APP_FOTO', 'DATA_ENTREGA': 'APP_DATA_ENTREGA'}
                     if col_qr_app: rename_map[col_qr_app] = 'APP_QR'
                     df_app_clean.rename(columns=rename_map, inplace=True)
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
@@ -167,7 +167,6 @@ def carregar_dados_completos(_planilha):
                     
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
-                    
                     if 'APP_QR' in df.columns:
                         if 'QR_CODE' not in df.columns: df['QR_CODE'] = df['APP_QR']
                         else: df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
@@ -183,7 +182,6 @@ def carregar_dados_completos(_planilha):
                         if s_db in ['EM ROTA DE ENTREGA', 'CONFERIDO']: return s_db
                         if s_app and s_app != 'NAN': return s_app
                         return s_db
-                    
                     df['STATUS'] = df.apply(get_true_status, axis=1)
                     
                     def get_true_data_entrega(row):
@@ -195,9 +193,7 @@ def carregar_dados_completos(_planilha):
                             d_app = str(row.get('APP_DATA_ENTREGA', '')).strip()
                             if d_app and d_app.upper() != 'NAN': return d_app
                         return d_db if d_db.upper() != 'NAN' else ""
-                        
-                    if 'DATA_ENTREGA' in df.columns or 'APP_DATA_ENTREGA' in df.columns:
-                        df['DATA_ENTREGA'] = df.apply(get_true_data_entrega, axis=1)
+                    if 'DATA_ENTREGA' in df.columns or 'APP_DATA_ENTREGA' in df.columns: df['DATA_ENTREGA'] = df.apply(get_true_data_entrega, axis=1)
 
                     def get_true_foto(row):
                         f_db, f_app, rom_id = str(row.get('FOTO', '')).strip(), str(row.get('APP_FOTO', '')).strip(), str(row.get('ROMANEIO', '')).strip()
@@ -206,16 +202,11 @@ def carregar_dados_completos(_planilha):
                             if f_rom and f_rom.upper() != 'NAN': return f_rom
                         if f_app and f_app.upper() != 'NAN': return f_app
                         return f_db
-                        
-                    if 'APP_FOTO' in df.columns or len(rom_dict) > 0: 
-                        df['FOTO'] = df.apply(get_true_foto, axis=1)
+                    if 'APP_FOTO' in df.columns or len(rom_dict) > 0: df['FOTO'] = df.apply(get_true_foto, axis=1)
             except: pass
-            
-            if 'DATA' in df.columns: 
-                df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+            if 'DATA' in df.columns: df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
     except: pass
-    
     return pd.DataFrame()
 
 planilha_db = conectar_banco()
@@ -229,8 +220,7 @@ def despachar_para_appsheet(lista_pedidos_dicts):
     try:
         aba = planilha_db.worksheet("App_Tarefas")
         linhas = [[str(uuid.uuid4())[:8].upper(), str(p.get('PEDIDO','')), str(p.get('MOTORISTA', p.get('AGENTE_RAW', ''))), "PENDENTE", str(p.get('ENDERECO','')), str(p.get('NUMERO','')), str(p.get('BAIRRO','')), str(p.get('CIDADE','')), str(p.get('CEP','')), "", "", str(p.get('LABORATORIO','')), str(p.get('TOMADOR','')), "", str(p.get('ROMANEIO',''))] for p in lista_pedidos_dicts]
-        aba.append_rows(linhas)
-        return True
+        aba.append_rows(linhas); return True
     except: return False
 
 def padronizar_texto(texto):
@@ -242,8 +232,7 @@ def tratar_texto_global(texto):
     t = padronizar_texto(texto)
     return t[:-2] if t.endswith('.0') else t if t not in ['0', '0.0', 'NAN', 'NONE', 'NAT'] else ""
 
-def limpar_nome_local_rota(texto): 
-    return tratar_texto_global(texto).split('/')[0].split('-')[0].strip()
+def limpar_nome_local_rota(texto): return tratar_texto_global(texto).split('/')[0].split('-')[0].strip()
 
 def obter_login_agente(cidade, bairro, laboratorio, endereco="", base_rotas_df=pd.DataFrame()):
     if base_rotas_df.empty: return ""
@@ -281,7 +270,9 @@ def obter_proximo_id(df):
     try: return int(df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().astype(int).max()) + 1 if not df['PEDIDO'].empty else 100000
     except: return 100000
 
-# CSS DA NOSSA GRID PREMIUM
+# =============================================================================
+# 🔥 CSS DA GRID PREMIUM QUE NÃO PISCA
+# =============================================================================
 def obter_css_grid():
     return {
         ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
@@ -331,7 +322,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 menu = st.radio("Navegação:", ["📊 Dashboard", "📝 Manual", "📥 Lotes", "🔬 Triagem", "📱 Zap", "📁 Relatórios", "⚙️ Rotas"], horizontal=True, label_visibility="collapsed")
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (COM AGGRID PREMIUM 100% BLINDADA)
+# 🚀 MÓDULO 1: DASHBOARD (GRID PREMIUM DE VOLTA E BLINDADA)
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -350,7 +341,9 @@ if menu == "📊 Dashboard":
         
         df_f = df_raw.copy()
         if f_cli != "Todos": df_f = df_f[df_f['TOMADOR'] == f_cli]
-        if isinstance(f_data, tuple) and len(f_data) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= f_data[0]) & (df_f['DATA_OBJ'] <= f_data[1])]
+        if isinstance(f_data, tuple) and len(f_data) == 2: 
+            mask = df_f['DATA_OBJ'].notna() & (df_f['DATA_OBJ'] >= f_data[0]) & (df_f['DATA_OBJ'] <= f_data[1])
+            df_f = df_f[mask]
 
         n_tot = len(df_f)
         n_ent = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', case=False)])
@@ -361,7 +354,6 @@ if menu == "📊 Dashboard":
 
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         def set_kpi(v): st.session_state.filtro_kpi_admin = v
-        
         c1.button(f"📦 TOTAL\n{n_tot}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
         c2.button(f"✅ ENTREGUES\n{n_ent}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
         c3.button(f"⏳ PENDENTES\n{n_pend}", key="kpi_pend", use_container_width=True, on_click=set_kpi, args=("PENDENTE",))
@@ -380,24 +372,21 @@ if menu == "📊 Dashboard":
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'BAIRRO', 'CIDADE', 'UF', 'STATUS_DISPLAY', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA', 'FOTO_URL']
-        
         for col in colunas_mostrar:
             if col not in df_grid.columns: df_grid[col] = ""
                 
-        # 🔥 A VACINA DE TITÂNIO FINAL: Limpa os nulos e reseta o index para o AgGrid NUNCA mais dar crash silencioso
+        # 🔥 A VACINA DE TITÂNIO: Limpa os nulos e reseta o index matematicamente para o AgGrid NUNCA mais dar crash silencioso
         df_grid = df_grid[colunas_mostrar].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "")
         df_grid = df_grid.reset_index(drop=True)
         
-        if busca: 
-            mask = df_grid.apply(lambda x: busca.upper() in x.str.upper().values, axis=1)
-            df_grid = df_grid[mask].reset_index(drop=True)
+        if busca: df_grid = df_grid[df_grid.apply(lambda x: busca.upper() in x.str.upper().values, axis=1)].reset_index(drop=True)
 
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
         
         container_botoes = st.container()
         container_grid = st.container()
 
-        # 🔥 A GRID PREMIUM VOLTOU À VIDA COM CHECKBOX
+        # 🔥 A GRID PREMIUM VOLTOU À VIDA (Mas agora blindada contra o Excel)
         with container_grid:
             gb = GridOptionsBuilder.from_dataframe(df_grid)
             gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=120)
@@ -417,7 +406,7 @@ if menu == "📊 Dashboard":
             
             st_js = JsCode("""
             function(p){
-                let v = String(p.value || '').toUpperCase(); 
+                let v = p.value ? String(p.value).toUpperCase() : ''; 
                 if(v.includes('ENTREGUE')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
                 if(v.includes('FRUSTRADA') || v.includes('PROBLEMA') || v.includes('CANCELADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
                 if(v.includes('EM ROTA')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
@@ -433,7 +422,7 @@ if menu == "📊 Dashboard":
                 init(params) {
                     this.eGui = document.createElement('div');
                     this.eGui.style.textAlign = 'center';
-                    let val = String(params.value || '');
+                    let val = params.value ? String(params.value) : '';
                     if (val.includes('http')) {
                         this.eGui.innerHTML = '<span style="cursor: pointer; font-size: 16px;" title="Ver Comprovante">📸</span>';
                         this.eGui.onclick = () => {
@@ -459,16 +448,7 @@ if menu == "📊 Dashboard":
             """)
             gb.configure_column("FOTO_URL", headerName="Foto", cellRenderer=img_js, width=80)
             
-            grid_response = AgGrid(
-                df_grid, 
-                gridOptions=gb.build(), 
-                allow_unsafe_jscode=True, 
-                theme='alpine', 
-                custom_css=obter_css_grid(), 
-                height=550, 
-                fit_columns_on_grid_load=False, 
-                update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED
-            )
+            grid_response = AgGrid(df_grid, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=550, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.SELECTION_CHANGED)
             
             selecionados = grid_response['selected_rows']
             tem_sel = False
@@ -496,7 +476,7 @@ if menu == "📊 Dashboard":
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
+                                df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                                 for pid in p_ids:
                                     mask = df_nuvem['PEDIDO'] == pid
                                     if 'STATUS' not in df_nuvem.columns: df_nuvem['STATUS'] = ""
@@ -508,7 +488,7 @@ if menu == "📊 Dashboard":
                                 try:
                                     aba_app = planilha_db.worksheet("App_Tarefas")
                                     df_app = pd.DataFrame(aba_app.get_all_values()[1:], columns=aba_app.get_all_values()[0])
-                                    df_app = df_app.loc[:, ~df_app.columns.duplicated()].copy()
+                                    df_app.columns = limpar_cabecalhos(df_app.columns)
                                     if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
                                         mascara_app = df_app['PEDIDO'].isin(p_ids)
                                         df_app.loc[mascara_app, 'STATUS'] = status_limpo
@@ -531,7 +511,7 @@ if menu == "📊 Dashboard":
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
+                                df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                                 prox_id = obter_proximo_id(df_nuvem)
                                 clones_app = []
                                 for pid in p_ids:
@@ -561,7 +541,7 @@ if menu == "📊 Dashboard":
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
+                                df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                                 lista_app_troca = []
                                 for pid in p_ids:
                                     mask = df_nuvem['PEDIDO'] == pid
@@ -576,8 +556,6 @@ if menu == "📊 Dashboard":
 
             if col_b5.button("🔄 Atualizar Painel", use_container_width=True):
                 carregar_dados_completos.clear(); st.rerun()
-    else:
-        st.warning("O banco de dados está vazio. Vá para a aba Manual.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
@@ -638,7 +616,7 @@ elif menu == "📝 Manual":
                         try:
                             aba_memoria = planilha_db.worksheet("Memoria_Sistema")
                             df_nuvem = pd.DataFrame(aba_memoria.get_all_values()[1:], columns=aba_memoria.get_all_values()[0]) if len(aba_memoria.get_all_values()) > 1 else pd.DataFrame()
-                            df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
+                            df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                             m_pedido = str(obter_proximo_id(df_nuvem))
                             novo_ped = pd.DataFrame([{'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 'LABORATORIO': lab_limpo, 'ENDERECO': rua_limpa, 'NUMERO': "", 'BAIRRO': bai_limpo, 'CIDADE': cid_limpa, 'UF': uf_limpa, 'CEP': cep_input, 'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""}])
                             df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
@@ -675,7 +653,7 @@ elif menu == "📥 Lotes":
                     
                     df_limpo = df_raw_import.iloc[idx_h+1:].copy()
                     df_limpo.columns = [str(c).strip() for c in df_raw_import.iloc[idx_h].values]
-                    df_limpo = df_limpo.loc[:, ~df_limpo.columns.duplicated()] 
+                    df_limpo.columns = limpar_cabecalhos(df_limpo.columns)
                     for col in df_limpo.columns: df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
                     
                     mapa = {}
@@ -738,9 +716,7 @@ elif menu == "📥 Lotes":
             colunas_prev = ['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']
             for col in colunas_prev:
                 if col not in df_ok.columns: df_ok[col] = ""
-            
-            # VACINA NA GRID DE PREVIEW
-            df_ok = df_ok[colunas_prev].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT"], "").reset_index(drop=True)
+            df_ok = df_ok[colunas_prev].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "").reset_index(drop=True)
             
             gb_prev = GridOptionsBuilder.from_dataframe(df_ok)
             AgGrid(df_ok, gridOptions=gb_prev.build(), theme='alpine', custom_css=obter_css_grid(), height=400)
@@ -751,7 +727,7 @@ elif menu == "📥 Lotes":
                     try:
                         aba = planilha_db.worksheet("Memoria_Sistema")
                         df_up = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0]) if len(aba.get_all_values()) > 1 else pd.DataFrame()
-                        df_up = df_up.loc[:, ~df_up.columns.duplicated()].copy()
+                        df_up.columns = limpar_cabecalhos(df_up.columns)
                         prox_id = obter_proximo_id(df_up)
                         for idx, row in df_final.iterrows():
                             if not str(row['PEDIDO']).strip() or str(row['PEDIDO']).upper() == 'NAN': 
@@ -794,7 +770,7 @@ elif menu == "🔬 Triagem":
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
+                                df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                                 df_nuvem.loc[df_nuvem['PEDIDO'] == str(df_raw.at[idx, 'PEDIDO']), 'STATUS'] = 'CONFERIDO'
                                 atualizar_planilha_memoria(df_nuvem, aba)
                                 st.success(f"✅ Pedido {df_raw.at[idx, 'PEDIDO']} VALIDADO!"); carregar_dados_completos.clear()
@@ -809,8 +785,8 @@ elif menu == "🔬 Triagem":
                 for col in colunas_fila:
                     if col not in df_fila.columns: df_fila[col] = ""
                 
-                # VACINA NA TRIAGEM
-                df_fila = df_fila[colunas_fila].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT"], "").reset_index(drop=True)
+                # 🔥 VACINA APLICADA NA TRIAGEM (Remove erro de Index)
+                df_fila = df_fila[colunas_fila].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "").reset_index(drop=True)
                 
                 gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
                 gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
@@ -821,7 +797,7 @@ elif menu == "🔬 Triagem":
                     p_ids = [str(r['PEDIDO']) for r in (sel_m.to_dict('records') if isinstance(sel_m, pd.DataFrame) else sel_m)]
                     aba = planilha_db.worksheet("Memoria_Sistema")
                     df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                    df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
+                    df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                     df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'STATUS'] = 'CONFERIDO'
                     atualizar_planilha_memoria(df_nuvem, aba); st.success("Enviados!"); carregar_dados_completos.clear(); st.rerun()
 
@@ -837,8 +813,8 @@ elif menu == "🔬 Triagem":
                 for col in colunas_romaneio:
                     if col not in df_conf.columns: df_conf[col] = ""
                 
-                # VACINA NO ROMANEIO
-                df_conf = df_conf[colunas_romaneio].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT"], "").reset_index(drop=True)
+                # 🔥 VACINA APLICADA NO ROMANEIO (Remove erro de Index)
+                df_conf = df_conf[colunas_romaneio].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "").reset_index(drop=True)
                 
                 gb = GridOptionsBuilder.from_dataframe(df_conf)
                 gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
@@ -853,7 +829,7 @@ elif menu == "🔬 Triagem":
                     id_rom = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
                     aba = planilha_db.worksheet("Memoria_Sistema")
                     df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                    df_nuvem = df_nuvem.loc[:, ~df_nuvem.columns.duplicated()].copy()
+                    df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
                     mask = df_nuvem['PEDIDO'].isin([str(r['PEDIDO']) for r in sel_lista])
                     df_nuvem.loc[mask, 'STATUS'] = 'EM ROTA DE ENTREGA'
                     df_nuvem.loc[mask, 'ROMANEIO'] = id_rom
@@ -877,8 +853,8 @@ elif menu == "🔬 Triagem":
                 for col in colunas_hist:
                     if col not in df_hist.columns: df_hist[col] = ""
                 
-                # VACINA NO HISTORICO
-                df_hist_show = df_hist[colunas_hist].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT"], "").reset_index(drop=True)
+                # 🔥 VACINA APLICADA NO HISTÓRICO (Remove erro de Index)
+                df_hist_show = df_hist[colunas_hist].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "").reset_index(drop=True)
                 
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
                 AgGrid(df_hist_show, gridOptions=gb_hist.build(), theme='alpine', custom_css=obter_css_grid(), height=400)
@@ -899,7 +875,7 @@ elif menu == "📱 Zap":
                 df_ag = df_p[df_p['AGENTE_RAW'] == ag].copy()
                 for c in ['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'ENDERECO', 'NUMERO', 'BAIRRO', 'OBSERVACOES']:
                     if c not in df_ag.columns: df_ag[c] = ""
-                df_ag = df_ag.fillna("").astype(str)
+                df_ag = df_ag.fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "")
                 tel = dict_tels.get(str(ag).strip().lower(), "")
                 with st.expander(f"Agente: {ag} | Volumes: {len(df_ag)}"):
                     st.dataframe(df_ag[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True, use_container_width=True)
@@ -918,7 +894,7 @@ elif menu == "📁 Relatórios":
         colunas_export = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'DATA_ENTREGA', 'AGENTE_RAW', 'DATA_LIMITE']
         for col in colunas_export:
             if col not in df_raw.columns: df_raw[col] = ""
-        df_export_base = df_raw[colunas_export].fillna("").astype(str).copy()
+        df_export_base = df_raw[colunas_export].fillna("").astype(str).replace(["nan", "NaN", "None", "NaT", "<NA>"], "").copy()
         if 'AGENTE_RAW' in df_export_base.columns: df_export_base.rename(columns={'AGENTE_RAW': 'MOTORISTA'}, inplace=True)
         
         st.markdown("### ⚡ Extração Rápida")
