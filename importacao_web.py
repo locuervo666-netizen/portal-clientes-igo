@@ -84,12 +84,11 @@ if not st.session_state.autenticado:
     st.stop()
 
 # =============================================================================
-# 🔗 2. CONEXÃO ANCORADA PELO ID DA PLANILHA
+# 🔗 2. CONEXÃO ANCORADA BLINDADA
 # =============================================================================
 @st.cache_resource
 def conectar_banco():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    # 🔥 CADEADO DE TITÂNIO: Ancora o código ao ID exato do seu link
     SHEET_KEY = "1r754gu4JJ2XcKGtCSSYWFH8fa-ekjN4qi3awHaNVzlk"
     try:
         caminho_windows = r"C:\Users\elcic\IGO_Logistica_Sistema"
@@ -114,8 +113,7 @@ def limpar_cabecalhos(colunas):
         base = c_limpo
         i = 1
         while c_limpo in novas:
-            c_limpo = f"{base}_{i}"
-            i += 1
+            c_limpo = f"{base}_{i}"; i += 1
         novas.append(c_limpo)
     return novas
 
@@ -132,17 +130,19 @@ def atualizar_planilha_memoria(df_atualizada, worksheet):
 def carregar_dados_agentes(_planilha):
     if not _planilha: return pd.DataFrame()
     try:
-        # 🔥 CORREÇÃO: Lê a aba correta que está na sua planilha real
-        aba = _planilha.worksheet("MemoriaAgentes")
+        # 🔥 AMORTECEDOR: Se não achar a aba, cria vazio em vez de tela vermelha
+        aba = _planilha.worksheet("Agentes")
         dados = aba.get_all_values()
         if len(dados) > 1: return pd.DataFrame(dados[1:], columns=dados[0])
-    except: pass
+    except Exception as e: 
+        st.warning("⚠️ Aba 'Agentes' não encontrada. Usando base vazia temporariamente.")
     return pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
 
 @st.cache_data(ttl=20)
 def carregar_dados_completos(_planilha):
     if not _planilha: return pd.DataFrame()
     try:
+        # 🔥 AMORTECEDOR: Blindagem contra tela vermelha
         aba_m = _planilha.worksheet("Memoria_Sistema")
         dados_m = aba_m.get_all_values()
         if len(dados_m) > 1:
@@ -212,7 +212,9 @@ def carregar_dados_completos(_planilha):
             except: pass
             if 'DATA' in df.columns: df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
-    except: pass
+    except Exception as e:
+        # 🔥 AMORTECEDOR: Avisa o erro sem tela vermelha
+        pass
     return pd.DataFrame()
 
 planilha_db = conectar_banco()
@@ -323,6 +325,11 @@ with col_logout:
 
 st.markdown("<br>", unsafe_allow_html=True)
 menu = st.radio("Navegação:", ["📊 Dashboard", "📝 Manual", "📥 Lotes", "🔬 Triagem", "📱 Zap", "📁 Relatórios", "⚙️ Rotas"], horizontal=True, label_visibility="collapsed")
+
+# Se o banco falhar, não exibe o Dashboard, apenas avisa.
+if planilha_db is None:
+    st.error("🚨 CONEXÃO COM O GOOGLE SHEETS FALHOU! Verifique as credenciais ou se o arquivo foi apagado.")
+    st.stop()
 
 # =============================================================================
 # 🚀 MÓDULO 1: DASHBOARD
@@ -560,7 +567,7 @@ if menu == "📊 Dashboard":
             if col_b5.button("🔄 Atualizar Painel", use_container_width=True):
                 carregar_dados_completos.clear(); st.rerun()
     else:
-        st.warning("O banco de dados está vazio. Vá para a aba Manual.")
+        st.warning("O banco de dados está vazio ou a aba Memoria_Sistema não foi encontrada. Vá para a aba Manual.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
@@ -629,7 +636,7 @@ elif menu == "📝 Manual":
                             st.success(f"Pedido {m_pedido} criado!")
                             st.session_state['m_rua'] = ""; st.session_state['m_bai'] = ""; st.session_state['m_cid'] = ""; st.session_state['m_uf'] = ""
                             carregar_dados_completos.clear()
-                        except Exception as e: st.error(f"Erro: {e}")
+                        except Exception as e: st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
@@ -780,7 +787,7 @@ elif menu == "🔬 Triagem":
                                 df_nuvem.loc[df_nuvem['PEDIDO'] == str(df_raw.at[idx, 'PEDIDO']), 'STATUS'] = 'CONFERIDO'
                                 atualizar_planilha_memoria(df_nuvem, aba)
                                 st.success(f"✅ Pedido {df_raw.at[idx, 'PEDIDO']} VALIDADO!"); carregar_dados_completos.clear()
-                            except: st.error("Falha.")
+                            except Exception as e: st.error(f"Falha ao validar: {e}")
                         else: st.error(f"Status incorreto: {str(df_raw.at[idx, 'STATUS']).strip().upper()}")
                     else: st.error("Não encontrado.")
             
@@ -800,11 +807,13 @@ elif menu == "🔬 Triagem":
                 
                 if st.button("✅ Enviar Selecionados", type="primary") and sel_m is not None and len(sel_m) > 0:
                     p_ids = [str(r['PEDIDO']) for r in (sel_m.to_dict('records') if isinstance(sel_m, pd.DataFrame) else sel_m)]
-                    aba = planilha_db.worksheet("Memoria_Sistema")
-                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                    df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
-                    df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'STATUS'] = 'CONFERIDO'
-                    atualizar_planilha_memoria(df_nuvem, aba); st.success("Enviados!"); carregar_dados_completos.clear(); st.rerun()
+                    try:
+                        aba = planilha_db.worksheet("Memoria_Sistema")
+                        df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                        df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
+                        df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'STATUS'] = 'CONFERIDO'
+                        atualizar_planilha_memoria(df_nuvem, aba); st.success("Enviados!"); carregar_dados_completos.clear(); st.rerun()
+                    except Exception as e: st.error(f"Erro ao enviar: {e}")
 
         with t2:
             df_conf = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
@@ -830,24 +839,26 @@ elif menu == "🔬 Triagem":
                 if c_btn.button("🚚 Gerar e Despachar", type="primary") and sel is not None and len(sel) > 0 and motorista_escolhido != "Selecione...":
                     sel_lista = sel.to_dict('records') if isinstance(sel, pd.DataFrame) else sel
                     id_rom = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
-                    aba = planilha_db.worksheet("Memoria_Sistema")
-                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                    df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
-                    mask = df_nuvem['PEDIDO'].isin([str(r['PEDIDO']) for r in sel_lista])
-                    df_nuvem.loc[mask, 'STATUS'] = 'EM ROTA DE ENTREGA'
-                    df_nuvem.loc[mask, 'ROMANEIO'] = id_rom
-                    df_nuvem.loc[mask, 'DATA'] = data_despacho.strftime("%d/%m/%Y")
-                    if 'AGENTE_RAW' in df_nuvem.columns: df_nuvem.loc[mask, 'AGENTE_RAW'] = motorista_escolhido
-                    atualizar_planilha_memoria(df_nuvem, aba)
-                    
-                    despachar_para_appsheet([{'PEDIDO': id_rom, 'MOTORISTA': motorista_escolhido, 'ENDERECO': "LOTE", 'NUMERO': str(len(sel_lista)), 'BAIRRO': sel_lista[0].get('TOMADOR', ''), 'CIDADE': sel_lista[0].get('CIDADE', ''), 'CEP': "-", 'LABORATORIO': f"LOTE {len(sel_lista)} PEDIDOS", 'TOMADOR': sel_lista[0].get('TOMADOR', ''), 'ROMANEIO': id_rom, 'QR_CODE': ''}])
-                    
-                    pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", "B", 14); pdf.cell(0, 10, "PROTOCOLO DE ENTREGA", ln=True, align="C")
-                    pdf.set_font("Arial", "", 10); pdf.cell(0, 10, f"LOTE: {id_rom}", ln=True, align="C")
-                    for i, item in enumerate(sel_lista, 1): pdf.cell(0, 5, f"{i}. Pedido: {item.get('PEDIDO')} - Lab: {item.get('LABORATORIO')[:40]}", ln=True)
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp: pdf.output(tmp.name); 
-                    with open(tmp.name, "rb") as f: st.download_button("📥 Baixar PDF", f.read(), f"{id_rom}.pdf", "application/pdf")
-                    carregar_dados_completos.clear(); st.success("Despachado!")
+                    try:
+                        aba = planilha_db.worksheet("Memoria_Sistema")
+                        df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                        df_nuvem.columns = limpar_cabecalhos(df_nuvem.columns)
+                        mask = df_nuvem['PEDIDO'].isin([str(r['PEDIDO']) for r in sel_lista])
+                        df_nuvem.loc[mask, 'STATUS'] = 'EM ROTA DE ENTREGA'
+                        df_nuvem.loc[mask, 'ROMANEIO'] = id_rom
+                        df_nuvem.loc[mask, 'DATA'] = data_despacho.strftime("%d/%m/%Y")
+                        if 'AGENTE_RAW' in df_nuvem.columns: df_nuvem.loc[mask, 'AGENTE_RAW'] = motorista_escolhido
+                        atualizar_planilha_memoria(df_nuvem, aba)
+                        
+                        despachar_para_appsheet([{'PEDIDO': id_rom, 'MOTORISTA': motorista_escolhido, 'ENDERECO': "LOTE", 'NUMERO': str(len(sel_lista)), 'BAIRRO': sel_lista[0].get('TOMADOR', ''), 'CIDADE': sel_lista[0].get('CIDADE', ''), 'CEP': "-", 'LABORATORIO': f"LOTE {len(sel_lista)} PEDIDOS", 'TOMADOR': sel_lista[0].get('TOMADOR', ''), 'ROMANEIO': id_rom, 'QR_CODE': ''}])
+                        
+                        pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", "B", 14); pdf.cell(0, 10, "PROTOCOLO DE ENTREGA", ln=True, align="C")
+                        pdf.set_font("Arial", "", 10); pdf.cell(0, 10, f"LOTE: {id_rom}", ln=True, align="C")
+                        for i, item in enumerate(sel_lista, 1): pdf.cell(0, 5, f"{i}. Pedido: {item.get('PEDIDO')} - Lab: {item.get('LABORATORIO')[:40]}", ln=True)
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp: pdf.output(tmp.name); 
+                        with open(tmp.name, "rb") as f: st.download_button("📥 Baixar PDF", f.read(), f"{id_rom}.pdf", "application/pdf")
+                        carregar_dados_completos.clear(); st.success("Despachado!")
+                    except Exception as e: st.error(f"Erro ao despachar: {e}")
 
         with t3:
             df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper().isin(['CONFERIDO', 'EM ROTA DE ENTREGA', 'ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO'])].copy()
@@ -951,7 +962,7 @@ elif menu == "⚙️ Rotas":
                     nova_linha = pd.DataFrame([{"ROTA MAPEADA": "SEM ROTA DEFINIDA", "LOGIN DO AGENTE": login_ag.lower().strip(), "NOME DO AGENTE": nome_ag.upper().strip(), "TELEFONE": tel_limpo}])
                     df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
                     try:
-                        planilha_db.worksheet("MemoriaAgentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                        planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                         st.success(f"✅ Agente salvo!"); carregar_dados_agentes.clear()
                     except Exception as e: st.error(f"Erro: {e}")
 
@@ -972,7 +983,7 @@ elif menu == "⚙️ Rotas":
                     nova_linha = pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": ag_selecionado, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])
                     df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
                     try:
-                        planilha_db.worksheet("MemoriaAgentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                        planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                         st.success(f"✅ Rota '{rota_str}' atrelada!"); carregar_dados_agentes.clear()
                     except Exception as e: st.error(f"Erro: {e}")
 
@@ -995,7 +1006,7 @@ elif menu == "⚙️ Rotas":
                         nova_linha = pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": agente_filtro, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])
                         df_novo = pd.concat([DF_AGENTES, nova_linha], ignore_index=True)
                         try:
-                            planilha_db.worksheet("MemoriaAgentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                            planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                             st.success("Rota adicionada!"); carregar_dados_agentes.clear(); st.rerun()
                         except Exception as e: st.error(f"Erro: {e}")
 
@@ -1010,7 +1021,7 @@ elif menu == "⚙️ Rotas":
                         if col_del.button("🗑️ Remover", key=f"del_{idx}", use_container_width=True):
                             df_novo = DF_AGENTES.drop(idx)
                             try:
-                                planilha_db.worksheet("MemoriaAgentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                                planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                                 carregar_dados_agentes.clear(); st.rerun()
                             except Exception as e: st.error(f"Erro ao remover: {e}")
         else: st.warning("Nenhum dado encontrado.")
