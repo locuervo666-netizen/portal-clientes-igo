@@ -72,6 +72,7 @@ st.markdown("""<style>[data-testid="stSidebar"] { display: none !important; }</s
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
+# 🔥 TELA DE LOGIN CENTRALIZADA COM LOGO 🔥
 if not st.session_state.autenticado:
     col_vazia1, col_login, col_vazia2 = st.columns([1, 1.5, 1])
     with col_login:
@@ -256,10 +257,11 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         st.error(f"🚨 ERRO APPSHEET: {e}")
         return False
 
-# 🔥 MOTOR DE DISPARO DA Z-API (COM DEDO-DURO DE ERROS) 🔥
+# 🔥 MOTOR DE DISPARO DA Z-API (CONFIGURADO COM AS SUAS CHAVES) 🔥
 def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
     INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
     TOKEN = "2321563615C4242CB6031504"         
+    CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S" 
     
     # TRATAMENTO: Garante que o telefone só tem números
     tel_limpo = re.sub(r'\D', '', str(telefone_destino))
@@ -274,18 +276,19 @@ def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
         "phone": tel_limpo, 
         "message": texto_mensagem
     }
+    
+    # Adicionamos a camada de segurança extra que a Z-API pediu
     headers = {
         "Accept": "application/json",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Client-Token": CLIENT_TOKEN
     }
     
     try:
         response = requests.post(url, json=payload, headers=headers)
-        # Se for Sucesso (200 ou 201)
         if response.status_code in [200, 201]:
             return True
         else:
-            # Se for erro, mostra exatamente o motivo na tela!
             st.error(f"🚨 Retorno da Z-API (Telefone: {tel_limpo}): {response.text}")
             return False
     except Exception as e:
@@ -459,7 +462,7 @@ if planilha_db is None:
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD
+# 🚀 MÓDULO 1: DASHBOARD / GRID PRINCIPAL
 # =============================================================================
 if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
@@ -1005,6 +1008,7 @@ elif menu == "📥 Importações":
                         if lista_app: 
                             despachar_para_appsheet(lista_app)
                             
+                        # 🔥 NOTIFICAÇÃO CLARA E TEMPORIZADA 🔥
                         st.success(f"🎉 SUCESSO! Foram importados um total de {len(df_ok)} pedidos com sucesso.")
                         time.sleep(2.5) 
                         
@@ -1175,7 +1179,7 @@ elif menu == "🔬 Triagem":
         st.info("O banco de dados está vazio no momento.")
 
 # =============================================================================
-# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (AGORA COM API)
+# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (AGORA COM API E CLIENT-TOKEN)
 # =============================================================================
 elif menu == "📱 WhatsApp":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
