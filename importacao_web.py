@@ -72,18 +72,25 @@ st.markdown("""<style>[data-testid="stSidebar"] { display: none !important; }</s
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
+# 🔥 TELA DE LOGIN CENTRALIZADA COM LOGO 🔥
 if not st.session_state.autenticado:
-    with st.form("form_login"):
-        st.markdown("<h3 style='text-align: center; color: #0F172A;'>PORTAL CORPORATIVO</h3>", unsafe_allow_html=True)
-        usuario = st.text_input("👤 Usuário")
-        senha = st.text_input("🔑 Senha", type="password")
-        if st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary"):
-            logins_autorizados = {"robson.melo": "123", "william.bertoldo": "123"}
-            if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
-                st.session_state.autenticado = True
-                st.rerun()
-            else:
-                st.error("❌ Credenciais inválidas.")
+    col_vazia1, col_login, col_vazia2 = st.columns([1, 1.5, 1])
+    with col_login:
+        st.markdown("<br><br><br>", unsafe_allow_html=True) 
+        st.markdown("<div style='text-align: center;'><img src='https://i.postimg.cc/x84nnjjq/IGO-LOGO.png' width='250'></div>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #0F172A; margin-top: 15px; margin-bottom: 25px; font-weight: 800;'>PORTAL CORPORATIVO</h2>", unsafe_allow_html=True)
+        
+        with st.form("form_login"):
+            usuario = st.text_input("👤 Usuário")
+            senha = st.text_input("🔑 Senha", type="password")
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary"):
+                logins_autorizados = {"robson.melo": "123", "william.bertoldo": "123"}
+                if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
+                    st.session_state.autenticado = True
+                    st.rerun()
+                else:
+                    st.error("❌ Credenciais inválidas.")
     st.stop()
 
 # =============================================================================
@@ -247,7 +254,7 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         aba.append_rows(linhas, value_input_option='USER_ENTERED')
         return True
     except Exception as e: 
-        st.error(f"🚨 ERRO APPSHEET: {e}")
+        st.error(f"🚨 ERRO DE SINCRONIZAÇÃO APPSHEET: {e}")
         return False
 
 def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_lista):
@@ -394,7 +401,7 @@ def calc_status_display(row):
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
 # =============================================================================
-# 🎨 3. CABEÇALHO E NAVEGAÇÃO (NOMES ATUALIZADOS)
+# 🎨 3. CABEÇALHO E NAVEGAÇÃO
 # =============================================================================
 col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
 
@@ -409,7 +416,6 @@ with col_logout:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# NOVOS NOMES NA BARRA DE TAREFAS
 menu = st.radio("Navegação:", ["📊 GRID", "📝 Pedido Manual", "📥 Importações", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"], horizontal=True, label_visibility="collapsed")
 
 if planilha_db is None:
@@ -418,7 +424,7 @@ if planilha_db is None:
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD / GRID PRINCIPAL
+# 🚀 MÓDULO 1: DASHBOARD
 # =============================================================================
 if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
@@ -468,7 +474,6 @@ if menu == "📊 GRID":
         
         df_grid['COMPROVANTE'] = df_grid['FOTO_URL']
 
-        # 🔥 ORDENAÇÃO DE PRIORIDADE: PENDENTES NO TOPO 🔥
         def definir_prioridade(status_str):
             s = str(status_str).upper()
             if 'PENDENTE' in s: return 1
@@ -499,7 +504,6 @@ if menu == "📊 GRID":
         
         df_grid.insert(0, "SELECIONAR", False)
         
-        # 🔥 NOMES DOS CABEÇALHOS ALTERADOS AQUI 🔥
         tabela_renderizada = st.data_editor(
             df_grid,
             column_config={
@@ -968,7 +972,7 @@ elif menu == "📥 Importações":
                             
                         # 🔥 NOTIFICAÇÃO CLARA E TEMPORIZADA 🔥
                         st.success(f"🎉 SUCESSO! Foram importados um total de {len(df_ok)} pedidos com sucesso.")
-                        time.sleep(2.5) # Aguarda 2.5s para o usuário poder ler
+                        time.sleep(2.5) 
                         
                         st.session_state.df_preview = pd.DataFrame()
                         carregar_dados_completos.clear()
@@ -977,7 +981,7 @@ elif menu == "📥 Importações":
                         st.error(f"Erro: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (COM SELEÇÃO EM MASSA)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO
 # =============================================================================
 elif menu == "🔬 Triagem":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🔬 Terminal de Triagem e Expedição</h3></div>", unsafe_allow_html=True)
@@ -1137,7 +1141,7 @@ elif menu == "🔬 Triagem":
         st.info("O banco de dados está vazio no momento.")
 
 # =============================================================================
-# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
+# 📱 MÓDULO EXTRA: DISPARO WHATSAPP
 # =============================================================================
 elif menu == "📱 WhatsApp":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
