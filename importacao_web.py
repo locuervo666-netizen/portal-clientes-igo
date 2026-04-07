@@ -297,20 +297,30 @@ def enviar_pdf_zapi(telefone_destino, pdf_bytes, nome_arquivo):
         tel_limpo = '55' + tel_limpo
         
     url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-document/pdf"
+    
+    # Adicionando o cabeçalho base64 corretamente para PDFs
     b64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+    document_payload = f"data:application/pdf;base64,{b64_pdf}"
     
     payload = {
         "phone": tel_limpo, 
-        "document": b64_pdf,
-        "fileName": nome_arquivo
+        "document": document_payload,
+        "fileName": nome_arquivo,
+        "title": "Rota Oficial IGO Logística"
     }
     headers = {"Accept": "application/json", "Content-Type": "application/json", "Client-Token": CLIENT_TOKEN}
     
     try:
         response = requests.post(url, json=payload, headers=headers)
-        if response.status_code in [200, 201]: return True
-        else: return False
-    except Exception: return False
+        if response.status_code in [200, 201]: 
+            return True
+        else: 
+            # AGORA O ERRO VAI GRITAR NA TELA SE A Z-API BARRAR
+            st.error(f"🚨 Z-API recusou o PDF do agente {tel_limpo}: {response.text}")
+            return False
+    except Exception as e: 
+        st.error(f"🚨 Erro interno ao enviar PDF: {e}")
+        return False
 
 # 🔥 CONSTRUTOR DE PDF PARA WHATSAPP 🔥
 def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
@@ -342,7 +352,6 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
     
     pdf.ln(3); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(3)
     
-    # Agrupamento da Rota por Cidade e Bairro
     grouped_cidade = df_agente.groupby('CIDADE')
     for cidade, group_cid in grouped_cidade:
         cidade_nome = padronizar_texto(str(cidade))
@@ -361,7 +370,6 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
             pdf.set_font("Arial", "B", 8)
             pdf.cell(0, 5, f"   BAIRRO: {bairro_nome}", 1, 1, "L", True)
             
-            # Cabeçalho da Tabela
             pdf.set_fill_color(241, 245, 249)
             pdf.set_text_color(71, 85, 105)
             pdf.set_font("Arial", "B", 7)
@@ -371,7 +379,6 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
             pdf.cell(77, 5, "ENDERECO", 1, 0, "L", True)
             pdf.cell(25, 5, "TOMADOR", 1, 1, "C", True)
             
-            # Linhas da Tabela
             pdf.set_text_color(51, 65, 85)
             pdf.set_font("Arial", "", 7)
             for _, row in group_bai.iterrows():
