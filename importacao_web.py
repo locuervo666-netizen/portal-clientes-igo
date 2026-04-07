@@ -246,7 +246,7 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         aba.append_rows(linhas, value_input_option='USER_ENTERED')
         return True
     except Exception as e: 
-        st.error(f"🚨 ERRO APPSHEET: {e}")
+        st.error(f"🚨 ERRO DE SINCRONIZAÇÃO APPSHEET: {e}")
         return False
 
 def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_lista):
@@ -460,15 +460,20 @@ if menu == "📊 Dashboard":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        # CRIA O LINK DA FOTO PARA CLICAR DIRETO NA TABELA
-        df_grid['COMPROVANTE'] = df_grid['FOTO_URL'].apply(lambda x: x if x else None)
+        df_grid['COMPROVANTE'] = df_grid['FOTO_URL']
 
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'COMPROVANTE', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
         df_grid = df_grid[df_grid['PEDIDO'].astype(str).str.strip() != ""] 
-        for col in df_grid.columns: df_grid[col] = df_grid[col].astype(str).replace(["nan", "NaN", "None", "<NA>", "NaT"], "")
+        
+        for col in df_grid.columns: 
+            df_grid[col] = df_grid[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
+            
         if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)]
         df_grid = df_grid.reset_index(drop=True)
+
+        # 🔥 FORÇA O VALOR A SER 'None' REAL (E NÃO A PALAVRA "None") PARA A CÉLULA FICAR 100% VAZIA
+        df_grid['COMPROVANTE'] = df_grid['COMPROVANTE'].apply(lambda x: x if str(x).startswith("http") else None)
 
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione as caixinhas na tabela para liberar os botões.</p>", unsafe_allow_html=True)
 
