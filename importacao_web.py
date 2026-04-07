@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 import random
 import gspread
 import uuid
+import base64
 from streamlit_autorefresh import st_autorefresh
 from fpdf import FPDF
 
@@ -138,7 +139,6 @@ def carregar_dados_completos(_planilha):
             df = df.loc[:, ~df.columns.duplicated()] 
             df = df.dropna(how='all') 
             
-            # 🔥 GARANTE A COLUNA ZAP_ENVIADO 🔥
             if 'ZAP_ENVIADO' not in df.columns:
                 df['ZAP_ENVIADO'] = ""
 
@@ -229,6 +229,10 @@ FERIADOS_BR = holidays.Brazil()
 CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "MB_CAEP"]
 hoje_br = datetime.now(FUSO_BR).date() 
 
+def padronizar_texto(texto):
+    if pd.isna(texto) or not texto: return ""
+    return unicodedata.normalize('NFKD', str(texto).strip()).encode('ASCII', 'ignore').decode('utf-8').upper()
+
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts: return False
     try:
@@ -262,7 +266,7 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         st.error(f"🚨 ERRO APPSHEET: {e}")
         return False
 
-# 🔥 MOTOR DE DISPARO DA Z-API 🔥
+# 🔥 MOTOR DE DISPARO DA Z-API (TEXTOS) 🔥
 def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
     INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
     TOKEN = "2321563615C4242CB6031504"         
@@ -279,10 +283,115 @@ def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
     try:
         response = requests.post(url, json=payload, headers=headers)
         if response.status_code in [200, 201]: return True
-        else: st.error(f"🚨 Retorno da Z-API (Telefone: {tel_limpo}): {response.text}"); return False
-    except Exception as e:
-        st.error(f"🚨 Falha geral de comunicação com a Z-API: {e}")
-        return False
+        else: return False
+    except Exception: return False
+
+# 🔥 MOTOR DE DISPARO DA Z-API (ARQUIVOS / PDF) 🔥
+def enviar_pdf_zapi(telefone_destino, pdf_bytes, nome_arquivo):
+    INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
+    TOKEN = "2321563615C4242CB6031504"         
+    CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S" 
+    
+    tel_limpo = re.sub(r'\D', '', str(telefone_destino))
+    if not tel_limpo.startswith('55') and len(tel_limpo) in [10, 11]:
+        tel_limpo = '55' + tel_limpo
+        
+    url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-document/pdf"
+    b64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+    
+    payload = {
+        "phone": tel_limpo, 
+        "document": b64_pdf,
+        "fileName": nome_arquivo
+    }
+    headers = {"Accept": "application/json", "Content-Type": "application/json", "Client-Token": CLIENT_TOKEN}
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code in [200, 201]: return True
+        else: return False
+    except Exception: return False
+
+# 🔥 CONSTRUTOR DE PDF PARA WHATSAPP 🔥
+def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_draw_color(15, 23, 42)
+    pdf.set_line_width(0.3)
+    pdf.rect(5, 5, 200, 287)
+    
+    try:
+        logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
+        if not os.path.exists(logo_path):
+            req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file: 
+                out_file.write(response.read())
+        pdf.image(logo_path, x=10, y=8, w=30) 
+    except Exception: pass
+    
+    pdf.set_y(15)
+    pdf.set_font("Arial", "B", 14)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 6, f"ROTA OFICIAL DE OPERACAO - IGO LOGISTICA", ln=True, align="C") 
+    pdf.set_font("Arial", "B", 10)
+    pdf.set_text_color(2, 132, 199) 
+    pdf.cell(0, 5, f"AGENTE: {padronizar_texto(nome_motorista)}", ln=True, align="C")
+    pdf.set_font("Arial", "", 8)
+    pdf.set_text_color(100, 116, 139) 
+    pdf.cell(0, 4, f"Data da Rota: {data_str} | Total de Volumes: {len(df_agente)}", ln=True, align="C")
+    
+    pdf.ln(3); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(3)
+    
+    # Agrupamento da Rota por Cidade e Bairro
+    grouped_cidade = df_agente.groupby('CIDADE')
+    for cidade, group_cid in grouped_cidade:
+        cidade_nome = padronizar_texto(str(cidade))
+        
+        pdf.set_fill_color(15, 23, 42)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 9)
+        pdf.cell(0, 6, f"CIDADE: {cidade_nome}", 1, 1, "L", True)
+        
+        grouped_bairro = group_cid.groupby('BAIRRO')
+        for bairro, group_bai in grouped_bairro:
+            bairro_nome = padronizar_texto(str(bairro))
+            
+            pdf.set_fill_color(226, 232, 240)
+            pdf.set_text_color(15, 23, 42)
+            pdf.set_font("Arial", "B", 8)
+            pdf.cell(0, 5, f"   BAIRRO: {bairro_nome}", 1, 1, "L", True)
+            
+            # Cabeçalho da Tabela
+            pdf.set_fill_color(241, 245, 249)
+            pdf.set_text_color(71, 85, 105)
+            pdf.set_font("Arial", "B", 7)
+            pdf.cell(8, 5, "OK", 1, 0, "C", True)
+            pdf.cell(20, 5, "PEDIDO", 1, 0, "C", True)
+            pdf.cell(60, 5, "LABORATORIO", 1, 0, "L", True)
+            pdf.cell(77, 5, "ENDERECO", 1, 0, "L", True)
+            pdf.cell(25, 5, "TOMADOR", 1, 1, "C", True)
+            
+            # Linhas da Tabela
+            pdf.set_text_color(51, 65, 85)
+            pdf.set_font("Arial", "", 7)
+            for _, row in group_bai.iterrows():
+                ped = padronizar_texto(str(row.get('PEDIDO','')))
+                lab = padronizar_texto(str(row.get('LABORATORIO','')))[:35]
+                end = padronizar_texto(f"{str(row.get('ENDERECO',''))}, {str(row.get('NUMERO',''))}")[:48]
+                tom = padronizar_texto(str(row.get('TOMADOR','')))[:15]
+                
+                pdf.cell(8, 5, "[  ]", 1, 0, "C")
+                pdf.cell(20, 5, ped, 1, 0, "C")
+                pdf.cell(60, 5, lab, 1, 0, "L")
+                pdf.cell(77, 5, end, 1, 0, "L")
+                pdf.cell(25, 5, tom, 1, 1, "C")
+                
+        pdf.ln(2)
+        
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+        pdf.output(tmp_pdf.name)
+        with open(tmp_pdf.name, "rb") as f: pdf_bytes = f.read()
+    return pdf_bytes
 
 def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_lista):
     pdf = FPDF()
@@ -335,8 +444,8 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
         pdf.cell(10, 5, str(idx), 1, 0, "C", True)
         pdf.cell(25, 5, str(item.get('PEDIDO','')), 1, 0, "C", True)
         pdf.cell(30, 5, qr_val, 1, 0, "C", True)
-        pdf.cell(80, 5, str(item.get('LABORATORIO',''))[:48], 1, 0, "L", True)
-        pdf.cell(35, 5, str(item.get('CIDADE',''))[:22], 1, 0, "L", True)
+        pdf.cell(80, 5, padronizar_texto(str(item.get('LABORATORIO','')))[:48], 1, 0, "L", True)
+        pdf.cell(35, 5, padronizar_texto(str(item.get('CIDADE','')))[:22], 1, 0, "L", True)
         pdf.cell(10, 5, str(item.get('UF','')), 1, 1, "C", True)
         
     pdf.ln(4)
@@ -355,10 +464,6 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
         pdf.output(tmp_pdf.name)
         with open(tmp_pdf.name, "rb") as f: pdf_bytes = f.read()
     return pdf_bytes
-
-def padronizar_texto(texto):
-    if pd.isna(texto) or not texto: return ""
-    return unicodedata.normalize('NFKD', str(texto).strip()).encode('ASCII', 'ignore').decode('utf-8').upper()
 
 def tratar_texto_global(texto):
     if pd.isna(texto): return ""
@@ -1180,7 +1285,7 @@ elif menu == "🔬 Triagem":
         st.info("O banco de dados está vazio no momento.")
 
 # =============================================================================
-# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (LOG E DISPARO EM MASSA)
+# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (LOG, DISPARO EM MASSA E PDF OFICIAL)
 # =============================================================================
 elif menu == "📱 WhatsApp":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
@@ -1190,10 +1295,8 @@ elif menu == "📱 WhatsApp":
         data_filtro = st.date_input("📅 Cronograma da Data (Filtro e Histórico):", value=hoje_br, format="DD/MM/YYYY")
         st.markdown("---")
         
-        # Criação das duas colunas: 70% para a ação, 30% para o Log
         col_esq, col_dir = st.columns([2.5, 1.2])
         
-        # Filtramos os dados do dia escolhido
         df_dia = df_raw[df_raw['DATA_OBJ'] == data_filtro].copy()
         df_pendentes = df_dia[df_dia['STATUS'].astype(str).str.upper() == 'PENDENTE'].copy()
         
@@ -1206,7 +1309,6 @@ elif menu == "📱 WhatsApp":
             else:
                 agentes_com_rota = [ag for ag in df_pendentes['AGENTE_RAW'].dropna().unique() if str(ag).strip()]
                 
-                # Identifica quem falta receber a mensagem
                 agentes_para_enviar = []
                 for ag in agentes_com_rota:
                     df_ag = df_pendentes[df_pendentes['AGENTE_RAW'] == ag]
@@ -1216,7 +1318,7 @@ elif menu == "📱 WhatsApp":
                 # 🔥 BOTÃO DE DISPARO EM MASSA 🔥
                 if agentes_para_enviar:
                     st.info(f"🚀 Existem {len(agentes_para_enviar)} motoristas aguardando o envio da rota oficial.")
-                    if st.button("🚀 DISPARAR PARA TODOS OS PENDENTES AGORA", type="primary", use_container_width=True):
+                    if st.button("🚀 DISPARAR TEXTO E PDF PARA TODOS AGORA", type="primary", use_container_width=True):
                         with st.spinner("Iniciando disparos em massa via Z-API... (isso pode levar alguns segundos)"):
                             pedidos_atualizados = []
                             sucessos = 0
@@ -1274,10 +1376,17 @@ elif menu == "📱 WhatsApp":
                                         
                                     msg_final = "\n".join(msg_parts)
                                     
+                                    # 1️⃣ Dispara o Texto
                                     if enviar_whatsapp_zapi(telefone, msg_final):
+                                        time.sleep(1.0)
+                                        # 2️⃣ Gera e Dispara o PDF Oficial
+                                        pdf_bytes = gerar_pdf_rota_whatsapp(nome_amigavel, data_str, df_agente)
+                                        nome_pdf = f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.pdf"
+                                        enviar_pdf_zapi(telefone, pdf_bytes, nome_pdf)
+                                        
                                         sucessos += 1
                                         pedidos_atualizados.extend(df_agente['PEDIDO'].tolist())
-                                    time.sleep(1.2) 
+                                    time.sleep(1.5) 
                             
                             if pedidos_atualizados:
                                 try:
@@ -1292,7 +1401,7 @@ elif menu == "📱 WhatsApp":
                                 except Exception as e:
                                     st.error(f"Erro ao carimbar envio no banco: {e}")
                             
-                            st.success(f"🎉 Disparo em massa concluído! {sucessos} motoristas foram notificados com sucesso.")
+                            st.success(f"🎉 Disparo em massa concluído! {sucessos} motoristas receberam Texto e PDF.")
                             time.sleep(2.5)
                             st.rerun()
                 else:
@@ -1360,11 +1469,20 @@ elif menu == "📱 WhatsApp":
                                 
                             msg_final = "\n".join(msg_parts)
                             
-                            texto_botao = "🔄 Reenviar Rota Oficial" if todos_enviados else f"📲 Disparar Rota para {nome_amigavel}"
+                            texto_botao = "🔄 Reenviar Texto e PDF" if todos_enviados else f"📲 Disparar Texto e PDF para {nome_amigavel}"
                             if st.button(texto_botao, key=f"zap_api_ind_{agente}", type="primary" if not todos_enviados else "secondary"):
-                                with st.spinner("Enviando dados via satélite..."):
-                                    sucesso = enviar_whatsapp_zapi(telefone, msg_final)
-                                    if sucesso:
+                                with st.spinner("Enviando pacote completo via satélite..."):
+                                    
+                                    # 1️⃣ Manda o Texto
+                                    sucesso_texto = enviar_whatsapp_zapi(telefone, msg_final)
+                                    
+                                    if sucesso_texto:
+                                        time.sleep(1.0)
+                                        # 2️⃣ Gera e Manda o PDF
+                                        pdf_bytes = gerar_pdf_rota_whatsapp(nome_amigavel, data_str, df_agente)
+                                        nome_pdf = f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.pdf"
+                                        enviar_pdf_zapi(telefone, pdf_bytes, nome_pdf)
+                                        
                                         try:
                                             aba = planilha_db.worksheet("Memoria_Sistema")
                                             df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
@@ -1377,9 +1495,11 @@ elif menu == "📱 WhatsApp":
                                         except Exception as e:
                                             st.error(f"Erro ao carimbar envio: {e}")
                                             
-                                        st.success(f"✅ Rota enviada com sucesso para {nome_amigavel}!")
+                                        st.success(f"✅ Texto e PDF enviados com sucesso para {nome_amigavel}!")
                                         time.sleep(1.5)
                                         st.rerun()
+                                    else:
+                                        st.error("🚨 Falha ao enviar o texto. O PDF não foi gerado.")
                         else: 
                             st.error(f"⚠️ Telefone do agente '{agente}' não encontrado.")
         
@@ -1388,7 +1508,6 @@ elif menu == "📱 WhatsApp":
                 st.markdown("<h4 style='color:#0F172A; margin-top:0px; font-size:16px;'>⏱️ Log de Disparos</h4>", unsafe_allow_html=True)
                 st.divider()
                 
-                # O Log busca em df_dia (Para ver os envios, mesmo se o pacote já foi entregue depois)
                 log_list = []
                 agentes_dia = [ag for ag in df_dia['AGENTE_RAW'].dropna().unique() if str(ag).strip()]
                 
