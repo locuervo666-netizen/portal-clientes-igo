@@ -450,6 +450,11 @@ if menu == "📊 Dashboard":
         c5.button(f"🚨 ATRASADOS\n{n_atra}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
         c6.button(f"📅 HOJE\n{n_hoje}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
+        # 🔥 A BARRA DE PROGRESSO VOLTOU!
+        st.markdown("<br>", unsafe_allow_html=True)
+        taxa_progresso = n_ent / n_tot if n_tot > 0 else 0.0
+        st.progress(taxa_progresso, text=f"📊 Progresso da Operação: {int(taxa_progresso * 100)}% dos pacotes entregues")
+        
         st.markdown("<br>", unsafe_allow_html=True)
         busca = st.text_input("🔎 Busca Rápida (Código, Lab, Cidade...):", placeholder="Filtrar dados na tabela...")
 
@@ -462,7 +467,8 @@ if menu == "📊 Dashboard":
         
         df_grid['COMPROVANTE'] = df_grid['FOTO_URL']
 
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'COMPROVANTE', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA']
+        # 🔥 COMPROVANTE AGORA É A ÚLTIMA COLUNA
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA', 'COMPROVANTE']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
         df_grid = df_grid[df_grid['PEDIDO'].astype(str).str.strip() != ""] 
         
@@ -472,8 +478,8 @@ if menu == "📊 Dashboard":
         if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)]
         df_grid = df_grid.reset_index(drop=True)
 
-        # 🔥 FORÇA O VALOR A SER 'None' REAL (E NÃO A PALAVRA "None") PARA A CÉLULA FICAR 100% VAZIA
-        df_grid['COMPROVANTE'] = df_grid['COMPROVANTE'].apply(lambda x: x if str(x).startswith("http") else None)
+        # 🔥 FORÇA O VALOR A SER UM TEXTO COMPLETAMENTE VAZIO SE NÃO TIVER FOTO (Para não virar link fantasma nem None)
+        df_grid['COMPROVANTE'] = df_grid['COMPROVANTE'].apply(lambda x: x if str(x).startswith("http") else "")
 
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione as caixinhas na tabela para liberar os botões.</p>", unsafe_allow_html=True)
 
@@ -993,8 +999,7 @@ elif menu == "🔬 Triagem":
                     df_fila, 
                     hide_index=True, 
                     disabled=[c for c in df_fila.columns if c != "SELECIONAR"], 
-                    use_container_width=True,
-                    key="tabela_triagem_lote"
+                    use_container_width=True
                 )
                 
                 selecionados_manuais = tabela_fila[tabela_fila["SELECIONAR"]]
