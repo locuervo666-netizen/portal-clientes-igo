@@ -277,7 +277,6 @@ def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
         "message": texto_mensagem
     }
     
-    # Adicionamos a camada de segurança extra que a Z-API pediu
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
@@ -1008,7 +1007,6 @@ elif menu == "📥 Importações":
                         if lista_app: 
                             despachar_para_appsheet(lista_app)
                             
-                        # 🔥 NOTIFICAÇÃO CLARA E TEMPORIZADA 🔥
                         st.success(f"🎉 SUCESSO! Foram importados um total de {len(df_ok)} pedidos com sucesso.")
                         time.sleep(2.5) 
                         
@@ -1179,41 +1177,94 @@ elif menu == "🔬 Triagem":
         st.info("O banco de dados está vazio no momento.")
 
 # =============================================================================
-# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (AGORA COM API E CLIENT-TOKEN)
+# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (TEMPLATE OFICIAL IGO)
 # =============================================================================
 elif menu == "📱 WhatsApp":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
+    
     if not df_raw.empty:
         data_filtro = st.date_input("📅 Cronograma da Data:", value=hoje_br, format="DD/MM/YYYY")
         df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
+        
         if df_pendentes.empty:
             st.success(f"Nenhum volume PENDENTE detectado em {data_filtro.strftime('%d/%m/%Y')}.")
         else:
             agentes_com_rota = [ag for ag in df_pendentes['AGENTE_RAW'].dropna().unique() if str(ag).strip()]
+            
+            # Dicionários para buscar o Telefone e o Nome Bonito do motorista
             dict_telefones = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip() and re.sub(r'\D', '', str(r.get('TELEFONE', '')))}
+            dict_nomes = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
+            
             for agente in sorted(agentes_com_rota):
                 df_agente = df_pendentes[df_pendentes['AGENTE_RAW'] == agente]
                 telefone = dict_telefones.get(str(agente).strip().lower(), "")
-                with st.expander(f"👤 Agente Tático: {str(agente).upper()} | Volumes: {len(df_agente)}", expanded=False):
+                nome_amigavel = dict_nomes.get(str(agente).strip().lower(), str(agente).upper())
+                
+                with st.expander(f"👤 Agente Tático: {nome_amigavel} | Volumes: {len(df_agente)}", expanded=False):
                     st.dataframe(df_agente[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True)
+                    
                     if telefone:
-                        msg = f"🚚 *ROTA OFICIAL IGO LOGÍSTICA*\nData: {data_filtro.strftime('%d/%m/%Y')}\nAgente Tático: {str(agente).upper()}\n\n"
-                        for i, (_, row) in enumerate(df_agente.iterrows(), 1):
-                            msg += f"*{i}️⃣ ID:* {row['PEDIDO']}\n🏥 *Tomador:* {row.get('TOMADOR', '')}\n🏢 *Local:* {row.get('LABORATORIO', '')}\n📍 *Endereço:* {row.get('ENDERECO', '')}, {row.get('NUMERO', '')} - {row.get('CIDADE', '')}\n"
-                            if str(row.get('OBSERVACOES', '')).strip() and str(row.get('OBSERVACOES', '')).upper() != 'NAN': 
-                                msg += f"📝 *Aviso:* {row['OBSERVACOES']}\n"
-                            msg += "------------------------\n"
+                        # 🔥 MONTAGEM DA MENSAGEM NO NOVO PADRÃO IGO 🔥
+                        data_str = data_filtro.strftime('%d/%m/%Y')
+                        msg_parts = []
+                        msg_parts.append(f"Bom dia, {nome_amigavel}")
+                        msg_parts.append(f"🗓️ {data_str}\n")
+                        msg_parts.append("RESUMO DA ROTA:\n")
+                        msg_parts.append("CIDADE                  | QTD")
+                        msg_parts.append("-------------------------------")
                         
-                        # 🔥 NOVO BOTÃO DA API Z-API 🔥
-                        if st.button(f"📲 Disparar Ordem Oficial (API) - {str(agente).upper()}", key=f"zap_api_{agente}", type="primary"):
+                        # Resumo por cidade
+                        cidades_counts = df_agente['CIDADE'].value_counts()
+                        total_qtd = 0
+                        for cid, count in cidades_counts.items():
+                            cid_str = str(cid).strip().ljust(23)
+                            qtd_str = f"{count:02d}"
+                            msg_parts.append(f"{cid_str} | {qtd_str}")
+                            total_qtd += count
+                            
+                        msg_parts.append("-------------------------------")
+                        msg_parts.append(f"TOTAL                   | {total_qtd:02d}\n\n")
+                        
+                        msg_parts.append("⬇️ DETALHES:")
+                        msg_parts.append("========================\n")
+                        
+                        # Detalhes Agrupados por Cidade
+                        grouped = df_agente.groupby('CIDADE')
+                        for cid, group in grouped:
+                            cid_limpa = str(cid).strip()
+                            msg_parts.append("------------------------------")
+                            msg_parts.append(f"{cid_limpa.center(30)}")
+                            msg_parts.append("------------------------------\n")
+                            
+                            items = []
+                            for _, row in group.iterrows():
+                                item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', '')}\n"
+                                item_str += f"> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n"
+                                item_str += f"> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n"
+                                item_str += f"> 🏘️ Bairro: {row.get('BAIRRO', '')}\n"
+                                item_str += f"> 📮 CEP: {row.get('CEP', '')}\n"
+                                item_str += f"> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                
+                                obs = str(row.get('OBSERVACOES', '')).strip()
+                                if obs and obs.upper() != 'NAN': 
+                                    item_str += f"\n> 📝 Aviso: {obs}"
+                                
+                                items.append(item_str)
+                                
+                            msg_parts.append("\n\n      . . . . .\n\n".join(items))
+                            msg_parts.append("\n")
+                            
+                        msg_final = "\n".join(msg_parts)
+                        
+                        # Botão de Disparo
+                        if st.button(f"📲 Disparar Ordem Oficial (API) - {nome_amigavel}", key=f"zap_api_{agente}", type="primary"):
                             with st.spinner("Enviando dados via satélite..."):
-                                sucesso = enviar_whatsapp_zapi(telefone, msg)
+                                sucesso = enviar_whatsapp_zapi(telefone, msg_final)
                                 if sucesso:
-                                    st.success(f"✅ Rota enviada com sucesso para {str(agente).upper()}!")
+                                    st.success(f"✅ Rota enviada com sucesso para {nome_amigavel}!")
                                     time.sleep(2)
                                     st.rerun()
-                                # Se der erro, a função enviar_whatsapp_zapi já vai imprimir o erro exato na tela!
                     else: 
                         st.error(f"⚠️ Telefone do agente '{agente}' não encontrado.")
     else:
