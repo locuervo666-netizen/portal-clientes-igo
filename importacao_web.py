@@ -10,6 +10,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 import requests
+import time
 from datetime import datetime, timedelta, timezone
 import random
 import gspread
@@ -55,6 +56,13 @@ st.markdown("""
     div.st-key-kpi_hoje button { background: linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%) !important; }
     div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_pend button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
         color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
+    }
+    
+    div[data-testid="stPopover"] > button, button[kind="secondary"] {
+        white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
+    }
+    div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
+        border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -386,7 +394,7 @@ def calc_status_display(row):
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
 # =============================================================================
-# 🎨 3. CABEÇALHO E NAVEGAÇÃO
+# 🎨 3. CABEÇALHO E NAVEGAÇÃO (NOMES ATUALIZADOS)
 # =============================================================================
 col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
 
@@ -401,7 +409,8 @@ with col_logout:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-menu = st.radio("Navegação:", ["📊 Dashboard", "📝 Manual", "📥 Lotes", "🔬 Triagem", "📱 Zap", "📁 Relatórios", "⚙️ Rotas"], horizontal=True, label_visibility="collapsed")
+# NOVOS NOMES NA BARRA DE TAREFAS
+menu = st.radio("Navegação:", ["📊 GRID", "📝 Pedido Manual", "📥 Importações", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"], horizontal=True, label_visibility="collapsed")
 
 if planilha_db is None:
     st.error("🚨 FALHA CRÍTICA: Não foi possível conectar ao Google Sheets.")
@@ -409,9 +418,9 @@ if planilha_db is None:
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD
+# 🚀 MÓDULO 1: DASHBOARD / GRID PRINCIPAL
 # =============================================================================
-if menu == "📊 Dashboard":
+if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
@@ -459,6 +468,19 @@ if menu == "📊 Dashboard":
         
         df_grid['COMPROVANTE'] = df_grid['FOTO_URL']
 
+        # 🔥 ORDENAÇÃO DE PRIORIDADE: PENDENTES NO TOPO 🔥
+        def definir_prioridade(status_str):
+            s = str(status_str).upper()
+            if 'PENDENTE' in s: return 1
+            if 'COLETADO' in s: return 2
+            if 'CONFERIDO' in s: return 3
+            if 'ROTA' in s: return 4
+            if 'ENTREGUE' in s: return 5
+            return 6 
+            
+        df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(definir_prioridade)
+        df_grid = df_grid.sort_values(by=['PRIORIDADE', 'PEDIDO'], ascending=[True, False]).drop(columns=['PRIORIDADE'])
+
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA', 'COMPROVANTE']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
         df_grid = df_grid[df_grid['PEDIDO'].astype(str).str.strip() != ""] 
@@ -477,12 +499,21 @@ if menu == "📊 Dashboard":
         
         df_grid.insert(0, "SELECIONAR", False)
         
+        # 🔥 NOMES DOS CABEÇALHOS ALTERADOS AQUI 🔥
         tabela_renderizada = st.data_editor(
             df_grid,
             column_config={
-                "SELECIONAR": st.column_config.CheckboxColumn("✔ Ação", default=False),
-                "STATUS_DISPLAY": st.column_config.TextColumn("📌 Status Operacional"),
-                "COMPROVANTE": st.column_config.LinkColumn("📸 Comprovante", display_text="🔎 Ver Foto")
+                "SELECIONAR": st.column_config.CheckboxColumn("✔ AÇÃO", default=False),
+                "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
+                "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Ver Foto"),
+                "AGENTE_RAW": st.column_config.TextColumn("AGENTE"),
+                "DATA_ENTREGA": st.column_config.TextColumn("ENTREGA"),
+                "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
+                "DATA": st.column_config.TextColumn("DATA"),
+                "PEDIDO": st.column_config.TextColumn("PEDIDO"),
+                "TOMADOR": st.column_config.TextColumn("TOMADOR"),
+                "LABORATORIO": st.column_config.TextColumn("LABORATÓRIO"),
+                "CIDADE": st.column_config.TextColumn("CIDADE")
             },
             disabled=[c for c in df_grid.columns if c != "SELECIONAR"],
             hide_index=True,
@@ -551,7 +582,10 @@ if menu == "📊 Dashboard":
                                                 aba_app.clear(); aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
                                         except Exception: pass
                                             
-                                        st.success("Atualizado!"); carregar_dados_completos.clear(); st.rerun()
+                                        st.success("🎉 Atualizado com sucesso!")
+                                        time.sleep(1.5)
+                                        carregar_dados_completos.clear()
+                                        st.rerun()
                                     except Exception as e: st.error(f"Erro: {e}")
 
             with col_b2.popover("🔄 Trocar de Motorista", use_container_width=True):
@@ -580,7 +614,11 @@ if menu == "📊 Dashboard":
                                                 lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
                                         aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                         despachar_para_appsheet(lista_app_troca)
-                                        st.success("Trocado!"); carregar_dados_completos.clear(); st.rerun()
+                                        
+                                        st.success("🎉 Troca realizada com sucesso!")
+                                        time.sleep(1.5)
+                                        carregar_dados_completos.clear()
+                                        st.rerun()
                                     except Exception as e: st.error(f"Erro: {e}")
             
             with col_b3.popover("👯 Clonar Pedidos", use_container_width=True):
@@ -628,7 +666,8 @@ if menu == "📊 Dashboard":
                                     if clones_para_app: 
                                         despachar_para_appsheet(clones_para_app)
                                     
-                                    st.success("Clonado!")
+                                    st.success(f"🎉 {len(p_ids)} Pedido(s) clonado(s) com sucesso!")
+                                    time.sleep(1.5)
                                     carregar_dados_completos.clear()
                                     st.rerun()
                                 except Exception as e: 
@@ -660,7 +699,8 @@ if menu == "📊 Dashboard":
                                         except Exception: 
                                             pass 
                                             
-                                        st.success(f"Apagados!")
+                                        st.success(f"🗑️ Pedido(s) apagado(s) com sucesso!")
+                                        time.sleep(1.5)
                                         carregar_dados_completos.clear()
                                         st.rerun()
                                     except Exception as e: 
@@ -671,13 +711,14 @@ if menu == "📊 Dashboard":
             col_b5.button("🔄 Atualizar Painel", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
 
     else:
-        st.warning("O banco de dados está vazio ou a aba Memoria_Sistema não foi encontrada. Vá para a aba Manual.")
+        st.warning("O banco de dados está vazio ou a aba Memoria_Sistema não foi encontrada. Vá para a aba Pedido Manual.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL COM API VIACEP
 # =============================================================================
-elif menu == "📝 Manual":
+elif menu == "📝 Pedido Manual":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
+    st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente.**")
     
     if 'm_rua' not in st.session_state: st.session_state['m_rua'] = ""
     if 'm_bai' not in st.session_state: st.session_state['m_bai'] = ""
@@ -761,7 +802,12 @@ elif menu == "📝 Manual":
                                 despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
                                 
                             st.success(f"🎉 Pedido {m_pedido} criado com sucesso!")
-                            st.session_state['m_rua'] = ""; st.session_state['m_bai'] = ""; st.session_state['m_cid'] = ""; st.session_state['m_uf'] = ""
+                            
+                            st.session_state['m_rua'] = ""
+                            st.session_state['m_bai'] = ""
+                            st.session_state['m_cid'] = ""
+                            st.session_state['m_uf'] = ""
+                            
                             carregar_dados_completos.clear()
                         except Exception as e: 
                             st.error(f"Erro ao salvar: {e}")
@@ -769,7 +815,7 @@ elif menu == "📝 Manual":
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
 # =============================================================================
-elif menu == "📥 Lotes":
+elif menu == "📥 Importações":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes</h3></div>", unsafe_allow_html=True)
     if "df_preview" not in st.session_state: 
         st.session_state.df_preview = pd.DataFrame()
@@ -792,42 +838,60 @@ elif menu == "📥 Lotes":
                 try:
                     delim = '\t' if '\t' in txt else (';' if ';' in txt else ',')
                     df_raw_import = pd.read_csv(io.StringIO(txt), sep=delim, header=None, dtype=str).fillna("")
-                    idx_h = 0; max_matches = 0
+                    idx_h = 0
+                    max_matches = 0
                     for i in range(min(15, len(df_raw_import))):
                         row_str = " ".join(df_raw_import.iloc[i].astype(str).values).upper()
                         row_str = unicodedata.normalize('NFKD', row_str).encode('ASCII', 'ignore').decode('utf-8')
                         matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP'] if kw in row_str)
-                        if matches > max_matches: max_matches = matches; idx_h = i
+                        if matches > max_matches: 
+                            max_matches = matches
+                            idx_h = i
                             
                     df_limpo = df_raw_import.iloc[idx_h+1:].copy()
                     df_limpo.columns = [str(c).strip() for c in df_raw_import.iloc[idx_h].values]
                     df_limpo = df_limpo.loc[:, ~df_limpo.columns.duplicated()] 
-                    for col in df_limpo.columns: df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
+                    
+                    for col in df_limpo.columns: 
+                        df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
                         
                     mapa = {}
                     for c in df_limpo.columns:
                         cl = ''.join(e for e in unicodedata.normalize('NFKD', str(c).upper().strip()).encode('ASCII', 'ignore').decode('utf-8') if e.isalnum()) 
-                        if any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': mapa[c] = 'PEDIDO'
-                        elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): mapa[c] = 'LABORATORIO'
-                        elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): mapa[c] = 'ENDERECO'
-                        elif any(x in cl for x in ['NUM', 'NRO']) or cl in ['N', 'NO']: mapa[c] = 'NUMERO'
-                        elif 'BAIRRO' in cl: mapa[c] = 'BAIRRO'
-                        elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa[c] = 'CIDADE'
-                        elif any(x in cl for x in ['ESTADO', 'UF']): mapa[c] = 'UF'
-                        elif 'CEP' in cl: mapa[c] = 'CEP'
+                        if any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': 
+                            mapa[c] = 'PEDIDO'
+                        elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): 
+                            mapa[c] = 'LABORATORIO'
+                        elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): 
+                            mapa[c] = 'ENDERECO'
+                        elif any(x in cl for x in ['NUM', 'NRO']) or cl in ['N', 'NO']: 
+                            mapa[c] = 'NUMERO'
+                        elif 'BAIRRO' in cl: 
+                            mapa[c] = 'BAIRRO'
+                        elif any(x in cl for x in ['CIDADE', 'MUNIC']): 
+                            mapa[c] = 'CIDADE'
+                        elif any(x in cl for x in ['ESTADO', 'UF']): 
+                            mapa[c] = 'UF'
+                        elif 'CEP' in cl: 
+                            mapa[c] = 'CEP'
+                            
                     df_limpo.rename(columns=mapa, inplace=True)
                     
                     for c in ['PEDIDO', 'LABORATORIO', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
-                        if c not in df_limpo.columns: df_limpo[c] = ""
+                        if c not in df_limpo.columns: 
+                            df_limpo[c] = ""
                             
                     for idx, row in df_limpo.iterrows():
                         e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
                         if e and (not n or not b):
                             cep_m = re.search(r'(\d{5}-?\d{3})', e)
                             if cep_m: 
-                                df_limpo.at[idx, 'CEP'] = cep_m.group(1); e = e.replace(cep_m.group(1), '').strip(' ,-')
+                                df_limpo.at[idx, 'CEP'] = cep_m.group(1)
+                                e = e.replace(cep_m.group(1), '').strip(' ,-')
                             if ',' in e and not n: 
-                                pts = e.split(','); df_limpo.at[idx, 'ENDERECO'] = pts[0].strip(); df_limpo.at[idx, 'NUMERO'] = pts[1].strip()
+                                pts = e.split(',')
+                                df_limpo.at[idx, 'ENDERECO'] = pts[0].strip()
+                                df_limpo.at[idx, 'NUMERO'] = pts[1].strip()
                                 
                     df_limpo['UF'] = df_limpo['UF'].astype(str).str.upper().str.strip()
                     df_limpo['CIDADE'] = df_limpo['CIDADE'].astype(str).str.upper().str.strip()
@@ -838,18 +902,21 @@ elif menu == "📥 Lotes":
                     
                     st.session_state.df_preview = df_limpo[['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
                     st.rerun()
-                except Exception as e: st.error(f"Erro no processamento: {e}")
+                except Exception as e: 
+                    st.error(f"Erro no processamento: {e}")
 
     if not st.session_state.df_preview.empty:
         st.markdown("---")
         col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
         col_tit.markdown("### 👀 2. Preview de Carga")
         if col_canc.button("❌ Cancelar / Limpar", type="secondary", use_container_width=True):
-            st.session_state.df_preview = pd.DataFrame(); st.rerun()
+            st.session_state.df_preview = pd.DataFrame()
+            st.rerun()
 
         df_preview = st.session_state.df_preview
         mask_err = (df_preview['AGENTE_RAW'].astype(str).str.strip() == "") | (df_preview['AGENTE_RAW'].astype(str).str.upper() == "NAN")
-        df_err = df_preview[mask_err]; df_ok = df_preview[~mask_err]
+        df_err = df_preview[mask_err]
+        df_ok = df_preview[~mask_err]
 
         if not df_err.empty:
             st.error(f"🚨 **Atenção:** {len(df_err)} pedido(s) sem motorista. Corrija abaixo.")
@@ -862,7 +929,8 @@ elif menu == "📥 Lotes":
                     st.divider()
                 if st.form_submit_button("💾 Validar", type="primary"):
                     for idx, novo_mot in correcoes.items():
-                        if novo_mot != "Selecione...": st.session_state.df_preview.at[idx, 'AGENTE_RAW'] = novo_mot
+                        if novo_mot != "Selecione...": 
+                            st.session_state.df_preview.at[idx, 'AGENTE_RAW'] = novo_mot
                     st.rerun()
         else:
             st.success(f"✅ Lote validado! {len(df_ok)} pedidos prontos.")
@@ -875,22 +943,38 @@ elif menu == "📥 Lotes":
                         df_up = pd.DataFrame(atuais[1:], columns=atuais[0]) if len(atuais) > 1 else pd.DataFrame()
                         prox_id = obter_proximo_id(df_up)
                         for idx, row in df_ok.iterrows():
-                            if not str(row['PEDIDO']).strip(): df_ok.at[idx, 'PEDIDO'] = str(prox_id); prox_id += 1
+                            if not str(row['PEDIDO']).strip(): 
+                                df_ok.at[idx, 'PEDIDO'] = str(prox_id)
+                                prox_id += 1
                         df_ok['PRAZO_DIAS'] = df_ok.apply(lambda r: str(calcular_sla_dias(r['UF'], r['CIDADE'])), axis=1)
                         df_ok['DATA_LIMITE'] = df_ok.apply(lambda r: str(calcular_data_limite(r['DATA'], int(r['PRAZO_DIAS']))), axis=1)
-                        df_ok['STATUS'] = 'PENDENTE'; df_ok['DATA_ENTREGA'] = ''; df_ok['FOTO'] = ''; df_ok['ROMANEIO'] = ''
+                        df_ok['STATUS'] = 'PENDENTE'
+                        df_ok['DATA_ENTREGA'] = ''
+                        df_ok['FOTO'] = ''
+                        df_ok['ROMANEIO'] = ''
                         
                         df_ok = df_ok.astype(str)
                         df_up = pd.concat([df_up, df_ok], ignore_index=True) if not df_up.empty else df_ok
-                        aba.clear(); aba.update("A1", [df_up.columns.tolist()] + df_up.fillna("").astype(str).values.tolist())
+                        aba.clear()
+                        aba.update("A1", [df_up.columns.tolist()] + df_up.fillna("").astype(str).values.tolist())
                         
                         lista_app = []
                         for _, r in df_ok.iterrows():
                             if str(r.get('AGENTE_RAW','')).strip():
                                 lista_app.append({'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'], 'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'], 'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'], 'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'], 'TOMADOR': r['TOMADOR']})
-                        if lista_app: despachar_para_appsheet(lista_app)
-                        st.session_state.df_preview = pd.DataFrame(); carregar_dados_completos.clear(); st.rerun()
-                    except Exception as e: st.error(f"Erro: {e}")
+                        
+                        if lista_app: 
+                            despachar_para_appsheet(lista_app)
+                            
+                        # 🔥 NOTIFICAÇÃO CLARA E TEMPORIZADA 🔥
+                        st.success(f"🎉 SUCESSO! Foram importados um total de {len(df_ok)} pedidos com sucesso.")
+                        time.sleep(2.5) # Aguarda 2.5s para o usuário poder ler
+                        
+                        st.session_state.df_preview = pd.DataFrame()
+                        carregar_dados_completos.clear()
+                        st.rerun()
+                    except Exception as e: 
+                        st.error(f"Erro: {e}")
 
 # =============================================================================
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO (COM SELEÇÃO EM MASSA)
@@ -940,7 +1024,6 @@ elif menu == "🔬 Triagem":
             if not df_fila.empty:
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']].fillna("").astype(str)
                 
-                # 🔥 BOTÃO DE SELECIONAR TODOS (VALIADÇÃO)
                 c_sel1, c_sel2 = st.columns([1, 4])
                 sel_todos_val = c_sel1.checkbox("✅ Selecionar Todos", key="sel_all_val")
                 df_fila.insert(0, "SELECIONAR", sel_todos_val)
@@ -964,7 +1047,11 @@ elif menu == "🔬 Triagem":
                                 df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
                                 df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'STATUS'] = 'CONFERIDO'
                                 aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                st.success(f"🎉 {len(p_ids)} volumes liberados!"); carregar_dados_completos.clear(); st.rerun()
+                                
+                                st.success(f"🎉 {len(p_ids)} volumes liberados!")
+                                time.sleep(1.5)
+                                carregar_dados_completos.clear()
+                                st.rerun()
                             except Exception as e: st.error(f"Erro: {e}")
             else:
                 st.info("O salão está vazio. Materiais 'Coletados' no app chegam aqui.")
@@ -986,7 +1073,6 @@ elif menu == "🔬 Triagem":
                 
                 df_conf_show = df_conf[col_rom].fillna("").astype(str)
                 
-                # 🔥 BOTÃO DE SELECIONAR TODOS (EXPEDIÇÃO)
                 c_sel_exp1, c_sel_exp2 = st.columns([1, 4])
                 sel_todos_exp = c_sel_exp1.checkbox("✅ Selecionar Todos", key="sel_all_exp")
                 df_conf_show.insert(0, "SELECIONAR", sel_todos_exp)
@@ -1053,7 +1139,7 @@ elif menu == "🔬 Triagem":
 # =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
 # =============================================================================
-elif menu == "📱 Zap":
+elif menu == "📱 WhatsApp":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     if not df_raw.empty:
@@ -1118,12 +1204,19 @@ elif menu == "📁 Relatórios":
             c_base = cf2.text_input("🏢 Hub Logístico (Tomador/Clínica):")
             if st.form_submit_button("Executar Pesquisa e Compilar Tabela"):
                 df_custom = df_export_base.copy()
-                if c_ag and 'MOTORISTA' in df_custom.columns: df_custom = df_custom[df_custom['MOTORISTA'].str.upper().str.contains(c_ag.upper(), na=False)]
-                if c_cid and 'CIDADE' in df_custom.columns: df_custom = df_custom[df_custom['CIDADE'].str.upper().str.contains(c_cid.upper(), na=False)]
-                if c_uf and 'UF' in df_custom.columns: df_custom = df_custom[df_custom['UF'].str.upper() == c_uf.upper()]
-                if c_base: df_custom = df_custom[df_custom['TOMADOR'].str.upper().str.contains(c_base.upper(), na=False) | df_custom['LABORATORIO'].str.upper().str.contains(c_base.upper(), na=False)]
-                if not df_custom.empty: st.download_button("📥 Fazer Download do Relatório Cru (Excel)", data=gerar_excel_memoria(df_custom), file_name=f"Pesquisa_Customizada_IGO.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                else: st.warning("Nenhum dado encontrado.")
+                if c_ag and 'MOTORISTA' in df_custom.columns: 
+                    df_custom = df_custom[df_custom['MOTORISTA'].str.upper().str.contains(c_ag.upper(), na=False)]
+                if c_cid and 'CIDADE' in df_custom.columns: 
+                    df_custom = df_custom[df_custom['CIDADE'].str.upper().str.contains(c_cid.upper(), na=False)]
+                if c_uf and 'UF' in df_custom.columns: 
+                    df_custom = df_custom[df_custom['UF'].str.upper() == c_uf.upper()]
+                if c_base: 
+                    df_custom = df_custom[df_custom['TOMADOR'].str.upper().str.contains(c_base.upper(), na=False) | df_custom['LABORATORIO'].str.upper().str.contains(c_base.upper(), na=False)]
+                
+                if not df_custom.empty: 
+                    st.download_button("📥 Fazer Download do Relatório Cru (Excel)", data=gerar_excel_memoria(df_custom), file_name=f"Pesquisa_Customizada_IGO.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                else: 
+                    st.warning("Nenhum dado encontrado.")
     else: 
         st.warning("O banco de dados está vazio.")
 
@@ -1136,49 +1229,70 @@ elif menu == "⚙️ Rotas":
     
     with tab_agente:
         with st.form("form_novo_agente", clear_on_submit=True):
-            c1, c2 = st.columns(2); login_ag = c1.text_input("ID de Login", placeholder="Ex: carlos.rj"); nome_ag = c2.text_input("Nome Amigável", placeholder="Ex: CARLOS SILVA")
+            c1, c2 = st.columns(2)
+            login_ag = c1.text_input("ID de Login", placeholder="Ex: carlos.rj")
+            nome_ag = c2.text_input("Nome Amigável", placeholder="Ex: CARLOS SILVA")
             tel_ag = st.text_input("WhatsApp com DDD", placeholder="Ex: 5521999999999")
             if st.form_submit_button("💾 Salvar Novo Agente", type="primary"):
-                if not login_ag or not nome_ag or not tel_ag: st.error("⚠️ Preencha todos os campos!")
+                if not login_ag or not nome_ag or not tel_ag: 
+                    st.error("⚠️ Preencha todos os campos!")
                 else:
                     df_novo = pd.concat([DF_AGENTES, pd.DataFrame([{"ROTA MAPEADA": "SEM ROTA DEFINIDA", "LOGIN DO AGENTE": login_ag.lower().strip(), "NOME DO AGENTE": nome_ag.upper().strip(), "TELEFONE": re.sub(r'\D', '', tel_ag)}])], ignore_index=True)
                     try:
                         planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
-                        st.success(f"✅ Agente salvo!"); carregar_dados_agentes.clear()
-                    except Exception as e: st.error(f"Erro: {e}")
+                        st.success(f"✅ Agente salvo!")
+                        carregar_dados_agentes.clear()
+                    except Exception as e: 
+                        st.error(f"Erro: {e}")
                         
     with tab_rota:
         with st.form("form_nova_rota", clear_on_submit=True):
-            c1, c2, c3 = st.columns(3); cid_rota = c1.text_input("Cidade *", placeholder="Ex: SAO PAULO"); bai_rota = c2.text_input("Bairro (Opcional)"); rua_rota = c3.text_input("Endereço (Opcional)")
+            c1, c2, c3 = st.columns(3)
+            cid_rota = c1.text_input("Cidade *", placeholder="Ex: SAO PAULO")
+            bai_rota = c2.text_input("Bairro (Opcional)")
+            rua_rota = c3.text_input("Endereço (Opcional)")
             ag_selecionado = st.selectbox("Selecione o Agente:", sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else [])
             if st.form_submit_button("📍 Salvar Nova Rota", type="primary"):
-                if not cid_rota or not ag_selecionado: st.error("⚠️ Cidade e Agente são obrigatórios!")
+                if not cid_rota or not ag_selecionado: 
+                    st.error("⚠️ Cidade e Agente são obrigatórios!")
                 else:
                     rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(cid_rota), limpar_nome_local_rota(bai_rota), tratar_texto_global(rua_rota)] if p])
                     dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == ag_selecionado].iloc[0]
                     df_novo = pd.concat([DF_AGENTES, pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": ag_selecionado, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])], ignore_index=True)
                     try:
                         planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
-                        st.success(f"✅ Rota atrelada!"); carregar_dados_agentes.clear()
-                    except Exception as e: st.error(f"Erro: {e}")
+                        st.success(f"✅ Rota atrelada!")
+                        carregar_dados_agentes.clear()
+                    except Exception as e: 
+                        st.error(f"Erro: {e}")
                         
     with tab_tabela:
         if not DF_AGENTES.empty:
             agente_filtro = st.selectbox("👤 Selecione o Motorista para gerenciar apenas suas rotas:", sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()))
             with st.form(f"form_rapido_{agente_filtro}", clear_on_submit=True):
-                ca1, ca2, ca3, ca4 = st.columns([2, 2, 2, 1]); r_cid = ca1.text_input("Cidade"); r_bai = ca2.text_input("Bairro (Opç)"); r_rua = ca3.text_input("Endereço (Opç)")
+                ca1, ca2, ca3, ca4 = st.columns([2, 2, 2, 1])
+                r_cid = ca1.text_input("Cidade")
+                r_bai = ca2.text_input("Bairro (Opç)")
+                r_rua = ca3.text_input("Endereço (Opç)")
                 if ca4.form_submit_button("➕ Salvar", use_container_width=True):
-                    if not r_cid: st.error("A Cidade é obrigatória!")
+                    if not r_cid: 
+                        st.error("A Cidade é obrigatória!")
                     else:
                         rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai), tratar_texto_global(r_rua)] if p])
                         dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
                         df_novo = pd.concat([DF_AGENTES, pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": agente_filtro, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])], ignore_index=True)
                         try:
                             planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
-                            st.success("Rota adicionada!"); carregar_dados_agentes.clear(); st.rerun()
-                        except Exception as e: st.error(f"Erro ao salvar: {e}")
+                            st.success("Rota adicionada!")
+                            time.sleep(0.5)
+                            carregar_dados_agentes.clear()
+                            st.rerun()
+                        except Exception as e: 
+                            st.error(f"Erro ao salvar: {e}")
+                            
             df_ag_filtrado = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].copy()
-            if df_ag_filtrado.empty: st.warning("Nenhuma rota atrelada.")
+            if df_ag_filtrado.empty: 
+                st.warning("Nenhuma rota atrelada.")
             else:
                 for idx, row in df_ag_filtrado.iterrows():
                     col_rota, col_del = st.columns([5, 1])
@@ -1186,6 +1300,10 @@ elif menu == "⚙️ Rotas":
                     if col_del.button("🗑️ Remover", key=f"del_{idx}", use_container_width=True):
                         try:
                             planilha_db.worksheet("Agentes").update("A1", [DF_AGENTES.drop(idx).columns.tolist()] + DF_AGENTES.drop(idx).fillna("").astype(str).values.tolist())
-                            carregar_dados_agentes.clear(); st.rerun()
-                        except Exception as e: st.error(f"Erro ao remover: {e}")
-        else: st.warning("Nenhum dado encontrado.")
+                            time.sleep(0.5)
+                            carregar_dados_agentes.clear()
+                            st.rerun()
+                        except Exception as e: 
+                            st.error(f"Erro ao remover: {e}")
+        else: 
+            st.warning("Nenhum dado encontrado.")
