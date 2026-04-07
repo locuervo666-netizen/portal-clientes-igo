@@ -246,7 +246,7 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         aba.append_rows(linhas, value_input_option='USER_ENTERED')
         return True
     except Exception as e: 
-        st.error(f"🚨 ERRO DE SINCRONIZAÇÃO APPSHEET: {e}")
+        st.error(f"🚨 ERRO APPSHEET: {e}")
         return False
 
 def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_lista):
@@ -416,7 +416,7 @@ if planilha_db is None:
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (TOTALMENTE NATIVO - SEM AGGRID)
+# 🚀 MÓDULO 1: DASHBOARD
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -460,29 +460,28 @@ if menu == "📊 Dashboard":
         elif st.session_state.filtro_kpi_admin == "ATRASADO": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('ATRASADO')]
         elif st.session_state.filtro_kpi_admin == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
         
-        df_grid['FOTO_INDICADOR'] = df_grid['FOTO_URL'].apply(lambda x: '📸 Sim' if x else '❌ Não')
+        # CRIA O LINK DA FOTO PARA CLICAR DIRETO NA TABELA
+        df_grid['COMPROVANTE'] = df_grid['FOTO_URL'].apply(lambda x: x if x else None)
 
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'FOTO_INDICADOR', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA']
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'COMPROVANTE', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA']
         df_grid = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
         df_grid = df_grid[df_grid['PEDIDO'].astype(str).str.strip() != ""] 
         for col in df_grid.columns: df_grid[col] = df_grid[col].astype(str).replace(["nan", "NaN", "None", "<NA>", "NaT"], "")
         if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)]
         df_grid = df_grid.reset_index(drop=True)
 
-        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione as caixinhas na tabela para liberar os botões e abrir a foto.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione as caixinhas na tabela para liberar os botões.</p>", unsafe_allow_html=True)
 
-        # 🔥 A MÁGICA: BOTÕES EM CIMA, TABELA NATIVA 100%, FOTOS EMBAIXO
         box_botoes = st.empty()
         
         df_grid.insert(0, "SELECIONAR", False)
         
-        # TABELA NATIVA 100% LARGA
         tabela_renderizada = st.data_editor(
             df_grid,
             column_config={
                 "SELECIONAR": st.column_config.CheckboxColumn("✔ Ação", default=False),
                 "STATUS_DISPLAY": st.column_config.TextColumn("📌 Status Operacional"),
-                "FOTO_INDICADOR": st.column_config.TextColumn("📸 Foto")
+                "COMPROVANTE": st.column_config.LinkColumn("📸 Comprovante", display_text="🔎 Ver Foto")
             },
             disabled=[c for c in df_grid.columns if c != "SELECIONAR"],
             hide_index=True,
@@ -495,22 +494,6 @@ if menu == "📊 Dashboard":
         p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
 
-        # FOTOS SÓ APARECEM EMBAIXO DA TABELA E QUANDO SELECIONADAS
-        if tem_sel:
-            st.markdown("---")
-            st.markdown(f"<h3 style='margin-top:0; color:#0369A1;'>📸 Comprovantes Selecionados ({len(p_ids)} pedidos)</h3>", unsafe_allow_html=True)
-            fotos = df_f[df_f['PEDIDO'].isin(p_ids)]['FOTO_URL'].tolist()
-            fotos_validas = [f for f in fotos if str(f).strip() and str(f).upper() != 'NAN']
-            
-            if not fotos_validas:
-                st.info("Nenhuma foto encontrada para os pedidos selecionados.")
-            else:
-                cols_fotos = st.columns(len(fotos_validas) if len(fotos_validas) <= 4 else 4)
-                for i, url in enumerate(fotos_validas):
-                    with cols_fotos[i % 4]:
-                        st.image(url, use_container_width=True)
-
-        # 🔥 OS BOTÕES APARECEM NO ESPAÇO VAZIO LÁ EM CIMA BLINDADOS COM ST.FORM 🔥
         with box_botoes.container():
             st.markdown("""
             <style>
@@ -550,10 +533,8 @@ if menu == "📊 Dashboard":
                                         for pid in p_ids:
                                             mask = df_nuvem['PEDIDO'] == pid
                                             df_nuvem.loc[mask, 'STATUS'] = status_limpo
-                                            if status_limpo == "ENTREGUE": 
-                                                df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
-                                            elif status_limpo == "PENDENTE": 
-                                                df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
+                                            if status_limpo == "ENTREGUE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
+                                            elif status_limpo == "PENDENTE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
                                         
                                         aba.clear()
                                         aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
@@ -564,20 +545,13 @@ if menu == "📊 Dashboard":
                                             if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
                                                 df_app.loc[df_app['PEDIDO'].isin(p_ids), 'STATUS'] = status_limpo
                                                 if 'DATA_ENTREGA' in df_app.columns:
-                                                    if status_limpo == "ENTREGUE": 
-                                                        df_app.loc[df_app['PEDIDO'].isin(p_ids), 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
-                                                    elif status_limpo == "PENDENTE": 
-                                                        df_app.loc[df_app['PEDIDO'].isin(p_ids), 'DATA_ENTREGA'] = ""
-                                                aba_app.clear()
-                                                aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
-                                        except Exception: 
-                                            pass
+                                                    if status_limpo == "ENTREGUE": df_app.loc[df_app['PEDIDO'].isin(p_ids), 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
+                                                    elif status_limpo == "PENDENTE": df_app.loc[df_app['PEDIDO'].isin(p_ids), 'DATA_ENTREGA'] = ""
+                                                aba_app.clear(); aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
+                                        except Exception: pass
                                             
-                                        st.success("Atualizado!")
-                                        carregar_dados_completos.clear()
-                                        st.rerun()
-                                    except Exception as e: 
-                                        st.error(f"Erro: {e}")
+                                        st.success("Atualizado!"); carregar_dados_completos.clear(); st.rerun()
+                                    except Exception as e: st.error(f"Erro: {e}")
 
             with col_b2.popover("🔄 Trocar de Motorista", use_container_width=True):
                 if not tem_sel: 
@@ -600,19 +574,13 @@ if menu == "📊 Dashboard":
                                         for pid in p_ids:
                                             mask = df_nuvem['PEDIDO'] == pid
                                             if mask.any():
-                                                df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
-                                                df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
-                                                df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
+                                                df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot; df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"; df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
                                                 l_app = df_nuvem[mask].iloc[0]
                                                 lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
-                                        aba.clear()
-                                        aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                        aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                         despachar_para_appsheet(lista_app_troca)
-                                        st.success("Trocado!")
-                                        carregar_dados_completos.clear()
-                                        st.rerun()
-                                    except Exception as e: 
-                                        st.error(f"Erro: {e}")
+                                        st.success("Trocado!"); carregar_dados_completos.clear(); st.rerun()
+                                    except Exception as e: st.error(f"Erro: {e}")
             
             with col_b3.popover("👯 Clonar Pedidos", use_container_width=True):
                 if not tem_sel: 
@@ -1020,7 +988,8 @@ elif menu == "🔬 Triagem":
                     df_fila, 
                     hide_index=True, 
                     disabled=[c for c in df_fila.columns if c != "SELECIONAR"], 
-                    use_container_width=True
+                    use_container_width=True,
+                    key="tabela_triagem_lote"
                 )
                 
                 selecionados_manuais = tabela_fila[tabela_fila["SELECIONAR"]]
@@ -1066,7 +1035,14 @@ elif menu == "🔬 Triagem":
                 df_conf_show = df_conf[colunas_romaneio].fillna("").astype(str)
                 df_conf_show.insert(0, "SELECIONAR", False)
                 
-                tabela_conf = st.data_editor(df_conf_show, hide_index=True, disabled=[c for c in df_conf_show.columns if c != "SELECIONAR"], use_container_width=True)
+                tabela_conf = st.data_editor(
+                    df_conf_show, 
+                    hide_index=True, 
+                    disabled=[c for c in df_conf_show.columns if c != "SELECIONAR"], 
+                    use_container_width=True,
+                    key="tabela_triagem_expedicao"
+                )
+                
                 selecionados = tabela_conf[tabela_conf["SELECIONAR"]]
                 tem_sel_pdf = not selecionados.empty
                 
