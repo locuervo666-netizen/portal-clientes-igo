@@ -286,7 +286,7 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         linhas = []
         for p in lista_pedidos_dicts:
             mot = str(p.get('MOTORISTA', p.get('AGENTE_RAW', '')))
-            # 🔥 INJEÇÃO BLINDADA: EXATAS 17 COLUNAS COMO NO SEU GOOGLE SHEETS NOVO!
+            # 🔥 AGORA COM 18 COLUNAS (Incluindo DATA_ENTREGA no final)
             linhas.append([
                 str(uuid.uuid4())[:8].upper(),    # 1. ID_TAREFA
                 str(p.get('PEDIDO','')),          # 2. PEDIDO
@@ -304,12 +304,13 @@ def despachar_para_appsheet(lista_pedidos_dicts):
                 str(p.get('QR_CODE','')),         # 14. QR_CODE
                 "",                               # 15. DETALHES
                 str(p.get('ROMANEIO','')),        # 16. ROMANEIO
-                ""                                # 17. RECEBEDOR
+                "",                               # 17. RECEBEDOR
+                ""                                # 18. DATA_ENTREGA
             ])
         aba.append_rows(linhas, value_input_option='USER_ENTERED')
         return True
     except Exception as e: 
-        st.error(f"🚨 ERRO DE SINCRONIZAÇÃO APPSHEET: Ocorreu um erro ao gravar no Google Sheets: {e}")
+        st.error(f"🚨 ERRO DE SINCRONIZAÇÃO APPSHEET: {e}")
         return False
 
 def padronizar_texto(texto):
@@ -521,7 +522,7 @@ if menu == "📊 Dashboard":
                 hide_index=True,
                 use_container_width=True,
                 height=650,
-                key="tabela_principal_blindada" # 🔥 ANCORA DE MEMÓRIA CRUCIAL PARA CAIXA LATERAL
+                key="tabela_principal_blindada" 
             )
             
             linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
@@ -672,7 +673,7 @@ if menu == "📊 Dashboard":
                                 except Exception as e: st.error(f"Erro: {e}")
                         else: st.error("Senha incorreta.")
                 
-                st.button("🔄 Atualizar Grid", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
+                st.button("🔄 Atualizar Dados", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
                 st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.warning("O banco de dados está vazio ou a aba Memoria_Sistema não foi encontrada. Vá para a aba Manual.")
