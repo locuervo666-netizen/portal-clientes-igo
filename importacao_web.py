@@ -138,7 +138,7 @@ def carregar_dados_completos(_planilha):
             df = df.loc[:, ~df.columns.duplicated()] 
             df = df.dropna(how='all') 
             
-            # Garante que a coluna de Controle do Zap exista
+            # 🔥 GARANTE A COLUNA ZAP_ENVIADO 🔥
             if 'ZAP_ENVIADO' not in df.columns:
                 df['ZAP_ENVIADO'] = ""
 
@@ -262,37 +262,24 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         st.error(f"🚨 ERRO APPSHEET: {e}")
         return False
 
-# 🔥 MOTOR DE DISPARO DA Z-API (CONFIGURADO COM AS SUAS CHAVES) 🔥
+# 🔥 MOTOR DE DISPARO DA Z-API 🔥
 def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
     INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
     TOKEN = "2321563615C4242CB6031504"         
     CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S" 
     
     tel_limpo = re.sub(r'\D', '', str(telefone_destino))
-    
     if not tel_limpo.startswith('55') and len(tel_limpo) in [10, 11]:
         tel_limpo = '55' + tel_limpo
         
     url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-text"
-    
-    payload = {
-        "phone": tel_limpo, 
-        "message": texto_mensagem
-    }
-    
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Client-Token": CLIENT_TOKEN
-    }
+    payload = {"phone": tel_limpo, "message": texto_mensagem}
+    headers = {"Accept": "application/json", "Content-Type": "application/json", "Client-Token": CLIENT_TOKEN}
     
     try:
         response = requests.post(url, json=payload, headers=headers)
-        if response.status_code in [200, 201]:
-            return True
-        else:
-            st.error(f"🚨 Retorno da Z-API (Telefone: {tel_limpo}): {response.text}")
-            return False
+        if response.status_code in [200, 201]: return True
+        else: st.error(f"🚨 Retorno da Z-API (Telefone: {tel_limpo}): {response.text}"); return False
     except Exception as e:
         st.error(f"🚨 Falha geral de comunicação com a Z-API: {e}")
         return False
@@ -658,7 +645,7 @@ if menu == "📊 GRID":
                                                 df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
                                                 df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
                                                 df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
-                                                df_nuvem.loc[mask, 'ZAP_ENVIADO'] = "" # Reseta o zap na troca
+                                                df_nuvem.loc[mask, 'ZAP_ENVIADO'] = "" 
                                                 
                                                 l_app = df_nuvem[mask].iloc[0]
                                                 lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
@@ -1193,7 +1180,7 @@ elif menu == "🔬 Triagem":
         st.info("O banco de dados está vazio no momento.")
 
 # =============================================================================
-# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO EM MASSA E SELO)
+# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (LOG E DISPARO EM MASSA)
 # =============================================================================
 elif menu == "📱 WhatsApp":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
@@ -1201,193 +1188,232 @@ elif menu == "📱 WhatsApp":
     
     if not df_raw.empty:
         data_filtro = st.date_input("📅 Cronograma da Data (Filtro e Histórico):", value=hoje_br, format="DD/MM/YYYY")
-        df_pendentes = df_raw[(df_raw['DATA_OBJ'] == data_filtro) & (df_raw['STATUS'].astype(str).str.upper() == 'PENDENTE')].copy()
+        st.markdown("---")
         
-        if df_pendentes.empty:
-            st.success(f"Nenhum volume PENDENTE detectado em {data_filtro.strftime('%d/%m/%Y')}.")
-        else:
-            agentes_com_rota = [ag for ag in df_pendentes['AGENTE_RAW'].dropna().unique() if str(ag).strip()]
-            
-            dict_telefones = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip() and re.sub(r'\D', '', str(r.get('TELEFONE', '')))}
-            dict_nomes = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
-            
-            # Identificar quem falta receber a mensagem
-            agentes_para_enviar = []
-            for ag in agentes_com_rota:
-                df_ag = df_pendentes[df_pendentes['AGENTE_RAW'] == ag]
-                if not (df_ag['ZAP_ENVIADO'] == 'SIM').all():
-                    agentes_para_enviar.append(ag)
-            
-            # 🔥 BOTÃO DE DISPARO EM MASSA 🔥
-            if agentes_para_enviar:
-                st.info(f"🚀 Existem {len(agentes_para_enviar)} motoristas aguardando o envio da rota oficial.")
-                if st.button("🚀 DISPARAR PARA TODOS OS PENDENTES AGORA", type="primary", use_container_width=True):
-                    with st.spinner("Iniciando disparos em massa via Z-API... (isso pode levar alguns segundos)"):
-                        pedidos_atualizados = []
-                        sucessos = 0
-                        
-                        for agente in agentes_para_enviar:
-                            df_agente = df_pendentes[(df_pendentes['AGENTE_RAW'] == agente) & (df_pendentes['ZAP_ENVIADO'] != 'SIM')]
-                            telefone = dict_telefones.get(str(agente).strip().lower(), "")
-                            nome_amigavel = dict_nomes.get(str(agente).strip().lower(), str(agente).upper())
-                            
-                            if telefone:
-                                data_str = data_filtro.strftime('%d/%m/%Y')
-                                msg_parts = []
-                                msg_parts.append(f"Bom dia, {nome_amigavel}")
-                                msg_parts.append(f"🗓️ {data_str}\n")
-                                msg_parts.append("RESUMO DA ROTA:\n")
-                                msg_parts.append("CIDADE                  | QTD")
-                                msg_parts.append("-------------------------------")
-                                
-                                cidades_counts = df_agente['CIDADE'].value_counts()
-                                total_qtd = 0
-                                for cid, count in cidades_counts.items():
-                                    cid_str = str(cid).strip().ljust(23)
-                                    qtd_str = f"{count:02d}"
-                                    msg_parts.append(f"{cid_str} | {qtd_str}")
-                                    total_qtd += count
-                                    
-                                msg_parts.append("-------------------------------")
-                                msg_parts.append(f"TOTAL                   | {total_qtd:02d}\n\n")
-                                msg_parts.append("⬇️ DETALHES:")
-                                msg_parts.append("========================\n")
-                                
-                                grouped = df_agente.groupby('CIDADE')
-                                for cid, group in grouped:
-                                    cid_limpa = str(cid).strip()
-                                    msg_parts.append("------------------------------")
-                                    msg_parts.append(f"{cid_limpa.center(30)}")
-                                    msg_parts.append("------------------------------\n")
-                                    
-                                    items = []
-                                    for _, row in group.iterrows():
-                                        item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', '')}\n"
-                                        item_str += f"> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n"
-                                        item_str += f"> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n"
-                                        item_str += f"> 🏘️ Bairro: {row.get('BAIRRO', '')}\n"
-                                        item_str += f"> 📮 CEP: {row.get('CEP', '')}\n"
-                                        item_str += f"> 🏢 Tomador: {row.get('TOMADOR', '')}"
-                                        
-                                        obs = str(row.get('OBSERVACOES', '')).strip()
-                                        if obs and obs.upper() != 'NAN': 
-                                            item_str += f"\n> 📝 Aviso: {obs}"
-                                        items.append(item_str)
-                                        
-                                    msg_parts.append("\n\n      . . . . .\n\n".join(items))
-                                    msg_parts.append("\n")
-                                    
-                                msg_final = "\n".join(msg_parts)
-                                
-                                if enviar_whatsapp_zapi(telefone, msg_final):
-                                    sucessos += 1
-                                    pedidos_atualizados.extend(df_agente['PEDIDO'].tolist())
-                                time.sleep(1.2) # Intervalo para não engasgar a API
-                        
-                        # Atualiza o Banco com os "Carimbos" de quem foi enviado
-                        if pedidos_atualizados:
-                            try:
-                                aba = planilha_db.worksheet("Memoria_Sistema")
-                                df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
-                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(pedidos_atualizados), 'ZAP_ENVIADO'] = 'SIM'
-                                aba.clear()
-                                aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                carregar_dados_completos.clear()
-                            except Exception as e:
-                                st.error(f"Erro ao carimbar envio no banco: {e}")
-                        
-                        st.success(f"🎉 Disparo em massa concluído! {sucessos} motoristas foram notificados com sucesso.")
-                        time.sleep(2.5)
-                        st.rerun()
+        # Criação das duas colunas: 70% para a ação, 30% para o Log
+        col_esq, col_dir = st.columns([2.5, 1.2])
+        
+        # Filtramos os dados do dia escolhido
+        df_dia = df_raw[df_raw['DATA_OBJ'] == data_filtro].copy()
+        df_pendentes = df_dia[df_dia['STATUS'].astype(str).str.upper() == 'PENDENTE'].copy()
+        
+        dict_telefones = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip() and re.sub(r'\D', '', str(r.get('TELEFONE', '')))}
+        dict_nomes = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
+        
+        with col_esq:
+            if df_pendentes.empty:
+                st.success(f"Nenhum volume PENDENTE aguardando envio na data {data_filtro.strftime('%d/%m/%Y')}.")
             else:
-                st.success("✅ Excelente! Todos os motoristas com rotas pendentes nesta data já receberam as mensagens.")
-            
-            st.markdown("---")
-            
-            # 🔥 LISTA DE MOTORISTAS COM O SELO 🔥
-            for agente in sorted(agentes_com_rota):
-                df_agente = df_pendentes[df_pendentes['AGENTE_RAW'] == agente]
-                telefone = dict_telefones.get(str(agente).strip().lower(), "")
-                nome_amigavel = dict_nomes.get(str(agente).strip().lower(), str(agente).upper())
+                agentes_com_rota = [ag for ag in df_pendentes['AGENTE_RAW'].dropna().unique() if str(ag).strip()]
                 
-                todos_enviados = (df_agente['ZAP_ENVIADO'] == 'SIM').all()
-                selo = "✅ ENVIADO" if todos_enviados else "⏳ PENDENTE"
+                # Identifica quem falta receber a mensagem
+                agentes_para_enviar = []
+                for ag in agentes_com_rota:
+                    df_ag = df_pendentes[df_pendentes['AGENTE_RAW'] == ag]
+                    if not df_ag['ZAP_ENVIADO'].astype(str).apply(lambda x: str(x).startswith('SIM')).all():
+                        agentes_para_enviar.append(ag)
                 
-                # Se já estiver enviado, a caixinha fica fechada para não poluir
-                with st.expander(f"{selo} | 👤 {nome_amigavel} | Volumes: {len(df_agente)}", expanded=not todos_enviados):
-                    st.dataframe(df_agente[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True)
-                    
-                    if telefone:
-                        data_str = data_filtro.strftime('%d/%m/%Y')
-                        msg_parts = []
-                        msg_parts.append(f"Bom dia, {nome_amigavel}")
-                        msg_parts.append(f"🗓️ {data_str}\n")
-                        msg_parts.append("RESUMO DA ROTA:\n")
-                        msg_parts.append("CIDADE                  | QTD")
-                        msg_parts.append("-------------------------------")
-                        
-                        cidades_counts = df_agente['CIDADE'].value_counts()
-                        total_qtd = 0
-                        for cid, count in cidades_counts.items():
-                            cid_str = str(cid).strip().ljust(23)
-                            qtd_str = f"{count:02d}"
-                            msg_parts.append(f"{cid_str} | {qtd_str}")
-                            total_qtd += count
+                # 🔥 BOTÃO DE DISPARO EM MASSA 🔥
+                if agentes_para_enviar:
+                    st.info(f"🚀 Existem {len(agentes_para_enviar)} motoristas aguardando o envio da rota oficial.")
+                    if st.button("🚀 DISPARAR PARA TODOS OS PENDENTES AGORA", type="primary", use_container_width=True):
+                        with st.spinner("Iniciando disparos em massa via Z-API... (isso pode levar alguns segundos)"):
+                            pedidos_atualizados = []
+                            sucessos = 0
                             
-                        msg_parts.append("-------------------------------")
-                        msg_parts.append(f"TOTAL                   | {total_qtd:02d}\n\n")
-                        msg_parts.append("⬇️ DETALHES:")
-                        msg_parts.append("========================\n")
-                        
-                        grouped = df_agente.groupby('CIDADE')
-                        for cid, group in grouped:
-                            cid_limpa = str(cid).strip()
-                            msg_parts.append("------------------------------")
-                            msg_parts.append(f"{cid_limpa.center(30)}")
-                            msg_parts.append("------------------------------\n")
-                            
-                            items = []
-                            for _, row in group.iterrows():
-                                item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', '')}\n"
-                                item_str += f"> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n"
-                                item_str += f"> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n"
-                                item_str += f"> 🏘️ Bairro: {row.get('BAIRRO', '')}\n"
-                                item_str += f"> 📮 CEP: {row.get('CEP', '')}\n"
-                                item_str += f"> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                            for agente in agentes_para_enviar:
+                                df_agente = df_pendentes[(df_pendentes['AGENTE_RAW'] == agente) & (~df_pendentes['ZAP_ENVIADO'].astype(str).apply(lambda x: str(x).startswith('SIM')))]
+                                telefone = dict_telefones.get(str(agente).strip().lower(), "")
+                                nome_amigavel = dict_nomes.get(str(agente).strip().lower(), str(agente).upper())
                                 
-                                obs = str(row.get('OBSERVACOES', '')).strip()
-                                if obs and obs.upper() != 'NAN': 
-                                    item_str += f"\n> 📝 Aviso: {obs}"
-                                items.append(item_str)
-                                
-                            msg_parts.append("\n\n      . . . . .\n\n".join(items))
-                            msg_parts.append("\n")
-                            
-                        msg_final = "\n".join(msg_parts)
-                        
-                        # Botão Individual
-                        texto_botao = "🔄 Reenviar Rota Oficial" if todos_enviados else f"📲 Disparar Rota para {nome_amigavel}"
-                        if st.button(texto_botao, key=f"zap_api_ind_{agente}", type="primary" if not todos_enviados else "secondary"):
-                            with st.spinner("Enviando dados via satélite..."):
-                                sucesso = enviar_whatsapp_zapi(telefone, msg_final)
-                                if sucesso:
-                                    try:
-                                        aba = planilha_db.worksheet("Memoria_Sistema")
-                                        df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                        if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
-                                        df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_agente['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = 'SIM'
-                                        aba.clear()
-                                        aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                        carregar_dados_completos.clear()
-                                    except Exception as e:
-                                        st.error(f"Erro ao carimbar envio: {e}")
+                                if telefone:
+                                    data_str = data_filtro.strftime('%d/%m/%Y')
+                                    msg_parts = []
+                                    msg_parts.append(f"Bom dia, {nome_amigavel}")
+                                    msg_parts.append(f"🗓️ {data_str}\n")
+                                    msg_parts.append("RESUMO DA ROTA:\n")
+                                    msg_parts.append("CIDADE                  | QTD")
+                                    msg_parts.append("-------------------------------")
+                                    
+                                    cidades_counts = df_agente['CIDADE'].value_counts()
+                                    total_qtd = 0
+                                    for cid, count in cidades_counts.items():
+                                        cid_str = str(cid).strip().ljust(23)
+                                        qtd_str = f"{count:02d}"
+                                        msg_parts.append(f"{cid_str} | {qtd_str}")
+                                        total_qtd += count
                                         
-                                    st.success(f"✅ Rota enviada com sucesso para {nome_amigavel}!")
-                                    time.sleep(1.5)
-                                    st.rerun()
-                    else: 
-                        st.error(f"⚠️ Telefone do agente '{agente}' não encontrado.")
+                                    msg_parts.append("-------------------------------")
+                                    msg_parts.append(f"TOTAL                   | {total_qtd:02d}\n\n")
+                                    msg_parts.append("⬇️ DETALHES:")
+                                    msg_parts.append("========================\n")
+                                    
+                                    grouped = df_agente.groupby('CIDADE')
+                                    for cid, group in grouped:
+                                        cid_limpa = str(cid).strip()
+                                        msg_parts.append("------------------------------")
+                                        msg_parts.append(f"{cid_limpa.center(30)}")
+                                        msg_parts.append("------------------------------\n")
+                                        
+                                        items = []
+                                        for _, row in group.iterrows():
+                                            item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', '')}\n"
+                                            item_str += f"> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n"
+                                            item_str += f"> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n"
+                                            item_str += f"> 🏘️ Bairro: {row.get('BAIRRO', '')}\n"
+                                            item_str += f"> 📮 CEP: {row.get('CEP', '')}\n"
+                                            item_str += f"> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                            
+                                            obs = str(row.get('OBSERVACOES', '')).strip()
+                                            if obs and obs.upper() != 'NAN': 
+                                                item_str += f"\n> 📝 Aviso: {obs}"
+                                            items.append(item_str)
+                                            
+                                        msg_parts.append("\n\n      . . . . .\n\n".join(items))
+                                        msg_parts.append("\n")
+                                        
+                                    msg_final = "\n".join(msg_parts)
+                                    
+                                    if enviar_whatsapp_zapi(telefone, msg_final):
+                                        sucessos += 1
+                                        pedidos_atualizados.extend(df_agente['PEDIDO'].tolist())
+                                    time.sleep(1.2) 
+                            
+                            if pedidos_atualizados:
+                                try:
+                                    aba = planilha_db.worksheet("Memoria_Sistema")
+                                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                    if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
+                                    hora_atual = datetime.now(FUSO_BR).strftime('%H:%M')
+                                    df_nuvem.loc[df_nuvem['PEDIDO'].isin(pedidos_atualizados), 'ZAP_ENVIADO'] = f"SIM|{hora_atual}"
+                                    aba.clear()
+                                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                    carregar_dados_completos.clear()
+                                except Exception as e:
+                                    st.error(f"Erro ao carimbar envio no banco: {e}")
+                            
+                            st.success(f"🎉 Disparo em massa concluído! {sucessos} motoristas foram notificados com sucesso.")
+                            time.sleep(2.5)
+                            st.rerun()
+                else:
+                    st.success("✅ Excelente! Todos os motoristas com rotas pendentes nesta data já receberam as mensagens.")
+                
+                st.markdown("---")
+                
+                # 🔥 LISTA DE MOTORISTAS COM O SELO 🔥
+                for agente in sorted(agentes_com_rota):
+                    df_agente = df_pendentes[df_pendentes['AGENTE_RAW'] == agente]
+                    telefone = dict_telefones.get(str(agente).strip().lower(), "")
+                    nome_amigavel = dict_nomes.get(str(agente).strip().lower(), str(agente).upper())
+                    
+                    todos_enviados = df_agente['ZAP_ENVIADO'].astype(str).apply(lambda x: str(x).startswith('SIM')).all()
+                    selo = "✅ ENVIADO" if todos_enviados else "⏳ PENDENTE"
+                    
+                    with st.expander(f"{selo} | 👤 {nome_amigavel} | Volumes: {len(df_agente)}", expanded=not todos_enviados):
+                        st.dataframe(df_agente[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True)
+                        
+                        if telefone:
+                            data_str = data_filtro.strftime('%d/%m/%Y')
+                            msg_parts = []
+                            msg_parts.append(f"Bom dia, {nome_amigavel}")
+                            msg_parts.append(f"🗓️ {data_str}\n")
+                            msg_parts.append("RESUMO DA ROTA:\n")
+                            msg_parts.append("CIDADE                  | QTD")
+                            msg_parts.append("-------------------------------")
+                            
+                            cidades_counts = df_agente['CIDADE'].value_counts()
+                            total_qtd = 0
+                            for cid, count in cidades_counts.items():
+                                cid_str = str(cid).strip().ljust(23)
+                                qtd_str = f"{count:02d}"
+                                msg_parts.append(f"{cid_str} | {qtd_str}")
+                                total_qtd += count
+                                
+                            msg_parts.append("-------------------------------")
+                            msg_parts.append(f"TOTAL                   | {total_qtd:02d}\n\n")
+                            msg_parts.append("⬇️ DETALHES:")
+                            msg_parts.append("========================\n")
+                            
+                            grouped = df_agente.groupby('CIDADE')
+                            for cid, group in grouped:
+                                cid_limpa = str(cid).strip()
+                                msg_parts.append("------------------------------")
+                                msg_parts.append(f"{cid_limpa.center(30)}")
+                                msg_parts.append("------------------------------\n")
+                                
+                                items = []
+                                for _, row in group.iterrows():
+                                    item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', '')}\n"
+                                    item_str += f"> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n"
+                                    item_str += f"> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n"
+                                    item_str += f"> 🏘️ Bairro: {row.get('BAIRRO', '')}\n"
+                                    item_str += f"> 📮 CEP: {row.get('CEP', '')}\n"
+                                    item_str += f"> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                    
+                                    obs = str(row.get('OBSERVACOES', '')).strip()
+                                    if obs and obs.upper() != 'NAN': 
+                                        item_str += f"\n> 📝 Aviso: {obs}"
+                                    items.append(item_str)
+                                    
+                                msg_parts.append("\n\n      . . . . .\n\n".join(items))
+                                msg_parts.append("\n")
+                                
+                            msg_final = "\n".join(msg_parts)
+                            
+                            texto_botao = "🔄 Reenviar Rota Oficial" if todos_enviados else f"📲 Disparar Rota para {nome_amigavel}"
+                            if st.button(texto_botao, key=f"zap_api_ind_{agente}", type="primary" if not todos_enviados else "secondary"):
+                                with st.spinner("Enviando dados via satélite..."):
+                                    sucesso = enviar_whatsapp_zapi(telefone, msg_final)
+                                    if sucesso:
+                                        try:
+                                            aba = planilha_db.worksheet("Memoria_Sistema")
+                                            df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                            if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
+                                            hora_atual = datetime.now(FUSO_BR).strftime('%H:%M')
+                                            df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_agente['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{hora_atual}"
+                                            aba.clear()
+                                            aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                            carregar_dados_completos.clear()
+                                        except Exception as e:
+                                            st.error(f"Erro ao carimbar envio: {e}")
+                                            
+                                        st.success(f"✅ Rota enviada com sucesso para {nome_amigavel}!")
+                                        time.sleep(1.5)
+                                        st.rerun()
+                        else: 
+                            st.error(f"⚠️ Telefone do agente '{agente}' não encontrado.")
+        
+        with col_dir:
+            with st.container(border=True):
+                st.markdown("<h4 style='color:#0F172A; margin-top:0px; font-size:16px;'>⏱️ Log de Disparos</h4>", unsafe_allow_html=True)
+                st.divider()
+                
+                # O Log busca em df_dia (Para ver os envios, mesmo se o pacote já foi entregue depois)
+                log_list = []
+                agentes_dia = [ag for ag in df_dia['AGENTE_RAW'].dropna().unique() if str(ag).strip()]
+                
+                for ag in agentes_dia:
+                    df_ag_log = df_dia[df_dia['AGENTE_RAW'] == ag]
+                    status_s = df_ag_log['ZAP_ENVIADO'].dropna().astype(str).tolist()
+                    sent_statuses = [s for s in status_s if str(s).startswith('SIM')]
+                    if sent_statuses:
+                        tempos = [s.split('|')[1] for s in sent_statuses if '|' in s]
+                        hora = tempos[0] if tempos else "Desconhecida"
+                        nome_amigavel = dict_nomes.get(str(ag).strip().lower(), str(ag).upper())
+                        log_list.append({"agente": nome_amigavel, "hora": hora})
+                        
+                log_list.sort(key=lambda x: x["hora"], reverse=True)
+                
+                if log_list:
+                    for item in log_list:
+                        st.markdown(f"""
+                        <div style='padding:10px; background-color:#F8FAFC; border-left: 4px solid #10B981; margin-bottom:10px; border-radius:4px;'>
+                            <b style='color:#334155; font-size:13px;'>👤 {item['agente']}</b><br>
+                            <span style='color:#64748B; font-size:12px;'>✅ Enviado às {item['hora']}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.info("Nenhum disparo registrado para esta data ainda.")
     else:
         st.warning("O banco de dados está vazio.")
 
