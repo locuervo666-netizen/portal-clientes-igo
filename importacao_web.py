@@ -254,7 +254,30 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         aba.append_rows(linhas, value_input_option='USER_ENTERED')
         return True
     except Exception as e: 
-        st.error(f"🚨 ERRO DE SINCRONIZAÇÃO APPSHEET: {e}")
+        st.error(f"🚨 ERRO APPSHEET: {e}")
+        return False
+
+# 🔥 MOTOR DE DISPARO DA Z-API (INTEGRADO E ATIVO) 🔥
+def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
+    INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
+    TOKEN = "2321563615C4242CB6031504"         
+    
+    url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-text"
+    
+    payload = {
+        "phone": telefone_destino, 
+        "message": texto_mensagem
+    }
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        return response.status_code in [200, 201]
+    except Exception as e:
+        st.error(f"🚨 Falha de comunicação com a Z-API: {e}")
         return False
 
 def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_lista):
@@ -424,7 +447,7 @@ if planilha_db is None:
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD
+# 🚀 MÓDULO 1: DASHBOARD / GRID PRINCIPAL
 # =============================================================================
 if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
@@ -1141,7 +1164,7 @@ elif menu == "🔬 Triagem":
         st.info("O banco de dados está vazio no momento.")
 
 # =============================================================================
-# 📱 MÓDULO EXTRA: DISPARO WHATSAPP
+# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (AGORA COM API)
 # =============================================================================
 elif menu == "📱 WhatsApp":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
@@ -1166,7 +1189,17 @@ elif menu == "📱 WhatsApp":
                             if str(row.get('OBSERVACOES', '')).strip() and str(row.get('OBSERVACOES', '')).upper() != 'NAN': 
                                 msg += f"📝 *Aviso:* {row['OBSERVACOES']}\n"
                             msg += "------------------------\n"
-                        st.link_button("📲 Emitir Ordem de Deslocamento", f"https://api.whatsapp.com/send?phone={telefone}&text={urllib.parse.quote(msg)}", type="primary")
+                        
+                        # 🔥 NOVO BOTÃO DA API Z-API 🔥
+                        if st.button(f"📲 Disparar Ordem Oficial (API) - {str(agente).upper()}", key=f"zap_api_{agente}", type="primary"):
+                            with st.spinner("Enviando dados via satélite..."):
+                                sucesso = enviar_whatsapp_zapi(telefone, msg)
+                                if sucesso:
+                                    st.success(f"✅ Rota enviada com sucesso para {str(agente).upper()}!")
+                                    time.sleep(2)
+                                    st.rerun()
+                                else:
+                                    st.error("🚨 Falha na comunicação com a Z-API. Verifique se o aparelho emissor está conectado na plataforma.")
                     else: 
                         st.error(f"⚠️ Telefone do agente '{agente}' não encontrado.")
     else:
