@@ -67,6 +67,13 @@ st.markdown("""
 
     .stButton > button[kind="primary"] { background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; color: #FFFFFF !important;}
     .stButton > button[kind="primary"]:hover { background: #0369A1 !important; }
+    
+    div[data-testid="stPopover"] > button, button[kind="secondary"] {
+        white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
+    }
+    div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
+        border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -232,7 +239,7 @@ def carregar_dados_completos(_planilha):
             
             if 'DATA' in df.columns: df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
-    except Exception as e: st.error(f"Erro ao carregar banco: {e}")
+    except Exception as e: st.error(f"Erro Crítico ao carregar a Memoria_Sistema: {e}")
     return pd.DataFrame()
 
 # ======== VARIÁVEIS GLOBAIS ========
@@ -249,16 +256,31 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         linhas = []
         for p in lista_pedidos_dicts:
             mot = str(p.get('MOTORISTA', p.get('AGENTE_RAW', '')))
+            # 18 COLUNAS BLINDADAS
             linhas.append([
-                str(uuid.uuid4())[:8].upper(), str(p.get('PEDIDO','')), mot, "PENDENTE",
-                str(p.get('ENDERECO','')), str(p.get('NUMERO','')), str(p.get('BAIRRO','')), str(p.get('CIDADE','')), str(p.get('CEP','')),
-                "", str(p.get('OBSERVACOES','')), str(p.get('LABORATORIO','')), str(p.get('TOMADOR','')), str(p.get('QR_CODE','')),
-                "", str(p.get('ROMANEIO','')), "", ""
+                str(uuid.uuid4())[:8].upper(),    # 1. ID_TAREFA
+                str(p.get('PEDIDO','')),          # 2. PEDIDO
+                mot,                              # 3. MOTORISTA
+                "PENDENTE",                       # 4. STATUS
+                str(p.get('ENDERECO','')),        # 5. ENDERECO
+                str(p.get('NUMERO','')),          # 6. NUMERO
+                str(p.get('BAIRRO','')),          # 7. BAIRRO
+                str(p.get('CIDADE','')),          # 8. CIDADE
+                str(p.get('CEP','')),             # 9. CEP
+                "",                               # 10. FOTO
+                str(p.get('OBSERVACOES','')),     # 11. OBSERVACOES
+                str(p.get('LABORATORIO','')),     # 12. LABORATORIO
+                str(p.get('TOMADOR','')),         # 13. TOMADOR
+                str(p.get('QR_CODE','')),         # 14. QR_CODE
+                "",                               # 15. DETALHES
+                str(p.get('ROMANEIO','')),        # 16. ROMANEIO
+                "",                               # 17. RECEBEDOR
+                ""                                # 18. DATA_ENTREGA
             ])
         aba.append_rows(linhas, value_input_option='USER_ENTERED')
         return True
     except Exception as e: 
-        st.error(f"🚨 ERRO APPSHEET: {e}")
+        st.error(f"🚨 ERRO DE SINCRONIZAÇÃO APPSHEET: {e}")
         return False
 
 def padronizar_texto(texto):
@@ -356,7 +378,7 @@ if planilha_db is None:
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (NATIVO STREAMLIT - SEM SUMIR)
+# 🚀 MÓDULO 1: DASHBOARD (NATIVO STREAMLIT - TABELA 100% LARGA E INDESTRUTÍVEL)
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -412,42 +434,48 @@ if menu == "📊 Dashboard":
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Marque a caixinha na tabela para acessar os Botões e a Foto.</p>", unsafe_allow_html=True)
 
         # 🔥 A MÁGICA DOS BOTÕES NO TOPO E GRID NATIVA EMBAIXO
-        container_botoes = st.container()
-        
-        df_grid.insert(0, "SELECIONAR", False)
-        
-        # TABELA NATIVA DO STREAMLIT: NÃO SOME NUNCA.
-        tabela_renderizada = st.data_editor(
-            df_grid,
-            column_config={
-                "SELECIONAR": st.column_config.CheckboxColumn("✔ Ação", default=False),
-                "STATUS_DISPLAY": st.column_config.TextColumn("📌 Status"),
-                "FOTO_INDICADOR": st.column_config.TextColumn("Foto")
-            },
-            disabled=[c for c in df_grid.columns if c != "SELECIONAR"],
-            hide_index=True,
-            use_container_width=True,
-            height=500,
-            key="tabela_nativa_indestrutivel"
-        )
-        
-        linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
-        p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
-        tem_sel = len(p_ids) > 0
+        box_botoes = st.empty()
+        box_grid = st.container()
 
-        # 🔥 RENDERIZA OS BOTÕES DENTRO DO CONTAINER DO TOPO, LENDO A SELEÇÃO ATUAL
-        with container_botoes:
-            st.markdown("""
-            <style>
-            div[data-testid="stPopover"] > button, button[kind="secondary"] {
-                white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
-            }
-            div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
-                border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
+        # RENDERIZANDO A TABELA E PEGANDO A SELEÇÃO
+        with box_grid:
+            df_grid.insert(0, "SELECIONAR", False)
+            
+            # TABELA NATIVA DO STREAMLIT: NÃO SOME NUNCA. LARGURA TOTAL.
+            tabela_renderizada = st.data_editor(
+                df_grid,
+                column_config={
+                    "SELECIONAR": st.column_config.CheckboxColumn("✔ Ação", default=False),
+                    "STATUS_DISPLAY": st.column_config.TextColumn("📌 Status Operacional"),
+                    "FOTO_INDICADOR": st.column_config.TextColumn("📸 Foto")
+                },
+                disabled=[c for c in df_grid.columns if c != "SELECIONAR"],
+                hide_index=True,
+                use_container_width=True,
+                height=500,
+                key="tabela_nativa_indestrutivel"
+            )
+            
+            linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
+            p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
+            tem_sel = len(p_ids) > 0
 
+            # A FOTO APARECE EMBAIXO DA TABELA APENAS QUANDO SELECIONADA
+            if tem_sel:
+                st.markdown("---")
+                st.markdown(f"<h3 style='margin-top:0; color:#0369A1;'>📸 Comprovantes ({len(p_ids)} pedidos)</h3>", unsafe_allow_html=True)
+                fotos = df_f[df_f['PEDIDO'].isin(p_ids)]['FOTO_URL'].tolist()
+                fotos_validas = [f for f in fotos if str(f).strip() and str(f).upper() != 'NAN']
+                if not fotos_validas:
+                    st.info("Nenhuma foto encontrada para os pedidos selecionados.")
+                else:
+                    cols_fotos = st.columns(len(fotos_validas) if len(fotos_validas) <= 3 else 3)
+                    for i, url in enumerate(fotos_validas):
+                        with cols_fotos[i % 3]:
+                            st.image(url, use_container_width=True)
+
+        # 🔥 PREENCHENDO O ESPAÇO RESERVADO LÁ NO TOPO COM OS BOTÕES
+        with box_botoes.container():
             col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
             
             with col_b1.popover("📲 Dar Baixa Manual", use_container_width=True):
@@ -484,7 +512,7 @@ if menu == "📊 Dashboard":
                                                 if status_limpo == "ENTREGUE": df_app.loc[df_app['PEDIDO'].isin(p_ids), 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                                 elif status_limpo == "PENDENTE": df_app.loc[df_app['PEDIDO'].isin(p_ids), 'DATA_ENTREGA'] = ""
                                             aba_app.clear(); aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
-                                    except Exception: pass
+                                    except Exception as ex: pass
                                     st.success("Atualizado!"); carregar_dados_completos.clear(); st.rerun()
                                 except Exception as e: st.error(f"Erro: {e}")
 
@@ -534,9 +562,11 @@ if menu == "📊 Dashboard":
                                         l_orig['PEDIDO'] = novo_id; l_orig['DATA'] = clone_data.strftime("%d/%m/%Y"); l_orig['STATUS'] = "PENDENTE"; l_orig['DATA_ENTREGA'] = ""; l_orig['FOTO'] = ""; l_orig['ROMANEIO'] = ""
                                         if clone_mot != "Manter Original": l_orig['AGENTE_RAW'] = clone_mot
                                         prazo = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')))
+                                        
                                         l_orig['PRAZO_DIAS'] = str(prazo) 
                                         l_orig['DATA_LIMITE'] = str(calcular_data_limite(l_orig['DATA'], prazo))
                                         l_orig = l_orig.astype(str)
+                                        
                                         df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
                                         if str(l_orig.get('AGENTE_RAW','')).strip():
                                             clones_para_app.append({'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'], 'ENDERECO': l_orig.get('ENDERECO',''), 'NUMERO': l_orig.get('NUMERO',''), 'BAIRRO': l_orig.get('BAIRRO',''), 'CIDADE': l_orig.get('CIDADE',''), 'CEP': l_orig.get('CEP',''), 'LABORATORIO': l_orig.get('LABORATORIO',''), 'TOMADOR': l_orig.get('TOMADOR','')})
@@ -563,45 +593,65 @@ if menu == "📊 Dashboard":
                                         df_app = pd.DataFrame(aba_app.get_all_values()[1:], columns=aba_app.get_all_values()[0])
                                         df_app = df_app[~df_app['PEDIDO'].isin(p_ids)]
                                         aba_app.clear(); aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
-                                    except Exception: pass 
+                                    except: pass 
                                     st.success(f"Apagados!"); carregar_dados_completos.clear(); st.rerun()
                                 except Exception as e: st.error(f"Erro: {e}")
                         else: st.error("Senha incorreta.")
             
             col_b5.button("🔄 Atualizar Painel", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
 
-        # 🔥 A FOTO SÓ APARECE EMBAIXO SE TIVER SELEÇÃO
-        if tem_sel:
-            st.markdown("---")
-            st.markdown(f"<h3 style='margin-top:0; color:#0369A1;'>📸 Comprovantes Selecionados ({len(p_ids)} pedidos)</h3>", unsafe_allow_html=True)
-            fotos = df_f[df_f['PEDIDO'].isin(p_ids)]['FOTO_URL'].tolist()
-            fotos_validas = [f for f in fotos if str(f).strip() and str(f).upper() != 'NAN']
-            
-            if not fotos_validas:
-                st.info("Nenhuma foto encontrada para os pedidos selecionados.")
-            else:
-                cols_fotos = st.columns(len(fotos_validas) if len(fotos_validas) <= 4 else 4)
-                for i, url in enumerate(fotos_validas):
-                    with cols_fotos[i % 4]:
-                        st.image(url, use_container_width=True)
     else:
         st.warning("O banco de dados está vazio ou a aba Memoria_Sistema não foi encontrada. Vá para a aba Manual.")
 
 # =============================================================================
-# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
+# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL COM API VIACEP
 # =============================================================================
 elif menu == "📝 Manual":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
+    st.markdown("Use esta tela para registrar amostras fora do padrão. **Os textos inseridos perderão os acentos e ficarão maiúsculos automaticamente.**")
+    
+    if 'm_rua' not in st.session_state: st.session_state['m_rua'] = ""
+    if 'm_bai' not in st.session_state: st.session_state['m_bai'] = ""
+    if 'm_cid' not in st.session_state: st.session_state['m_cid'] = ""
+    if 'm_uf' not in st.session_state: st.session_state['m_uf'] = ""
+
     with st.container(border=True):
+        st.markdown("#### 📍 Busca Inteligente de Endereço (ViaCEP)")
+        cc1, cc2, cc3 = st.columns([2, 1, 3], vertical_alignment="bottom")
+        cep_input = cc1.text_input("Digite o CEP (Apenas números)", max_chars=9)
+        
+        if cc2.button("🔍 Buscar CEP", use_container_width=True):
+            cep_limpo = re.sub(r'\D', '', cep_input)
+            if len(cep_limpo) == 8:
+                try:
+                    resp = requests.get(f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
+                    if "erro" not in resp:
+                        st.session_state['m_rua'] = padronizar_texto(resp.get("logradouro", ""))
+                        st.session_state['m_bai'] = padronizar_texto(resp.get("bairro", ""))
+                        st.session_state['m_cid'] = padronizar_texto(resp.get("localidade", ""))
+                        st.session_state['m_uf'] = padronizar_texto(resp.get("uf", ""))
+                        st.rerun()
+                    else:
+                        st.error("❌ CEP não encontrado na base dos Correios.")
+                except Exception as e:
+                    st.error(f"Erro na API de CEP: {e}")
+            else:
+                st.warning("⚠️ Digite um CEP válido com 8 dígitos.")
+        
+        st.markdown("---")
+        
         with st.form("form_manual_page", clear_on_submit=True):
             col1, col2 = st.columns(2)
             m_tomador = col1.selectbox("Laboratório Solicitante (Tomador) *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
             m_data = col2.date_input("Data do Pedido *", format="DD/MM/YYYY", value=hoje_br)
             m_lab = st.text_input("Ponto de Coleta (Clínica/Posto) *")
-            m_rua = st.text_input("Logradouro *")
-            col3, col4 = st.columns(2)
-            m_bai = col3.text_input("Bairro *")
-            m_cid = col4.text_input("Cidade *")
+            m_rua = st.text_input("Logradouro *", value=st.session_state['m_rua'])
+            
+            col3, col4, col5 = st.columns([2, 2, 1])
+            m_bai = col3.text_input("Bairro *", value=st.session_state['m_bai'])
+            m_cid = col4.text_input("Cidade *", value=st.session_state['m_cid'])
+            m_uf = col5.text_input("UF *", value=st.session_state['m_uf'])
+            
             logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
             m_agente_escolha = st.selectbox("Agente Designado (Busque ou deixe Automático):", ["Automático (Por Rota)"] + logins_disp)
             st.markdown("<br>", unsafe_allow_html=True)
@@ -615,22 +665,43 @@ elif menu == "📝 Manual":
                         rua_limpa = padronizar_texto(m_rua)
                         bai_limpo = padronizar_texto(m_bai)
                         cid_limpa = padronizar_texto(m_cid)
+                        uf_limpa = padronizar_texto(m_uf)
                         m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES) if m_agente_escolha == "Automático (Por Rota)" else m_agente_escolha
-                        m_prazo = str(calcular_sla_dias("SP", cid_limpa))
+                        m_prazo = str(calcular_sla_dias(uf_limpa, cid_limpa))
                         m_limite = str(calcular_data_limite(m_data.strftime("%d/%m/%Y"), int(m_prazo)))
+                        
                         try:
                             aba_memoria = planilha_db.worksheet("Memoria_Sistema")
                             dados_atuais = aba_memoria.get_all_values()
                             df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
                             m_pedido = str(obter_proximo_id(df_nuvem))
                             
-                            novo_ped = pd.DataFrame([{'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 'LABORATORIO': lab_limpo, 'ENDERECO': rua_limpa, 'NUMERO': "", 'BAIRRO': bai_limpo, 'CIDADE': cid_limpa, 'UF': "SP", 'CEP': "", 'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""}]).astype(str)
+                            novo_ped = pd.DataFrame([{
+                                'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 
+                                'LABORATORIO': lab_limpo, 'ENDERECO': rua_limpa, 'NUMERO': "", 'BAIRRO': bai_limpo, 
+                                'CIDADE': cid_limpa, 'UF': uf_limpa, 'CEP': cep_limpo if 'cep_limpo' in locals() else "", 
+                                'STATUS': 'PENDENTE', 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 
+                                'DATA_LIMITE': m_limite, 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': ""
+                            }]).astype(str)
                             
                             df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
-                            aba_memoria.clear(); aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
-                            if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
-                            st.success(f"🎉 Pedido {m_pedido} criado com sucesso!"); carregar_dados_completos.clear()
-                        except Exception as e: st.error(f"Erro ao salvar: {e}")
+                            aba_memoria.clear()
+                            aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
+                            
+                            if m_agente: 
+                                despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
+                                
+                            st.success(f"🎉 Pedido {m_pedido} criado com sucesso!")
+                            
+                            # Limpando a memória pós-sucesso
+                            st.session_state['m_rua'] = ""
+                            st.session_state['m_bai'] = ""
+                            st.session_state['m_cid'] = ""
+                            st.session_state['m_uf'] = ""
+                            
+                            carregar_dados_completos.clear()
+                        except Exception as e: 
+                            st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
@@ -741,13 +812,12 @@ elif menu == "📥 Lotes":
                         for _, r in df_ok.iterrows():
                             if str(r.get('AGENTE_RAW','')).strip():
                                 lista_app.append({'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'], 'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'], 'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'], 'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'], 'TOMADOR': r['TOMADOR']})
-                        
                         if lista_app: despachar_para_appsheet(lista_app)
                         st.session_state.df_preview = pd.DataFrame(); carregar_dados_completos.clear(); st.rerun()
                     except Exception as e: st.error(f"Erro: {e}")
 
 # =============================================================================
-# 📋 MÓDULO 3: TRIAGEM E ROMANEIO (PDF E TABELA MANUAL RESTAURADOS)
+# 📋 MÓDULO 3: TRIAGEM E ROMANEIO
 # =============================================================================
 elif menu == "🔬 Triagem":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🔬 Terminal de Triagem e Expedição</h3></div>", unsafe_allow_html=True)
@@ -852,7 +922,6 @@ elif menu == "🔬 Triagem":
                                 base_cidade = sel_lista[0].get('CIDADE', '')
                                 despachar_para_appsheet([{'PEDIDO': id_romaneio, 'MOTORISTA': motorista_escolhido, 'ENDERECO': "ENTREGA LOTE NO TOMADOR", 'NUMERO': f"{len(p_ids)} VOLUMES", 'BAIRRO': base_tomador, 'CIDADE': base_cidade, 'CEP': "---", 'LABORATORIO': f"CONJUNTO DE {len(sel_lista)} PEDIDOS", 'TOMADOR': base_tomador, 'ROMANEIO': id_romaneio}])
                                 
-                                # 🔥 O PDF VOLTOU E BLINDADO
                                 pdf = FPDF()
                                 pdf.add_page()
                                 pdf.set_draw_color(15, 23, 42); pdf.set_line_width(0.3); pdf.rect(5, 5, 200, 287)
@@ -913,8 +982,7 @@ elif menu == "🔬 Triagem":
                 st.dataframe(df_hist[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']], hide_index=True, use_container_width=True)
             else:
                 st.warning("O arquivo histórico de varreduras está temporariamente em branco.")
-    else: 
-        st.info("O banco de dados está vazio no momento.")
+    else: st.info("O banco de dados está vazio no momento.")
 
 # =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP (BOTÃO ZAP)
