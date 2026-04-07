@@ -68,6 +68,13 @@ st.markdown("""
 
     .stButton > button[kind="primary"] { background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; color: #FFFFFF !important;}
     .stButton > button[kind="primary"]:hover { background: #0369A1 !important; }
+    
+    div[data-testid="stPopover"] > button, button[kind="secondary"] {
+        white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
+    }
+    div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
+        border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -123,7 +130,6 @@ def conectar_banco():
         caminho_windows = r"C:\Users\elcic\IGO_Logistica_Sistema"
         cred_win = os.path.join(caminho_windows, "credentials.json")
         token_win = os.path.join(caminho_windows, "token.json")
-        
         if os.path.exists(cred_win):
             gc = gspread.oauth(credentials_filename=cred_win, authorized_user_filename=token_win)
             return gc.open("DB_IGO_Logistica")
@@ -278,7 +284,6 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         linhas = []
         for p in lista_pedidos_dicts:
             mot = str(p.get('MOTORISTA', p.get('AGENTE_RAW', '')))
-            # 18 COLUNAS BLINDADAS
             linhas.append([
                 str(uuid.uuid4())[:8].upper(),    # 1. ID_TAREFA
                 str(p.get('PEDIDO','')),          # 2. PEDIDO
@@ -406,8 +411,8 @@ def obter_css_grid():
     return {
         ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
         ".ag-header": {"background-color": "#F8FAFC !important", "border-bottom": "1px solid #CBD5E1 !important"},
-        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "700 !important", "font-size": "11px !important"},
-        ".ag-cell": {"font-size": "11px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
+        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "700 !important", "font-size": "12px !important"},
+        ".ag-cell": {"font-size": "12px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
         ".ag-row-even": {"background-color": "#FFFFFF !important"},
         ".ag-row-odd": {"background-color": "#F8FAFC !important"}, 
         ".ag-row-hover": {"background-color": "#E2E8F0 !important"},
@@ -574,17 +579,6 @@ if menu == "📊 Dashboard":
 
         # 🔥 PREENCHENDO O ESPAÇO RESERVADO LÁ NO TOPO COM OS BOTÕES
         with box_botoes.container():
-            st.markdown("""
-            <style>
-            div[data-testid="stPopover"] > button, button[kind="secondary"] {
-                white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
-            }
-            div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
-                border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-
             col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
             
             with col_b1.popover("📲 Dar Baixa Manual", use_container_width=True):
@@ -672,7 +666,7 @@ if menu == "📊 Dashboard":
                                         if clone_mot != "Manter Original": l_orig['AGENTE_RAW'] = clone_mot
                                         prazo = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')))
                                         
-                                        # 🔥 O TRATAMENTO DE CHOQUE DO DTYPE (str em tudo) para parar o erro 'Invalid value 1'
+                                        # 🔥 O TRATAMENTO DE CHOQUE DO DTYPE (str em tudo)
                                         l_orig['PRAZO_DIAS'] = str(prazo) 
                                         l_orig['DATA_LIMITE'] = str(calcular_data_limite(l_orig['DATA'], prazo))
                                         l_orig = l_orig.astype(str)
@@ -918,21 +912,24 @@ elif menu == "🔬 Triagem":
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']].fillna("").astype(str)
-                df_fila.insert(0, "SELECIONAR", False)
-                tabela_fila = st.data_editor(
-                    df_fila, 
-                    hide_index=True, 
-                    disabled=[c for c in df_fila.columns if c != "SELECIONAR"], 
-                    use_container_width=True
-                )
-                selecionados_manuais = tabela_fila[tabela_fila["SELECIONAR"]]
-                tem_selecao = not selecionados_manuais.empty
+                
+                gb_fila = GridOptionsBuilder.from_dataframe(df_fila)
+                gb_fila.configure_default_column(resizable=True, sortable=True, filter=False, flex=1)
+                gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+                grid_fila_resp = AgGrid(df_fila, gridOptions=gb_fila.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.SELECTION_CHANGED)
+                
+                selecionados_manuais = grid_fila_resp['selected_rows']
+                tem_selecao = False
+                if selecionados_manuais is not None:
+                    if isinstance(selecionados_manuais, pd.DataFrame): tem_selecao = not selecionados_manuais.empty
+                    else: tem_selecao = len(selecionados_manuais) > 0
 
                 if st.button("✅ Enviar Selecionados para Despacho", type="primary"):
                     if not tem_selecao: st.warning("⚠️ Marque os pedidos na tabela acima primeiro!")
                     else:
                         with st.spinner("Atualizando pedidos selecionados em lote..."):
-                            p_ids = selecionados_manuais['PEDIDO'].astype(str).tolist()
+                            if isinstance(selecionados_manuais, pd.DataFrame): p_ids = selecionados_manuais['PEDIDO'].astype(str).tolist()
+                            else: p_ids = [str(r['PEDIDO']) for r in selecionados_manuais]
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
@@ -946,9 +943,9 @@ elif menu == "🔬 Triagem":
                 st.info("O salão está vazio. Apenas materiais marcados como 'Coletados' chegam à triagem.")
 
         with t2:
+            st.markdown("#### Matriz de Expedição (Romaneio)")
             df_conf = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
             if not df_conf.empty:
-                st.markdown("#### Matriz de Expedição (Romaneio)")
                 lista_tomadores_conf = sorted(df_conf['TOMADOR'].astype(str).unique().tolist())
                 c_filtro, _ = st.columns([1, 2])
                 tomador_filtro = c_filtro.selectbox("🏢 Blindagem de Carga (Filtro por Tomador):", ["Todos"] + [t for t in lista_tomadores_conf if t.strip()])
@@ -959,81 +956,92 @@ elif menu == "🔬 Triagem":
                 if 'QR_CODE' in df_conf.columns: colunas_romaneio.append('QR_CODE')
                 
                 df_conf_show = df_conf[colunas_romaneio].fillna("").astype(str)
-                df_conf_show.insert(0, "SELECIONAR", False)
-                tabela_conf = st.data_editor(df_conf_show, hide_index=True, disabled=[c for c in df_conf_show.columns if c != "SELECIONAR"], use_container_width=True)
-                selecionados = tabela_conf[tabela_conf["SELECIONAR"]]
-                tem_sel_pdf = not selecionados.empty
                 
+                gb_conf = GridOptionsBuilder.from_dataframe(df_conf_show)
+                gb_conf.configure_default_column(resizable=True, sortable=True, filter=False, flex=1)
+                gb_conf.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+                grid_conf_resp = AgGrid(df_conf_show, gridOptions=gb_conf.build(), theme='alpine', custom_css=obter_css_grid(), height=300, fit_columns_on_grid_load=False, update_mode=GridUpdateMode.SELECTION_CHANGED)
+                
+                selecionados = grid_conf_resp['selected_rows']
+                tem_sel_pdf = False
+                if selecionados is not None:
+                    if isinstance(selecionados, pd.DataFrame): tem_sel_pdf = not selecionados.empty
+                    else: tem_sel_pdf = len(selecionados) > 0
+                
+                st.markdown("---")
                 c_mot, c_data, c_btn = st.columns([2, 1, 2])
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                 motorista_escolhido = c_mot.selectbox("👤 Motorista:", ["Selecione..."] + logins_disp)
                 data_despacho = c_data.date_input("📅 Data:", format="DD/MM/YYYY", value=hoje_br)
-                if c_btn.button("🚚 Despachar e Gerar PDF", type="primary") and tem_sel_pdf and motorista_escolhido != "Selecione...":
-                    with st.spinner("Gerando Romaneio..."):
-                        id_romaneio = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
-                        sel_lista = selecionados.to_dict('records')
-                        p_ids = [str(r['PEDIDO']) for r in sel_lista]
-                        try:
-                            aba = planilha_db.worksheet("Memoria_Sistema")
-                            df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                            df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), ['STATUS', 'ROMANEIO', 'DATA', 'AGENTE_RAW']] = ['EM ROTA DE ENTREGA', id_romaneio, data_despacho.strftime("%d/%m/%Y"), motorista_escolhido]
-                            aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                            
-                            base_tomador = sel_lista[0].get('TOMADOR', 'CLIENTE')
-                            base_cidade = sel_lista[0].get('CIDADE', '')
-                            despachar_para_appsheet([{'PEDIDO': id_romaneio, 'MOTORISTA': motorista_escolhido, 'ENDERECO': "ENTREGA LOTE", 'NUMERO': f"{len(p_ids)} VOLUMES", 'BAIRRO': base_tomador, 'CIDADE': base_cidade, 'CEP': "---", 'LABORATORIO': f"CONJUNTO DE {len(sel_lista)} PEDIDOS", 'TOMADOR': base_tomador, 'ROMANEIO': id_romaneio}])
-                            
-                            # 🔥 O PDF MARAVILHOSO VOLTOU 
-                            pdf = FPDF()
-                            pdf.add_page()
-                            pdf.set_draw_color(15, 23, 42)  
-                            pdf.set_line_width(0.3)
-                            pdf.rect(5, 5, 200, 287)
+                if c_btn.button("🚚 Despachar e Gerar PDF", type="primary", use_container_width=True):
+                    if not tem_sel_pdf or motorista_escolhido == "Selecione...": st.warning("⚠️ Exigência de Rota: Marque os pacotes e informe o responsável.")
+                    else:
+                        with st.spinner("Gerando Romaneio PDF (Selo IGO)..."):
+                            id_romaneio = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
+                            if isinstance(selecionados, pd.DataFrame): sel_lista = selecionados.to_dict('records')
+                            else: sel_lista = selecionados
+                            p_ids = [str(r['PEDIDO']) for r in sel_lista]
                             try:
-                                logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
-                                if not os.path.exists(logo_path):
-                                    req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
-                                    with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file: out_file.write(response.read())
-                                pdf.image(logo_path, x=10, y=8, w=30) 
-                            except: pass
-                            
-                            pdf.set_y(15); pdf.set_font("Arial", "B", 14); pdf.set_text_color(15, 23, 42)
-                            pdf.cell(0, 6, f"PROTOCOLO DE ENTREGA - IGO LOGISTICA", ln=True, align="C") 
-                            pdf.set_font("Arial", "B", 10); pdf.set_text_color(2, 132, 199) 
-                            pdf.cell(0, 5, f"LOTE DE EXPEDIÇÃO: {id_romaneio}", ln=True, align="C")
-                            pdf.set_font("Arial", "", 8); pdf.set_text_color(100, 116, 139) 
-                            pdf.cell(0, 4, f"Data do Embarque: {data_despacho.strftime('%d/%m/%Y')} | Motorista: {str(motorista_escolhido).upper()}", ln=True, align="C")
-                            pdf.ln(3); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(3)
-                            
-                            pdf.set_fill_color(15, 23, 42); pdf.set_text_color(255, 255, 255); pdf.set_font("Arial", "B", 7)
-                            pdf.cell(10, 5, "ITEM", 1, 0, "C", True); pdf.cell(25, 5, "PEDIDO", 1, 0, "C", True)
-                            pdf.cell(30, 5, "ID CLIENTE", 1, 0, "C", True); pdf.cell(80, 5, "PONTO DE COLETA / LABORATÓRIO", 1, 0, "C", True)
-                            pdf.cell(35, 5, "CIDADE", 1, 0, "C", True); pdf.cell(10, 5, "UF", 1, 1, "C", True)
-                            pdf.set_text_color(51, 65, 85); pdf.set_font("Arial", "", 7)
-                            
-                            for idx, item in enumerate(sel_lista, 1):
-                                fill = (idx % 2 == 0)
-                                if fill: pdf.set_fill_color(241, 245, 249) 
-                                else: pdf.set_fill_color(255, 255, 255)
-                                qr_val = str(item.get('QR_CODE', ''))
-                                if qr_val.upper() == 'NAN' or not qr_val: qr_val = "-"
-                                pdf.cell(10, 5, str(idx), 1, 0, "C", True); pdf.cell(25, 5, str(item.get('PEDIDO','')), 1, 0, "C", True)
-                                pdf.cell(30, 5, qr_val, 1, 0, "C", True); pdf.cell(80, 5, str(item.get('LABORATORIO',''))[:48], 1, 0, "L", True)
-                                pdf.cell(35, 5, str(item.get('CIDADE',''))[:22], 1, 0, "L", True); pdf.cell(10, 5, str(item.get('UF','')), 1, 1, "C", True)
+                                aba = planilha_db.worksheet("Memoria_Sistema")
+                                df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), ['STATUS', 'ROMANEIO', 'DATA', 'AGENTE_RAW']] = ['EM ROTA DE ENTREGA', id_romaneio, data_despacho.strftime("%d/%m/%Y"), motorista_escolhido]
+                                aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 
-                            pdf.ln(4); pdf.set_font("Arial", "B", 8); pdf.set_text_color(15, 23, 42)
-                            pdf.cell(0, 5, f"TOTAL DE VOLUMES CONFERIDOS E EMBARCADOS: {len(sel_lista)}", ln=True, align="R")
-                            pdf.set_y(-25); pdf.line(20, pdf.get_y(), 90, pdf.get_y()); pdf.line(120, pdf.get_y(), 190, pdf.get_y())
-                            pdf.set_font("Arial", "B", 7)
-                            pdf.cell(95, 4, "ASSINATURA CADEIA (MOTORISTA)", 0, 0, "C"); pdf.cell(95, 4, "ASSINATURA EXPEDIÇÃO (BASE IGO)", 0, 1, "C")
-                            
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
-                                pdf.output(tmp_pdf.name)
-                                with open(tmp_pdf.name, "rb") as f: pdf_bytes = f.read()
-                            
-                            carregar_dados_completos.clear()
-                            st.success(f"🎉 Lote {id_romaneio} gerado com sucesso!")
-                            st.download_button(label="📥 BAIXAR PROTOCOLO TÉCNICO (PDF)", data=pdf_bytes, file_name=f"Romaneio_Tecnico_{id_romaneio}.pdf", mime="application/pdf", type="primary")
+                                base_tomador = sel_lista[0].get('TOMADOR', 'CLIENTE')
+                                base_cidade = sel_lista[0].get('CIDADE', '')
+                                despachar_para_appsheet([{'PEDIDO': id_romaneio, 'MOTORISTA': motorista_escolhido, 'ENDERECO': "ENTREGA LOTE", 'NUMERO': f"{len(p_ids)} VOLUMES", 'BAIRRO': base_tomador, 'CIDADE': base_cidade, 'CEP': "---", 'LABORATORIO': f"CONJUNTO DE {len(sel_lista)} PEDIDOS", 'TOMADOR': base_tomador, 'ROMANEIO': id_romaneio}])
+                                
+                                # 🔥 O PDF VOLTOU E BLINDADO
+                                pdf = FPDF()
+                                pdf.add_page()
+                                pdf.set_draw_color(15, 23, 42)  
+                                pdf.set_line_width(0.3)
+                                pdf.rect(5, 5, 200, 287)
+                                try:
+                                    logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
+                                    if not os.path.exists(logo_path):
+                                        req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
+                                        with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file: out_file.write(response.read())
+                                    pdf.image(logo_path, x=10, y=8, w=30) 
+                                except: pass
+                                
+                                pdf.set_y(15); pdf.set_font("Arial", "B", 14); pdf.set_text_color(15, 23, 42)
+                                pdf.cell(0, 6, f"PROTOCOLO DE ENTREGA - IGO LOGISTICA", ln=True, align="C") 
+                                pdf.set_font("Arial", "B", 10); pdf.set_text_color(2, 132, 199) 
+                                pdf.cell(0, 5, f"LOTE DE EXPEDIÇÃO: {id_romaneio}", ln=True, align="C")
+                                pdf.set_font("Arial", "", 8); pdf.set_text_color(100, 116, 139) 
+                                pdf.cell(0, 4, f"Data do Embarque: {data_despacho.strftime('%d/%m/%Y')} | Motorista: {str(motorista_escolhido).upper()}", ln=True, align="C")
+                                pdf.ln(3); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(3)
+                                
+                                pdf.set_fill_color(15, 23, 42); pdf.set_text_color(255, 255, 255); pdf.set_font("Arial", "B", 7)
+                                pdf.cell(10, 5, "ITEM", 1, 0, "C", True); pdf.cell(25, 5, "PEDIDO", 1, 0, "C", True)
+                                pdf.cell(30, 5, "ID CLIENTE", 1, 0, "C", True); pdf.cell(80, 5, "PONTO DE COLETA / LABORATÓRIO", 1, 0, "C", True)
+                                pdf.cell(35, 5, "CIDADE", 1, 0, "C", True); pdf.cell(10, 5, "UF", 1, 1, "C", True)
+                                pdf.set_text_color(51, 65, 85); pdf.set_font("Arial", "", 7)
+                                
+                                for idx, item in enumerate(sel_lista, 1):
+                                    fill = (idx % 2 == 0)
+                                    if fill: pdf.set_fill_color(241, 245, 249) 
+                                    else: pdf.set_fill_color(255, 255, 255)
+                                    qr_val = str(item.get('QR_CODE', ''))
+                                    if qr_val.upper() == 'NAN' or not qr_val: qr_val = "-"
+                                    pdf.cell(10, 5, str(idx), 1, 0, "C", True); pdf.cell(25, 5, str(item.get('PEDIDO','')), 1, 0, "C", True)
+                                    pdf.cell(30, 5, qr_val, 1, 0, "C", True); pdf.cell(80, 5, str(item.get('LABORATORIO',''))[:48], 1, 0, "L", True)
+                                    pdf.cell(35, 5, str(item.get('CIDADE',''))[:22], 1, 0, "L", True); pdf.cell(10, 5, str(item.get('UF','')), 1, 1, "C", True)
+                                    
+                                pdf.ln(4); pdf.set_font("Arial", "B", 8); pdf.set_text_color(15, 23, 42)
+                                pdf.cell(0, 5, f"TOTAL DE VOLUMES CONFERIDOS E EMBARCADOS: {len(sel_lista)}", ln=True, align="R")
+                                pdf.set_y(-25); pdf.line(20, pdf.get_y(), 90, pdf.get_y()); pdf.line(120, pdf.get_y(), 190, pdf.get_y())
+                                pdf.set_font("Arial", "B", 7)
+                                pdf.cell(95, 4, "ASSINATURA CADEIA (MOTORISTA)", 0, 0, "C"); pdf.cell(95, 4, "ASSINATURA EXPEDIÇÃO (BASE IGO)", 0, 1, "C")
+                                
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+                                    pdf.output(tmp_pdf.name)
+                                    with open(tmp_pdf.name, "rb") as f: pdf_bytes = f.read()
+                                
+                                carregar_dados_completos.clear()
+                                st.success(f"🎉 Lote {id_romaneio} gerado com sucesso!")
+                                st.download_button(label="📥 BAIXAR PROTOCOLO TÉCNICO (PDF)", data=pdf_bytes, file_name=f"Romaneio_Tecnico_{id_romaneio}.pdf", mime="application/pdf", type="primary")
                         except Exception as e: st.error(f"Erro: {e}")
             else:
                 st.info("O salão está vazio. Somente lotes validados na Triagem aparecem para despacho.")
@@ -1045,7 +1053,22 @@ elif menu == "🔬 Triagem":
             df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper().isin(status_mostrar)].copy()
             if not df_hist.empty:
                 df_hist = df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])
-                st.dataframe(df_hist[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']], hide_index=True, use_container_width=True)
+                df_hist_show = df_hist[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']]
+                
+                gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
+                gb_hist.configure_default_column(resizable=True, sortable=True, filter=True, flex=1)
+                st_js = JsCode("""
+                function(p){
+                    let v = p.value ? String(p.value).toUpperCase() : ''; 
+                    if(v.includes('ENTREGUE')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
+                    if(v.includes('FRUSTRADA') || v.includes('PROBLEMA') || v.includes('CANCELADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
+                    if(v.includes('EM ROTA')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
+                    if(v.includes('COLETADO') || v.includes('CONFERIDO')){ return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'}; } 
+                    return {'fontWeight':'600', 'color': '#64748B'};
+                }
+                """)
+                gb_hist.configure_column("STATUS", headerName="STATUS", cellStyle=st_js)
+                AgGrid(df_hist_show, gridOptions=gb_hist.build(), allow_unsafe_jscode=True, theme='alpine', custom_css=obter_css_grid(), height=400, fit_columns_on_grid_load=False)
             else:
                 st.warning("O arquivo histórico de varreduras está temporariamente em branco.")
     else: st.info("O banco de dados está vazio no momento.")
@@ -1115,6 +1138,9 @@ elif menu == "📁 Relatórios":
                 if not df_custom.empty: st.download_button("📥 Fazer Download do Relatório Cru (Excel)", data=gerar_excel_memoria(df_custom), file_name=f"Pesquisa_Customizada_IGO.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 else: st.warning("Nenhum dado encontrado.")
 
+# =============================================================================
+# ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
+# =============================================================================
 elif menu == "⚙️ Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
     tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
@@ -1160,7 +1186,7 @@ elif menu == "⚙️ Rotas":
                 if ca4.form_submit_button("➕ Salvar", use_container_width=True):
                     if not r_cid: st.error("A Cidade é obrigatória!")
                     else:
-                        rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai), tratar_texto_global(r_rua)] if p])
+                        rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(bai_rota), tratar_texto_global(r_rua)] if p])
                         dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
                         df_novo = pd.concat([DF_AGENTES, pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": agente_filtro, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])], ignore_index=True)
                         try:
