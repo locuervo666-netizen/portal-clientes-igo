@@ -15,15 +15,15 @@ import random
 import gspread
 import uuid
 from streamlit_autorefresh import st_autorefresh
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, GridUpdateMode
 from fpdf import FPDF
 
 FUSO_BR = timezone(timedelta(hours=-3))
 
 # =============================================================================
-# 🔗 1. CONFIGURAÇÃO DA PÁGINA E AUTENTICAÇÃO
+# 🔗 1. CONFIGURAÇÃO DA PÁGINA E ESTILOS
 # =============================================================================
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="collapsed")
-
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 st.markdown("""
@@ -33,7 +33,6 @@ st.markdown("""
     .stDeployButton { display: none !important; }
     #MainMenu { display: none !important; }
     footer { display: none !important; }
-    
     .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 98% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
@@ -50,8 +49,6 @@ st.markdown("""
     div[data-testid="stRadio"] label[data-checked="true"] p { color: #0F172A !important; font-weight: 800 !important; }
     div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; }
 
-    .dinamic-border { border-bottom: 2px solid #E2E8F0 !important; margin-bottom: 24px; padding-bottom: 8px; }
-    
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
         border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
@@ -64,45 +61,20 @@ st.markdown("""
     div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_pend button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
         color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
     }
-
-    .stButton > button[kind="primary"] { background: #0284C7 !important; border: none !important; border-radius: 6px !important; font-weight: 700 !important; color: #FFFFFF !important;}
-    .stButton > button[kind="primary"]:hover { background: #0369A1 !important; }
     </style>
 """, unsafe_allow_html=True)
+
+st.markdown("""<style>[data-testid="stSidebar"] { display: none !important; }</style>""", unsafe_allow_html=True)
 
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
-# =============================================================================
-# 🔐 TELA DE LOGIN
-# =============================================================================
 if not st.session_state.autenticado:
-    st.markdown("""
-        <style>
-        [data-testid="stForm"] {
-            background: #FFFFFF; padding: 40px 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08); border: 1px solid #E2E8F0; max-width: 380px !important; margin: 8vh auto !important; 
-        }
-        .login-header { text-align: center; margin-bottom: 25px; }
-        .login-title { color: #0F172A; font-weight: 800; font-size: 20px; margin-top: 15px; letter-spacing: -0.5px; }
-        .login-subtitle { color: #64748B; font-size: 13px; font-weight: 500; }
-        </style>
-    """, unsafe_allow_html=True)
-    
     with st.form("form_login"):
-        st.markdown("""
-            <div class="login-header">
-                <img src="https://i.postimg.cc/x84nnjjq/IGO-LOGO.png" width="160">
-                <div class="login-title">PORTAL CORPORATIVO</div>
-                <div class="login-subtitle">Autenticação de Operadores</div>
-            </div>
-        """, unsafe_allow_html=True)
-        
+        st.markdown("<h3 style='text-align: center; color: #0F172A;'>PORTAL CORPORATIVO</h3>", unsafe_allow_html=True)
         usuario = st.text_input("👤 Usuário")
         senha = st.text_input("🔑 Senha", type="password")
-        st.markdown("<br>", unsafe_allow_html=True)
-        submit = st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary")
-        
-        if submit:
+        if st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary"):
             logins_autorizados = {"robson.melo": "123", "william.bertoldo": "123"}
             if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
                 st.session_state.autenticado = True
@@ -111,9 +83,8 @@ if not st.session_state.autenticado:
                 st.error("❌ Credenciais inválidas.")
     st.stop()
 
-
 # =============================================================================
-# 🔗 2. CONEXÃO COM A NUVEM E CÉREBRO DE DADOS
+# 🔗 2. FUNÇÕES E CÉREBRO DE DADOS
 # =============================================================================
 @st.cache_resource
 def conectar_banco():
@@ -122,7 +93,6 @@ def conectar_banco():
         caminho_windows = r"C:\Users\elcic\IGO_Logistica_Sistema"
         cred_win = os.path.join(caminho_windows, "credentials.json")
         token_win = os.path.join(caminho_windows, "token.json")
-        
         if os.path.exists(cred_win):
             gc = gspread.oauth(credentials_filename=cred_win, authorized_user_filename=token_win)
             return gc.open("DB_IGO_Logistica")
@@ -133,12 +103,9 @@ def conectar_banco():
             creds = Credentials.from_authorized_user_info(token_info, scopes)
             gc = gspread.authorize(creds)
             return gc.open("DB_IGO_Logistica")
-        else:
-            st.error("❌ Credenciais não encontradas (Local ou Secrets).")
-            return None
     except Exception as e:
         st.error(f"Erro na conexão com o Banco: {e}")
-        return None
+    return None
 
 def carregar_dados_agentes(_planilha):
     if not _planilha: return pd.DataFrame()
@@ -160,7 +127,6 @@ def carregar_dados_completos(_planilha):
             df.columns = df.columns.str.strip().str.upper() 
             df = df.loc[:, ~df.columns.duplicated()] 
             df = df.dropna(how='all') 
-            
             try:
                 aba_app = _planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
@@ -172,12 +138,7 @@ def carregar_dados_completos(_planilha):
                     cols_to_extract = ['PEDIDO', 'STATUS', 'OBSERVACOES']
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
                     if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
-                    
-                    col_qr_app = None
-                    for c in ['QR_CODE', 'QRCODE', 'QR', 'CODIGO']:
-                        if c in df_app.columns:
-                            col_qr_app = c
-                            break
+                    col_qr_app = next((c for c in ['QR_CODE', 'QRCODE', 'QR', 'CODIGO'] if c in df_app.columns), None)
                     if col_qr_app: cols_to_extract.append(col_qr_app)
                     
                     df_app_clean = df_app[[c for c in cols_to_extract if c in df_app.columns]].copy()
@@ -185,7 +146,6 @@ def carregar_dados_completos(_planilha):
                     if 'DATA_ENTREGA' in df_app.columns: rename_map['DATA_ENTREGA'] = 'APP_DATA_ENTREGA'
                     if col_qr_app: rename_map[col_qr_app] = 'APP_QR'
                     df_app_clean.rename(columns=rename_map, inplace=True)
-                    
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                     
@@ -196,21 +156,16 @@ def carregar_dados_completos(_planilha):
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
                     
                     if 'APP_QR' in df.columns:
-                        if 'QR_CODE' not in df.columns:
-                            df['QR_CODE'] = df['APP_QR']
-                        else:
-                            df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
+                        if 'QR_CODE' not in df.columns: df['QR_CODE'] = df['APP_QR']
+                        else: df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
 
                     def get_true_status(row):
                         s_db = str(row.get('STATUS', '')).strip().upper()
                         s_app = str(row.get('APP_STATUS', '')).strip().upper()
                         rom_id = str(row.get('ROMANEIO', '')).strip()
-                        
                         if rom_id in rom_dict:
                             s_rom = str(rom_dict[rom_id].get('APP_STATUS', '')).strip().upper()
-                            if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']:
-                                return s_rom
-                                
+                            if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']: return s_rom
                         if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_db
                         if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_app
                         if s_db in ['EM ROTA DE ENTREGA', 'CONFERIDO']: return s_db
@@ -223,17 +178,12 @@ def carregar_dados_completos(_planilha):
                         d_db = str(row.get('DATA_ENTREGA', '')).strip()
                         s_final = str(row.get('STATUS', '')).strip().upper()
                         rom_id = str(row.get('ROMANEIO', '')).strip()
-                        
                         if rom_id in rom_dict:
                             d_rom = str(rom_dict[rom_id].get('APP_DATA_ENTREGA', '')).strip()
-                            if d_rom and d_rom.upper() != 'NAN':
-                                return d_rom
-
+                            if d_rom and d_rom.upper() != 'NAN': return d_rom
                         if s_final in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA'] and 'APP_DATA_ENTREGA' in row:
                             d_app = str(row.get('APP_DATA_ENTREGA', '')).strip()
-                            if d_app and d_app.upper() != 'NAN':
-                                return d_app
-                        
+                            if d_app and d_app.upper() != 'NAN': return d_app
                         return d_db if d_db.upper() != 'NAN' else ""
                         
                     if 'DATA_ENTREGA' in df.columns or 'APP_DATA_ENTREGA' in df.columns:
@@ -243,27 +193,21 @@ def carregar_dados_completos(_planilha):
                         f_db = str(row.get('FOTO', '')).strip()
                         f_app = str(row.get('APP_FOTO', '')).strip()
                         rom_id = str(row.get('ROMANEIO', '')).strip()
-                        
                         if rom_id in rom_dict:
                             f_rom = str(rom_dict[rom_id].get('APP_FOTO', '')).strip()
-                            if f_rom and f_rom.upper() != 'NAN':
-                                return f_rom
-                                
+                            if f_rom and f_rom.upper() != 'NAN': return f_rom
                         if f_app and f_app.upper() != 'NAN': return f_app
                         return f_db
                         
                     if 'APP_FOTO' in df.columns or len(rom_dict) > 0:
                         df['FOTO'] = df.apply(get_true_foto, axis=1)
-                        
             except Exception: pass
             
             if 'DATA' in df.columns: df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
-    except Exception as e: 
-        st.error(f"Erro Crítico ao carregar a Memoria_Sistema: {e}")
+    except Exception as e: st.error(f"Erro Crítico ao carregar a Memoria_Sistema: {e}")
     return pd.DataFrame()
 
-# ======== VARIÁVEIS GLOBAIS ========
 planilha_db = conectar_banco()
 DF_AGENTES = carregar_dados_agentes(planilha_db)
 FERIADOS_BR = holidays.Brazil()
@@ -278,30 +222,122 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         for p in lista_pedidos_dicts:
             mot = str(p.get('MOTORISTA', p.get('AGENTE_RAW', '')))
             linhas.append([
-                str(uuid.uuid4())[:8].upper(),    # 1. ID_TAREFA
-                str(p.get('PEDIDO','')),          # 2. PEDIDO
-                mot,                              # 3. MOTORISTA
-                "PENDENTE",                       # 4. STATUS
-                str(p.get('ENDERECO','')),        # 5. ENDERECO
-                str(p.get('NUMERO','')),          # 6. NUMERO
-                str(p.get('BAIRRO','')),          # 7. BAIRRO
-                str(p.get('CIDADE','')),          # 8. CIDADE
-                str(p.get('CEP','')),             # 9. CEP
-                "",                               # 10. FOTO
-                str(p.get('OBSERVACOES','')),     # 11. OBSERVACOES
-                str(p.get('LABORATORIO','')),     # 12. LABORATORIO
-                str(p.get('TOMADOR','')),         # 13. TOMADOR
-                str(p.get('QR_CODE','')),         # 14. QR_CODE
-                "",                               # 15. DETALHES
-                str(p.get('ROMANEIO','')),        # 16. ROMANEIO
-                "",                               # 17. RECEBEDOR
-                ""                                # 18. DATA_ENTREGA
+                str(uuid.uuid4())[:8].upper(),    
+                str(p.get('PEDIDO','')),          
+                mot,                              
+                "PENDENTE",                       
+                str(p.get('ENDERECO','')),        
+                str(p.get('NUMERO','')),          
+                str(p.get('BAIRRO','')),          
+                str(p.get('CIDADE','')),          
+                str(p.get('CEP','')),             
+                "",                               
+                str(p.get('OBSERVACOES','')),     
+                str(p.get('LABORATORIO','')),     
+                str(p.get('TOMADOR','')),         
+                str(p.get('QR_CODE','')),         
+                "",                               
+                str(p.get('ROMANEIO','')),        
+                "",                               
+                ""                                
             ])
         aba.append_rows(linhas, value_input_option='USER_ENTERED')
         return True
     except Exception as e: 
-        st.error(f"🚨 ERRO DE SINCRONIZAÇÃO APPSHEET: Ocorreu um erro ao gravar no Google Sheets: {e}")
+        st.error(f"🚨 ERRO DE SINCRONIZAÇÃO APPSHEET: {e}")
         return False
+
+# =============================================================================
+# 🔗 2.1 FUNÇÃO ISOLADA DO PDF (MATA O ERRO DE INDENTAÇÃO)
+# =============================================================================
+def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_lista):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_draw_color(15, 23, 42)  
+    pdf.set_line_width(0.3)
+    pdf.rect(5, 5, 200, 287)
+    
+    try:
+        logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
+        if not os.path.exists(logo_path):
+            req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file: 
+                out_file.write(response.read())
+        pdf.image(logo_path, x=10, y=8, w=30) 
+    except Exception: 
+        pass
+        
+    pdf.set_y(15)
+    pdf.set_font("Arial", "B", 14)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 6, f"PROTOCOLO DE ENTREGA - IGO LOGISTICA", ln=True, align="C") 
+    
+    pdf.set_font("Arial", "B", 10)
+    pdf.set_text_color(2, 132, 199) 
+    pdf.cell(0, 5, f"LOTE DE EXPEDIÇÃO: {id_romaneio}", ln=True, align="C")
+    
+    pdf.set_font("Arial", "", 8)
+    pdf.set_text_color(100, 116, 139) 
+    if isinstance(data_despacho, str):
+        dt_str = data_despacho
+    else:
+        dt_str = data_despacho.strftime('%d/%m/%Y')
+    pdf.cell(0, 4, f"Data do Embarque: {dt_str} | Motorista: {str(motorista_escolhido).upper()}", ln=True, align="C")
+    
+    pdf.ln(3)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(3)
+    
+    pdf.set_fill_color(15, 23, 42)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", "B", 7)
+    pdf.cell(10, 5, "ITEM", 1, 0, "C", True)
+    pdf.cell(25, 5, "PEDIDO", 1, 0, "C", True)
+    pdf.cell(30, 5, "ID CLIENTE", 1, 0, "C", True)
+    pdf.cell(80, 5, "PONTO DE COLETA / LABORATÓRIO", 1, 0, "C", True)
+    pdf.cell(35, 5, "CIDADE", 1, 0, "C", True)
+    pdf.cell(10, 5, "UF", 1, 1, "C", True)
+    
+    pdf.set_text_color(51, 65, 85)
+    pdf.set_font("Arial", "", 7)
+    
+    for idx, item in enumerate(sel_lista, 1):
+        fill = (idx % 2 == 0)
+        if fill: 
+            pdf.set_fill_color(241, 245, 249) 
+        else: 
+            pdf.set_fill_color(255, 255, 255)
+            
+        qr_val = str(item.get('QR_CODE', ''))
+        if qr_val.upper() == 'NAN' or not qr_val: 
+            qr_val = "-"
+            
+        pdf.cell(10, 5, str(idx), 1, 0, "C", True)
+        pdf.cell(25, 5, str(item.get('PEDIDO','')), 1, 0, "C", True)
+        pdf.cell(30, 5, qr_val, 1, 0, "C", True)
+        pdf.cell(80, 5, str(item.get('LABORATORIO',''))[:48], 1, 0, "L", True)
+        pdf.cell(35, 5, str(item.get('CIDADE',''))[:22], 1, 0, "L", True)
+        pdf.cell(10, 5, str(item.get('UF','')), 1, 1, "C", True)
+        
+    pdf.ln(4)
+    pdf.set_font("Arial", "B", 8)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 5, f"TOTAL DE VOLUMES CONFERIDOS E EMBARCADOS: {len(sel_lista)}", ln=True, align="R")
+    
+    pdf.set_y(-25)
+    pdf.line(20, pdf.get_y(), 90, pdf.get_y())
+    pdf.line(120, pdf.get_y(), 190, pdf.get_y())
+    
+    pdf.set_font("Arial", "B", 7)
+    pdf.cell(95, 4, "ASSINATURA CADEIA (MOTORISTA)", 0, 0, "C")
+    pdf.cell(95, 4, "ASSINATURA EXPEDIÇÃO (BASE IGO)", 0, 1, "C")
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+        pdf.output(tmp_pdf.name)
+        with open(tmp_pdf.name, "rb") as f: 
+            pdf_bytes = f.read()
+            
+    return pdf_bytes
 
 def padronizar_texto(texto):
     if pd.isna(texto) or not texto: return ""
@@ -312,30 +348,16 @@ def padronizar_texto(texto):
 def tratar_texto_global(texto):
     if pd.isna(texto): return ""
     t = padronizar_texto(texto)
-    if t in ['0', '0.0', 'NAN', 'NONE', 'NAT']: return ""
     return t[:-2] if t.endswith('.0') else t
 
 def limpar_nome_local_rota(texto):
-    t = tratar_texto_global(texto)
-    return t.split('/')[0].split('-')[0].strip()
+    return tratar_texto_global(texto).split('/')[0].split('-')[0].strip()
 
 def obter_login_agente(cidade, bairro, laboratorio, endereco="", base_rotas_df=pd.DataFrame()):
     if base_rotas_df.empty: return ""
-    
-    rotas_dict = {}
-    for _, row in base_rotas_df.iterrows():
-        rota_banco = str(row['ROTA MAPEADA']).upper()
-        rota_banco = rota_banco.replace(" ➔ ", "---").replace(" -> ", "---")
-        rota_limpa = padronizar_texto(rota_banco)
-        rotas_dict[rota_limpa] = str(row['LOGIN DO AGENTE']).lower().strip()
-    
-    cid = limpar_nome_local_rota(cidade)
-    bai = limpar_nome_local_rota(bairro)
-    lab = tratar_texto_global(laboratorio)
-    end = tratar_texto_global(endereco)
-    
-    chaves = [f"{cid}---{bai}---{end}", f"{cid}---{bai}---{lab}", f"{cid}---{lab}", f"{cid}---{bai}", cid]
-    for c in chaves:
+    rotas_dict = {padronizar_texto(str(row['ROTA MAPEADA']).upper().replace(" ➔ ", "---").replace(" -> ", "---")): str(row['LOGIN DO AGENTE']).lower().strip() for _, row in base_rotas_df.iterrows()}
+    cid, bai, lab, end = limpar_nome_local_rota(cidade), limpar_nome_local_rota(bairro), tratar_texto_global(laboratorio), tratar_texto_global(endereco)
+    for c in [f"{cid}---{bai}---{end}", f"{cid}---{bai}---{lab}", f"{cid}---{lab}", f"{cid}---{bai}", cid]:
         if c in rotas_dict: return rotas_dict[c]
     return ""
 
@@ -343,8 +365,7 @@ def calcular_sla_dias(uf, cidade):
     uf, cidade = str(uf).upper().strip(), tratar_texto_global(str(cidade))
     if uf == 'SP': return 1
     if uf == 'RJ': return 2 if cidade in ['ANGRA DOS REIS', 'CAMPOS DOS GOYTACAZES'] else 1
-    if uf in ['GO', 'DF', 'SC', 'RS']: return 2
-    return 3 
+    return 2 if uf in ['GO', 'DF', 'SC', 'RS'] else 3 
 
 def calcular_data_limite(data_ini, prazo):
     try:
@@ -354,7 +375,7 @@ def calcular_data_limite(data_ini, prazo):
             dt += timedelta(days=1)
             if dt.weekday() < 5 and dt not in FERIADOS_BR: add += 1
         return dt.strftime("%d/%m/%Y")
-    except: return data_ini
+    except Exception: return data_ini
 
 def gerar_excel_memoria(df):
     output = io.BytesIO()
@@ -362,28 +383,19 @@ def gerar_excel_memoria(df):
         df.to_excel(writer, sheet_name='Relatorio', index=False)
         worksheet = writer.sheets['Relatorio']
         worksheet.hide_gridlines(2)
-        max_row, max_col = df.shape
-        if max_row > 0:
-            col_settings = [{'header': str(col)} for col in df.columns]
-            worksheet.add_table(0, 0, max_row, max_col - 1, {'columns': col_settings, 'style': 'Table Style Medium 2'})
-            for i, col in enumerate(df.columns):
-                tamanho = max(df[col].astype(str).map(len).max(), len(str(col))) + 2
-                worksheet.set_column(i, i, min(tamanho, 40))
+        if df.shape[0] > 0:
+            worksheet.add_table(0, 0, df.shape[0], df.shape[1] - 1, {'columns': [{'header': str(col)} for col in df.columns], 'style': 'Table Style Medium 2'})
+            for i, col in enumerate(df.columns): worksheet.set_column(i, i, min(max(df[col].astype(str).map(len).max(), len(str(col))) + 2, 40))
     return output.getvalue()
 
 def obter_proximo_id(df):
     if df is None or df.empty or 'PEDIDO' not in df.columns: return 100000
-    try:
-        nums = df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().astype(int)
-        return int(nums.max()) + 1 if not nums.empty else 100000
-    except:
-        return 100000
+    try: return int(df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().astype(int).max()) + 1 if not df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().empty else 100000
+    except Exception: return 100000
 
 def calc_status_display(row):
-    status_final = str(row.get('STATUS', '')).strip().upper()
-    previsao = str(row.get('DATA_LIMITE', '')).strip()
+    status_final, previsao = str(row.get('STATUS', '')).strip().upper(), str(row.get('DATA_LIMITE', '')).strip()
     res = '⏳ Pendente'
-    
     if 'ENTREGUE' in status_final: res = '✅ Entregue'
     elif 'COLETADO' in status_final: res = '📦 Coletado'
     elif 'ROTA' in status_final: res = '🚚 Em Rota'
@@ -394,29 +406,38 @@ def calc_status_display(row):
     
     if '✅' not in res and '🚫' not in res and '❌' not in res and previsao:
         try:
-            if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: 
-                res = f"{res} ⚠️ ATRASADO"
-        except: pass
+            if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: res = f"{res} ⚠️ ATRASADO"
+        except Exception: pass
     return res
+
+def obter_css_grid():
+    return {
+        ".ag-root-wrapper": {"border": "1px solid #E2E8F0 !important", "border-radius": "6px", "overflow": "hidden"},
+        ".ag-header": {"background-color": "#F8FAFC !important", "border-bottom": "1px solid #CBD5E1 !important"},
+        ".ag-header-cell-text": {"color": "#334155 !important", "font-weight": "700 !important", "font-size": "12px !important"},
+        ".ag-cell": {"font-size": "12px !important", "color": "#0F172A !important", "border-bottom": "1px solid #F1F5F9 !important", "display": "flex", "align-items": "center"},
+        ".ag-row-even": {"background-color": "#FFFFFF !important"},
+        ".ag-row-odd": {"background-color": "#F8FAFC !important"}, 
+        ".ag-row-hover": {"background-color": "#E2E8F0 !important"},
+        ".ag-row-selected": {"background-color": "#E0F2FE !important", "color": "#0369A1 !important"},
+        ".ag-row-selected .ag-cell": {"color": "#0369A1 !important", "font-weight": "600"}
+    }
 
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
 # =============================================================================
-# 🎨 3. CABEÇALHO LIMPO E NAVEGAÇÃO
+# 🎨 3. CABEÇALHO E NAVEGAÇÃO
 # =============================================================================
 col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
 
 with col_logo:
     st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=140)
-    
 with col_title:
     st.markdown("<h2 style='color: #0F172A; font-weight: 800; margin: 0; text-align: center;'>PAINEL GERENCIAL</h2>", unsafe_allow_html=True)
     st.markdown("<p style='color: #64748B; margin: 0; text-align: center; font-weight: 600;'>Centro de Controle Operacional - IGO Logística</p>", unsafe_allow_html=True)
-
 with col_logout:
     if st.button("🚪 Sair", use_container_width=True):
-        st.session_state.autenticado = False
-        st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
+        st.session_state.autenticado = False; st.cache_data.clear(); st.cache_resource.clear(); st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -428,7 +449,7 @@ if planilha_db is None:
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD (TABELA NATIVA 100% LARGA + BOTÕES TOPO)
+# 🚀 MÓDULO 1: DASHBOARD (GRID ZEBRADA 100% LARGA + BOTÕES NO TOPO)
 # =============================================================================
 if menu == "📊 Dashboard":
     df_raw = carregar_dados_completos(planilha_db)
@@ -436,14 +457,11 @@ if menu == "📊 Dashboard":
     if not df_raw.empty:
         df_raw['FOTO_URL'] = df_raw['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
-        
         if 'DATA_LIMITE' in df_raw.columns: df_raw['DATA_LIMITE'] = df_raw['DATA_LIMITE'].fillna("").astype(str)
 
         col_f1, col_f2 = st.columns(2)
         f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
-        
-        data_inicial_padrao = hoje_br - timedelta(days=2)
-        f_data = col_f2.date_input("📅 Período de Análise:", value=(data_inicial_padrao, hoje_br), format="DD/MM/YYYY")
+        f_data = col_f2.date_input("📅 Período de Análise:", value=(hoje_br - timedelta(days=2), hoje_br), format="DD/MM/YYYY")
         
         df_f = df_raw.copy()
         if f_cli != "Todos": df_f = df_f[df_f['TOMADOR'] == f_cli]
@@ -489,31 +507,64 @@ if menu == "📊 Dashboard":
         # 🔥 A MÁGICA DOS BOTÕES NO TOPO E GRID NATIVA EMBAIXO
         box_botoes = st.empty()
         box_grid = st.container()
+        box_foto = st.container()
 
-        # RENDERIZANDO A TABELA NATIVA (QUE NUNCA SOME) E PEGANDO A SELEÇÃO
+        # RENDERIZANDO A TABELA 100% COM AGGRID (ÂNCORA INFALÍVEL)
         with box_grid:
-            df_grid.insert(0, "SELECIONAR", False)
+            gb = GridOptionsBuilder.from_dataframe(df_grid)
+            gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=120)
+            gb.configure_selection(selection_mode='multiple', use_checkbox=True, header_checkbox=True)
+            gb.configure_grid_options(rowHeight=35, headerHeight=35)
             
-            # TABELA NATIVA: 100% de largura, sem caixas laterais comendo a tela.
-            tabela_renderizada = st.data_editor(
-                df_grid,
-                column_config={
-                    "SELECIONAR": st.column_config.CheckboxColumn("✔ Ação", default=False),
-                    "STATUS_DISPLAY": st.column_config.TextColumn("📌 Status Operacional"),
-                    "FOTO_INDICADOR": st.column_config.TextColumn("📸 Foto")
-                },
-                disabled=[c for c in df_grid.columns if c != "SELECIONAR"],
-                hide_index=True,
-                use_container_width=True,
-                height=500,
-                key="tabela_nativa_indestrutivel"
+            gb.configure_column("DATA", headerName="Data", width=100)
+            gb.configure_column("PEDIDO", headerName="Pedido", width=110)
+            gb.configure_column("TOMADOR", headerName="Tomador", width=130)
+            gb.configure_column("LABORATORIO", headerName="Laboratório", minWidth=200, flex=1)
+            gb.configure_column("CIDADE", headerName="Cidade", minWidth=150)
+            gb.configure_column("FOTO_INDICADOR", headerName="Comprovante", width=110)
+            gb.configure_column("DATA_LIMITE", headerName="Previsão", width=110)
+            gb.configure_column("AGENTE_RAW", headerName="Agente", width=120) 
+            gb.configure_column("DATA_ENTREGA", headerName="Data Real Entrega", width=130) 
+            
+            st_js = JsCode("""
+            function(p){
+                let v = p.value ? String(p.value).toUpperCase() : ''; 
+                if(v.includes('ENTREGUE')){ return {'backgroundColor':'rgba(16,185,129,0.1)','color':'#059669','fontWeight':'700'}; } 
+                if(v.includes('FRUSTRADA') || v.includes('PROBLEMA') || v.includes('CANCELADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
+                if(v.includes('EM ROTA')){ return {'backgroundColor':'rgba(245,158,11,0.1)','color':'#D97706','fontWeight':'700'}; } 
+                if(v.includes('COLETADO') || v.includes('CONFERIDO')){ return {'backgroundColor':'rgba(59,130,246,0.1)','color':'#2563EB','fontWeight':'700'}; } 
+                if(v.includes('ATRASADO')){ return {'backgroundColor':'rgba(239,68,68,0.1)','color':'#DC2626','fontWeight':'700'}; } 
+                return {'fontWeight':'600', 'color': '#64748B'};
+            }
+            """)
+            gb.configure_column("STATUS_DISPLAY", headerName="Status", cellStyle=st_js, width=170)
+            
+            grid_response = AgGrid(
+                df_grid, 
+                gridOptions=gb.build(), 
+                allow_unsafe_jscode=True, 
+                theme='alpine', 
+                custom_css=obter_css_grid(), 
+                height=450, 
+                fit_columns_on_grid_load=False, 
+                update_mode=GridUpdateMode.SELECTION_CHANGED,
+                key="grid_oficial_dashboard_v2", # 🔥 ÂNCORA INFALÍVEL
+                reload_data=False 
             )
             
-            linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
-            p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
-            tem_sel = len(p_ids) > 0
+            selecionados = grid_response['selected_rows']
+            tem_sel = False
+            if selecionados is not None:
+                if isinstance(selecionados, pd.DataFrame): tem_sel = not selecionados.empty
+                else: tem_sel = len(selecionados) > 0
+                
+            if tem_sel:
+                if isinstance(selecionados, pd.DataFrame): p_ids = selecionados['PEDIDO'].astype(str).tolist()
+                else: p_ids = [str(r['PEDIDO']) for r in selecionados]
+            else: p_ids = []
 
-            # 🔥 A FOTO SÓ APARECE EMBAIXO SE TIVER SELEÇÃO (Para não ocupar a tela)
+        # 🔥 A FOTO SÓ APARECE EMBAIXO DA GRID APENAS SE SELECIONADA
+        with box_foto:
             if tem_sel:
                 st.markdown("---")
                 st.markdown(f"<h3 style='margin-top:0; color:#0369A1;'>📸 Comprovantes Selecionados ({len(p_ids)} pedidos)</h3>", unsafe_allow_html=True)
@@ -528,7 +579,7 @@ if menu == "📊 Dashboard":
                         with cols_fotos[i % 4]:
                             st.image(url, use_container_width=True)
 
-        # 🔥 PREENCHENDO O ESPAÇO VAZIO NO TOPO COM OS BOTÕES DE COMANDO
+        # 🔥 PREENCHENDO A CAIXA VAZIA NO TOPO COM OS BOTÕES LIGADOS À SELEÇÃO
         with box_botoes.container():
             st.markdown("""
             <style>
@@ -659,11 +710,13 @@ if menu == "📊 Dashboard":
                                             l_orig['AGENTE_RAW'] = clone_mot
                                         
                                         prazo = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')))
+                                        
                                         l_orig['PRAZO_DIAS'] = str(prazo) 
                                         l_orig['DATA_LIMITE'] = str(calcular_data_limite(l_orig['DATA'], prazo))
-                                        l_orig = l_orig.astype(str)
                                         
+                                        l_orig = l_orig.astype(str)
                                         df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
+                                        
                                         if str(l_orig.get('AGENTE_RAW','')).strip():
                                             clones_para_app.append({'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'], 'ENDERECO': l_orig.get('ENDERECO',''), 'NUMERO': l_orig.get('NUMERO',''), 'BAIRRO': l_orig.get('BAIRRO',''), 'CIDADE': l_orig.get('CIDADE',''), 'CEP': l_orig.get('CEP',''), 'LABORATORIO': l_orig.get('LABORATORIO',''), 'TOMADOR': l_orig.get('TOMADOR','')})
                                 
@@ -810,6 +863,7 @@ elif menu == "📝 Manual":
                             st.session_state['m_bai'] = ""
                             st.session_state['m_cid'] = ""
                             st.session_state['m_uf'] = ""
+                            
                             carregar_dados_completos.clear()
                         except Exception as e: 
                             st.error(f"Erro ao salvar: {e}")
@@ -1093,7 +1147,6 @@ elif menu == "🔬 Triagem":
                     else:
                         sel_lista = selecionados.to_dict('records')
                         
-                        # 🔥 BLINDAGEM DO JURAMENTO: VERIFICA SE TEM MAIS DE 1 TOMADOR NO LOTE
                         tomadores_unicos = list(set([str(r.get('TOMADOR', '')).strip() for r in sel_lista]))
                         
                         if len(tomadores_unicos) > 1:
@@ -1114,93 +1167,13 @@ elif menu == "🔬 Triagem":
                                     base_cidade = sel_lista[0].get('CIDADE', '')
                                     despachar_para_appsheet([{'PEDIDO': id_romaneio, 'MOTORISTA': motorista_escolhido, 'ENDERECO': "ENTREGA LOTE NO TOMADOR", 'NUMERO': f"{len(p_ids)} VOLUMES", 'BAIRRO': base_tomador, 'CIDADE': base_cidade, 'CEP': "---", 'LABORATORIO': f"CONJUNTO DE {len(sel_lista)} PEDIDOS", 'TOMADOR': base_tomador, 'ROMANEIO': id_romaneio}])
                                     
-                                    pdf = FPDF()
-                                    pdf.add_page()
-                                    pdf.set_draw_color(15, 23, 42)  
-                                    pdf.set_line_width(0.3)
-                                    pdf.rect(5, 5, 200, 287)
-                                    
-                                    try:
-                                        logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
-                                        if not os.path.exists(logo_path):
-                                            req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
-                                            with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file: 
-                                                out_file.write(response.read())
-                                        pdf.image(logo_path, x=10, y=8, w=30) 
-                                    except Exception: 
-                                        pass
-                                    
-                                    pdf.set_y(15)
-                                    pdf.set_font("Arial", "B", 14)
-                                    pdf.set_text_color(15, 23, 42)
-                                    pdf.cell(0, 6, f"PROTOCOLO DE ENTREGA - IGO LOGISTICA", ln=True, align="C") 
-                                    
-                                    pdf.set_font("Arial", "B", 10)
-                                    pdf.set_text_color(2, 132, 199) 
-                                    pdf.cell(0, 5, f"LOTE DE EXPEDIÇÃO: {id_romaneio}", ln=True, align="C")
-                                    
-                                    pdf.set_font("Arial", "", 8)
-                                    pdf.set_text_color(100, 116, 139) 
-                                    pdf.cell(0, 4, f"Data do Embarque: {data_despacho.strftime('%d/%m/%Y')} | Motorista: {str(motorista_escolhido).upper()}", ln=True, align="C")
-                                    
-                                    pdf.ln(3)
-                                    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-                                    pdf.ln(3)
-                                    
-                                    pdf.set_fill_color(15, 23, 42)
-                                    pdf.set_text_color(255, 255, 255)
-                                    pdf.set_font("Arial", "B", 7)
-                                    pdf.cell(10, 5, "ITEM", 1, 0, "C", True)
-                                    pdf.cell(25, 5, "PEDIDO", 1, 0, "C", True)
-                                    pdf.cell(30, 5, "ID CLIENTE", 1, 0, "C", True)
-                                    pdf.cell(80, 5, "PONTO DE COLETA / LABORATÓRIO", 1, 0, "C", True)
-                                    pdf.cell(35, 5, "CIDADE", 1, 0, "C", True)
-                                    pdf.cell(10, 5, "UF", 1, 1, "C", True)
-                                    
-                                    pdf.set_text_color(51, 65, 85)
-                                    pdf.set_font("Arial", "", 7)
-                                    
-                                    for idx, item in enumerate(sel_lista, 1):
-                                        fill = (idx % 2 == 0)
-                                        if fill: 
-                                            pdf.set_fill_color(241, 245, 249) 
-                                        else: 
-                                            pdf.set_fill_color(255, 255, 255)
-                                            
-                                        qr_val = str(item.get('QR_CODE', ''))
-                                        if qr_val.upper() == 'NAN' or not qr_val: 
-                                            qr_val = "-"
-                                            
-                                        pdf.cell(10, 5, str(idx), 1, 0, "C", True)
-                                        pdf.cell(25, 5, str(item.get('PEDIDO','')), 1, 0, "C", True)
-                                        pdf.cell(30, 5, qr_val, 1, 0, "C", True)
-                                        pdf.cell(80, 5, str(item.get('LABORATORIO',''))[:48], 1, 0, "L", True)
-                                        pdf.cell(35, 5, str(item.get('CIDADE',''))[:22], 1, 0, "L", True)
-                                        pdf.cell(10, 5, str(item.get('UF','')), 1, 1, "C", True)
-                                        
-                                    pdf.ln(4)
-                                    pdf.set_font("Arial", "B", 8)
-                                    pdf.set_text_color(15, 23, 42)
-                                    pdf.cell(0, 5, f"TOTAL DE VOLUMES CONFERIDOS E EMBARCADOS: {len(sel_lista)}", ln=True, align="R")
-                                    
-                                    pdf.set_y(-25)
-                                    pdf.line(20, pdf.get_y(), 90, pdf.get_y())
-                                    pdf.line(120, pdf.get_y(), 190, pdf.get_y())
-                                    
-                                    pdf.set_font("Arial", "B", 7)
-                                    pdf.cell(95, 4, "ASSINATURA CADEIA (MOTORISTA)", 0, 0, "C")
-                                    pdf.cell(95, 4, "ASSINATURA EXPEDIÇÃO (BASE IGO)", 0, 1, "C")
-                                    
-                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
-                                        pdf.output(tmp_pdf.name)
-                                        with open(tmp_pdf.name, "rb") as f: 
-                                            pdf_bytes = f.read()
+                                    pdf_bytes = gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_lista)
                                     
                                     carregar_dados_completos.clear()
                                     st.success(f"🎉 Lote {id_romaneio} gerado com sucesso!")
                                     st.download_button(label="📥 BAIXAR PROTOCOLO TÉCNICO (PDF)", data=pdf_bytes, file_name=f"Romaneio_Tecnico_{id_romaneio}.pdf", mime="application/pdf", type="primary")
-                            except Exception as e: 
-                                st.error(f"Erro na Geração: {e}")
+                                except Exception as e: 
+                                    st.error(f"Erro na Geração: {e}")
             else:
                 st.info("O salão está vazio. Somente lotes validados na Triagem aparecem para despacho.")
 
