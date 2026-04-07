@@ -72,7 +72,6 @@ st.markdown("""<style>[data-testid="stSidebar"] { display: none !important; }</s
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
-# 🔥 TELA DE LOGIN CENTRALIZADA COM LOGO 🔥
 if not st.session_state.autenticado:
     col_vazia1, col_login, col_vazia2 = st.columns([1, 1.5, 1])
     with col_login:
@@ -257,15 +256,22 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         st.error(f"🚨 ERRO APPSHEET: {e}")
         return False
 
-# 🔥 MOTOR DE DISPARO DA Z-API (INTEGRADO E ATIVO) 🔥
+# 🔥 MOTOR DE DISPARO DA Z-API (COM DEDO-DURO DE ERROS) 🔥
 def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
     INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
     TOKEN = "2321563615C4242CB6031504"         
     
+    # TRATAMENTO: Garante que o telefone só tem números
+    tel_limpo = re.sub(r'\D', '', str(telefone_destino))
+    
+    # TRATAMENTO: Se o número for brasileiro e não tiver o 55, o sistema coloca sozinho
+    if not tel_limpo.startswith('55') and len(tel_limpo) in [10, 11]:
+        tel_limpo = '55' + tel_limpo
+        
     url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-text"
     
     payload = {
-        "phone": telefone_destino, 
+        "phone": tel_limpo, 
         "message": texto_mensagem
     }
     headers = {
@@ -275,9 +281,15 @@ def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
     
     try:
         response = requests.post(url, json=payload, headers=headers)
-        return response.status_code in [200, 201]
+        # Se for Sucesso (200 ou 201)
+        if response.status_code in [200, 201]:
+            return True
+        else:
+            # Se for erro, mostra exatamente o motivo na tela!
+            st.error(f"🚨 Retorno da Z-API (Telefone: {tel_limpo}): {response.text}")
+            return False
     except Exception as e:
-        st.error(f"🚨 Falha de comunicação com a Z-API: {e}")
+        st.error(f"🚨 Falha geral de comunicação com a Z-API: {e}")
         return False
 
 def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_lista):
@@ -447,7 +459,7 @@ if planilha_db is None:
 
 
 # =============================================================================
-# 🚀 MÓDULO 1: DASHBOARD / GRID PRINCIPAL
+# 🚀 MÓDULO 1: DASHBOARD
 # =============================================================================
 if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
@@ -993,7 +1005,6 @@ elif menu == "📥 Importações":
                         if lista_app: 
                             despachar_para_appsheet(lista_app)
                             
-                        # 🔥 NOTIFICAÇÃO CLARA E TEMPORIZADA 🔥
                         st.success(f"🎉 SUCESSO! Foram importados um total de {len(df_ok)} pedidos com sucesso.")
                         time.sleep(2.5) 
                         
@@ -1198,8 +1209,7 @@ elif menu == "📱 WhatsApp":
                                     st.success(f"✅ Rota enviada com sucesso para {str(agente).upper()}!")
                                     time.sleep(2)
                                     st.rerun()
-                                else:
-                                    st.error("🚨 Falha na comunicação com a Z-API. Verifique se o aparelho emissor está conectado na plataforma.")
+                                # Se der erro, a função enviar_whatsapp_zapi já vai imprimir o erro exato na tela!
                     else: 
                         st.error(f"⚠️ Telefone do agente '{agente}' não encontrado.")
     else:
