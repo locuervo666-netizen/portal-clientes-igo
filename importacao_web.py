@@ -174,17 +174,26 @@ def carregar_dados_completos(_planilha):
                         if 'QR_CODE' not in df.columns: df['QR_CODE'] = df['APP_QR']
                         else: df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
 
+                    # 🔥 CORREÇÃO DA HIERARQUIA DE STATUS (Efeito Borboleta resolvido) 🔥
                     def get_true_status(row):
                         s_db = str(row.get('STATUS', '')).strip().upper()
                         s_app = str(row.get('APP_STATUS', '')).strip().upper()
                         rom_id = str(row.get('ROMANEIO', '')).strip()
+                        
                         if rom_id in rom_dict:
                             s_rom = str(rom_dict[rom_id].get('APP_STATUS', '')).strip().upper()
                             if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']: return s_rom
-                        # 🔥 CORREÇÃO: ADICIONADO "COLETADO" NA LISTA VIP 🔥
-                        if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA', 'COLETADO']: return s_db
-                        if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA', 'COLETADO']: return s_app
+                            
+                        # 1. Status Finais da Nuvem ganham de todos
+                        if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_db
+                        # 2. Status Finais do App ganham do resto
+                        if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_app
+                        # 3. Status Intermediários Avançados (Conferido, Rota) da Nuvem ganham do "Coletado"
                         if s_db in ['EM ROTA DE ENTREGA', 'CONFERIDO']: return s_db
+                        # 4. Status de Coleta
+                        if s_db == 'COLETADO': return s_db
+                        if s_app == 'COLETADO': return s_app
+                        # 5. Qualquer outro lixo
                         if s_app and s_app != 'NAN': return s_app
                         return s_db
                     
@@ -653,12 +662,10 @@ if menu == "📊 GRID":
     
     if not df_raw.empty:
         
-        # 🔥 AQUI ESTÁ A CORREÇÃO DA FOTO FRANKENSTEIN 🔥
         def tratar_link_foto(x):
             x_str = str(x).strip()
             if not x_str or x_str.upper() in ['NAN', 'NONE']: return ""
-            if x_str.startswith("http"): return x_str # Se já é link do Google Drive (Bot), deixa em paz!
-            # Se for só o nome do arquivo, aplica o link do AppSheet
+            if x_str.startswith("http"): return x_str 
             return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={x_str}"
             
         df_raw['FOTO_URL'] = df_raw['FOTO'].apply(tratar_link_foto)
@@ -1151,7 +1158,10 @@ elif menu == "🔬 Triagem":
                                 if mask_nuvem.any():
                                     df_nuvem.loc[mask_nuvem, 'STATUS'] = 'CONFERIDO'
                                     aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    st.success(f"✅ Pedido {str(df_raw.at[idx, 'PEDIDO'])} VALIDADO!"); carregar_dados_completos.clear()
+                                    st.success(f"✅ Pedido {str(df_raw.at[idx, 'PEDIDO'])} VALIDADO!")
+                                    time.sleep(1.0)
+                                    carregar_dados_completos.clear()
+                                    st.rerun() # 🔥 O "PISCAR" MÁGICO ADICIONADO AQUI! 🔥
                             except Exception as e: st.error(f"Erro: {e}")
                         else: st.error("❌ Volume não está com status COLETADO.")
                     else: st.error("❌ Assinatura não reconhecida.")
