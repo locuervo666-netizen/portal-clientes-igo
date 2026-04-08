@@ -304,8 +304,7 @@ def enviar_pdf_zapi(telefone_destino, pdf_bytes, nome_arquivo):
     payload = {
         "phone": tel_limpo, 
         "document": document_payload,
-        "fileName": nome_arquivo,
-        "title": "Rota Oficial IGO Logística"
+        "fileName": nome_arquivo
     }
     headers = {"Accept": "application/json", "Content-Type": "application/json", "Client-Token": CLIENT_TOKEN}
     
@@ -315,9 +314,11 @@ def enviar_pdf_zapi(telefone_destino, pdf_bytes, nome_arquivo):
             return True
         else: 
             st.error(f"🚨 Z-API recusou o PDF do agente {tel_limpo}: {response.text}")
+            time.sleep(6) # Congela a tela para você ler
             return False
     except Exception as e: 
         st.error(f"🚨 Erro interno ao enviar PDF: {e}")
+        time.sleep(6)
         return False
 
 # 🔥 MOTOR DE DISPARO DA Z-API (EXCEL / XLSX) 🔥
@@ -333,13 +334,13 @@ def enviar_excel_zapi(telefone_destino, xls_bytes, nome_arquivo):
     url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-document/xlsx"
     
     b64_xls = base64.b64encode(xls_bytes).decode('utf-8')
-    document_payload = f"data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64_xls}"
+    # Simplificado para formato universal "octet-stream" para evitar bloqueios de tipo
+    document_payload = f"data:application/octet-stream;base64,{b64_xls}"
     
     payload = {
         "phone": tel_limpo, 
         "document": document_payload,
-        "fileName": nome_arquivo,
-        "title": "Rota Estruturada Excel"
+        "fileName": nome_arquivo
     }
     headers = {"Accept": "application/json", "Content-Type": "application/json", "Client-Token": CLIENT_TOKEN}
     
@@ -348,10 +349,12 @@ def enviar_excel_zapi(telefone_destino, xls_bytes, nome_arquivo):
         if response.status_code in [200, 201]: 
             return True
         else: 
-            st.error(f"🚨 Z-API recusou o Excel do agente {tel_limpo}: {response.text}")
+            st.error(f"🚨 Z-API RECUSOU O EXCEL do agente {tel_limpo}: {response.text}")
+            time.sleep(6) # Congela a tela para você ler
             return False
     except Exception as e: 
         st.error(f"🚨 Erro interno ao enviar Excel: {e}")
+        time.sleep(6)
         return False
 
 # 🔥 CONSTRUTOR DE EXCEL PARA WHATSAPP (MULTIPLAS ABAS) 🔥
@@ -1464,7 +1467,8 @@ elif menu == "📱 WhatsApp":
                                     
                                     # 1️⃣ Dispara o Texto
                                     if enviar_whatsapp_zapi(telefone, msg_final):
-                                        time.sleep(1.0)
+                                        time.sleep(2.0) # 🐢 Tempo de respiro do robô
+                                        
                                         # 2️⃣ Gera e Dispara o PDF Oficial
                                         pdf_bytes = gerar_pdf_rota_whatsapp(nome_amigavel, data_str, df_agente)
                                         nome_pdf = f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.pdf"
@@ -1472,7 +1476,7 @@ elif menu == "📱 WhatsApp":
                                         
                                         # 3️⃣ Gera e Dispara o EXCEL de Luxo se for VIP
                                         if agente_login in agentes_xls:
-                                            time.sleep(1.0)
+                                            time.sleep(3.0) # 🐢 Tempo de respiro maior para não dar "Spam"
                                             xls_bytes = gerar_excel_rota_whatsapp(df_agente)
                                             nome_xls = f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx"
                                             enviar_excel_zapi(telefone, xls_bytes, nome_xls)
@@ -1572,7 +1576,8 @@ elif menu == "📱 WhatsApp":
                                     sucesso_texto = enviar_whatsapp_zapi(telefone, msg_final)
                                     
                                     if sucesso_texto:
-                                        time.sleep(1.0)
+                                        time.sleep(2.0) # 🐢 Tempo de respiro do robô
+                                        
                                         # 2️⃣ Gera e Manda o PDF
                                         pdf_bytes = gerar_pdf_rota_whatsapp(nome_amigavel, data_str, df_agente)
                                         nome_pdf = f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.pdf"
@@ -1580,7 +1585,7 @@ elif menu == "📱 WhatsApp":
                                         
                                         # 3️⃣ Gera e Manda o Excel Se for VIP
                                         if agente_login in agentes_xls:
-                                            time.sleep(1.0)
+                                            time.sleep(3.0) # 🐢 Tempo de respiro maior para não dar "Spam"
                                             xls_bytes = gerar_excel_rota_whatsapp(df_agente)
                                             nome_xls = f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx"
                                             enviar_excel_zapi(telefone, xls_bytes, nome_xls)
