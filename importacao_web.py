@@ -181,8 +181,8 @@ def carregar_dados_completos(_planilha):
                         if rom_id in rom_dict:
                             s_rom = str(rom_dict[rom_id].get('APP_STATUS', '')).strip().upper()
                             if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']: return s_rom
-                        if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_db
-                        if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_app
+                        if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA', 'COLETADO']: return s_db
+                        if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA', 'COLETADO']: return s_app
                         if s_db in ['EM ROTA DE ENTREGA', 'CONFERIDO']: return s_db
                         if s_app and s_app != 'NAN': return s_app
                         return s_db
@@ -314,7 +314,7 @@ def enviar_pdf_zapi(telefone_destino, pdf_bytes, nome_arquivo):
             return True
         else: 
             st.error(f"🚨 Z-API recusou o PDF do agente {tel_limpo}: {response.text}")
-            time.sleep(6) # Congela a tela para você ler
+            time.sleep(6) 
             return False
     except Exception as e: 
         st.error(f"🚨 Erro interno ao enviar PDF: {e}")
@@ -349,7 +349,7 @@ def enviar_excel_zapi(telefone_destino, xls_bytes, nome_arquivo):
             return True
         else: 
             st.error(f"🚨 Z-API RECUSOU O EXCEL do agente {tel_limpo}: {response.text}")
-            time.sleep(6) # Congela a tela para você ler
+            time.sleep(6) 
             return False
     except Exception as e: 
         st.error(f"🚨 Erro interno ao enviar Excel: {e}")
@@ -361,7 +361,6 @@ def gerar_excel_rota_whatsapp(df_agente):
     output = io.BytesIO()
     df_xls = df_agente.copy()
     
-    # AMORTECEDOR DE ERRO: Garante que todas as colunas que o Excel precisa existam!
     cols_desejadas = ['PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CEP', 'TOMADOR', 'OBSERVACOES']
     for c in cols_desejadas:
         if c not in df_xls.columns:
@@ -369,7 +368,6 @@ def gerar_excel_rota_whatsapp(df_agente):
             
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         
-        # 1. Criar aba de Resumo Geral
         resumo = df_xls.groupby('CIDADE').size().reset_index(name='QTD_VOLUMES')
         resumo.loc[len(resumo)] = ['TOTAL GERAL', resumo['QTD_VOLUMES'].sum()]
         resumo.to_excel(writer, sheet_name='RESUMO_GERAL', index=False)
@@ -383,7 +381,6 @@ def gerar_excel_rota_whatsapp(df_agente):
         worksheet_res.set_column('A:A', 30)
         worksheet_res.set_column('B:B', 15)
         
-        # 2. Criar abas individuais por Cidade
         for cidade, group in df_xls.groupby('CIDADE'):
             cid_limpa = re.sub(r'[^A-Za-z0-9 ]', '', str(cidade).strip())[:30] 
             if not cid_limpa: cid_limpa = "Sem_Cidade"
@@ -654,7 +651,17 @@ if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        df_raw['FOTO_URL'] = df_raw['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if str(x).strip() and str(x).upper() not in ['NAN', 'NONE', ''] else "")
+        
+        # 🔥 AQUI ESTÁ A CORREÇÃO DA FOTO FRANKENSTEIN 🔥
+        def tratar_link_foto(x):
+            x_str = str(x).strip()
+            if not x_str or x_str.upper() in ['NAN', 'NONE']: return ""
+            if x_str.startswith("http"): return x_str # Se já é link do Google Drive (Bot), deixa em paz!
+            # Se for só o nome do arquivo, aplica o link do AppSheet
+            return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={x_str}"
+            
+        df_raw['FOTO_URL'] = df_raw['FOTO'].apply(tratar_link_foto)
+        
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         if 'DATA_LIMITE' in df_raw.columns: df_raw['DATA_LIMITE'] = df_raw['DATA_LIMITE'].fillna("").astype(str)
 
@@ -1483,7 +1490,7 @@ elif menu == "📱 WhatsApp":
                                         
                                         # 3️⃣ Gera e Dispara o EXCEL de Luxo se for VIP
                                         if agente_login in agentes_xls:
-                                            time.sleep(3.0) # 🐢 Tempo de respiro maior
+                                            time.sleep(3.0) # 🐢 Tempo de respiro maior para não dar "Spam"
                                             xls_bytes = gerar_excel_rota_whatsapp(df_agente)
                                             nome_xls = f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx"
                                             enviar_excel_zapi(telefone, xls_bytes, nome_xls)
