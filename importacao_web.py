@@ -334,7 +334,6 @@ def enviar_excel_zapi(telefone_destino, xls_bytes, nome_arquivo):
     url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-document/xlsx"
     
     b64_xls = base64.b64encode(xls_bytes).decode('utf-8')
-    # Simplificado para formato universal "octet-stream" para evitar bloqueios de tipo
     document_payload = f"data:application/octet-stream;base64,{b64_xls}"
     
     payload = {
@@ -357,13 +356,21 @@ def enviar_excel_zapi(telefone_destino, xls_bytes, nome_arquivo):
         time.sleep(6)
         return False
 
-# 🔥 CONSTRUTOR DE EXCEL PARA WHATSAPP (MULTIPLAS ABAS) 🔥
+# 🔥 CONSTRUTOR DE EXCEL PARA WHATSAPP (MULTIPLAS ABAS BLINDADO) 🔥
 def gerar_excel_rota_whatsapp(df_agente):
     output = io.BytesIO()
+    df_xls = df_agente.copy()
+    
+    # AMORTECEDOR DE ERRO: Garante que todas as colunas que o Excel precisa existam!
+    cols_desejadas = ['PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CEP', 'TOMADOR', 'OBSERVACOES']
+    for c in cols_desejadas:
+        if c not in df_xls.columns:
+            df_xls[c] = ""
+            
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         
         # 1. Criar aba de Resumo Geral
-        resumo = df_agente.groupby('CIDADE').size().reset_index(name='QTD_VOLUMES')
+        resumo = df_xls.groupby('CIDADE').size().reset_index(name='QTD_VOLUMES')
         resumo.loc[len(resumo)] = ['TOTAL GERAL', resumo['QTD_VOLUMES'].sum()]
         resumo.to_excel(writer, sheet_name='RESUMO_GERAL', index=False)
         
@@ -377,11 +384,11 @@ def gerar_excel_rota_whatsapp(df_agente):
         worksheet_res.set_column('B:B', 15)
         
         # 2. Criar abas individuais por Cidade
-        for cidade, group in df_agente.groupby('CIDADE'):
+        for cidade, group in df_xls.groupby('CIDADE'):
             cid_limpa = re.sub(r'[^A-Za-z0-9 ]', '', str(cidade).strip())[:30] 
             if not cid_limpa: cid_limpa = "Sem_Cidade"
             
-            df_cid = group[['PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CEP', 'TOMADOR', 'OBSERVACOES']].copy()
+            df_cid = group[cols_desejadas].copy()
             df_cid.to_excel(writer, sheet_name=cid_limpa, index=False)
             
             worksheet = writer.sheets[cid_limpa]
@@ -1476,7 +1483,7 @@ elif menu == "📱 WhatsApp":
                                         
                                         # 3️⃣ Gera e Dispara o EXCEL de Luxo se for VIP
                                         if agente_login in agentes_xls:
-                                            time.sleep(3.0) # 🐢 Tempo de respiro maior para não dar "Spam"
+                                            time.sleep(3.0) # 🐢 Tempo de respiro maior
                                             xls_bytes = gerar_excel_rota_whatsapp(df_agente)
                                             nome_xls = f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx"
                                             enviar_excel_zapi(telefone, xls_bytes, nome_xls)
@@ -1585,7 +1592,7 @@ elif menu == "📱 WhatsApp":
                                         
                                         # 3️⃣ Gera e Manda o Excel Se for VIP
                                         if agente_login in agentes_xls:
-                                            time.sleep(3.0) # 🐢 Tempo de respiro maior para não dar "Spam"
+                                            time.sleep(3.0) # 🐢 Tempo de respiro maior
                                             xls_bytes = gerar_excel_rota_whatsapp(df_agente)
                                             nome_xls = f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx"
                                             enviar_excel_zapi(telefone, xls_bytes, nome_xls)
