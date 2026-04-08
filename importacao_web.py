@@ -298,7 +298,6 @@ def enviar_pdf_zapi(telefone_destino, pdf_bytes, nome_arquivo):
         
     url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-document/pdf"
     
-    # Adicionando o cabeçalho base64 corretamente para PDFs
     b64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
     document_payload = f"data:application/pdf;base64,{b64_pdf}"
     
@@ -315,12 +314,88 @@ def enviar_pdf_zapi(telefone_destino, pdf_bytes, nome_arquivo):
         if response.status_code in [200, 201]: 
             return True
         else: 
-            # AGORA O ERRO VAI GRITAR NA TELA SE A Z-API BARRAR
             st.error(f"🚨 Z-API recusou o PDF do agente {tel_limpo}: {response.text}")
             return False
     except Exception as e: 
         st.error(f"🚨 Erro interno ao enviar PDF: {e}")
         return False
+
+# 🔥 MOTOR DE DISPARO DA Z-API (EXCEL / XLSX) 🔥
+def enviar_excel_zapi(telefone_destino, xls_bytes, nome_arquivo):
+    INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
+    TOKEN = "2321563615C4242CB6031504"         
+    CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S" 
+    
+    tel_limpo = re.sub(r'\D', '', str(telefone_destino))
+    if not tel_limpo.startswith('55') and len(tel_limpo) in [10, 11]:
+        tel_limpo = '55' + tel_limpo
+        
+    url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-document/xlsx"
+    
+    b64_xls = base64.b64encode(xls_bytes).decode('utf-8')
+    document_payload = f"data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64_xls}"
+    
+    payload = {
+        "phone": tel_limpo, 
+        "document": document_payload,
+        "fileName": nome_arquivo,
+        "title": "Rota Estruturada Excel"
+    }
+    headers = {"Accept": "application/json", "Content-Type": "application/json", "Client-Token": CLIENT_TOKEN}
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code in [200, 201]: 
+            return True
+        else: 
+            st.error(f"🚨 Z-API recusou o Excel do agente {tel_limpo}: {response.text}")
+            return False
+    except Exception as e: 
+        st.error(f"🚨 Erro interno ao enviar Excel: {e}")
+        return False
+
+# 🔥 CONSTRUTOR DE EXCEL PARA WHATSAPP (MULTIPLAS ABAS) 🔥
+def gerar_excel_rota_whatsapp(df_agente):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        
+        # 1. Criar aba de Resumo Geral
+        resumo = df_agente.groupby('CIDADE').size().reset_index(name='QTD_VOLUMES')
+        resumo.loc[len(resumo)] = ['TOTAL GERAL', resumo['QTD_VOLUMES'].sum()]
+        resumo.to_excel(writer, sheet_name='RESUMO_GERAL', index=False)
+        
+        worksheet_res = writer.sheets['RESUMO_GERAL']
+        worksheet_res.hide_gridlines(2)
+        worksheet_res.add_table(0, 0, len(resumo), 1, {
+            'columns': [{'header': 'CIDADE'}, {'header': 'QTD_VOLUMES'}],
+            'style': 'Table Style Medium 2'
+        })
+        worksheet_res.set_column('A:A', 30)
+        worksheet_res.set_column('B:B', 15)
+        
+        # 2. Criar abas individuais por Cidade
+        for cidade, group in df_agente.groupby('CIDADE'):
+            cid_limpa = re.sub(r'[^A-Za-z0-9 ]', '', str(cidade).strip())[:30] 
+            if not cid_limpa: cid_limpa = "Sem_Cidade"
+            
+            df_cid = group[['PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CEP', 'TOMADOR', 'OBSERVACOES']].copy()
+            df_cid.to_excel(writer, sheet_name=cid_limpa, index=False)
+            
+            worksheet = writer.sheets[cid_limpa]
+            worksheet.hide_gridlines(2)
+            
+            if len(df_cid) > 0:
+                worksheet.add_table(0, 0, len(df_cid), len(df_cid.columns) - 1, {
+                    'columns': [{'header': str(col)} for col in df_cid.columns],
+                    'style': 'Table Style Light 9'
+                })
+                
+            worksheet.set_column('A:A', 15) 
+            worksheet.set_column('B:B', 40) 
+            worksheet.set_column('C:C', 40) 
+            worksheet.set_column('D:H', 20) 
+            
+    return output.getvalue()
 
 # 🔥 CONSTRUTOR DE PDF PARA WHATSAPP 🔥
 def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
@@ -1310,6 +1385,9 @@ elif menu == "📱 WhatsApp":
         dict_telefones = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip() and re.sub(r'\D', '', str(r.get('TELEFONE', '')))}
         dict_nomes = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         
+        # AGENTES COM ACESSO VIP AO EXCEL
+        agentes_xls = ['veloz.express', 'robson.melo', 'william.bertoldo']
+
         with col_esq:
             if df_pendentes.empty:
                 st.success(f"Nenhum volume PENDENTE aguardando envio na data {data_filtro.strftime('%d/%m/%Y')}.")
@@ -1325,7 +1403,7 @@ elif menu == "📱 WhatsApp":
                 # 🔥 BOTÃO DE DISPARO EM MASSA 🔥
                 if agentes_para_enviar:
                     st.info(f"🚀 Existem {len(agentes_para_enviar)} motoristas aguardando o envio da rota oficial.")
-                    if st.button("🚀 DISPARAR TEXTO E PDF PARA TODOS AGORA", type="primary", use_container_width=True):
+                    if st.button("🚀 DISPARAR ROTAS PARA TODOS AGORA", type="primary", use_container_width=True):
                         with st.spinner("Iniciando disparos em massa via Z-API... (isso pode levar alguns segundos)"):
                             pedidos_atualizados = []
                             sucessos = 0
@@ -1334,6 +1412,7 @@ elif menu == "📱 WhatsApp":
                                 df_agente = df_pendentes[(df_pendentes['AGENTE_RAW'] == agente) & (~df_pendentes['ZAP_ENVIADO'].astype(str).apply(lambda x: str(x).startswith('SIM')))]
                                 telefone = dict_telefones.get(str(agente).strip().lower(), "")
                                 nome_amigavel = dict_nomes.get(str(agente).strip().lower(), str(agente).upper())
+                                agente_login = str(agente).strip().lower()
                                 
                                 if telefone:
                                     data_str = data_filtro.strftime('%d/%m/%Y')
@@ -1391,6 +1470,13 @@ elif menu == "📱 WhatsApp":
                                         nome_pdf = f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.pdf"
                                         enviar_pdf_zapi(telefone, pdf_bytes, nome_pdf)
                                         
+                                        # 3️⃣ Gera e Dispara o EXCEL de Luxo se for VIP
+                                        if agente_login in agentes_xls:
+                                            time.sleep(1.0)
+                                            xls_bytes = gerar_excel_rota_whatsapp(df_agente)
+                                            nome_xls = f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx"
+                                            enviar_excel_zapi(telefone, xls_bytes, nome_xls)
+                                        
                                         sucessos += 1
                                         pedidos_atualizados.extend(df_agente['PEDIDO'].tolist())
                                     time.sleep(1.5) 
@@ -1408,7 +1494,7 @@ elif menu == "📱 WhatsApp":
                                 except Exception as e:
                                     st.error(f"Erro ao carimbar envio no banco: {e}")
                             
-                            st.success(f"🎉 Disparo em massa concluído! {sucessos} motoristas receberam Texto e PDF.")
+                            st.success(f"🎉 Disparo em massa concluído! {sucessos} motoristas receberam os arquivos.")
                             time.sleep(2.5)
                             st.rerun()
                 else:
@@ -1421,11 +1507,13 @@ elif menu == "📱 WhatsApp":
                     df_agente = df_pendentes[df_pendentes['AGENTE_RAW'] == agente]
                     telefone = dict_telefones.get(str(agente).strip().lower(), "")
                     nome_amigavel = dict_nomes.get(str(agente).strip().lower(), str(agente).upper())
+                    agente_login = str(agente).strip().lower()
                     
                     todos_enviados = df_agente['ZAP_ENVIADO'].astype(str).apply(lambda x: str(x).startswith('SIM')).all()
                     selo = "✅ ENVIADO" if todos_enviados else "⏳ PENDENTE"
+                    tag_vip = " 🌟 [RECEBE EXCEL]" if agente_login in agentes_xls else ""
                     
-                    with st.expander(f"{selo} | 👤 {nome_amigavel} | Volumes: {len(df_agente)}", expanded=not todos_enviados):
+                    with st.expander(f"{selo} | 👤 {nome_amigavel}{tag_vip} | Volumes: {len(df_agente)}", expanded=not todos_enviados):
                         st.dataframe(df_agente[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True)
                         
                         if telefone:
@@ -1476,7 +1564,7 @@ elif menu == "📱 WhatsApp":
                                 
                             msg_final = "\n".join(msg_parts)
                             
-                            texto_botao = "🔄 Reenviar Texto e PDF" if todos_enviados else f"📲 Disparar Texto e PDF para {nome_amigavel}"
+                            texto_botao = "🔄 Reenviar Arquivos" if todos_enviados else f"📲 Disparar Rota para {nome_amigavel}"
                             if st.button(texto_botao, key=f"zap_api_ind_{agente}", type="primary" if not todos_enviados else "secondary"):
                                 with st.spinner("Enviando pacote completo via satélite..."):
                                     
@@ -1490,6 +1578,13 @@ elif menu == "📱 WhatsApp":
                                         nome_pdf = f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.pdf"
                                         enviar_pdf_zapi(telefone, pdf_bytes, nome_pdf)
                                         
+                                        # 3️⃣ Gera e Manda o Excel Se for VIP
+                                        if agente_login in agentes_xls:
+                                            time.sleep(1.0)
+                                            xls_bytes = gerar_excel_rota_whatsapp(df_agente)
+                                            nome_xls = f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx"
+                                            enviar_excel_zapi(telefone, xls_bytes, nome_xls)
+                                        
                                         try:
                                             aba = planilha_db.worksheet("Memoria_Sistema")
                                             df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
@@ -1502,11 +1597,11 @@ elif menu == "📱 WhatsApp":
                                         except Exception as e:
                                             st.error(f"Erro ao carimbar envio: {e}")
                                             
-                                        st.success(f"✅ Texto e PDF enviados com sucesso para {nome_amigavel}!")
+                                        st.success(f"✅ Rota e arquivos enviados com sucesso para {nome_amigavel}!")
                                         time.sleep(1.5)
                                         st.rerun()
                                     else:
-                                        st.error("🚨 Falha ao enviar o texto. O PDF não foi gerado.")
+                                        st.error("🚨 Falha ao enviar o texto principal.")
                         else: 
                             st.error(f"⚠️ Telefone do agente '{agente}' não encontrado.")
         
@@ -1653,7 +1748,7 @@ elif menu == "⚙️ Rotas":
                     if not r_cid: 
                         st.error("A Cidade é obrigatória!")
                     else:
-                        rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai), tratar_texto_global(r_rua)] if p])
+                        rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(bai_rota), tratar_texto_global(r_rua)] if p])
                         dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
                         df_novo = pd.concat([DF_AGENTES, pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": agente_filtro, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])], ignore_index=True)
                         try:
