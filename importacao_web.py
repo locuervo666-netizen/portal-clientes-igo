@@ -181,6 +181,7 @@ def carregar_dados_completos(_planilha):
                         if rom_id in rom_dict:
                             s_rom = str(rom_dict[rom_id].get('APP_STATUS', '')).strip().upper()
                             if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']: return s_rom
+                        # 🔥 CORREÇÃO: ADICIONADO "COLETADO" NA LISTA VIP 🔥
                         if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA', 'COLETADO']: return s_db
                         if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA', 'COLETADO']: return s_app
                         if s_db in ['EM ROTA DE ENTREGA', 'CONFERIDO']: return s_db
@@ -661,7 +662,6 @@ if menu == "📊 GRID":
             return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={x_str}"
             
         df_raw['FOTO_URL'] = df_raw['FOTO'].apply(tratar_link_foto)
-        
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         if 'DATA_LIMITE' in df_raw.columns: df_raw['DATA_LIMITE'] = df_raw['DATA_LIMITE'].fillna("").astype(str)
 
@@ -762,200 +762,92 @@ if menu == "📊 GRID":
         tem_sel = len(p_ids) > 0
 
         with box_botoes.container():
-            st.markdown("""
-            <style>
-            div[data-testid="stPopover"] > button, button[kind="secondary"] {
-                white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
-            }
-            div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
-                border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-
-            col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
+            col_b1, col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns(6)
             
-            with col_b1.popover("📲 Dar Baixa Manual", use_container_width=True):
-                if not tem_sel: 
-                    st.warning("Selecione um pedido na tabela abaixo primeiro!")
+            # 🔥 BOTÃO INDIVIDUAL DE COBRANÇA 🔥
+            with col_b1.popover("🛎️ Cobrar Agente", use_container_width=True):
+                if not tem_sel: st.warning("Selecione um pedido primeiro!")
+                else:
+                    if st.button("📲 Manda Cobrança Amigável Agora", type="primary", use_container_width=True):
+                        agentes_selecionados = list(set(linhas_selecionadas['AGENTE_RAW'].tolist()))
+                        for ag in agentes_selecionados:
+                            login_ag = str(ag).lower().strip()
+                            tel_row = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == login_ag]
+                            if not tel_row.empty:
+                                tel = tel_row.iloc[0]['TELEFONE']
+                                nome = tel_row.iloc[0]['NOME DO AGENTE']
+                                qtd_ag = len(linhas_selecionadas[linhas_selecionadas['AGENTE_RAW'] == ag])
+                                msg_ind = f"Olá {nome}, a IGO Logística informa que você ainda possui {qtd_ag} pedidos pendentes na sua rota de hoje. Por favor, lembre-se de dar baixa no sistema assim que concluir. Bom trabalho!"
+                                if enviar_whatsapp_zapi(tel, msg_ind): st.success(f"Enviado para {nome}!")
+                                else: st.error(f"Erro ao enviar para {nome}")
+                            else: st.error(f"Telefone do agente {login_ag} não encontrado.")
+
+            with col_b2.popover("📲 Baixa Manual", use_container_width=True):
+                if not tem_sel: st.warning("Selecione um pedido!")
                 else:
                     with st.form("form_baixa_manual"):
                         status_baixa = st.selectbox("Novo Status:", ["ENTREGUE ✅", "PROBLEMA 🚨", "CANCELADO ❌", "PENDENTE ⏳"])
                         data_baixa = st.date_input("Data da Ocorrência:", format="DD/MM/YYYY", value=hoje_br)
-                        tem_entregue = df_f[df_f['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
-                        senha_reversao = ""
-                        if tem_entregue:
-                            st.warning("⚠️ Desfazendo pedido já **ENTREGUES**.")
-                            senha_reversao = st.text_input("🔑 Senha:", type="password")
-
                         if st.form_submit_button("Confirmar Nova Baixa", type="primary", use_container_width=True):
                             status_limpo = status_baixa.split(" ")[0].upper()
-                            if tem_entregue and status_limpo != 'ENTREGUE' and senha_reversao != '123': 
-                                st.error("❌ Senha incorreta!")
-                            else:
-                                with st.spinner("Atualizando Banco..."):
-                                    try:
-                                        aba = planilha_db.worksheet("Memoria_Sistema")
-                                        df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                        for pid in p_ids:
-                                            mask = df_nuvem['PEDIDO'] == pid
-                                            df_nuvem.loc[mask, 'STATUS'] = status_limpo
-                                            if status_limpo == "ENTREGUE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
-                                            elif status_limpo == "PENDENTE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
-                                        
-                                        aba.clear()
-                                        aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                        
-                                        try:
-                                            aba_app = planilha_db.worksheet("App_Tarefas")
-                                            df_app = pd.DataFrame(aba_app.get_all_values()[1:], columns=aba_app.get_all_values()[0])
-                                            if 'PEDIDO' in df_app.columns and 'STATUS' in df_app.columns:
-                                                df_app.loc[df_app['PEDIDO'].isin(p_ids), 'STATUS'] = status_limpo
-                                                if 'DATA_ENTREGA' in df_app.columns:
-                                                    if status_limpo == "ENTREGUE": df_app.loc[df_app['PEDIDO'].isin(p_ids), 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
-                                                    elif status_limpo == "PENDENTE": df_app.loc[df_app['PEDIDO'].isin(p_ids), 'DATA_ENTREGA'] = ""
-                                                aba_app.clear(); aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
-                                        except Exception: pass
-                                            
-                                        st.success("🎉 Atualizado com sucesso!")
-                                        time.sleep(1.5)
-                                        carregar_dados_completos.clear()
-                                        st.rerun()
-                                    except Exception as e: st.error(f"Erro: {e}")
+                            try:
+                                aba = planilha_db.worksheet("Memoria_Sistema")
+                                df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                for pid in p_ids:
+                                    mask = df_nuvem['PEDIDO'] == pid
+                                    df_nuvem.loc[mask, 'STATUS'] = status_limpo
+                                    if status_limpo == "ENTREGUE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
+                                aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                st.success("🎉 Atualizado!"); time.sleep(1.5); carregar_dados_completos.clear(); st.rerun()
+                            except Exception as e: st.error(f"Erro: {e}")
 
-            with col_b2.popover("🔄 Trocar de Motorista", use_container_width=True):
-                if not tem_sel: 
-                    st.warning("Selecione um pedido na tabela abaixo primeiro!")
+            with col_b3.popover("🔄 Trocar Agente", use_container_width=True):
+                if not tem_sel: st.warning("Selecione um pedido!")
                 else:
                     with st.form("form_troca_motorista"):
-                        tem_entregue = df_f[df_f['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
-                        if tem_entregue: 
-                            st.error("⚠️ Não é possível trocar motorista de pedidos já ENTREGUES.")
-                        else:
-                            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-                            novo_mot = st.selectbox("Novo Agente:", logins_disp)
-                            nova_data_troca = st.date_input("Nova Data do Pedido:", format="DD/MM/YYYY", value=hoje_br)
-                            if st.form_submit_button("Confirmar Troca", type="primary", use_container_width=True):
-                                with st.spinner("Trocando motorista..."):
-                                    try:
-                                        aba = planilha_db.worksheet("Memoria_Sistema")
-                                        df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                        if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
-                                        
-                                        lista_app_troca = []
-                                        for pid in p_ids:
-                                            mask = df_nuvem['PEDIDO'] == pid
-                                            if mask.any():
-                                                df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
-                                                df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
-                                                df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
-                                                df_nuvem.loc[mask, 'ZAP_ENVIADO'] = "" 
-                                                
-                                                l_app = df_nuvem[mask].iloc[0]
-                                                lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
-                                        aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                        despachar_para_appsheet(lista_app_troca)
-                                        
-                                        st.success("🎉 Troca realizada com sucesso!")
-                                        time.sleep(1.5)
-                                        carregar_dados_completos.clear()
-                                        st.rerun()
-                                    except Exception as e: st.error(f"Erro: {e}")
-            
-            with col_b3.popover("👯 Clonar Pedidos", use_container_width=True):
-                if not tem_sel: 
-                    st.warning("Selecione um pedido na tabela abaixo primeiro!")
+                        logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                        novo_mot = st.selectbox("Novo Agente:", logins_disp)
+                        if st.form_submit_button("Confirmar Troca", type="primary", use_container_width=True):
+                            try:
+                                aba = planilha_db.worksheet("Memoria_Sistema")
+                                df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                for pid in p_ids: df_nuvem.loc[df_nuvem['PEDIDO'] == pid, 'AGENTE_RAW'] = novo_mot
+                                aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                st.success("🎉 Troca realizada!"); time.sleep(1.5); carregar_dados_completos.clear(); st.rerun()
+                            except Exception as e: st.error(f"Erro: {e}")
+
+            with col_b4.popover("👯 Clonar Pedidos", use_container_width=True):
+                if not tem_sel: st.warning("Selecione um pedido!")
                 else:
                     with st.form("form_clonar_pedido"):
-                        clone_data = st.date_input("Nova Data de Embarque:", format="DD/MM/YYYY", value=hoje_br)
-                        logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-                        clone_mot = st.selectbox("Agente Designado:", ["Manter Original"] + logins_disp)
-                        
-                        if st.form_submit_button("Confirmar Clone", type="primary", use_container_width=True):
-                            with st.spinner("Clonando na base..."):
-                                try:
-                                    aba = planilha_db.worksheet("Memoria_Sistema")
-                                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                    if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
-                                    
-                                    prox_id = obter_proximo_id(df_nuvem)
-                                    clones_para_app = []
-                                    for pid in p_ids:
-                                        if pid in df_nuvem['PEDIDO'].values:
-                                            l_orig = df_nuvem[df_nuvem['PEDIDO'] == pid].iloc[0].copy()
-                                            novo_id = str(prox_id)
-                                            prox_id += 1
-                                            l_orig['PEDIDO'] = novo_id
-                                            l_orig['DATA'] = clone_data.strftime("%d/%m/%Y")
-                                            l_orig['STATUS'] = "PENDENTE"
-                                            l_orig['DATA_ENTREGA'] = ""
-                                            l_orig['FOTO'] = ""
-                                            l_orig['ROMANEIO'] = ""
-                                            l_orig['ZAP_ENVIADO'] = ""
-                                            if clone_mot != "Manter Original": 
-                                                l_orig['AGENTE_RAW'] = clone_mot
-                                            
-                                            prazo = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')))
-                                            l_orig['PRAZO_DIAS'] = str(prazo) 
-                                            l_orig['DATA_LIMITE'] = str(calcular_data_limite(l_orig['DATA'], prazo))
-                                            
-                                            l_orig = l_orig.astype(str)
-                                            df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
-                                            
-                                            if str(l_orig.get('AGENTE_RAW','')).strip():
-                                                clones_para_app.append({'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'], 'ENDERECO': l_orig.get('ENDERECO',''), 'NUMERO': l_orig.get('NUMERO',''), 'BAIRRO': l_orig.get('BAIRRO',''), 'CIDADE': l_orig.get('CIDADE',''), 'CEP': l_orig.get('CEP',''), 'LABORATORIO': l_orig.get('LABORATORIO',''), 'TOMADOR': l_orig.get('TOMADOR','')})
-                                    
-                                    aba.clear()
-                                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    if clones_para_app: 
-                                        despachar_para_appsheet(clones_para_app)
-                                    
-                                    st.success(f"🎉 {len(p_ids)} Pedido(s) clonado(s) com sucesso!")
-                                    time.sleep(1.5)
-                                    carregar_dados_completos.clear()
-                                    st.rerun()
-                                except Exception as e: 
-                                    st.error(f"Erro no Clone: {e}")
+                        clone_data = st.date_input("Nova Data:", format="DD/MM/YYYY", value=hoje_br)
+                        if st.form_submit_button("Confirmar Clone", type="primary"):
+                            try:
+                                aba = planilha_db.worksheet("Memoria_Sistema")
+                                df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                prox_id = obter_proximo_id(df_nuvem)
+                                for pid in p_ids:
+                                    if pid in df_nuvem['PEDIDO'].values:
+                                        l_orig = df_nuvem[df_nuvem['PEDIDO'] == pid].iloc[0].copy()
+                                        l_orig['PEDIDO'] = str(prox_id); prox_id += 1
+                                        l_orig['DATA'] = clone_data.strftime("%d/%m/%Y"); l_orig['STATUS'] = "PENDENTE"; l_orig['DATA_ENTREGA'] = ""; l_orig['FOTO'] = ""; l_orig['ZAP_ENVIADO'] = ""
+                                        df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
+                                aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                st.success(f"🎉 Clonado!"); time.sleep(1.5); carregar_dados_completos.clear(); st.rerun()
+                            except Exception as e: st.error(f"Erro: {e}")
 
-            with col_b4.popover("🗑️ Excluir Definitivamente", use_container_width=True):
-                if not tem_sel: 
-                    st.warning("Selecione um pedido na tabela abaixo primeiro!")
+            with col_b5.popover("🗑️ Excluir", use_container_width=True):
+                if not tem_sel: st.warning("Selecione um pedido!")
                 else:
-                    with st.form("form_excluir_pedido"):
-                        st.error("⚠️ Atenção: Exclusão permanente.")
-                        senha_del = st.text_input("🔑 Senha Master:", type="password")
-                        if st.form_submit_button("Confirmar Exclusão", type="primary", use_container_width=True):
-                            if senha_del == "123":
-                                with st.spinner("Excluindo da base..."):
-                                    try:
-                                        aba = planilha_db.worksheet("Memoria_Sistema")
-                                        df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                        df_nuvem = df_nuvem[~df_nuvem['PEDIDO'].isin(p_ids)]
-                                        aba.clear()
-                                        aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                        
-                                        try:
-                                            aba_app = planilha_db.worksheet("App_Tarefas")
-                                            df_app = pd.DataFrame(aba_app.get_all_values()[1:], columns=aba_app.get_all_values()[0])
-                                            df_app = df_app[~df_app['PEDIDO'].isin(p_ids)]
-                                            aba_app.clear()
-                                            aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
-                                        except Exception: 
-                                            pass 
-                                            
-                                        st.success(f"🗑️ Pedido(s) apagado(s) com sucesso!")
-                                        time.sleep(1.5)
-                                        carregar_dados_completos.clear()
-                                        st.rerun()
-                                    except Exception as e: 
-                                        st.error(f"Erro: {e}")
-                            else: 
-                                st.error("Senha incorreta.")
-            
-            col_b5.button("🔄 Atualizar Painel", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
+                    senha_del = st.text_input("🔑 Senha Master:", type="password")
+                    if st.button("Confirmar Exclusão Definitiva"):
+                        if senha_del == "123":
+                            aba = planilha_db.worksheet("Memoria_Sistema"); df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                            df_nuvem = df_nuvem[~df_nuvem['PEDIDO'].isin(p_ids)]
+                            aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                            st.success("🗑️ Apagado!"); time.sleep(1.5); carregar_dados_completos.clear(); st.rerun()
 
-    else:
-        st.warning("O banco de dados está vazio ou a aba Memoria_Sistema não foi encontrada. Vá para a aba Pedido Manual.")
+            col_b6.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL COM API VIACEP
