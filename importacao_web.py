@@ -95,7 +95,7 @@ if not st.session_state.autenticado:
     st.stop()
 
 # =============================================================================
-# 🔗 2. CONEXÃO E DICIONÁRIOS
+# 🔗 2. CONEXÃO
 # =============================================================================
 @st.cache_resource
 def conectar_banco():
@@ -120,23 +120,6 @@ def conectar_banco():
 
 planilha_db = conectar_banco()
 CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
-
-# 🔥 DICIONÁRIO DE LOGOS 🔥
-DICIONARIO_LOGOS = {
-    "CAEP": "https://ui-avatars.com/api/?name=CAEP&background=0D8ABC&color=fff&rounded=true",
-    "SAPIENS": "https://ui-avatars.com/api/?name=SAPIENS&background=F59E0B&color=fff&rounded=true",
-    "GRALAB": "https://ui-avatars.com/api/?name=GRALAB&background=10B981&color=fff&rounded=true",
-    "SYNVIA": "https://ui-avatars.com/api/?name=SYNVIA&background=8B5CF6&color=fff&rounded=true",
-    "INNOVATOX": "https://ui-avatars.com/api/?name=INNO&background=EF4444&color=fff&rounded=true",
-    "LABEST": "https://ui-avatars.com/api/?name=LAB&background=3B82F6&color=fff&rounded=true", 
-    "AIRLAB": "https://ui-avatars.com/api/?name=AIR&background=EC4899&color=fff&rounded=true",
-    "UNILABOR": "https://ui-avatars.com/api/?name=UNI&background=14B8A6&color=fff&rounded=true",
-    "SODRE": "https://ui-avatars.com/api/?name=SOD&background=F97316&color=fff&rounded=true",
-    "BRASILIENSE": "https://ui-avatars.com/api/?name=BRA&background=06B6D4&color=fff&rounded=true",
-    "SOUZA CRUZ": "https://ui-avatars.com/api/?name=SOUZA&background=1E3A8A&color=fff&rounded=true",
-    "HEXALIFE": "https://ui-avatars.com/api/?name=HEXA&background=059669&color=fff&rounded=true",
-    "ECOLYZER": "https://ui-avatars.com/api/?name=ECOLYZER&background=4F46E5&color=fff&rounded=true"
-}
 
 @st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
@@ -789,7 +772,7 @@ if menu == "📊 GRID":
         p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
 
-        # 🔥 BLOCO DE BOTÕES DA GRID 🔥
+        # 🔥 BLOCO DE BOTÕES DA GRID (7 OPÇÕES TOTAIS COM FORMULÁRIOS DE SEGURANÇA) 🔥
         with box_botoes.container():
             col_b1, col_b2, col_b3, col_b4, col_b5, col_b6, col_b7 = st.columns(7)
             
@@ -834,29 +817,30 @@ if menu == "📊 GRID":
                             senha_reversao = st.text_input("🔑 Senha:", type="password")
                             
                         if st.form_submit_button("Confirmar Nova Baixa", type="primary", use_container_width=True):
-                            status_limpo = status_baixa.split(" ")[0].upper()
-                            if tem_entregue and status_limpo != 'ENTREGUE' and senha_reversao != '123': 
-                                st.error("❌ Senha incorreta!")
-                            else:
-                                try:
-                                    aba = planilha_db.worksheet("Memoria_Sistema")
-                                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                    for pid in p_ids:
-                                        mask = df_nuvem['PEDIDO'] == pid
-                                        df_nuvem.loc[mask, 'STATUS'] = status_limpo
-                                        if status_limpo == "ENTREGUE": 
-                                            df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
-                                        elif status_limpo == "PENDENTE": 
-                                            df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
-                                            
-                                    aba.clear()
-                                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    st.success("🎉 Atualizado!")
-                                    time.sleep(1.5)
-                                    carregar_dados_completos.clear()
-                                    st.rerun()
-                                except Exception as e: 
-                                    st.error(f"Erro: {e}")
+                            with st.spinner("Atualizando status no banco de dados..."):
+                                status_limpo = status_baixa.split(" ")[0].upper()
+                                if tem_entregue and status_limpo != 'ENTREGUE' and senha_reversao != '123': 
+                                    st.error("❌ Senha incorreta!")
+                                else:
+                                    try:
+                                        aba = planilha_db.worksheet("Memoria_Sistema")
+                                        df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                        for pid in p_ids:
+                                            mask = df_nuvem['PEDIDO'] == pid
+                                            df_nuvem.loc[mask, 'STATUS'] = status_limpo
+                                            if status_limpo == "ENTREGUE": 
+                                                df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
+                                            elif status_limpo == "PENDENTE": 
+                                                df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
+                                                
+                                        aba.clear()
+                                        aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                        st.success("🎉 Atualizado!")
+                                        time.sleep(1)
+                                        carregar_dados_completos.clear()
+                                        st.rerun()
+                                    except Exception as e: 
+                                        st.error(f"Erro: {e}")
 
             # 3. TROCAR AGENTE
             with col_b3.popover("🔄 Trocar Agente", use_container_width=True):
@@ -873,34 +857,35 @@ if menu == "📊 GRID":
                             nova_data_troca = st.date_input("Nova Data:", format="DD/MM/YYYY", value=hoje_br)
                             
                             if st.form_submit_button("Confirmar Troca", type="primary", use_container_width=True):
-                                try:
-                                    aba = planilha_db.worksheet("Memoria_Sistema")
-                                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                    if 'ZAP_ENVIADO' not in df_nuvem.columns: 
-                                        df_nuvem['ZAP_ENVIADO'] = ""
-                                    
-                                    lista_app_troca = []
-                                    for pid in p_ids:
-                                        mask = df_nuvem['PEDIDO'] == pid
-                                        if mask.any():
-                                            df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
-                                            df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
-                                            df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
-                                            df_nuvem.loc[mask, 'ZAP_ENVIADO'] = "" 
-                                            l_app = df_nuvem[mask].iloc[0]
-                                            lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
-                                            
-                                    aba.clear()
-                                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    if lista_app_troca: 
-                                        despachar_para_appsheet(lista_app_troca)
+                                with st.spinner("Atualizando rotas e motoristas..."):
+                                    try:
+                                        aba = planilha_db.worksheet("Memoria_Sistema")
+                                        df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                        if 'ZAP_ENVIADO' not in df_nuvem.columns: 
+                                            df_nuvem['ZAP_ENVIADO'] = ""
                                         
-                                    st.success("🎉 Troca realizada!")
-                                    time.sleep(1.5)
-                                    carregar_dados_completos.clear()
-                                    st.rerun()
-                                except Exception as e: 
-                                    st.error(f"Erro: {e}")
+                                        lista_app_troca = []
+                                        for pid in p_ids:
+                                            mask = df_nuvem['PEDIDO'] == pid
+                                            if mask.any():
+                                                df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
+                                                df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
+                                                df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
+                                                df_nuvem.loc[mask, 'ZAP_ENVIADO'] = "" 
+                                                l_app = df_nuvem[mask].iloc[0]
+                                                lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
+                                                
+                                        aba.clear()
+                                        aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                        if lista_app_troca: 
+                                            despachar_para_appsheet(lista_app_troca)
+                                            
+                                        st.success("🎉 Troca realizada!")
+                                        time.sleep(1)
+                                        carregar_dados_completos.clear()
+                                        st.rerun()
+                                    except Exception as e: 
+                                        st.error(f"Erro: {e}")
 
             # 4. CLONAR PEDIDOS
             with col_b4.popover("👯 Clonar Pedidos", use_container_width=True):
@@ -913,53 +898,54 @@ if menu == "📊 GRID":
                         clone_mot = st.selectbox("Agente Designado:", ["Manter Original"] + logins_disp)
                         
                         if st.form_submit_button("Confirmar Clone", type="primary"):
-                            try:
-                                aba = planilha_db.worksheet("Memoria_Sistema")
-                                df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                if 'ZAP_ENVIADO' not in df_nuvem.columns: 
-                                    df_nuvem['ZAP_ENVIADO'] = ""
+                            with st.spinner("👯 Clonando pedidos e roteirizando..."):
+                                try:
+                                    aba = planilha_db.worksheet("Memoria_Sistema")
+                                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                    if 'ZAP_ENVIADO' not in df_nuvem.columns: 
+                                        df_nuvem['ZAP_ENVIADO'] = ""
+                                        
+                                    prox_id = obter_proximo_id(df_nuvem)
+                                    clones_app = []
                                     
-                                prox_id = obter_proximo_id(df_nuvem)
-                                clones_app = []
-                                
-                                for pid in p_ids:
-                                    if pid in df_nuvem['PEDIDO'].values:
-                                        l_orig = df_nuvem[df_nuvem['PEDIDO'] == pid].iloc[0].copy()
-                                        novo_id = str(prox_id)
-                                        prox_id += 1
-                                        
-                                        l_orig['PEDIDO'] = novo_id
-                                        l_orig['DATA'] = clone_data.strftime("%d/%m/%Y")
-                                        l_orig['STATUS'] = "PENDENTE"
-                                        l_orig['DATA_ENTREGA'] = ""
-                                        l_orig['FOTO'] = ""
-                                        l_orig['ROMANEIO'] = ""
-                                        l_orig['ZAP_ENVIADO'] = ""
-                                        
-                                        if clone_mot != "Manter Original": 
-                                            l_orig['AGENTE_RAW'] = clone_mot
-                                        
-                                        prazo = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')))
-                                        l_orig['PRAZO_DIAS'] = str(prazo) 
-                                        l_orig['DATA_LIMITE'] = str(calcular_data_limite(l_orig['DATA'], prazo))
-                                        
-                                        l_orig = l_orig.astype(str)
-                                        df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
-                                        
-                                        if str(l_orig.get('AGENTE_RAW','')).strip():
-                                            clones_app.append({'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'], 'ENDERECO': l_orig.get('ENDERECO',''), 'NUMERO': l_orig.get('NUMERO',''), 'BAIRRO': l_orig.get('BAIRRO',''), 'CIDADE': l_orig.get('CIDADE',''), 'CEP': l_orig.get('CEP',''), 'LABORATORIO': l_orig.get('LABORATORIO',''), 'TOMADOR': l_orig.get('TOMADOR','')})
-                                
-                                aba.clear()
-                                aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                if clones_app: 
-                                    despachar_para_appsheet(clones_app)
+                                    for pid in p_ids:
+                                        if pid in df_nuvem['PEDIDO'].values:
+                                            l_orig = df_nuvem[df_nuvem['PEDIDO'] == pid].iloc[0].copy()
+                                            novo_id = str(prox_id)
+                                            prox_id += 1
+                                            
+                                            l_orig['PEDIDO'] = novo_id
+                                            l_orig['DATA'] = clone_data.strftime("%d/%m/%Y")
+                                            l_orig['STATUS'] = "PENDENTE"
+                                            l_orig['DATA_ENTREGA'] = ""
+                                            l_orig['FOTO'] = ""
+                                            l_orig['ROMANEIO'] = ""
+                                            l_orig['ZAP_ENVIADO'] = ""
+                                            
+                                            if clone_mot != "Manter Original": 
+                                                l_orig['AGENTE_RAW'] = clone_mot
+                                            
+                                            prazo = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')))
+                                            l_orig['PRAZO_DIAS'] = str(prazo) 
+                                            l_orig['DATA_LIMITE'] = str(calcular_data_limite(l_orig['DATA'], prazo))
+                                            
+                                            l_orig = l_orig.astype(str)
+                                            df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
+                                            
+                                            if str(l_orig.get('AGENTE_RAW','')).strip():
+                                                clones_app.append({'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'], 'ENDERECO': l_orig.get('ENDERECO',''), 'NUMERO': l_orig.get('NUMERO',''), 'BAIRRO': l_orig.get('BAIRRO',''), 'CIDADE': l_orig.get('CIDADE',''), 'CEP': l_orig.get('CEP',''), 'LABORATORIO': l_orig.get('LABORATORIO',''), 'TOMADOR': l_orig.get('TOMADOR','')})
                                     
-                                st.success("🎉 Clonado!")
-                                time.sleep(1.5)
-                                carregar_dados_completos.clear()
-                                st.rerun()
-                            except Exception as e: 
-                                st.error(f"Erro: {e}")
+                                    aba.clear()
+                                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                    if clones_app: 
+                                        despachar_para_appsheet(clones_app)
+                                        
+                                    st.success("🎉 Clonado!")
+                                    time.sleep(1)
+                                    carregar_dados_completos.clear()
+                                    st.rerun()
+                                except Exception as e: 
+                                    st.error(f"Erro: {e}")
 
             # 5. EXCLUIR
             with col_b5.popover("🗑️ Excluir", use_container_width=True):
@@ -970,28 +956,29 @@ if menu == "📊 GRID":
                         senha_del = st.text_input("🔑 Senha Master:", type="password")
                         if st.form_submit_button("Confirmar Exclusão"):
                             if senha_del == "123":
-                                try:
-                                    aba = planilha_db.worksheet("Memoria_Sistema")
-                                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                    df_nuvem = df_nuvem[~df_nuvem['PEDIDO'].isin(p_ids)]
-                                    aba.clear()
-                                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    
+                                with st.spinner("Apagando registros do banco..."):
                                     try:
-                                        aba_app = planilha_db.worksheet("App_Tarefas")
-                                        df_app = pd.DataFrame(aba_app.get_all_values()[1:], columns=aba_app.get_all_values()[0])
-                                        df_app = df_app[~df_app['PEDIDO'].isin(p_ids)]
-                                        aba_app.clear()
-                                        aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
-                                    except Exception: 
-                                        pass 
+                                        aba = planilha_db.worksheet("Memoria_Sistema")
+                                        df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                        df_nuvem = df_nuvem[~df_nuvem['PEDIDO'].isin(p_ids)]
+                                        aba.clear()
+                                        aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                         
-                                    st.success("🗑️ Apagado!")
-                                    time.sleep(1.5)
-                                    carregar_dados_completos.clear()
-                                    st.rerun()
-                                except Exception as e: 
-                                    st.error(f"Erro: {e}")
+                                        try:
+                                            aba_app = planilha_db.worksheet("App_Tarefas")
+                                            df_app = pd.DataFrame(aba_app.get_all_values()[1:], columns=aba_app.get_all_values()[0])
+                                            df_app = df_app[~df_app['PEDIDO'].isin(p_ids)]
+                                            aba_app.clear()
+                                            aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
+                                        except Exception: 
+                                            pass 
+                                            
+                                        st.success("🗑️ Apagado!")
+                                        time.sleep(1)
+                                        carregar_dados_completos.clear()
+                                        st.rerun()
+                                    except Exception as e: 
+                                        st.error(f"Erro: {e}")
 
             # 🔥 6. DISPARO WHATSAPP DIRETO DA GRID 🔥
             with col_b6.popover("📱 Enviar WhatsApp", use_container_width=True):
@@ -1136,64 +1123,65 @@ elif menu == "📝 Pedido Manual":
                 if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
                     st.error("⚠️ Preencha todos os campos!")
                 else:
-                    lab_limpo, rua_limpa, bai_limpo, cid_limpa, uf_limpa = padronizar_texto(m_lab), padronizar_texto(m_rua), padronizar_texto(m_bai), padronizar_texto(m_cid), padronizar_texto(m_uf)
-                    
-                    if m_agente_escolha == "Automático (Por Rota)":
-                        m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES)
-                    else:
-                        m_agente = m_agente_escolha
+                    with st.spinner("Injetando pedido no sistema..."):
+                        lab_limpo, rua_limpa, bai_limpo, cid_limpa, uf_limpa = padronizar_texto(m_lab), padronizar_texto(m_rua), padronizar_texto(m_bai), padronizar_texto(m_cid), padronizar_texto(m_uf)
                         
-                    m_prazo = str(calcular_sla_dias(uf_limpa, cid_limpa))
-                    m_limite = str(calcular_data_limite(m_data.strftime("%d/%m/%Y"), int(m_prazo)))
-                    
-                    try:
-                        aba_memoria = planilha_db.worksheet("Memoria_Sistema")
-                        dados_atuais = aba_memoria.get_all_values()
-                        df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
-                        
-                        if 'ZAP_ENVIADO' not in df_nuvem.columns: 
-                            df_nuvem['ZAP_ENVIADO'] = ""
+                        if m_agente_escolha == "Automático (Por Rota)":
+                            m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES)
+                        else:
+                            m_agente = m_agente_escolha
                             
-                        m_pedido = str(obter_proximo_id(df_nuvem))
+                        m_prazo = str(calcular_sla_dias(uf_limpa, cid_limpa))
+                        m_limite = str(calcular_data_limite(m_data.strftime("%d/%m/%Y"), int(m_prazo)))
                         
-                        novo_ped_dict = {
-                            'DATA': m_data.strftime("%d/%m/%Y"), 
-                            'PEDIDO': m_pedido, 
-                            'TOMADOR': m_tomador, 
-                            'LABORATORIO': lab_limpo, 
-                            'ENDERECO': rua_limpa, 
-                            'NUMERO': "", 
-                            'BAIRRO': bai_limpo, 
-                            'CIDADE': cid_limpa, 
-                            'UF': uf_limpa, 
-                            'CEP': cep_limpo if 'cep_limpo' in locals() else "", 
-                            'STATUS': 'PENDENTE', 
-                            'AGENTE_RAW': m_agente, 
-                            'PRAZO_DIAS': m_prazo, 
-                            'DATA_LIMITE': m_limite, 
-                            'DATA_ENTREGA': "", 
-                            'FOTO': "", 
-                            'ROMANEIO': "", 
-                            'ZAP_ENVIADO': ""
-                        }
-                        
-                        novo_ped = pd.DataFrame([novo_ped_dict]).astype(str)
-                        df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
-                        
-                        aba_memoria.clear()
-                        aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
-                        
-                        if m_agente: 
-                            despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
+                        try:
+                            aba_memoria = planilha_db.worksheet("Memoria_Sistema")
+                            dados_atuais = aba_memoria.get_all_values()
+                            df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
                             
-                        st.success(f"🎉 Pedido {m_pedido} criado!")
-                        carregar_dados_completos.clear()
-                        st.session_state['m_rua'] = ""
-                        st.session_state['m_bai'] = ""
-                        st.session_state['m_cid'] = ""
-                        st.session_state['m_uf'] = ""
-                    except Exception as e: 
-                        st.error(f"Erro: {e}")
+                            if 'ZAP_ENVIADO' not in df_nuvem.columns: 
+                                df_nuvem['ZAP_ENVIADO'] = ""
+                                
+                            m_pedido = str(obter_proximo_id(df_nuvem))
+                            
+                            novo_ped_dict = {
+                                'DATA': m_data.strftime("%d/%m/%Y"), 
+                                'PEDIDO': m_pedido, 
+                                'TOMADOR': m_tomador, 
+                                'LABORATORIO': lab_limpo, 
+                                'ENDERECO': rua_limpa, 
+                                'NUMERO': "", 
+                                'BAIRRO': bai_limpo, 
+                                'CIDADE': cid_limpa, 
+                                'UF': uf_limpa, 
+                                'CEP': cep_limpo if 'cep_limpo' in locals() else "", 
+                                'STATUS': 'PENDENTE', 
+                                'AGENTE_RAW': m_agente, 
+                                'PRAZO_DIAS': m_prazo, 
+                                'DATA_LIMITE': m_limite, 
+                                'DATA_ENTREGA': "", 
+                                'FOTO': "", 
+                                'ROMANEIO': "", 
+                                'ZAP_ENVIADO': ""
+                            }
+                            
+                            novo_ped = pd.DataFrame([novo_ped_dict]).astype(str)
+                            df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
+                            
+                            aba_memoria.clear()
+                            aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
+                            
+                            if m_agente: 
+                                despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
+                                
+                            st.success(f"🎉 Pedido {m_pedido} criado!")
+                            carregar_dados_completos.clear()
+                            st.session_state['m_rua'] = ""
+                            st.session_state['m_bai'] = ""
+                            st.session_state['m_cid'] = ""
+                            st.session_state['m_uf'] = ""
+                        except Exception as e: 
+                            st.error(f"Erro: {e}")
 
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES
@@ -1219,76 +1207,79 @@ elif menu == "📥 Importações":
             if not txt or tom == "Selecione...": 
                 st.warning("Preencha o Tomador e cole os dados!")
             else:
-                try:
-                    delim = '\t' if '\t' in txt else (';' if ';' in txt else ',')
-                    df_raw_import = pd.read_csv(io.StringIO(txt), sep=delim, header=None, dtype=str).fillna("")
-                    idx_h, max_matches = 0, 0
-                    
-                    for i in range(min(15, len(df_raw_import))):
-                        row_str = unicodedata.normalize('NFKD', " ".join(df_raw_import.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
-                        matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP'] if kw in row_str)
-                        if matches > max_matches: 
-                            max_matches, idx_h = matches, i
-                            
-                    df_limpo = df_raw_import.iloc[idx_h+1:].copy()
-                    df_limpo.columns = [str(c).strip() for c in df_raw_import.iloc[idx_h].values]
-                    df_limpo = df_limpo.loc[:, ~df_limpo.columns.duplicated()] 
-                    
-                    for col in df_limpo.columns: 
-                        df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
+                with st.spinner("⏳ Processando dados da planilha... Isso pode levar alguns segundos."):
+                    try:
+                        delim = '\t' if '\t' in txt else (';' if ';' in txt else ',')
+                        df_raw_import = pd.read_csv(io.StringIO(txt), sep=delim, header=None, dtype=str).fillna("")
+                        idx_h, max_matches = 0, 0
                         
-                    mapa = {}
-                    for c in df_limpo.columns:
-                        c_upper = str(c).upper().strip()
-                        cl = ''.join(e for e in unicodedata.normalize('NFKD', c_upper).encode('ASCII', 'ignore').decode('utf-8') if e.isalnum()) 
-                        
-                        if c_upper in ['Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in ['N', 'NO', 'NR', 'NUM', 'NUMERO']: 
-                            mapa[c] = 'NUMERO'
-                        elif any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': 
-                            mapa[c] = 'PEDIDO'
-                        elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): 
-                            mapa[c] = 'LABORATORIO'
-                        elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): 
-                            mapa[c] = 'ENDERECO'
-                        elif 'BAIRRO' in cl: 
-                            mapa[c] = 'BAIRRO'
-                        elif any(x in cl for x in ['CIDADE', 'MUNIC']): 
-                            mapa[c] = 'CIDADE'
-                        elif any(x in cl for x in ['ESTADO', 'UF']): 
-                            mapa[c] = 'UF'
-                        elif 'CEP' in cl: 
-                            mapa[c] = 'CEP'
-                            
-                    df_limpo.rename(columns=mapa, inplace=True)
-                    
-                    for c in ['PEDIDO', 'LABORATORIO', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
-                        if c not in df_limpo.columns: 
-                            df_limpo[c] = ""
-                            
-                    # 🔥 TRAVA DE SEGURANÇA: IGNORA QUALQUER ID/PEDIDO DO CLIENTE E FORÇA VAZIO 🔥
-                    df_limpo['PEDIDO'] = ""
-                        
-                    for idx, row in df_limpo.iterrows():
-                        e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
-                        if e and (not n or not b):
-                            cep_m = re.search(r'(\d{5}-?\d{3})', e)
-                            if cep_m: 
-                                df_limpo.at[idx, 'CEP'] = cep_m.group(1)
-                                e = e.replace(cep_m.group(1), '').strip(' ,-')
-                            if ',' in e and not n: 
-                                pts = e.split(',')
-                                df_limpo.at[idx, 'ENDERECO'], df_limpo.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
+                        for i in range(min(15, len(df_raw_import))):
+                            row_str = unicodedata.normalize('NFKD', " ".join(df_raw_import.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
+                            matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP'] if kw in row_str)
+                            if matches > max_matches: 
+                                max_matches, idx_h = matches, i
                                 
-                    df_limpo['UF'] = df_limpo['UF'].astype(str).str.upper().str.strip()
-                    df_limpo['CIDADE'] = df_limpo['CIDADE'].astype(str).str.upper().str.strip()
-                    df_limpo['TOMADOR'] = tom
-                    df_limpo['DATA'] = dt_c.strftime("%d/%m/%Y")
-                    df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
-                    
-                    st.session_state.df_preview = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
-                    st.rerun()
-                except Exception as e: 
-                    st.error(f"Erro no processamento: {e}")
+                        df_limpo = df_raw_import.iloc[idx_h+1:].copy()
+                        df_limpo.columns = [str(c).strip() for c in df_raw_import.iloc[idx_h].values]
+                        df_limpo = df_limpo.loc[:, ~df_limpo.columns.duplicated()] 
+                        
+                        for col in df_limpo.columns: 
+                            df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
+                            
+                        mapa = {}
+                        for c in df_limpo.columns:
+                            c_upper = str(c).upper().strip()
+                            cl = ''.join(e for e in unicodedata.normalize('NFKD', c_upper).encode('ASCII', 'ignore').decode('utf-8') if e.isalnum()) 
+                            
+                            if c_upper in ['Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in ['N', 'NO', 'NR', 'NUM', 'NUMERO']: 
+                                mapa[c] = 'NUMERO'
+                            elif any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': 
+                                mapa[c] = 'PEDIDO'
+                            elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): 
+                                mapa[c] = 'LABORATORIO'
+                            elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): 
+                                mapa[c] = 'ENDERECO'
+                            elif 'BAIRRO' in cl: 
+                                mapa[c] = 'BAIRRO'
+                            elif any(x in cl for x in ['CIDADE', 'MUNIC']): 
+                                mapa[c] = 'CIDADE'
+                            elif any(x in cl for x in ['ESTADO', 'UF']): 
+                                mapa[c] = 'UF'
+                            elif 'CEP' in cl: 
+                                mapa[c] = 'CEP'
+                                
+                        df_limpo.rename(columns=mapa, inplace=True)
+                        
+                        for c in ['PEDIDO', 'LABORATORIO', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
+                            if c not in df_limpo.columns: 
+                                df_limpo[c] = ""
+                                
+                        # 🔥 TRAVA DE SEGURANÇA: IGNORA QUALQUER ID/PEDIDO DO CLIENTE E FORÇA VAZIO 🔥
+                        df_limpo['PEDIDO'] = ""
+                            
+                        for idx, row in df_limpo.iterrows():
+                            e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
+                            if e and (not n or not b):
+                                cep_m = re.search(r'(\d{5}-?\d{3})', e)
+                                if cep_m: 
+                                    df_limpo.at[idx, 'CEP'] = cep_m.group(1)
+                                    e = e.replace(cep_m.group(1), '').strip(' ,-')
+                                if ',' in e and not n: 
+                                    pts = e.split(',')
+                                    df_limpo.at[idx, 'ENDERECO'], df_limpo.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
+                                    
+                        df_limpo['UF'] = df_limpo['UF'].astype(str).str.upper().str.strip()
+                        df_limpo['CIDADE'] = df_limpo['CIDADE'].astype(str).str.upper().str.strip()
+                        df_limpo['TOMADOR'] = tom
+                        df_limpo['DATA'] = dt_c.strftime("%d/%m/%Y")
+                        df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
+                        
+                        st.session_state.df_preview = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
+                        st.success("✅ Processamento Concluído!")
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e: 
+                        st.error(f"Erro no processamento: {e}")
 
     if not st.session_state.df_preview.empty:
         st.markdown("---")
@@ -1324,7 +1315,7 @@ elif menu == "📥 Importações":
             st.dataframe(df_ok, hide_index=True)
             
             if st.button("🚀 3. INJETAR LOTE", type="primary"):
-                with st.spinner("Injetando..."):
+                with st.spinner("🚀 Injetando lotes no banco de dados e gerando IDs..."):
                     try:
                         aba = planilha_db.worksheet("Memoria_Sistema")
                         atuais = aba.get_all_values()
