@@ -1697,7 +1697,7 @@ elif menu == "📁 Relatórios":
 # =============================================================================
 elif menu == "⚙️ Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
-    tab_agente, tab_rota, tab_tabela = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico"])
+    tab_agente, tab_rota, tab_tabela, tab_sistema = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico", "⚠️ Sistema"])
     
     with tab_agente:
         with st.form("form_novo_agente", clear_on_submit=True):
@@ -1779,3 +1779,39 @@ elif menu == "⚙️ Rotas":
                             st.error(f"Erro ao remover: {e}")
         else: 
             st.warning("Nenhum dado encontrado.")
+
+    with tab_sistema:
+        st.markdown("#### 🚨 Zona de Perigo: Reset do Banco de Dados")
+        st.warning("Esta ação apagará **TODOS OS PEDIDOS** da `Memoria_Sistema` e do `App_Tarefas`. Os Motoristas e as Rotas cadastradas serão preservados. Use apenas para limpar a base de testes antes de entrar em produção.")
+        
+        with st.form("form_reset_banco"):
+            senha_reset = st.text_input("🔑 Senha de Autorização (Digite: 123):", type="password")
+            
+            if st.form_submit_button("🗑️ RESETAR BASE DE DADOS", type="primary", use_container_width=True):
+                if senha_reset == "123":
+                    with st.spinner("Limpando banco de dados com segurança e preservando cabeçalhos..."):
+                        try:
+                            # 1. Limpar Memoria_Sistema com segurança
+                            aba_m = planilha_db.worksheet("Memoria_Sistema")
+                            cabecalho_m = aba_m.row_values(1) # Salva a linha 1 (cabeçalho)
+                            aba_m.clear() # Apaga tudo
+                            aba_m.update("A1", [cabecalho_m]) # Devolve o cabeçalho
+                            
+                            # 2. Limpar App_Tarefas com segurança
+                            try:
+                                aba_app = planilha_db.worksheet("App_Tarefas")
+                                cabecalho_app = aba_app.row_values(1) # Salva a linha 1 (cabeçalho)
+                                aba_app.clear() # Apaga tudo
+                                aba_app.update("A1", [cabecalho_app]) # Devolve o cabeçalho
+                            except Exception:
+                                pass # Ignora se a aba não for encontrada
+                            
+                            st.success("✅ Banco de dados resetado com sucesso! A base está limpa para a produção.")
+                            time.sleep(2)
+                            carregar_dados_completos.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro Crítico ao limpar o banco: {e}")
+                else:
+                    if senha_reset:
+                        st.error("❌ Senha incorreta. Ação bloqueada.")
