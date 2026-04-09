@@ -787,7 +787,8 @@ if menu == "📊 GRID":
             disabled=[c for c in df_grid_final.columns if c != "SELECIONAR"],
             hide_index=True,
             use_container_width=True,
-            height=500
+            height=500,
+            key="tabela_nativa_indestrutivel_final" # 🔥 ESSA É A LINHA QUE FALTAVA!
         )
 
         linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
