@@ -228,8 +228,8 @@ def carregar_dados_completos(_planilha):
 
 planilha_db = conectar_banco()
 DF_AGENTES = carregar_dados_agentes(planilha_db)
+CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE"]
 FERIADOS_BR = holidays.Brazil()
-CLIENTES_AUTORIZADOS = ["CUNHA", "CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "MB_CAEP"]
 hoje_br = datetime.now(FUSO_BR).date() 
 
 def padronizar_texto(texto):
