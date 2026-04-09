@@ -95,7 +95,7 @@ if not st.session_state.autenticado:
     st.stop()
 
 # =============================================================================
-# 🔗 2. CONEXÃO E DICIONÁRIOS
+# 🔗 2. CONEXÃO
 # =============================================================================
 @st.cache_resource
 def conectar_banco():
@@ -120,23 +120,6 @@ def conectar_banco():
 
 planilha_db = conectar_banco()
 CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
-
-# 🔥 DICIONÁRIO DE LOGOS (RESTAURADO PARA UI-AVATARS PARA EVITAR FOTO QUEBRADA DO GDRIVE) 🔥
-DICIONARIO_LOGOS = {
-    "CAEP": "https://ui-avatars.com/api/?name=CAEP&background=0D8ABC&color=fff&rounded=true",
-    "SAPIENS": "https://ui-avatars.com/api/?name=SAPIENS&background=F59E0B&color=fff&rounded=true",
-    "GRALAB": "https://ui-avatars.com/api/?name=GRALAB&background=10B981&color=fff&rounded=true",
-    "SYNVIA": "https://ui-avatars.com/api/?name=SYNVIA&background=8B5CF6&color=fff&rounded=true",
-    "INNOVATOX": "https://ui-avatars.com/api/?name=INNO&background=EF4444&color=fff&rounded=true",
-    "LABEST": "https://ui-avatars.com/api/?name=LAB&background=3B82F6&color=fff&rounded=true", 
-    "AIRLAB": "https://ui-avatars.com/api/?name=AIR&background=EC4899&color=fff&rounded=true",
-    "UNILABOR": "https://ui-avatars.com/api/?name=UNI&background=14B8A6&color=fff&rounded=true",
-    "SODRE": "https://ui-avatars.com/api/?name=SOD&background=F97316&color=fff&rounded=true",
-    "BRASILIENSE": "https://ui-avatars.com/api/?name=BRA&background=06B6D4&color=fff&rounded=true",
-    "SOUZA CRUZ": "https://ui-avatars.com/api/?name=SOUZA&background=1E3A8A&color=fff&rounded=true",
-    "HEXALIFE": "https://ui-avatars.com/api/?name=HEXA&background=059669&color=fff&rounded=true",
-    "ECOLYZER": "https://ui-avatars.com/api/?name=ECOLYZER&background=4F46E5&color=fff&rounded=true"
-}
 
 def carregar_dados_agentes(_planilha):
     if not _planilha: 
@@ -698,10 +681,6 @@ if menu == "📊 GRID":
         if 'DATA_LIMITE' in df_raw.columns: 
             df_raw['DATA_LIMITE'] = df_raw['DATA_LIMITE'].fillna("").astype(str)
         
-        # 🔥 APLICAÇÃO DO TRUQUE VISUAL DAS LOGOS (CORRIGIDO PARA EVITAR COLUNA VAZIA) 🔥
-        dicionario_upper = {str(k).strip().upper(): str(v).strip() for k, v in DICIONARIO_LOGOS.items()}
-        df_raw['LOGO'] = df_raw['TOMADOR'].astype(str).str.strip().str.upper().map(dicionario_upper).fillna("")
-        
         col_f1, col_f2 = st.columns(2)
         f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
         f_data = col_f2.date_input("📅 Período:", value=(hoje_br - timedelta(days=2), hoje_br), format="DD/MM/YYYY")
@@ -752,7 +731,8 @@ if menu == "📊 GRID":
         if busca: 
             df_grid = df_grid[df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)]
 
-        colunas_mostrar = ['LOGO', 'DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA', 'COMPROVANTE']
+        # 🔥 A COLUNA LOGO FOI REMOVIDA DESTA LISTA 🔥
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA', 'COMPROVANTE']
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
         df_grid_final = df_grid_final[df_grid_final['PEDIDO'].astype(str).str.strip() != ""] 
         
@@ -766,11 +746,11 @@ if menu == "📊 GRID":
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione as caixinhas na tabela para liberar os botões.</p>", unsafe_allow_html=True)
         box_botoes = st.empty()
 
+        # 🔥 A CONFIGURAÇÃO DA IMAGEM FOI REMOVIDA DA TABELA 🔥
         tabela_renderizada = st.data_editor(
             df_grid_final,
             column_config={
                 "SELECIONAR": st.column_config.CheckboxColumn("✔ AÇÃO", default=False),
-                "LOGO": st.column_config.ImageColumn("🖼️", width="small"),
                 "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
                 "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Ver Foto"),
                 "AGENTE_RAW": st.column_config.TextColumn("AGENTE"),
@@ -786,7 +766,7 @@ if menu == "📊 GRID":
             hide_index=True,
             use_container_width=True,
             height=500,
-            key="tabela_nativa_indestrutivel_final" # 🔥 ESSA É A CHAVE QUE MANTÉM OS BOTÕES FUNCIONANDO!
+            key="tabela_nativa_indestrutivel_final" 
         )
 
         linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
@@ -1137,7 +1117,7 @@ elif menu == "📝 Pedido Manual":
             m_agente_escolha = st.selectbox("Agente Designado:", ["Automático (Por Rota)"] + logins_disp)
             
             if st.form_submit_button("🚀 Injetar na Base", type="primary", use_container_width=True):
-                if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
+                if m_tomador == "Selecione... or not m_cid or not m_lab or not m_rua or not m_bai": 
                     st.error("⚠️ Preencha todos os campos!")
                 else:
                     lab_limpo, rua_limpa, bai_limpo, cid_limpa, uf_limpa = padronizar_texto(m_lab), padronizar_texto(m_rua), padronizar_texto(m_bai), padronizar_texto(m_cid), padronizar_texto(m_uf)
