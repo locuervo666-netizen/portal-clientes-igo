@@ -121,6 +121,8 @@ def conectar_banco():
 planilha_db = conectar_banco()
 CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
 
+# 🔥 ADICIONADO O CACHE AQUI PARA EVITAR O ERRO 'FUNCTION' OBJECT HAS NO ATTRIBUTE 'CLEAR' 🔥
+@st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
     if not _planilha: 
         return pd.DataFrame()
@@ -731,7 +733,6 @@ if menu == "📊 GRID":
         if busca: 
             df_grid = df_grid[df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)]
 
-        # 🔥 A COLUNA LOGO FOI REMOVIDA DESTA LISTA 🔥
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'AGENTE_RAW', 'DATA_ENTREGA', 'COMPROVANTE']
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
         df_grid_final = df_grid_final[df_grid_final['PEDIDO'].astype(str).str.strip() != ""] 
@@ -746,7 +747,6 @@ if menu == "📊 GRID":
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione as caixinhas na tabela para liberar os botões.</p>", unsafe_allow_html=True)
         box_botoes = st.empty()
 
-        # 🔥 A CONFIGURAÇÃO DA IMAGEM FOI REMOVIDA DA TABELA 🔥
         tabela_renderizada = st.data_editor(
             df_grid_final,
             column_config={
@@ -773,7 +773,7 @@ if menu == "📊 GRID":
         p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
 
-        # 🔥 BLOCO DE BOTÕES DA GRID (7 OPÇÕES TOTAIS COM FORMULÁRIOS DE SEGURANÇA) 🔥
+        # 🔥 BLOCO DE BOTÕES DA GRID 🔥
         with box_botoes.container():
             col_b1, col_b2, col_b3, col_b4, col_b5, col_b6, col_b7 = st.columns(7)
             
@@ -1117,7 +1117,7 @@ elif menu == "📝 Pedido Manual":
             m_agente_escolha = st.selectbox("Agente Designado:", ["Automático (Por Rota)"] + logins_disp)
             
             if st.form_submit_button("🚀 Injetar na Base", type="primary", use_container_width=True):
-                if m_tomador == "Selecione... or not m_cid or not m_lab or not m_rua or not m_bai": 
+                if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
                     st.error("⚠️ Preencha todos os campos!")
                 else:
                     lab_limpo, rua_limpa, bai_limpo, cid_limpa, uf_limpa = padronizar_texto(m_lab), padronizar_texto(m_rua), padronizar_texto(m_bai), padronizar_texto(m_cid), padronizar_texto(m_uf)
@@ -1749,6 +1749,7 @@ elif menu == "⚙️ Rotas":
                 else:
                     df_novo = pd.concat([DF_AGENTES, pd.DataFrame([{"ROTA MAPEADA": "SEM ROTA DEFINIDA", "LOGIN DO AGENTE": login_ag.lower().strip(), "NOME DO AGENTE": nome_ag.upper().strip(), "TELEFONE": re.sub(r'\D', '', tel_ag)}])], ignore_index=True)
                     try:
+                        planilha_db.worksheet("Agentes").clear()
                         planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                         st.success(f"✅ Agente salvo!")
                         carregar_dados_agentes.clear()
@@ -1773,6 +1774,7 @@ elif menu == "⚙️ Rotas":
                     dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == ag_selecionado].iloc[0]
                     df_novo = pd.concat([DF_AGENTES, pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": ag_selecionado, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])], ignore_index=True)
                     try:
+                        planilha_db.worksheet("Agentes").clear()
                         planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                         st.success(f"✅ Rota atrelada!")
                         carregar_dados_agentes.clear()
@@ -1781,7 +1783,37 @@ elif menu == "⚙️ Rotas":
                         
     with tab_tabela:
         if not DF_AGENTES.empty:
-            agente_filtro = st.selectbox("👤 Selecione o Motorista para gerenciar apenas suas rotas:", sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()))
+            agente_filtro = st.selectbox("👤 Selecione o Motorista para gerenciar:", sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()))
+            
+            # 🔥 NOVA SESSÃO PARA EDITAR O MOTORISTA (NOME E TELEFONE) 🔥
+            dados_atuais_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
+            with st.expander("✏️ Editar Cadastro (Nome / Telefone)"):
+                with st.form(f"form_edit_{agente_filtro}"):
+                    c_edit1, c_edit2 = st.columns(2)
+                    edit_nome = c_edit1.text_input("Nome Amigável", value=dados_atuais_ag['NOME DO AGENTE'])
+                    edit_tel = c_edit2.text_input("WhatsApp com DDD", value=dados_atuais_ag['TELEFONE'])
+                    
+                    if st.form_submit_button("💾 Salvar Alterações do Motorista", type="primary"):
+                        if not edit_nome or not edit_tel:
+                            st.error("Preencha todos os campos!")
+                        else:
+                            df_ag_edit = DF_AGENTES.copy()
+                            mask_edit = df_ag_edit['LOGIN DO AGENTE'] == agente_filtro
+                            df_ag_edit.loc[mask_edit, 'NOME DO AGENTE'] = edit_nome.upper().strip()
+                            df_ag_edit.loc[mask_edit, 'TELEFONE'] = re.sub(r'\D', '', edit_tel)
+                            try:
+                                aba_ag = planilha_db.worksheet("Agentes")
+                                aba_ag.clear()
+                                aba_ag.update("A1", [df_ag_edit.columns.tolist()] + df_ag_edit.fillna("").astype(str).values.tolist())
+                                st.success("✅ Cadastro atualizado com sucesso!")
+                                time.sleep(1)
+                                carregar_dados_agentes.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao editar: {e}")
+            
+            st.markdown("---")
+            st.markdown("#### 📍 Rotas Atreladas ao Motorista")
             with st.form(f"form_rapido_{agente_filtro}", clear_on_submit=True):
                 ca1, ca2, ca3, ca4 = st.columns([2, 2, 2, 1])
                 r_cid = ca1.text_input("Cidade")
@@ -1796,6 +1828,7 @@ elif menu == "⚙️ Rotas":
                         dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
                         df_novo = pd.concat([DF_AGENTES, pd.DataFrame([{"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": agente_filtro, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']}])], ignore_index=True)
                         try:
+                            planilha_db.worksheet("Agentes").clear()
                             planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                             st.success("Rota adicionada!")
                             time.sleep(0.5)
@@ -1813,6 +1846,7 @@ elif menu == "⚙️ Rotas":
                     col_rota.markdown(f"<div style='padding:10px; background-color:#FFFFFF; border-radius:5px; border: 1px solid #E2E8F0;'><b>📍 {row['ROTA MAPEADA'].replace('---', ' ➔ ')}</b></div>", unsafe_allow_html=True)
                     if col_del.button("🗑️ Remover", key=f"del_{idx}", use_container_width=True):
                         try:
+                            planilha_db.worksheet("Agentes").clear()
                             planilha_db.worksheet("Agentes").update("A1", [DF_AGENTES.drop(idx).columns.tolist()] + DF_AGENTES.drop(idx).fillna("").astype(str).values.tolist())
                             time.sleep(0.5)
                             carregar_dados_agentes.clear()
