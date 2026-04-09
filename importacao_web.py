@@ -181,7 +181,6 @@ def carregar_dados_completos(_planilha):
                         if rom_id in rom_dict:
                             s_rom = str(rom_dict[rom_id].get('APP_STATUS', '')).strip().upper()
                             if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']: return s_rom
-                        # 🔥 CORREÇÃO DA HIERARQUIA DE STATUS 🔥
                         if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_db
                         if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_app
                         if s_db in ['EM ROTA DE ENTREGA', 'CONFERIDO']: return s_db
@@ -228,8 +227,6 @@ def carregar_dados_completos(_planilha):
 
 planilha_db = conectar_banco()
 DF_AGENTES = carregar_dados_agentes(planilha_db)
-
-# 🚀 CLIENTES ATUALIZADOS: SOUZA CRUZ e HEXALIFE adicionados, CUNHA e MB_CAEP removidos
 CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE"]
 FERIADOS_BR = holidays.Brazil()
 hoje_br = datetime.now(FUSO_BR).date() 
@@ -1252,7 +1249,7 @@ elif menu == "🔬 Triagem":
                                     st.success(f"✅ Pedido {str(df_raw.at[idx, 'PEDIDO'])} VALIDADO!")
                                     time.sleep(1.0)
                                     carregar_dados_completos.clear()
-                                    st.rerun() # 🔥 O "PISCAR" MÁGICO ADICIONADO AQUI! 🔥
+                                    st.rerun() 
                             except Exception as e: st.error(f"Erro: {e}")
                         else: st.error("❌ Volume não está com status COLETADO.")
                     else: st.error("❌ Assinatura não reconhecida.")
@@ -1791,32 +1788,94 @@ elif menu == "⚙️ Rotas":
             st.warning("Nenhum dado encontrado.")
 
     with tab_sistema:
-        st.markdown("#### 🚨 Zona de Perigo: Reset do Banco de Dados")
-        st.warning("Esta ação apagará **TODOS OS PEDIDOS** da `Memoria_Sistema` e do `App_Tarefas`. Os Motoristas e as Rotas cadastradas serão preservados. Use apenas para limpar a base de testes antes de entrar em produção.")
+        st.markdown("#### 🧹 Manutenção: Limpeza Inteligente de 30 Dias")
+        st.info("💡 **Recomendado:** Esta ação varre o banco de dados e exclui apenas os pedidos com data superior a 30 dias. Como você possui rotina de backup, isso manterá o seu Painel C.C.O extremamente rápido e leve.")
+        
+        with st.form("form_limpeza_30_dias"):
+            senha_limpeza = st.text_input("🔑 Senha de Confirmação (Digite: 123):", type="password", key="senha_30d")
+            
+            if st.form_submit_button("🧹 REALIZAR LIMPEZA DE 30 DIAS", type="primary", use_container_width=True):
+                if senha_limpeza == "123":
+                    with st.spinner("Analisando linha do tempo e removendo histórico antigo..."):
+                        try:
+                            aba_m = planilha_db.worksheet("Memoria_Sistema")
+                            dados_m = aba_m.get_all_values()
+                            if len(dados_m) > 1:
+                                df_m = pd.DataFrame(dados_m[1:], columns=dados_m[0])
+                                
+                                # Converter coluna DATA para formato de data real do Python
+                                df_m['DATA_TEMP'] = pd.to_datetime(df_m['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+                                
+                                # Calcular a data de corte (Hoje - 30 dias)
+                                data_corte = hoje_br - timedelta(days=30)
+                                
+                                # Filtrar: Manter o que for mais novo que a data de corte OU se a data estiver vazia (prevenção)
+                                mask_manter = (df_m['DATA_TEMP'] >= data_corte) | (df_m['DATA_TEMP'].isna())
+                                df_m_novo = df_m[mask_manter].drop(columns=['DATA_TEMP'])
+                                
+                                pedidos_preservados = df_m_novo['PEDIDO'].astype(str).tolist()
+                                qtd_removidos = len(df_m) - len(df_m_novo)
+                                
+                                if qtd_removidos > 0:
+                                    # Atualiza a Memoria_Sistema apenas com os 30 dias recentes
+                                    aba_m.clear()
+                                    aba_m.update("A1", [df_m_novo.columns.tolist()] + df_m_novo.fillna("").astype(str).values.tolist())
+                                    
+                                    # Limpa o App_Tarefas para não sobrecarregar o celular dos motoristas
+                                    try:
+                                        aba_app = planilha_db.worksheet("App_Tarefas")
+                                        dados_app = aba_app.get_all_values()
+                                        if len(dados_app) > 1:
+                                            df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
+                                            if 'PEDIDO' in df_app.columns:
+                                                # Mantém no App apenas os pedidos que sobreviveram na Memória
+                                                df_app_novo = df_app[df_app['PEDIDO'].astype(str).isin(pedidos_preservados)]
+                                                aba_app.clear()
+                                                aba_app.update("A1", [df_app_novo.columns.tolist()] + df_app_novo.fillna("").astype(str).values.tolist())
+                                    except Exception:
+                                        pass
+                                    
+                                    st.success(f"✅ Limpeza concluída com sucesso! 🗑️ {qtd_removidos} registros antigos foram apagados da nuvem.")
+                                else:
+                                    st.info("👍 A base já está leve! Não foram encontrados pedidos com mais de 30 dias.")
+                                    
+                            time.sleep(2.5)
+                            carregar_dados_completos.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao realizar a limpeza: {e}")
+                else:
+                    if senha_limpeza:
+                        st.error("❌ Senha incorreta. Ação bloqueada.")
+
+        st.markdown("---")
+
+        st.markdown("#### 🚨 Zona de Perigo: Reset Total do Banco")
+        st.warning("Esta ação apagará **TODOS OS PEDIDOS** da `Memoria_Sistema` e do `App_Tarefas`. Os Motoristas e as Rotas serão preservados. Use apenas para limpar bases de testes.")
         
         with st.form("form_reset_banco"):
             senha_reset = st.text_input("🔑 Senha de Autorização (Digite: 123):", type="password")
             
-            if st.form_submit_button("🗑️ RESETAR BASE DE DADOS", type="primary", use_container_width=True):
+            if st.form_submit_button("🗑️ ZERAR TUDO (RESET TOTAL)", type="primary", use_container_width=True):
                 if senha_reset == "123":
                     with st.spinner("Limpando banco de dados com segurança e preservando cabeçalhos..."):
                         try:
                             # 1. Limpar Memoria_Sistema com segurança
                             aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            cabecalho_m = aba_m.row_values(1) # Salva a linha 1 (cabeçalho)
-                            aba_m.clear() # Apaga tudo
-                            aba_m.update("A1", [cabecalho_m]) # Devolve o cabeçalho
+                            cabecalho_m = aba_m.row_values(1)
+                            aba_m.clear()
+                            aba_m.update("A1", [cabecalho_m])
                             
                             # 2. Limpar App_Tarefas com segurança
                             try:
                                 aba_app = planilha_db.worksheet("App_Tarefas")
-                                cabecalho_app = aba_app.row_values(1) # Salva a linha 1 (cabeçalho)
-                                aba_app.clear() # Apaga tudo
-                                aba_app.update("A1", [cabecalho_app]) # Devolve o cabeçalho
+                                cabecalho_app = aba_app.row_values(1)
+                                aba_app.clear()
+                                aba_app.update("A1", [cabecalho_app])
                             except Exception:
-                                pass # Ignora se a aba não for encontrada
+                                pass
                             
-                            st.success("✅ Banco de dados resetado com sucesso! A base está limpa para a produção.")
+                            st.success("✅ Banco de dados zerado com sucesso! A base está pronta para a produção.")
                             time.sleep(2)
                             carregar_dados_completos.clear()
                             st.rerun()
