@@ -228,6 +228,8 @@ def carregar_dados_completos(_planilha):
 
 planilha_db = conectar_banco()
 DF_AGENTES = carregar_dados_agentes(planilha_db)
+
+# 🚀 CLIENTES ATUALIZADOS: SOUZA CRUZ e HEXALIFE adicionados, CUNHA e MB_CAEP removidos
 CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE"]
 FERIADOS_BR = holidays.Brazil()
 hoje_br = datetime.now(FUSO_BR).date() 
@@ -600,10 +602,18 @@ def gerar_excel_memoria(df):
             for i, col in enumerate(df.columns): worksheet.set_column(i, i, min(max(df[col].astype(str).map(len).max(), len(str(col))) + 2, 40))
     return output.getvalue()
 
+# 🔥 CONTADOR TOTALMENTE BLINDADO PARA INICIAR NO 1 🔥
 def obter_proximo_id(df):
-    if df is None or df.empty or 'PEDIDO' not in df.columns: return 1
-    try: return int(df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().astype(int).max()) + 1 if not df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().empty else 1
-    except Exception: return 1
+    if df is None or df.empty or 'PEDIDO' not in df.columns: 
+        return 1
+    try: 
+        numeros_extraidos = df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna()
+        if numeros_extraidos.empty:
+            return 1
+        val_max = int(numeros_extraidos.astype(int).max())
+        return val_max + 1 if val_max >= 1 else 1
+    except Exception: 
+        return 1
 
 def calc_status_display(row):
     status_final, previsao = str(row.get('STATUS', '')).strip().upper(), str(row.get('DATA_LIMITE', '')).strip()
