@@ -789,7 +789,7 @@ if menu == "📊 GRID":
         p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
 
-        # 🔥 BLOCO DE BOTÕES DA GRID (7 OPÇÕES TOTAIS COM FORMULÁRIOS DE SEGURANÇA) 🔥
+        # 🔥 BLOCO DE BOTÕES DA GRID 🔥
         with box_botoes.container():
             col_b1, col_b2, col_b3, col_b4, col_b5, col_b6, col_b7 = st.columns(7)
             
@@ -1237,7 +1237,6 @@ elif menu == "📥 Importações":
                     for col in df_limpo.columns: 
                         df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
                         
-                    # 🔥 LÓGICA DE MAPEAMENTO CORRIGIDA E BLINDADA PARA A COLUNA Nº 🔥
                     mapa = {}
                     for c in df_limpo.columns:
                         c_upper = str(c).upper().strip()
@@ -1266,6 +1265,9 @@ elif menu == "📥 Importações":
                         if c not in df_limpo.columns: 
                             df_limpo[c] = ""
                             
+                    # 🔥 TRAVA DE SEGURANÇA: IGNORA QUALQUER ID/PEDIDO DO CLIENTE E FORÇA VAZIO 🔥
+                    df_limpo['PEDIDO'] = ""
+                        
                     for idx, row in df_limpo.iterrows():
                         e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
                         if e and (not n or not b):
@@ -1309,7 +1311,7 @@ elif menu == "📥 Importações":
                 logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                 
                 for idx, row in df_err.iterrows():
-                    st.markdown(f"**Cód:** {row['PEDIDO']} | **Local:** {row['LABORATORIO']} | **Cidade:** {row['CIDADE']}")
+                    st.markdown(f"**Local:** {row['LABORATORIO']} | **Cidade:** {row['CIDADE']}")
                     correcoes[idx] = st.selectbox(f"Motorista:", ["Selecione..."] + logins_disp, key=f"fix_mot_{idx}")
                     
                 if st.form_submit_button("💾 Validar", type="primary"):
