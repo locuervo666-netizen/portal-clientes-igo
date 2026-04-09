@@ -227,7 +227,7 @@ def carregar_dados_completos(_planilha):
 
 planilha_db = conectar_banco()
 DF_AGENTES = carregar_dados_agentes(planilha_db)
-CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE"]
+CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE","ECOLYZER"]
 FERIADOS_BR = holidays.Brazil()
 hoje_br = datetime.now(FUSO_BR).date() 
 
