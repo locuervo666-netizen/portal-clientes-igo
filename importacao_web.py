@@ -95,7 +95,7 @@ if not st.session_state.autenticado:
     st.stop()
 
 # =============================================================================
-# 🔗 2. CONEXÃO
+# 🔗 2. CONEXÃO E DICIONÁRIOS
 # =============================================================================
 @st.cache_resource
 def conectar_banco():
@@ -121,7 +121,23 @@ def conectar_banco():
 planilha_db = conectar_banco()
 CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
 
-# 🔥 ADICIONADO O CACHE AQUI PARA EVITAR O ERRO 'FUNCTION' OBJECT HAS NO ATTRIBUTE 'CLEAR' 🔥
+# 🔥 DICIONÁRIO DE LOGOS 🔥
+DICIONARIO_LOGOS = {
+    "CAEP": "https://ui-avatars.com/api/?name=CAEP&background=0D8ABC&color=fff&rounded=true",
+    "SAPIENS": "https://ui-avatars.com/api/?name=SAPIENS&background=F59E0B&color=fff&rounded=true",
+    "GRALAB": "https://ui-avatars.com/api/?name=GRALAB&background=10B981&color=fff&rounded=true",
+    "SYNVIA": "https://ui-avatars.com/api/?name=SYNVIA&background=8B5CF6&color=fff&rounded=true",
+    "INNOVATOX": "https://ui-avatars.com/api/?name=INNO&background=EF4444&color=fff&rounded=true",
+    "LABEST": "https://ui-avatars.com/api/?name=LAB&background=3B82F6&color=fff&rounded=true", 
+    "AIRLAB": "https://ui-avatars.com/api/?name=AIR&background=EC4899&color=fff&rounded=true",
+    "UNILABOR": "https://ui-avatars.com/api/?name=UNI&background=14B8A6&color=fff&rounded=true",
+    "SODRE": "https://ui-avatars.com/api/?name=SOD&background=F97316&color=fff&rounded=true",
+    "BRASILIENSE": "https://ui-avatars.com/api/?name=BRA&background=06B6D4&color=fff&rounded=true",
+    "SOUZA CRUZ": "https://ui-avatars.com/api/?name=SOUZA&background=1E3A8A&color=fff&rounded=true",
+    "HEXALIFE": "https://ui-avatars.com/api/?name=HEXA&background=059669&color=fff&rounded=true",
+    "ECOLYZER": "https://ui-avatars.com/api/?name=ECOLYZER&background=4F46E5&color=fff&rounded=true"
+}
+
 @st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
     if not _planilha: 
@@ -773,7 +789,7 @@ if menu == "📊 GRID":
         p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
 
-        # 🔥 BLOCO DE BOTÕES DA GRID 🔥
+        # 🔥 BLOCO DE BOTÕES DA GRID (7 OPÇÕES TOTAIS COM FORMULÁRIOS DE SEGURANÇA) 🔥
         with box_botoes.container():
             col_b1, col_b2, col_b3, col_b4, col_b5, col_b6, col_b7 = st.columns(7)
             
@@ -1221,17 +1237,28 @@ elif menu == "📥 Importações":
                     for col in df_limpo.columns: 
                         df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
                         
+                    # 🔥 LÓGICA DE MAPEAMENTO CORRIGIDA E BLINDADA PARA A COLUNA Nº 🔥
                     mapa = {}
                     for c in df_limpo.columns:
-                        cl = ''.join(e for e in unicodedata.normalize('NFKD', str(c).upper().strip()).encode('ASCII', 'ignore').decode('utf-8') if e.isalnum()) 
-                        if any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': mapa[c] = 'PEDIDO'
-                        elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): mapa[c] = 'LABORATORIO'
-                        elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): mapa[c] = 'ENDERECO'
-                        elif any(x in cl for x in ['NUM', 'NRO']) or cl in ['N', 'NO']: mapa[c] = 'NUMERO'
-                        elif 'BAIRRO' in cl: mapa[c] = 'BAIRRO'
-                        elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa[c] = 'CIDADE'
-                        elif any(x in cl for x in ['ESTADO', 'UF']): mapa[c] = 'UF'
-                        elif 'CEP' in cl: mapa[c] = 'CEP'
+                        c_upper = str(c).upper().strip()
+                        cl = ''.join(e for e in unicodedata.normalize('NFKD', c_upper).encode('ASCII', 'ignore').decode('utf-8') if e.isalnum()) 
+                        
+                        if c_upper in ['Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in ['N', 'NO', 'NR', 'NUM', 'NUMERO']: 
+                            mapa[c] = 'NUMERO'
+                        elif any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': 
+                            mapa[c] = 'PEDIDO'
+                        elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): 
+                            mapa[c] = 'LABORATORIO'
+                        elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): 
+                            mapa[c] = 'ENDERECO'
+                        elif 'BAIRRO' in cl: 
+                            mapa[c] = 'BAIRRO'
+                        elif any(x in cl for x in ['CIDADE', 'MUNIC']): 
+                            mapa[c] = 'CIDADE'
+                        elif any(x in cl for x in ['ESTADO', 'UF']): 
+                            mapa[c] = 'UF'
+                        elif 'CEP' in cl: 
+                            mapa[c] = 'CEP'
                             
                     df_limpo.rename(columns=mapa, inplace=True)
                     
@@ -1785,7 +1812,6 @@ elif menu == "⚙️ Rotas":
         if not DF_AGENTES.empty:
             agente_filtro = st.selectbox("👤 Selecione o Motorista para gerenciar:", sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()))
             
-            # 🔥 NOVA SESSÃO PARA EDITAR O MOTORISTA (NOME E TELEFONE) 🔥
             dados_atuais_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
             with st.expander("✏️ Editar Cadastro (Nome / Telefone)"):
                 with st.form(f"form_edit_{agente_filtro}"):
