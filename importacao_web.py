@@ -601,9 +601,9 @@ def gerar_excel_memoria(df):
     return output.getvalue()
 
 def obter_proximo_id(df):
-    if df is None or df.empty or 'PEDIDO' not in df.columns: return 100000
-    try: return int(df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().astype(int).max()) + 1 if not df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().empty else 100000
-    except Exception: return 100000
+    if df is None or df.empty or 'PEDIDO' not in df.columns: return 1
+    try: return int(df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().astype(int).max()) + 1 if not df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().empty else 1
+    except Exception: return 1
 
 def calc_status_display(row):
     status_final, previsao = str(row.get('STATUS', '')).strip().upper(), str(row.get('DATA_LIMITE', '')).strip()
