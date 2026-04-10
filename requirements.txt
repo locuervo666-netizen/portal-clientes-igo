@@ -6,3 +6,5 @@ streamlit-aggrid
 fpdf
 holidays
 xlsxwriter
+requests
+google-auth
