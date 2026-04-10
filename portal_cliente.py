@@ -43,7 +43,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 🔥 AQUI ESTÁ A MUDANÇA: A logo da LABEST agora aponta para o arquivo local no GitHub!
 CLIENTES_CONFIG = {
     "GRALAB": {"senha": "123", "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png", "filtro": "GRALAB"},
     "IGO_LOGISTICA": {"senha": "admin", "logo": LOGO_IGO, "filtro": "TODOS"},
@@ -51,7 +50,7 @@ CLIENTES_CONFIG = {
 }
 
 # =======================================================
-# 🔗 2. MOTOR DE DADOS (CLONE EXATO DO C.C.O)
+# 🔗 2. MOTOR DE DADOS
 # =======================================================
 @st.cache_resource
 def conectar_banco_seguro():
@@ -60,19 +59,13 @@ def conectar_banco_seguro():
         import json
         import os
         from google.oauth2.credentials import Credentials
-        
         token_str = os.environ.get("google_token_json")
-        
         if not token_str:
-            try:
-                token_str = st.secrets.get("google_token_json")
-            except Exception:
-                pass
-                
+            try: token_str = st.secrets.get("google_token_json")
+            except: pass
         if not token_str:
             st.error("⚠️ Senha do Google não detectada no Render.")
             return None
-            
         token_info = json.loads(token_str)
         creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
         gc = gspread.authorize(creds)
@@ -140,7 +133,7 @@ if not st.session_state.logado:
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.image(LOGO_IGO, width=110)
+            st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=110)
             u = st.text_input("👤 Usuário").upper().strip()
             s = st.text_input("🔒 Senha", type="password")
             if st.button("🚀 Acessar Sistema", type="primary", use_container_width=True):
@@ -154,40 +147,28 @@ else:
     conf = CLIENTES_CONFIG[st.session_state.cliente]
     hoje_br = datetime.now(FUSO_BR).date()
     
-    # 🎯 ESTRUTURA DA SIDEBAR INTELIGENTE (Botão Sair fixado no final)
     with st.sidebar:
-        # Usa try/except para evitar tela branca caso a imagem não seja encontrada
-        try:
-            st.image(conf["logo"], width=160)
-        except:
-            st.markdown(f"### {st.session_state.cliente}")
+        try: st.image(conf["logo"], width=160)
+        except: st.markdown(f"### {st.session_state.cliente}")
             
         st.divider()
-        
-        # Datas sempre aparecem
         datas_sel = st.date_input("🗓️ Período:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY")
-        
-        # Caixas reservadas para os filtros e botões que dependem dos dados
         holder_cidades = st.empty()
         st.divider()
         holder_exportar = st.empty()
         
-        # Espaçamento gigante para empurrar o botão de SAIR para o rodapé
         st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
-        
         if st.button("🚪 Sair do Sistema", use_container_width=True): 
             st.session_state.logado = False
             st.rerun()
             
     st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:22px;">Monitoramento Logístico | {st.session_state.cliente}</h2><div class='sync-status'>🟢 Online: {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
 
-    # Carrega os dados com segurança
     df_raw = carregar_dados_nuvem()
     
     if df_raw.empty:
         st.info("Aguardando novas informações do C.C.O na base de dados...")
     else:
-        # Filtra apenas os dados do cliente logado
         if conf["filtro"] == "TODOS":
             df_cliente = df_raw.copy()
         else:
@@ -199,11 +180,10 @@ else:
         if df_cliente.empty:
             st.warning(f"Nenhum pedido ou lote foi registrado no sistema sob a titularidade '{conf['filtro']}' até o momento.")
         else:
-            # Preenche o Filtro de Cidades na Sidebar
             with holder_cidades:
                 cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
 
-            # Funções de Status e Fotos
+            # 🔥 Funções de Status, Fotos e DETALHES/OBSERVAÇÕES
             def get_st(row):
                 s = str(row.get('A_ST', row.get('STATUS', ''))).upper()
                 if 'ENTREGUE' in s: return '✅ Entregue'
@@ -213,6 +193,15 @@ else:
             
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
             
+            # Puxa o motivo da frustração (Observações do App ou do Banco)
+            def get_detalhes(row):
+                obs = str(row.get('A_OB', row.get('OBSERVACOES', ''))).strip()
+                if obs and obs.upper() != 'NAN':
+                    return obs
+                return "-"
+                
+            df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
+            
             def tratar_link_foto(x):
                 x_str = str(x).strip()
                 if not x_str or x_str.upper() in ['NAN', 'NONE']: return ""
@@ -221,7 +210,6 @@ else:
                 
             df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(tratar_link_foto)
 
-            # LÓGICA DE FILTROS NA TELA PRINCIPAL
             df_f = df_cliente.copy()
             if isinstance(datas_sel, (tuple, list)) and len(datas_sel) == 2:
                 df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
@@ -229,7 +217,6 @@ else:
             if cidades_sel: 
                 df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
-            # KPIs
             ck = st.columns(5)
             def set_kpi(v): st.session_state.filtro_kpi = v
             n_tot_k = len(df_f)
@@ -243,7 +230,6 @@ else:
             with ck[3]: st.button(f"🚨 ATRASADOS\n\n{n_atr_k}", key="kpi_atra", use_container_width=True)
             with ck[4]: st.button(f"📅 HOJE\n\n{len(df_f[df_f['DATA_OBJ'] == hoje_br])}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
-            # PROGRESSO
             st.markdown("<br>🎯 **Progresso de Hoje**", unsafe_allow_html=True)
             df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
             if not df_h.empty:
@@ -252,7 +238,6 @@ else:
             else: 
                 st.info("Nenhum pedido despachado para hoje.")
 
-            # BUSCA E PREPARAÇÃO DA TABELA
             st.markdown("<br>", unsafe_allow_html=True)
             busca = st.text_input("🔎 Busca Rápida:", placeholder="Buscar por pedido, laboratório, cidade...")
             
@@ -267,7 +252,8 @@ else:
                 df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
             if not df_grid.empty:
-                cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'FOTO_URL']
+                # 🔥 Coluna DETALHES adicionada antes da Foto!
+                cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DETALHES', 'FOTO_URL']
                 df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
                 
                 for col in df_final.columns: 
@@ -276,27 +262,24 @@ else:
                 df_final['COMPROVANTE'] = df_final['FOTO_URL'].apply(lambda x: x if str(x).startswith("http") else "")
                 df_final.drop(columns=['FOTO_URL'], inplace=True, errors='ignore')
 
-                st.markdown("<p style='font-size:13px; color:#64748B;'>Clique no link da coluna FOTO para abrir o comprovante original em uma nova aba do seu navegador.</p>", unsafe_allow_html=True)
-
-                # 🔥 TABELA NATIVA DO CLIENTE (Nomes Ajustados e Abertura em Nova Aba) 🔥
                 st.data_editor(
                     df_final,
                     column_config={
                         "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
-                        "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Abrir Foto"),
+                        "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large"),
+                        "COMPROVANTE": st.column_config.LinkColumn("COMPROVANTE", display_text="🔎 Abrir Foto"),
                         "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
                         "DATA": st.column_config.TextColumn("DATA PEDIDO"),
                         "PEDIDO": st.column_config.TextColumn("PEDIDO"),
                         "LABORATORIO": st.column_config.TextColumn("PCL"),
                         "CIDADE": st.column_config.TextColumn("CIDADE")
                     },
-                    disabled=True, # Toda a tabela é bloqueada para edição do cliente
+                    disabled=True, 
                     hide_index=True,
                     use_container_width=True,
                     height=500
                 )
 
-                # Preenche o Botão de Exportar na Sidebar
                 with holder_exportar:
                     csv = df_grid.to_csv(index=False, sep=';').encode('utf-8-sig')
                     st.download_button("📥 Exportar Planilha (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
