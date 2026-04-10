@@ -9,7 +9,7 @@ from streamlit_autorefresh import st_autorefresh
 from google.oauth2.credentials import Credentials
 
 FUSO_BR = timezone(timedelta(hours=-3))
-LOGO_IGO = "https://i.postimg.cc/d71mqWDx/IGO-LOGO.png"
+LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
 
 # =======================================================
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
@@ -43,10 +43,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# 🔥 AQUI ESTÁ A MUDANÇA: A logo da LABEST agora aponta para o arquivo local no GitHub!
 CLIENTES_CONFIG = {
     "GRALAB": {"senha": "123", "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png", "filtro": "GRALAB"},
-    "IGO_LOGISTICA": {"senha": "admin", "logo": "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", "filtro": "TODOS"},
-    "LOGISTICA.LABEST": {"senha": "123", "logo": "https://i.postimg.cc/mD8P8pGZ/LABEST-LOGO.png", "filtro": "LABEST"}
+    "IGO_LOGISTICA": {"senha": "admin", "logo": LOGO_IGO, "filtro": "TODOS"},
+    "LOGISTICA.LABEST": {"senha": "123", "logo": "logo_labest.png", "filtro": "LABEST"}
 }
 
 # =======================================================
@@ -139,7 +140,7 @@ if not st.session_state.logado:
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=110)
+            st.image(LOGO_IGO, width=110)
             u = st.text_input("👤 Usuário").upper().strip()
             s = st.text_input("🔒 Senha", type="password")
             if st.button("🚀 Acessar Sistema", type="primary", use_container_width=True):
@@ -155,7 +156,12 @@ else:
     
     # 🎯 ESTRUTURA DA SIDEBAR INTELIGENTE (Botão Sair fixado no final)
     with st.sidebar:
-        st.image(conf["logo"], width=160)
+        # Usa try/except para evitar tela branca caso a imagem não seja encontrada
+        try:
+            st.image(conf["logo"], width=160)
+        except:
+            st.markdown(f"### {st.session_state.cliente}")
+            
         st.divider()
         
         # Datas sempre aparecem
