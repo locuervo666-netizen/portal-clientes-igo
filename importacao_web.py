@@ -28,9 +28,13 @@ FUSO_BR = timezone(timedelta(hours=-3))
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS Limpo (Sem a barra inferior que ocupava espaço)
 st.markdown("""
     <style>
+    /* 🔥 MÁGICA AQUI: Força a setinha da Sidebar a NUNCA sumir 🔥 */
+    header { background-color: transparent !important; }
+    [data-testid="collapsedControl"] { display: flex !important; visibility: visible !important; z-index: 999999 !important; }
+    
+    /* Oculta as ferramentas indesejadas do Streamlit */
     [data-testid="stToolbar"], .stAppDeployButton, .stDeployButton, #MainMenu, footer { display: none !important; }
     .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
