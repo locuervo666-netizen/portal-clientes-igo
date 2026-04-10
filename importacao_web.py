@@ -95,23 +95,17 @@ if not st.session_state.autenticado:
     st.stop()
 
 # =============================================================================
-# 🔗 2. CONEXÃO
+# 🔗 2. CONEXÃO (Versão Atualizada Render)
 # =============================================================================
 @st.cache_resource
 def conectar_banco():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     try:
-        caminho_windows = r"C:\Users\elcic\IGO_Logistica_Sistema"
-        cred_win = os.path.join(caminho_windows, "credentials.json")
-        token_win = os.path.join(caminho_windows, "token.json")
-        if os.path.exists(cred_win):
-            gc = gspread.oauth(credentials_filename=cred_win, authorized_user_filename=token_win)
-            return gc.open("DB_IGO_Logistica")
-        elif "google_token_json" in st.secrets:
+        if "google_token_json" in st.secrets:
             import json
             from google.oauth2.credentials import Credentials
             token_info = json.loads(st.secrets["google_token_json"])
-            creds = Credentials.from_authorized_user_info(token_info, scopes)
+            creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
             gc = gspread.authorize(creds)
             return gc.open("DB_IGO_Logistica")
     except Exception as e:
@@ -279,7 +273,7 @@ def despachar_para_appsheet(lista_pedidos_dicts):
                 str(uuid.uuid4())[:8].upper(),    
                 str(p.get('PEDIDO','')),          
                 mot,                              
-                "PENDENTE",                       
+                "PENDENTE",                        
                 str(p.get('ENDERECO','')),        
                 str(p.get('NUMERO','')),          
                 str(p.get('BAIRRO','')),          
