@@ -18,7 +18,7 @@ import uuid
 import base64
 from streamlit_autorefresh import st_autorefresh
 from fpdf import FPDF
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 FUSO_BR = timezone(timedelta(hours=-3))
 
@@ -656,7 +656,7 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
     return pdf_bytes
 
 # =============================================================================
-# 📊 MÓDULO GRID PRINCIPAL (COM AGGRID ESTILIZADO E FOTO EMBUTIDA)
+# 📊 MÓDULO GRID PRINCIPAL (COM AGGRID BLINDADO E 100% PYTHON)
 # =============================================================================
 if 'filtro_kpi_admin' not in st.session_state: 
     st.session_state.filtro_kpi_admin = "TODOS"
@@ -754,13 +754,17 @@ if menu == "📊 GRID":
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Clique em qualquer lugar da linha para selecionar.</p>", unsafe_allow_html=True)
         box_botoes = st.empty()
 
-        # 🔥 O RETORNO DO AGGRID (AGREED) BLINDADO E ESTILIZADO 🔥
+        # 🔥 O RETORNO DO AGGRID (AGREED) 100% PYTHONICO E SEGURO 🔥
         df_aggrid = df_grid_final.copy()
         
-        gb = GridOptionsBuilder.from_dataframe(df_aggrid)
+        # MÁGICA: Em vez de usar Javascript (que quebra a tela), preparamos a coluna de foto direto no Python!
+        df_aggrid['LINK_OCULTO'] = df_aggrid['COMPROVANTE']
+        df_aggrid['COMPROVANTE'] = df_aggrid['COMPROVANTE'].apply(lambda x: '📷 Abrir Foto' if str(x).startswith('http') else '')
+        
+        gb = GridOptionsBuilder.from_dataframe(df_aggrid.drop(columns=['LINK_OCULTO']))
         gb.configure_default_column(filterable=True, sortable=True, resizable=True)
         
-        # Habilita a seleção clicando em qualquer lugar da linha
+        # Seleção ao clicar na linha
         gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True, rowMultiSelectWithClick=True)
         gb.configure_pagination(paginationAutoPageSize=True) 
         
@@ -773,25 +777,18 @@ if menu == "📊 GRID":
             ]
         })
         
-        # Coluna de Câmera com a tag JsCode correta
-        gb.configure_column("COMPROVANTE", header_name="FOTO", cellRenderer=JsCode('''function(params) {
-            if (params.value && params.value.startsWith('http')) {
-                return '📷 Ver';
-            }
-            return '';
-        }'''))
+        gb.configure_column("COMPROVANTE", header_name="FOTO")
 
         gridOptions = gb.build()
 
         resposta_aggrid = AgGrid(
-            df_aggrid,
+            df_aggrid.drop(columns=['LINK_OCULTO']),
             gridOptions=gridOptions,
             update_mode=GridUpdateMode.SELECTION_CHANGED, 
             data_return_mode=DataReturnMode.AS_INPUT,
             fit_columns_on_grid_load=False, 
-            theme='alpine', 
-            height=450,
-            allow_unsafe_jscode=True
+            theme='balham', # O Balham tem as cores intercaladas cinza e branco nativamente
+            height=450
         )
 
         linhas_selecionadas_aggrid = resposta_aggrid['selected_rows']
@@ -811,7 +808,10 @@ if menu == "📊 GRID":
 
         # 🔥 VISUALIZADOR DE FOTOS EMBUTIDO 🔥
         if tem_sel:
-            selecionados_com_foto = linhas_selecionadas[linhas_selecionadas["COMPROVANTE"].astype(str).str.startswith("http")]
+            pedidos_selecionados = linhas_selecionadas['PEDIDO'].tolist()
+            selecionados_com_foto = df_aggrid[df_aggrid['PEDIDO'].isin(pedidos_selecionados)]
+            selecionados_com_foto = selecionados_com_foto[selecionados_com_foto["LINK_OCULTO"].astype(str).str.startswith("http")]
+            
             if not selecionados_com_foto.empty:
                 st.markdown("<h4 style='color:#0F172A; margin-top: 10px;'>📸 Comprovantes Selecionados</h4>", unsafe_allow_html=True)
                 cols_fotos = st.columns(min(len(selecionados_com_foto), 4)) 
@@ -820,8 +820,8 @@ if menu == "📊 GRID":
                     with cols_fotos[col_idx]:
                         with st.container(border=True):
                             st.markdown(f"**Pedido:** {row['PEDIDO']}")
-                            st.image(row["COMPROVANTE"], use_container_width=True)
-                            st.markdown(f"<div style='text-align:center;'><a href='{row['COMPROVANTE']}' target='_blank' style='text-decoration:none; color:#0284C7; font-weight:bold;'>🔗 Ampliar Original</a></div>", unsafe_allow_html=True)
+                            st.image(row["LINK_OCULTO"], use_container_width=True)
+                            st.markdown(f"<div style='text-align:center;'><a href='{row['LINK_OCULTO']}' target='_blank' style='text-decoration:none; color:#0284C7; font-weight:bold;'>🔗 Ampliar Original</a></div>", unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
 
         # 🔥 BLOCO DE BOTÕES DA GRID (7 OPÇÕES TOTAIS COM FORMULÁRIOS DE SEGURANÇA) 🔥
