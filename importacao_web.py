@@ -18,7 +18,7 @@ import uuid
 import base64
 from streamlit_autorefresh import st_autorefresh
 from fpdf import FPDF
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
 
@@ -760,7 +760,7 @@ if menu == "📊 GRID":
         gb = GridOptionsBuilder.from_dataframe(df_aggrid)
         gb.configure_default_column(filterable=True, sortable=True, resizable=True)
         
-        # Habilita a seleção clicando em qualquer lugar da linha (sem precisar ser só na caixinha)
+        # Habilita a seleção clicando em qualquer lugar da linha
         gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True, rowMultiSelectWithClick=True)
         gb.configure_pagination(paginationAutoPageSize=True) 
         
@@ -773,32 +773,23 @@ if menu == "📊 GRID":
             ]
         })
         
-        # Coluna de Câmera (Mostra o ícone se tiver foto)
-        gb.configure_column("COMPROVANTE", header_name="FOTO", cellRenderer='''function(params) {
+        # Coluna de Câmera com a tag JsCode correta
+        gb.configure_column("COMPROVANTE", header_name="FOTO", cellRenderer=JsCode('''function(params) {
             if (params.value && params.value.startsWith('http')) {
                 return '📷 Ver';
             }
             return '';
-        }''')
+        }'''))
 
         gridOptions = gb.build()
-
-        # CSS customizado para a famosa Zebra (Cinza e Branco intercalados) e cabeçalhos bonitos
-        custom_css = {
-            ".ag-row-hover": {"background-color": "#E2E8F0 !important"},
-            ".ag-row-odd": {"background-color": "#F8FAFC !important"},
-            ".ag-row-even": {"background-color": "#FFFFFF !important"},
-            ".ag-header-cell-label": {"font-weight": "bold", "color": "#0F172A"}
-        }
 
         resposta_aggrid = AgGrid(
             df_aggrid,
             gridOptions=gridOptions,
-            custom_css=custom_css,
             update_mode=GridUpdateMode.SELECTION_CHANGED, 
             data_return_mode=DataReturnMode.AS_INPUT,
             fit_columns_on_grid_load=False, 
-            theme='alpine', # Tema moderno que combina com as margens da tela
+            theme='alpine', 
             height=450,
             allow_unsafe_jscode=True
         )
