@@ -105,18 +105,22 @@ def conectar_banco():
         import os
         from google.oauth2.credentials import Credentials
         
+        # 1. Tenta ler a senha do painel do Render
         token_str = os.environ.get("google_token_json")
         
+        # 2. Se não achar, tenta o padrão antigo do Streamlit com segurança (sem dar tela vermelha)
         if not token_str:
             try:
                 token_str = st.secrets.get("google_token_json")
             except Exception:
                 pass
                 
+        # 3. Se a senha realmente não existir em nenhum lugar, exibe aviso amigável
         if not token_str:
-            st.error("⚠️ Senha do Google não detectada. Vá no painel do Render > Environment Variables, confirme se a chave 'google_token_json' está lá.")
+            st.error("⚠️ Senha do Google não detectada. Vá no painel do Render > Environment Variables, confirme se a chave 'google_token_json' está lá, clique em 'Save Changes' e depois em 'Manual Deploy'.")
             return None
             
+        # 4. Faz a conexão
         token_info = json.loads(token_str)
         creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
         gc = gspread.authorize(creds)
@@ -128,7 +132,6 @@ def conectar_banco():
 
 planilha_db = conectar_banco()
 CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
-
 @st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
     if not _planilha: 
@@ -446,7 +449,7 @@ def gerar_excel_memoria(df):
                 worksheet.set_column(i, i, min(max(df[col].astype(str).map(len).max(), len(str(col))) + 2, 40))
     return output.getvalue()
 
-# 🔥 CONSTRUTOR DE EXCEL PARA WHATSAPP 🔥
+# 🔥 CONSTRUTOR DE EXCEL PARA WHATSAPP (MULTIPLAS ABAS BLINDADO) 🔥
 def gerar_excel_rota_whatsapp(df_agente):
     output = io.BytesIO()
     df_xls = df_agente.copy()
@@ -537,7 +540,7 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
         pdf.set_font("Arial", "B", 9)
         pdf.cell(0, 6, f"CIDADE: {cidade_nome}", 1, 1, "L", True)
         
-        grouped_bairro = group_bai = group_cid.groupby('BAIRRO')
+        grouped_bairro = group_cid.groupby('BAIRRO')
         for bairro, group_bai in grouped_bairro:
             bairro_nome = padronizar_texto(str(bairro))
             
@@ -754,7 +757,6 @@ if menu == "📊 GRID":
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione as caixinhas na tabela para liberar os botões.</p>", unsafe_allow_html=True)
         box_botoes = st.empty()
 
-        # 🔥 TABELA NATIVA (O Retorno da Estabilidade) 🔥
         tabela_renderizada = st.data_editor(
             df_grid_final,
             column_config={
