@@ -5,7 +5,6 @@ import os
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
-from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/d71mqWDx/IGO-LOGO.png"
@@ -49,31 +48,45 @@ CLIENTES_CONFIG = {
 }
 
 # =======================================================
-# 🔗 2. MOTOR DE DADOS
+# 🔗 2. MOTOR DE DADOS (Conexão Blindada Render)
 # =======================================================
 @st.cache_resource
-def conectar_banco_seguro():
+def conectar_banco():
+    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     try:
-        caminho_windows = os.path.join(os.path.expanduser("~"), "IGO_Logistica_Sistema")
-        cred_win = os.path.join(caminho_windows, "credentials.json")
-        token_win = os.path.join(caminho_windows, "token.json")
-        if os.path.exists(cred_win) and os.path.exists(token_win):
-            return gspread.oauth(credentials_filename=cred_win, authorized_user_filename=token_win)
-        elif "google_cred_json" in st.secrets and "google_token_json" in st.secrets:
-            with open("cred_temp.json", "w", encoding="utf-8") as f: f.write(st.secrets["google_cred_json"])
-            with open("token_temp.json", "w", encoding="utf-8") as f: f.write(st.secrets["google_token_json"])
-            return gspread.oauth(credentials_filename="cred_temp.json", authorized_user_filename="token_temp.json")
-        return None
-    except: return None
+        import json
+        import os
+        from google.oauth2.credentials import Credentials
+        
+        # Lê a senha do painel do Render
+        token_str = os.environ.get("google_token_json")
+        
+        if not token_str:
+            try: token_str = st.secrets.get("google_token_json")
+            except: pass
+                
+        if not token_str:
+            st.error("⚠️ Senha do Google não detectada no Render.")
+            return None
+            
+        token_info = json.loads(token_str)
+        creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
+        gc = gspread.authorize(creds)
+        return gc.open("DB_IGO_Logistica")
+        
+    except Exception as e:
+        st.error(f"Erro na leitura da chave: {e}")
+    return None
 
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
     try:
-        gc = conectar_banco_seguro()
+        gc = conectar_banco()
         if not gc: return pd.DataFrame()
         planilha = gc.open("DB_IGO_Logistica")
         aba_m = planilha.worksheet("Memoria_Sistema")
         dados_m = aba_m.get_all_values()
+        
         if len(dados_m) > 1:
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
@@ -181,25 +194,65 @@ else:
             else: st.info("Nenhum pedido para hoje.")
 
             # BUSCA E GRID
+            st.markdown("<br>", unsafe_allow_html=True)
             busca = st.text_input("🔎 Busca Rápida:", placeholder="Pedido, laboratório, cidade...")
+            
             df_grid = df_f.copy()
-            if st.session_state.filtro_kpi == "ENTREGUE": df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue')]
+            if st.session_state.filtro_kpi != "TODOS":
+                if st.session_state.filtro_kpi == "HOJE":
+                    df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
+                else:
+                    df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False)]
+            
             if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
             if not df_grid.empty:
                 df_grid['STATUS'] = df_grid['STATUS_DISPLAY']
                 cols = ['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'FOTO_URL']
-                df_final = df_grid[[c for c in cols if c in df_grid.columns]]
+                df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
                 
-                gb = GridOptionsBuilder.from_dataframe(df_final)
-                gb.configure_default_column(resizable=True, sortable=True, minWidth=100)
-                
-                status_js = JsCode("""function(params) { let v = params.value || ''; if (v.includes('Entregue')) return {'backgroundColor': 'rgba(16, 185, 129, 0.15)', 'color': '#10B981', 'fontWeight': '900'}; if (v.includes('Frustrada')) return {'backgroundColor': 'rgba(239, 68, 68, 0.15)', 'color': '#EF4444', 'fontWeight': '900'}; return {'fontWeight': 'bold'}; }""")
-                foto_js = JsCode("""class FotoRenderer { init(params) { this.eGui = document.createElement('div'); this.eGui.style.textAlign = 'center'; if (params.value && params.value.includes('http')) { let b = document.createElement('span'); b.innerHTML = '📸'; b.style.cursor='pointer'; b.onclick = () => { let m = document.createElement('div'); Object.assign(m.style, {position:'fixed', zIndex:'9999999', left:0, top:0, width:'100vw', height:'100vh', backgroundColor:'rgba(0,0,0,0.85)', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', cursor:'zoom-out'}); let i = document.createElement('img'); i.src = params.value; Object.assign(i.style, {maxWidth:'90%', maxHeight:'85%', borderRadius:'8px', boxShadow:'0 4px 20px rgba(0,0,0,0.5)', objectFit:'contain'}); m.appendChild(i); m.onclick = () => document.body.removeChild(m); document.body.appendChild(m); }; this.eGui.appendChild(b); } else { this.eGui.innerHTML = '➖'; } } getGui() { return this.eGui; } }""")
-                
-                gb.configure_column("STATUS", cellStyle=status_js)
-                gb.configure_column("FOTO_URL", headerName="FOTO", cellRenderer=foto_js, width=80)
-                AgGrid(df_final, gridOptions=gb.build(), allow_unsafe_jscode=True, theme='alpine', height=550)
+                # Prepara os dados e adiciona a coluna de seleção
+                for col in df_final.columns: 
+                    df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
+                df_final['COMPROVANTE'] = df_final['FOTO_URL'].apply(lambda x: x if str(x).startswith("http") else "")
+                df_final.drop(columns=['FOTO_URL'], inplace=True)
+                df_final.insert(0, "SELECIONAR", False)
+
+                st.markdown("<p style='font-size:13px; color:#64748B;'>Selecione a caixinha do pedido para visualizar a foto do comprovante de entrega.</p>", unsafe_allow_html=True)
+
+                # 🔥 TABELA NATIVA (O Retorno da Estabilidade) 🔥
+                tabela_renderizada = st.data_editor(
+                    df_final,
+                    column_config={
+                        "SELECIONAR": st.column_config.CheckboxColumn("✔ VER FOTO", default=False),
+                        "STATUS": st.column_config.TextColumn("STATUS DA ENTREGA"),
+                        "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Abrir Link"),
+                        "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
+                        "DATA": st.column_config.TextColumn("EMBARQUE"),
+                        "PEDIDO": st.column_config.TextColumn("PEDIDO"),
+                        "LABORATORIO": st.column_config.TextColumn("PONTO DE COLETA"),
+                        "CIDADE": st.column_config.TextColumn("CIDADE")
+                    },
+                    disabled=[c for c in df_final.columns if c != "SELECIONAR"],
+                    hide_index=True,
+                    use_container_width=True,
+                    height=500
+                )
+
+                # 🔥 VISUALIZADOR DE FOTOS EMBUTIDO PARA O CLIENTE 🔥
+                linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
+                if not linhas_selecionadas.empty:
+                    selecionados_com_foto = linhas_selecionadas[linhas_selecionadas["COMPROVANTE"].astype(str).str.startswith("http")]
+                    if not selecionados_com_foto.empty:
+                        st.markdown("<h4 style='color:#0F172A; margin-top: 15px;'>📸 Comprovantes de Entrega Selecionados</h4>", unsafe_allow_html=True)
+                        cols_fotos = st.columns(min(len(selecionados_com_foto), 4)) 
+                        for i, (_, row) in enumerate(selecionados_com_foto.iterrows()):
+                            with cols_fotos[i % 4]:
+                                with st.container(border=True):
+                                    st.markdown(f"**Pedido:** {row['PEDIDO']}")
+                                    st.image(row["COMPROVANTE"], use_container_width=True)
+                                    st.markdown(f"<div style='text-align:center;'><a href='{row['COMPROVANTE']}' target='_blank' style='text-decoration:none; color:#0284C7; font-weight:bold;'>🔗 Ampliar Original</a></div>", unsafe_allow_html=True)
+                        st.markdown("<br>", unsafe_allow_html=True)
 
             # SIDEBAR FINAL
             with st.sidebar:
