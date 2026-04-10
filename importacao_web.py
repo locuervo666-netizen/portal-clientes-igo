@@ -106,18 +106,22 @@ def conectar_banco():
         import os
         from google.oauth2.credentials import Credentials
         
+        # 1. Tenta ler a senha do painel do Render
         token_str = os.environ.get("google_token_json")
         
+        # 2. Se não achar, tenta o padrão antigo do Streamlit com segurança
         if not token_str:
             try:
                 token_str = st.secrets.get("google_token_json")
             except Exception:
                 pass
                 
+        # 3. Se a senha não existir, exibe aviso amigável
         if not token_str:
             st.error("⚠️ Senha do Google não detectada. Vá no painel do Render > Environment Variables, confirme se a chave 'google_token_json' está lá.")
             return None
             
+        # 4. Faz a conexão
         token_info = json.loads(token_str)
         creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
         gc = gspread.authorize(creds)
@@ -538,7 +542,7 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
         pdf.set_font("Arial", "B", 9)
         pdf.cell(0, 6, f"CIDADE: {cidade_nome}", 1, 1, "L", True)
         
-        grouped_bairro = group_bai = group_cid.groupby('BAIRRO')
+        grouped_bairro = group_cid.groupby('BAIRRO')
         for bairro, group_bai in grouped_bairro:
             bairro_nome = padronizar_texto(str(bairro))
             
@@ -656,7 +660,7 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
     return pdf_bytes
 
 # =============================================================================
-# 📊 MÓDULO GRID PRINCIPAL (COM AGGRID ESTILIZADO E FOTO EMBUTIDA)
+# 📊 MÓDULO GRID PRINCIPAL (COM AGGRID RESSUSCITADO)
 # =============================================================================
 if 'filtro_kpi_admin' not in st.session_state: 
     st.session_state.filtro_kpi_admin = "TODOS"
@@ -751,20 +755,18 @@ if menu == "📊 GRID":
         df_grid_final['COMPROVANTE'] = df_grid_final['COMPROVANTE'].apply(lambda x: x if str(x).startswith("http") else "")
         df_grid_final = df_grid_final.reset_index(drop=True)
 
-        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Clique em qualquer lugar da linha para selecionar.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione os pedidos usando as caixas da esquerda.</p>", unsafe_allow_html=True)
         box_botoes = st.empty()
 
-        # 🔥 O RETORNO DO AGGRID (AGREED) BLINDADO E ESTILIZADO 🔥
+        # 🔥 O RETORNO DO AGGRID (AGREED) BLINDADO 🔥
         df_aggrid = df_grid_final.copy()
         
         gb = GridOptionsBuilder.from_dataframe(df_aggrid)
         gb.configure_default_column(filterable=True, sortable=True, resizable=True)
-        
-        # Habilita a seleção clicando em qualquer lugar da linha (sem precisar ser só na caixinha)
-        gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True, rowMultiSelectWithClick=True)
+        gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
         gb.configure_pagination(paginationAutoPageSize=True) 
         
-        gb.configure_column("STATUS_DISPLAY", header_name="STATUS", cellStyle= {
+        gb.configure_column("STATUS_DISPLAY", cellStyle= {
             "styleConditions": [
                 {"condition": "value.includes('✅')", "style": {"color": "#059669", "fontWeight": "bold"}},
                 {"condition": "value.includes('❌')", "style": {"color": "#DC2626", "fontWeight": "bold"}},
@@ -773,32 +775,22 @@ if menu == "📊 GRID":
             ]
         })
         
-        # Coluna de Câmera (Mostra o ícone se tiver foto)
-        gb.configure_column("COMPROVANTE", header_name="FOTO", cellRenderer='''function(params) {
+        gb.configure_column("COMPROVANTE", cellRenderer='''function(params) {
             if (params.value && params.value.startsWith('http')) {
-                return '📷 Ver';
+                return '<a href="' + params.value + '" target="_blank">🔎 Ver Foto</a>';
             }
-            return '';
+            return params.value;
         }''')
 
         gridOptions = gb.build()
 
-        # CSS customizado para a famosa Zebra (Cinza e Branco intercalados) e cabeçalhos bonitos
-        custom_css = {
-            ".ag-row-hover": {"background-color": "#E2E8F0 !important"},
-            ".ag-row-odd": {"background-color": "#F8FAFC !important"},
-            ".ag-row-even": {"background-color": "#FFFFFF !important"},
-            ".ag-header-cell-label": {"font-weight": "bold", "color": "#0F172A"}
-        }
-
         resposta_aggrid = AgGrid(
             df_aggrid,
             gridOptions=gridOptions,
-            custom_css=custom_css,
             update_mode=GridUpdateMode.SELECTION_CHANGED, 
             data_return_mode=DataReturnMode.AS_INPUT,
             fit_columns_on_grid_load=False, 
-            theme='alpine', # Tema moderno que combina com as margens da tela
+            theme='balham', 
             height=450,
             allow_unsafe_jscode=True
         )
@@ -817,21 +809,6 @@ if menu == "📊 GRID":
             
         p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
-
-        # 🔥 VISUALIZADOR DE FOTOS EMBUTIDO 🔥
-        if tem_sel:
-            selecionados_com_foto = linhas_selecionadas[linhas_selecionadas["COMPROVANTE"].astype(str).str.startswith("http")]
-            if not selecionados_com_foto.empty:
-                st.markdown("<h4 style='color:#0F172A; margin-top: 10px;'>📸 Comprovantes Selecionados</h4>", unsafe_allow_html=True)
-                cols_fotos = st.columns(min(len(selecionados_com_foto), 4)) 
-                for i, (_, row) in enumerate(selecionados_com_foto.iterrows()):
-                    col_idx = i % 4
-                    with cols_fotos[col_idx]:
-                        with st.container(border=True):
-                            st.markdown(f"**Pedido:** {row['PEDIDO']}")
-                            st.image(row["COMPROVANTE"], use_container_width=True)
-                            st.markdown(f"<div style='text-align:center;'><a href='{row['COMPROVANTE']}' target='_blank' style='text-decoration:none; color:#0284C7; font-weight:bold;'>🔗 Ampliar Original</a></div>", unsafe_allow_html=True)
-                st.markdown("<br>", unsafe_allow_html=True)
 
         # 🔥 BLOCO DE BOTÕES DA GRID (7 OPÇÕES TOTAIS COM FORMULÁRIOS DE SEGURANÇA) 🔥
         with box_botoes.container():
