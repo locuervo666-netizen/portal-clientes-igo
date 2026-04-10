@@ -95,7 +95,7 @@ if not st.session_state.autenticado:
     st.stop()
 
 # =============================================================================
-# 🔗 2. CONEXÃO (Versão Definitiva Render)
+# 🔗 2. CONEXÃO (Versão Blindada Render)
 # =============================================================================
 @st.cache_resource
 def conectar_banco():
@@ -105,23 +105,33 @@ def conectar_banco():
         import os
         from google.oauth2.credentials import Credentials
         
-        # Procura a senha primeiro no Render (os.environ), depois tenta o antigo (st.secrets)
+        # 1. Tenta ler a senha do painel do Render
         token_str = os.environ.get("google_token_json")
-        if not token_str and "google_token_json" in st.secrets:
-            token_str = st.secrets["google_token_json"]
+        
+        # 2. Se não achar, tenta o padrão antigo do Streamlit com segurança (sem dar tela vermelha)
+        if not token_str:
+            try:
+                token_str = st.secrets.get("google_token_json")
+            except Exception:
+                pass
+                
+        # 3. Se a senha realmente não existir em nenhum lugar, exibe aviso amigável
+        if not token_str:
+            st.error("⚠️ Senha do Google não detectada. Vá no painel do Render > Environment Variables, confirme se a chave 'google_token_json' está lá, clique em 'Save Changes' e depois em 'Manual Deploy'.")
+            return None
             
-        if token_str:
-            token_info = json.loads(token_str)
-            creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
-            gc = gspread.authorize(creds)
-            return gc.open("DB_IGO_Logistica")
+        # 4. Faz a conexão
+        token_info = json.loads(token_str)
+        creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
+        gc = gspread.authorize(creds)
+        return gc.open("DB_IGO_Logistica")
+        
     except Exception as e:
-        st.error(f"Erro na conexão com o Banco: {e}")
+        st.error(f"Erro na leitura da chave: {e}")
     return None
 
 planilha_db = conectar_banco()
 CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
-
 @st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
     if not _planilha: 
