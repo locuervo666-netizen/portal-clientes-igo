@@ -27,28 +27,17 @@ FUSO_BR = timezone(timedelta(hours=-3))
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS CIRÚRGICO: Esconde as ferramentas da direita sem quebrar o botão de recolher (hambúrguer)
+# 🔥 CSS SEGURO: Sem mexer no header nativo do Streamlit! 🔥
 st.markdown("""
     <style>
-    /* 1. PROTEGE A SETA DE RECOLHER A BARRA LATERAL */
-    header { background-color: transparent !important; }
-    [data-testid="collapsedControl"] {
-        display: flex !important; 
-        visibility: visible !important; 
-        z-index: 999999 !important;
-    }
-    
-    /* 2. ESCONDE O LIXO DO STREAMLIT COM VISIBILITY (NÃO QUEBRA O LAYOUT) */
+    /* Oculta apenas o menu e rodapé padrão com segurança */
     #MainMenu { visibility: hidden !important; }
     footer { visibility: hidden !important; }
     .stAppDeployButton { display: none !important; }
-    [data-testid="stToolbar"] { visibility: hidden !important; }
     
-    /* 3. ESPAÇAMENTO DA TELA GERAL */
-    .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
+    .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
-    /* 4. BOTÕES KPI */
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
         border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
@@ -62,7 +51,6 @@ st.markdown("""
         color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
     }
     
-    /* 5. POPOVERS (BOTÕES DA TABELA) */
     div[data-testid="stPopover"] > button, button[kind="secondary"] {
         white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
     }
@@ -73,7 +61,6 @@ st.markdown("""
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
     .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
     
-    /* 6. BOTÃO DE SAIR CHAMATIVO NA SIDEBAR */
     div[data-testid="stSidebar"] button[kind="primary"] {
         background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%) !important;
         color: white !important;
@@ -679,10 +666,8 @@ with st.sidebar:
     st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=160)
     st.divider()
     
-    # Navegação limpa na lateral
     menu = st.radio("Navegação Operacional:", ["📊 GRID", "📝 Pedido Manual", "📥 Importações", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"])
     
-    # Empurrar o botão de sair para o fundo
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
@@ -759,11 +744,9 @@ if menu == "📊 GRID":
         if busca: 
             df_grid = df_grid[df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)]
 
-        # 🔥 Mapeando o Nome Amigável do Motorista
         dict_nomes_grid = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         df_grid['AGENTE_NOME'] = df_grid['AGENTE_RAW'].apply(lambda x: dict_nomes_grid.get(str(x).strip().lower(), str(x).upper()) if str(x).strip() else "")
 
-        # Movendo AGENTE_NOME para o final (antes do ID oculto)
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW']
         
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
@@ -807,11 +790,9 @@ if menu == "📊 GRID":
         p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
 
-        # 🔥 BLOCO DE BOTÕES DA GRID (7 OPÇÕES TOTAIS COM FORMULÁRIOS DE SEGURANÇA) 🔥
         with box_botoes.container():
             col_b1, col_b2, col_b3, col_b4, col_b5, col_b6, col_b7 = st.columns(7)
             
-            # 1. BOTÃO DE COBRANÇA
             with col_b1.popover("🛎️ Cobrar Agente", use_container_width=True):
                 if not tem_sel: 
                     st.warning("Selecione um pedido!")
@@ -836,7 +817,6 @@ if menu == "📊 GRID":
                                 else: 
                                     st.error(f"Telefone do agente {login_ag} não encontrado.")
 
-            # 2. BAIXA MANUAL
             with col_b2.popover("📲 Baixa Manual", use_container_width=True):
                 if not tem_sel: 
                     st.warning("Selecione um pedido!")
@@ -877,7 +857,6 @@ if menu == "📊 GRID":
                                     except Exception as e: 
                                         st.error(f"Erro: {e}")
 
-            # 3. TROCAR AGENTE
             with col_b3.popover("🔄 Trocar Agente", use_container_width=True):
                 if not tem_sel: 
                     st.warning("Selecione um pedido!")
@@ -922,7 +901,6 @@ if menu == "📊 GRID":
                                     except Exception as e: 
                                         st.error(f"Erro: {e}")
 
-            # 4. CLONAR PEDIDOS
             with col_b4.popover("👯 Clonar Pedidos", use_container_width=True):
                 if not tem_sel: 
                     st.warning("Selecione um pedido!")
@@ -982,7 +960,6 @@ if menu == "📊 GRID":
                                 except Exception as e: 
                                     st.error(f"Erro: {e}")
 
-            # 5. EXCLUIR
             with col_b5.popover("🗑️ Excluir", use_container_width=True):
                 if not tem_sel: 
                     st.warning("Selecione um pedido!")
@@ -1015,7 +992,6 @@ if menu == "📊 GRID":
                                     except Exception as e: 
                                         st.error(f"Erro: {e}")
 
-            # 🔥 6. DISPARO WHATSAPP DIRETO DA GRID 🔥
             with col_b6.popover("📱 Enviar WhatsApp", use_container_width=True):
                 if not tem_sel: 
                     st.warning("Selecione os pedidos na tabela!")
@@ -1106,7 +1082,6 @@ if menu == "📊 GRID":
                                     else:
                                         st.error("🚨 Nenhum envio realizado. Verifique os contatos.")
 
-            # 7. ATUALIZAR
             col_b7.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
 
 # =============================================================================
