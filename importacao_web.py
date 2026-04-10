@@ -27,19 +27,28 @@ FUSO_BR = timezone(timedelta(hours=-3))
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS Limpo e Seguro (Preserva a setinha e esconde só o lixo do Streamlit)
+# 🔥 CSS CIRÚRGICO: Esconde as ferramentas da direita sem quebrar o botão de recolher (hambúrguer)
 st.markdown("""
     <style>
-    /* Esconde as ferramentas de desenvolvedor do Streamlit */
-    [data-testid="stToolbar"], .stAppDeployButton, .stDeployButton, #MainMenu, footer { display: none !important; }
-    
-    /* Deixa o topo transparente mas mantém a setinha visível */
+    /* 1. PROTEGE A SETA DE RECOLHER A BARRA LATERAL */
     header { background-color: transparent !important; }
+    [data-testid="collapsedControl"] {
+        display: flex !important; 
+        visibility: visible !important; 
+        z-index: 999999 !important;
+    }
     
+    /* 2. ESCONDE O LIXO DO STREAMLIT COM VISIBILITY (NÃO QUEBRA O LAYOUT) */
+    #MainMenu { visibility: hidden !important; }
+    footer { visibility: hidden !important; }
+    .stAppDeployButton { display: none !important; }
+    [data-testid="stToolbar"] { visibility: hidden !important; }
+    
+    /* 3. ESPAÇAMENTO DA TELA GERAL */
     .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
-    /* Botões KPI */
+    /* 4. BOTÕES KPI */
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
         border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
@@ -53,7 +62,7 @@ st.markdown("""
         color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
     }
     
-    /* Popovers da Grid */
+    /* 5. POPOVERS (BOTÕES DA TABELA) */
     div[data-testid="stPopover"] > button, button[kind="secondary"] {
         white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
     }
@@ -64,7 +73,7 @@ st.markdown("""
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
     .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
     
-    /* Estilo exclusivo para o Botão de Sair Chamativo na Sidebar */
+    /* 6. BOTÃO DE SAIR CHAMATIVO NA SIDEBAR */
     div[data-testid="stSidebar"] button[kind="primary"] {
         background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%) !important;
         color: white !important;
