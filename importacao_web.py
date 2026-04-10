@@ -18,6 +18,7 @@ import uuid
 import base64
 from streamlit_autorefresh import st_autorefresh
 from fpdf import FPDF
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 FUSO_BR = timezone(timedelta(hours=-3))
 
@@ -108,16 +109,16 @@ def conectar_banco():
         # 1. Tenta ler a senha do painel do Render
         token_str = os.environ.get("google_token_json")
         
-        # 2. Se não achar, tenta o padrão antigo do Streamlit com segurança (sem dar tela vermelha)
+        # 2. Se não achar, tenta o padrão antigo do Streamlit com segurança
         if not token_str:
             try:
                 token_str = st.secrets.get("google_token_json")
             except Exception:
                 pass
                 
-        # 3. Se a senha realmente não existir em nenhum lugar, exibe aviso amigável
+        # 3. Se a senha não existir, exibe aviso amigável
         if not token_str:
-            st.error("⚠️ Senha do Google não detectada. Vá no painel do Render > Environment Variables, confirme se a chave 'google_token_json' está lá, clique em 'Save Changes' e depois em 'Manual Deploy'.")
+            st.error("⚠️ Senha do Google não detectada. Vá no painel do Render > Environment Variables, confirme se a chave 'google_token_json' está lá.")
             return None
             
         # 4. Faz a conexão
@@ -132,6 +133,7 @@ def conectar_banco():
 
 planilha_db = conectar_banco()
 CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
+
 @st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
     if not _planilha: 
@@ -449,7 +451,7 @@ def gerar_excel_memoria(df):
                 worksheet.set_column(i, i, min(max(df[col].astype(str).map(len).max(), len(str(col))) + 2, 40))
     return output.getvalue()
 
-# 🔥 CONSTRUTOR DE EXCEL PARA WHATSAPP (MULTIPLAS ABAS BLINDADO) 🔥
+# 🔥 CONSTRUTOR DE EXCEL PARA WHATSAPP 🔥
 def gerar_excel_rota_whatsapp(df_agente):
     output = io.BytesIO()
     df_xls = df_agente.copy()
@@ -658,7 +660,7 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
     return pdf_bytes
 
 # =============================================================================
-# 📊 MÓDULO GRID PRINCIPAL
+# 📊 MÓDULO GRID PRINCIPAL (COM AGGRID RESSUSCITADO)
 # =============================================================================
 if 'filtro_kpi_admin' not in st.session_state: 
     st.session_state.filtro_kpi_admin = "TODOS"
@@ -752,34 +754,59 @@ if menu == "📊 GRID":
         
         df_grid_final['COMPROVANTE'] = df_grid_final['COMPROVANTE'].apply(lambda x: x if str(x).startswith("http") else "")
         df_grid_final = df_grid_final.reset_index(drop=True)
-        df_grid_final.insert(0, "SELECIONAR", False)
 
-        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione as caixinhas na tabela para liberar os botões.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione os pedidos usando as caixas da esquerda.</p>", unsafe_allow_html=True)
         box_botoes = st.empty()
 
-        tabela_renderizada = st.data_editor(
-            df_grid_final,
-            column_config={
-                "SELECIONAR": st.column_config.CheckboxColumn("✔ AÇÃO", default=False),
-                "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
-                "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Ver Foto"),
-                "AGENTE_RAW": st.column_config.TextColumn("AGENTE"),
-                "DATA_ENTREGA": st.column_config.TextColumn("ENTREGA"),
-                "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
-                "DATA": st.column_config.TextColumn("DATA"),
-                "PEDIDO": st.column_config.TextColumn("PEDIDO"),
-                "TOMADOR": st.column_config.TextColumn("TOMADOR"),
-                "LABORATORIO": st.column_config.TextColumn("LABORATÓRIO"),
-                "CIDADE": st.column_config.TextColumn("CIDADE")
-            },
-            disabled=[c for c in df_grid_final.columns if c != "SELECIONAR"],
-            hide_index=True,
-            use_container_width=True,
-            height=500,
-            key="tabela_nativa_indestrutivel_final" 
+        # 🔥 O RETORNO DO AGGRID (AGREED) BLINDADO 🔥
+        df_aggrid = df_grid_final.copy()
+        
+        gb = GridOptionsBuilder.from_dataframe(df_aggrid)
+        gb.configure_default_column(filterable=True, sortable=True, resizable=True)
+        gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+        gb.configure_pagination(paginationAutoPageSize=True) 
+        
+        gb.configure_column("STATUS_DISPLAY", cellStyle= {
+            "styleConditions": [
+                {"condition": "value.includes('✅')", "style": {"color": "#059669", "fontWeight": "bold"}},
+                {"condition": "value.includes('❌')", "style": {"color": "#DC2626", "fontWeight": "bold"}},
+                {"condition": "value.includes('⏳')", "style": {"color": "#D97706", "fontWeight": "bold"}},
+                {"condition": "value.includes('🚚')", "style": {"color": "#2563EB", "fontWeight": "bold"}}
+            ]
+        })
+        
+        gb.configure_column("COMPROVANTE", cellRenderer='''function(params) {
+            if (params.value && params.value.startsWith('http')) {
+                return '<a href="' + params.value + '" target="_blank">🔎 Ver Foto</a>';
+            }
+            return params.value;
+        }''')
+
+        gridOptions = gb.build()
+
+        resposta_aggrid = AgGrid(
+            df_aggrid,
+            gridOptions=gridOptions,
+            update_mode=GridUpdateMode.SELECTION_CHANGED, 
+            data_return_mode=DataReturnMode.AS_INPUT,
+            fit_columns_on_grid_load=False, 
+            theme='balham', 
+            height=450,
+            allow_unsafe_jscode=True
         )
 
-        linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
+        linhas_selecionadas_aggrid = resposta_aggrid['selected_rows']
+        
+        if linhas_selecionadas_aggrid is not None:
+            if isinstance(linhas_selecionadas_aggrid, pd.DataFrame):
+                linhas_selecionadas = linhas_selecionadas_aggrid
+            elif len(linhas_selecionadas_aggrid) > 0:
+                linhas_selecionadas = pd.DataFrame(linhas_selecionadas_aggrid)
+            else:
+                linhas_selecionadas = pd.DataFrame(columns=df_grid_final.columns)
+        else:
+            linhas_selecionadas = pd.DataFrame(columns=df_grid_final.columns)
+            
         p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
 
