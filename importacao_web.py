@@ -18,7 +18,6 @@ import uuid
 import base64
 from streamlit_autorefresh import st_autorefresh
 from fpdf import FPDF
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 FUSO_BR = timezone(timedelta(hours=-3))
 
@@ -745,7 +744,7 @@ if menu == "📊 GRID":
         dict_nomes_grid = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         df_grid['AGENTE_NOME'] = df_grid['AGENTE_RAW'].apply(lambda x: dict_nomes_grid.get(str(x).strip().lower(), str(x).upper()) if str(x).strip() else "")
 
-        # Movendo AGENTE_NOME para o final (antes do ID oculto)
+        # Movendo AGENTE_NOME para o final e mantendo AGENTE_RAW na lista (ficará invisível)
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW']
         
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
@@ -756,83 +755,38 @@ if menu == "📊 GRID":
         
         df_grid_final['COMPROVANTE'] = df_grid_final['COMPROVANTE'].apply(lambda x: x if str(x).startswith("http") else "")
         df_grid_final = df_grid_final.reset_index(drop=True)
+        df_grid_final.insert(0, "SELECIONAR", False)
 
-        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Clique em qualquer lugar da linha para selecionar e visualizar a foto.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione as caixinhas na tabela para liberar os botões.</p>", unsafe_allow_html=True)
         box_botoes = st.empty()
 
-        # 🔥 O RETORNO DO AGGRID 100% PYTHONICO (Com Zebra e Foto Segura) 🔥
-        df_aggrid = df_grid_final.copy()
-        
-        # Guarda o link real e coloca a "câmerazinha" amigável
-        df_aggrid['LINK_OCULTO'] = df_aggrid['COMPROVANTE']
-        df_aggrid['COMPROVANTE'] = df_aggrid['COMPROVANTE'].apply(lambda x: '📷 Selecione a linha' if str(x).startswith('http') else '')
-        
-        gb = GridOptionsBuilder.from_dataframe(df_aggrid)
-        gb.configure_default_column(filterable=True, sortable=True, resizable=True)
-        
-        # Seleção clicando em qualquer lugar da linha
-        gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True, rowMultiSelectWithClick=True)
-        gb.configure_pagination(paginationAutoPageSize=True) 
-        
-        gb.configure_column("STATUS_DISPLAY", header_name="STATUS", cellStyle= {
-            "styleConditions": [
-                {"condition": "value.includes('✅')", "style": {"color": "#059669", "fontWeight": "bold"}},
-                {"condition": "value.includes('❌')", "style": {"color": "#DC2626", "fontWeight": "bold"}},
-                {"condition": "value.includes('⏳')", "style": {"color": "#D97706", "fontWeight": "bold"}},
-                {"condition": "value.includes('🚚')", "style": {"color": "#2563EB", "fontWeight": "bold"}}
-            ]
-        })
-        
-        # Esconde o Link e Esconde o ID feio, e renomeia as últimas colunas
-        gb.configure_column("LINK_OCULTO", hide=True)
-        gb.configure_column("AGENTE_RAW", hide=True)
-        gb.configure_column("COMPROVANTE", header_name="FOTO")
-        gb.configure_column("AGENTE_NOME", header_name="MOTORISTA")
-
-        gridOptions = gb.build()
-
-        resposta_aggrid = AgGrid(
-            df_aggrid.drop(columns=['LINK_OCULTO']),
-            gridOptions=gridOptions,
-            update_mode=GridUpdateMode.SELECTION_CHANGED, 
-            data_return_mode=DataReturnMode.AS_INPUT,
-            fit_columns_on_grid_load=False, 
-            theme='balham', # O Balham tem a zebra natural (cinza e branco intercalados)
-            height=450
+        # 🔥 TABELA NATIVA (O Retorno da Estabilidade) 🔥
+        tabela_renderizada = st.data_editor(
+            df_grid_final,
+            column_config={
+                "SELECIONAR": st.column_config.CheckboxColumn("✔ AÇÃO", default=False),
+                "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
+                "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Ver Foto"),
+                "AGENTE_NOME": st.column_config.TextColumn("MOTORISTA"), # Nome bonito aparece
+                "AGENTE_RAW": None, # ID feio fica oculto, mas não deletado (os botões precisam dele)
+                "DATA_ENTREGA": st.column_config.TextColumn("ENTREGA"),
+                "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
+                "DATA": st.column_config.TextColumn("DATA"),
+                "PEDIDO": st.column_config.TextColumn("PEDIDO"),
+                "TOMADOR": st.column_config.TextColumn("TOMADOR"),
+                "LABORATORIO": st.column_config.TextColumn("LABORATÓRIO"),
+                "CIDADE": st.column_config.TextColumn("CIDADE")
+            },
+            disabled=[c for c in df_grid_final.columns if c != "SELECIONAR"],
+            hide_index=True,
+            use_container_width=True,
+            height=500,
+            key="tabela_nativa_indestrutivel_final" 
         )
 
-        linhas_selecionadas_aggrid = resposta_aggrid['selected_rows']
-        
-        if linhas_selecionadas_aggrid is not None:
-            if isinstance(linhas_selecionadas_aggrid, pd.DataFrame):
-                linhas_selecionadas = linhas_selecionadas_aggrid
-            elif len(linhas_selecionadas_aggrid) > 0:
-                linhas_selecionadas = pd.DataFrame(linhas_selecionadas_aggrid)
-            else:
-                linhas_selecionadas = pd.DataFrame(columns=df_grid_final.columns)
-        else:
-            linhas_selecionadas = pd.DataFrame(columns=df_grid_final.columns)
-            
+        linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
         p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
-
-        # 🔥 VISUALIZADOR DE FOTOS EMBUTIDO 🔥
-        if tem_sel:
-            pedidos_selecionados = linhas_selecionadas['PEDIDO'].tolist()
-            selecionados_com_foto = df_aggrid[df_aggrid['PEDIDO'].isin(pedidos_selecionados)]
-            selecionados_com_foto = selecionados_com_foto[selecionados_com_foto["LINK_OCULTO"].astype(str).str.startswith("http")]
-            
-            if not selecionados_com_foto.empty:
-                st.markdown("<h4 style='color:#0F172A; margin-top: 10px;'>📸 Comprovantes Selecionados</h4>", unsafe_allow_html=True)
-                cols_fotos = st.columns(min(len(selecionados_com_foto), 4)) 
-                for i, (_, row) in enumerate(selecionados_com_foto.iterrows()):
-                    col_idx = i % 4
-                    with cols_fotos[col_idx]:
-                        with st.container(border=True):
-                            st.markdown(f"**Pedido:** {row['PEDIDO']}")
-                            st.image(row["LINK_OCULTO"], use_container_width=True)
-                            st.markdown(f"<div style='text-align:center;'><a href='{row['LINK_OCULTO']}' target='_blank' style='text-decoration:none; color:#0284C7; font-weight:bold;'>🔗 Ampliar Original</a></div>", unsafe_allow_html=True)
-                st.markdown("<br>", unsafe_allow_html=True)
 
         # 🔥 BLOCO DE BOTÕES DA GRID (7 OPÇÕES TOTAIS COM FORMULÁRIOS DE SEGURANÇA) 🔥
         with box_botoes.container():
