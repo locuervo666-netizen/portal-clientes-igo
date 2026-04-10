@@ -24,21 +24,22 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # =============================================================================
 # 🔗 1. CONFIGURAÇÃO DA PÁGINA E ESTILOS NATIVOS
 # =============================================================================
-# 🔥 Sidebar agora inicia expandida!
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
+# 🔥 CSS Limpo e Seguro (Preserva a setinha e esconde só o lixo do Streamlit)
 st.markdown("""
     <style>
-    /* 🔥 MÁGICA AQUI: Força a setinha da Sidebar a NUNCA sumir 🔥 */
-    header { background-color: transparent !important; }
-    [data-testid="collapsedControl"] { display: flex !important; visibility: visible !important; z-index: 999999 !important; }
-    
-    /* Oculta as ferramentas indesejadas do Streamlit */
+    /* Esconde as ferramentas de desenvolvedor do Streamlit */
     [data-testid="stToolbar"], .stAppDeployButton, .stDeployButton, #MainMenu, footer { display: none !important; }
+    
+    /* Deixa o topo transparente mas mantém a setinha visível */
+    header { background-color: transparent !important; }
+    
     .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
+    /* Botões KPI */
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
         border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
@@ -52,6 +53,7 @@ st.markdown("""
         color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
     }
     
+    /* Popovers da Grid */
     div[data-testid="stPopover"] > button, button[kind="secondary"] {
         white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
     }
@@ -765,7 +767,7 @@ if menu == "📊 GRID":
         df_grid_final = df_grid_final.reset_index(drop=True)
         df_grid_final.insert(0, "SELECIONAR", False)
 
-        st.markdown(f"<p style='color:#64748B; font-size:13px; margin-bottom: 5px;'>Selecione as caixinhas na tabela para liberar os botões de ação.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#64748B; font-size:13px; margin-bottom: 5px;'>Selecione as caixinhas na tabela para liberar os botões de ação. Clique no link FOTO para abrir a imagem original.</p>", unsafe_allow_html=True)
         box_botoes = st.empty()
 
         # 🔥 TABELA NATIVA INDESTRUTÍVEL 🔥
