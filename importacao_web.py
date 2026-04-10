@@ -24,28 +24,17 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # =============================================================================
 # 🔗 1. CONFIGURAÇÃO DA PÁGINA E ESTILOS NATIVOS
 # =============================================================================
-st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="collapsed")
+# 🔥 Sidebar agora inicia expandida!
+st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
+# 🔥 CSS Limpo (Sem a barra inferior que ocupava espaço)
 st.markdown("""
     <style>
     [data-testid="stToolbar"], .stAppDeployButton, .stDeployButton, #MainMenu, footer { display: none !important; }
-    .block-container { padding-top: 2rem !important; padding-bottom: 120px !important; max-width: 98% !important; }
+    .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
-    div[data-testid="stRadio"] {
-        position: fixed !important; bottom: 0 !important; left: 0 !important; width: 100vw !important;
-        background-color: #0F172A !important; padding: 12px 0px !important; z-index: 999999 !important;
-        box-shadow: 0px -10px 25px -5px rgba(0, 0, 0, 0.3) !important; border-top: 1px solid #1E293B !important; margin: 0 !important;
-    }
-    div[data-testid="stRadio"] > div { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 10px; }
-    div[data-testid="stRadio"] label { background-color: transparent !important; border: 1px solid transparent !important; padding: 8px 20px !important; border-radius: 8px !important; cursor: pointer !important; transition: all 0.2s ease !important; margin: 0 !important; }
-    div[data-testid="stRadio"] label:hover { background-color: #1E293B !important; }
-    div[data-testid="stRadio"] label p { color: #94A3B8 !important; font-weight: 600 !important; font-size: 14px !important; margin: 0 !important; }
-    div[data-testid="stRadio"] label[data-checked="true"] { background-color: #38BDF8 !important; box-shadow: 0 0 10px rgba(56, 189, 248, 0.4) !important; }
-    div[data-testid="stRadio"] label[data-checked="true"] p { color: #0F172A !important; font-weight: 800 !important; }
-    div[role="radiogroup"] label div[data-testid="stRadio-radio"] { display: none !important; }
-
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
         border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
@@ -65,10 +54,20 @@ st.markdown("""
     div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
         border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
     }
+    
+    .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+    .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
+    
+    /* Estilo exclusivo para o Botão de Sair Chamativo na Sidebar */
+    div[data-testid="stSidebar"] button[kind="primary"] {
+        background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%) !important;
+        color: white !important;
+        border: none !important;
+        font-weight: bold !important;
+        box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3) !important;
+    }
     </style>
 """, unsafe_allow_html=True)
-
-st.markdown("""<style>[data-testid="stSidebar"] { display: none !important; }</style>""", unsafe_allow_html=True)
 
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
@@ -655,23 +654,28 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
     return pdf_bytes
 
 # =============================================================================
-# 📊 MÓDULO GRID PRINCIPAL
+# 📊 MÓDULO GRID PRINCIPAL E SIDEBAR
 # =============================================================================
 if 'filtro_kpi_admin' not in st.session_state: 
     st.session_state.filtro_kpi_admin = "TODOS"
 
-col_logo, col_title, col_logout = st.columns([1, 4, 1], vertical_alignment="center")
-with col_logo: 
-    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=140)
-with col_title:
-    st.markdown("<h2 style='color: #0F172A; font-weight: 800; margin: 0; text-align: center;'>PAINEL GERENCIAL</h2>", unsafe_allow_html=True)
-with col_logout:
-    if st.button("🚪 Sair", use_container_width=True): 
+# 🔥 Construção da Sidebar C.C.O 🔥
+with st.sidebar:
+    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=160)
+    st.divider()
+    
+    # Navegação limpa na lateral
+    menu = st.radio("Navegação Operacional:", ["📊 GRID", "📝 Pedido Manual", "📥 Importações", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"])
+    
+    # Empurrar o botão de sair para o fundo
+    st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
+    st.divider()
+    if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
         st.session_state.autenticado = False
         st.rerun()
 
-st.markdown("<br>", unsafe_allow_html=True)
-menu = st.radio("Navegação:", ["📊 GRID", "📝 Pedido Manual", "📥 Importações", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"], horizontal=True, label_visibility="collapsed")
+# 🔥 Header Limpo no Topo 🔥
+st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:24px; color:#0F172A;">Central de Controle Operacional</h2><div class='sync-status'>🟢 Online: {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
 
 if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
@@ -744,7 +748,7 @@ if menu == "📊 GRID":
         dict_nomes_grid = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         df_grid['AGENTE_NOME'] = df_grid['AGENTE_RAW'].apply(lambda x: dict_nomes_grid.get(str(x).strip().lower(), str(x).upper()) if str(x).strip() else "")
 
-        # Movendo AGENTE_NOME para o final e mantendo AGENTE_RAW na lista (ficará invisível)
+        # Movendo AGENTE_NOME para o final (antes do ID oculto)
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW']
         
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
@@ -757,18 +761,18 @@ if menu == "📊 GRID":
         df_grid_final = df_grid_final.reset_index(drop=True)
         df_grid_final.insert(0, "SELECIONAR", False)
 
-        st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione as caixinhas na tabela para liberar os botões.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#64748B; font-size:13px; margin-bottom: 5px;'>Selecione as caixinhas na tabela para liberar os botões de ação.</p>", unsafe_allow_html=True)
         box_botoes = st.empty()
 
-        # 🔥 TABELA NATIVA (O Retorno da Estabilidade) 🔥
+        # 🔥 TABELA NATIVA INDESTRUTÍVEL 🔥
         tabela_renderizada = st.data_editor(
             df_grid_final,
             column_config={
                 "SELECIONAR": st.column_config.CheckboxColumn("✔ AÇÃO", default=False),
                 "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
-                "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Ver Foto"),
-                "AGENTE_NOME": st.column_config.TextColumn("MOTORISTA"), # Nome bonito aparece
-                "AGENTE_RAW": None, # ID feio fica oculto, mas não deletado (os botões precisam dele)
+                "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Abrir Foto"),
+                "AGENTE_NOME": st.column_config.TextColumn("MOTORISTA"), 
+                "AGENTE_RAW": None, 
                 "DATA_ENTREGA": st.column_config.TextColumn("ENTREGA"),
                 "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
                 "DATA": st.column_config.TextColumn("DATA"),
