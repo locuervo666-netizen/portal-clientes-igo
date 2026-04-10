@@ -6,14 +6,16 @@ import urllib.parse
 import json
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
+from google.oauth2.credentials import Credentials
 
 FUSO_BR = timezone(timedelta(hours=-3))
+LOGO_IGO = "https://i.postimg.cc/d71mqWDx/IGO-LOGO.png"
 
 # =======================================================
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
 # =======================================================
 st.set_page_config(page_title="Monitoramento IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
-st_autorefresh(interval=120000, limit=None, key="refresh_timer")
+st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
 st.markdown("""
     <style>
@@ -51,7 +53,7 @@ CLIENTES_CONFIG = {
 # 🔗 2. MOTOR DE DADOS (CLONE EXATO DO C.C.O)
 # =======================================================
 @st.cache_resource
-def conectar_banco():
+def conectar_banco_seguro():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     try:
         import json
@@ -73,30 +75,28 @@ def conectar_banco():
         token_info = json.loads(token_str)
         creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
         gc = gspread.authorize(creds)
-        return gc.open("DB_IGO_Logistica")
-        
+        return gc
     except Exception as e:
-        st.error(f"Erro na leitura da chave: {e}")
-    return None
-
-planilha_db = conectar_banco()
+        st.error(f"Erro Crítico de Conexão: {e}")
+        return None
 
 @st.cache_data(ttl=30)
-def carregar_dados_nuvem(_planilha):
-    if not _planilha: 
-        return pd.DataFrame()
+def carregar_dados_nuvem():
     try:
-        aba_m = _planilha.worksheet("Memoria_Sistema")
+        gc = conectar_banco_seguro()
+        if not gc: return pd.DataFrame()
+        
+        planilha = gc.open("DB_IGO_Logistica")
+        aba_m = planilha.worksheet("Memoria_Sistema")
         dados_m = aba_m.get_all_values()
         
         if len(dados_m) > 1:
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
             df = df.loc[:, ~df.columns.duplicated()] 
-            df = df.dropna(how='all') 
             
             try:
-                aba_app = _planilha.worksheet("App_Tarefas")
+                aba_app = planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
                 if len(dados_app) > 1:
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
@@ -124,10 +124,8 @@ def carregar_dados_nuvem(_planilha):
             if 'DATA' in df.columns: 
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
-    except Exception as e: 
-        st.error(f"Erro Crítico de Leitura: {e}")
+    except Exception: 
         return pd.DataFrame()
-    return pd.DataFrame()
 
 if 'logado' not in st.session_state: st.session_state.logado = False
 if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
@@ -152,15 +150,25 @@ if not st.session_state.logado:
                 else: 
                     st.error("❌ Credenciais Incorretas")
 else:
-    # 🎯 GARANTIA ANTI-TELA BRANCA: Desenha a estrutura antes de ler os dados
     conf = CLIENTES_CONFIG[st.session_state.cliente]
     hoje_br = datetime.now(FUSO_BR).date()
     
+    # 🎯 ESTRUTURA DA SIDEBAR INTELIGENTE (Botão Sair fixado no final)
     with st.sidebar:
         st.image(conf["logo"], width=160)
         st.divider()
+        
+        # Datas sempre aparecem
         datas_sel = st.date_input("🗓️ Período:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY")
+        
+        # Caixas reservadas para os filtros e botões que dependem dos dados
+        holder_cidades = st.empty()
         st.divider()
+        holder_exportar = st.empty()
+        
+        # Espaçamento gigante para empurrar o botão de SAIR para o rodapé
+        st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
+        
         if st.button("🚪 Sair do Sistema", use_container_width=True): 
             st.session_state.logado = False
             st.rerun()
@@ -168,7 +176,7 @@ else:
     st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:22px;">Monitoramento Logístico | {st.session_state.cliente}</h2><div class='sync-status'>🟢 Online: {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
 
     # Carrega os dados com segurança
-    df_raw = carregar_dados_nuvem(planilha_db)
+    df_raw = carregar_dados_nuvem()
     
     if df_raw.empty:
         st.info("Aguardando novas informações do C.C.O na base de dados...")
@@ -185,6 +193,10 @@ else:
         if df_cliente.empty:
             st.warning(f"Nenhum pedido ou lote foi registrado no sistema sob a titularidade '{conf['filtro']}' até o momento.")
         else:
+            # Preenche o Filtro de Cidades na Sidebar
+            with holder_cidades:
+                cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
+
             # Funções de Status e Fotos
             def get_st(row):
                 s = str(row.get('A_ST', row.get('STATUS', ''))).upper()
@@ -207,6 +219,9 @@ else:
             df_f = df_cliente.copy()
             if isinstance(datas_sel, (tuple, list)) and len(datas_sel) == 2:
                 df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
+            
+            if cidades_sel: 
+                df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
             # KPIs
             ck = st.columns(5)
@@ -254,47 +269,29 @@ else:
                 
                 df_final['COMPROVANTE'] = df_final['FOTO_URL'].apply(lambda x: x if str(x).startswith("http") else "")
                 df_final.drop(columns=['FOTO_URL'], inplace=True, errors='ignore')
-                df_final.insert(0, "SELECIONAR", False)
 
-                st.markdown("<p style='font-size:13px; color:#64748B;'>Selecione a caixinha ao lado do pedido na tabela para abrir a foto do comprovante original.</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size:13px; color:#64748B;'>Clique no link da coluna FOTO para abrir o comprovante original em uma nova aba do seu navegador.</p>", unsafe_allow_html=True)
 
-                # 🔥 TABELA NATIVA DO CLIENTE (Indestrutível) 🔥
-                tabela_renderizada = st.data_editor(
+                # 🔥 TABELA NATIVA DO CLIENTE (Nomes Ajustados e Abertura em Nova Aba) 🔥
+                st.data_editor(
                     df_final,
                     column_config={
-                        "SELECIONAR": st.column_config.CheckboxColumn("✔ VER FOTO", default=False),
-                        "STATUS_DISPLAY": st.column_config.TextColumn("STATUS DA ENTREGA"),
-                        "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Abrir Link Original"),
+                        "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
+                        "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Abrir Foto"),
                         "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
-                        "DATA": st.column_config.TextColumn("EMBARQUE"),
+                        "DATA": st.column_config.TextColumn("DATA PEDIDO"),
                         "PEDIDO": st.column_config.TextColumn("PEDIDO"),
-                        "LABORATORIO": st.column_config.TextColumn("PONTO DE COLETA / DESTINO"),
+                        "LABORATORIO": st.column_config.TextColumn("PCL"),
                         "CIDADE": st.column_config.TextColumn("CIDADE")
                     },
-                    disabled=[c for c in df_final.columns if c != "SELECIONAR"],
+                    disabled=True, # Toda a tabela é bloqueada para edição do cliente
                     hide_index=True,
                     use_container_width=True,
                     height=500
                 )
 
-                # 🔥 VISUALIZADOR DE FOTOS EMBUTIDO PARA O CLIENTE 🔥
-                linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
-                if not linhas_selecionadas.empty:
-                    selecionados_com_foto = linhas_selecionadas[linhas_selecionadas["COMPROVANTE"].astype(str).str.startswith("http")]
-                    if not selecionados_com_foto.empty:
-                        st.markdown("<h4 style='color:#0F172A; margin-top: 15px; border-top: 1px solid #E2E8F0; padding-top: 15px;'>📸 Comprovantes de Entrega Selecionados</h4>", unsafe_allow_html=True)
-                        cols_fotos = st.columns(min(len(selecionados_com_foto), 4)) 
-                        for i, (_, row) in enumerate(selecionados_com_foto.iterrows()):
-                            with cols_fotos[i % 4]:
-                                with st.container(border=True):
-                                    st.markdown(f"**Pedido:** {row['PEDIDO']}")
-                                    st.image(row["COMPROVANTE"], use_container_width=True)
-                                    st.markdown(f"<div style='text-align:center;'><a href='{row['COMPROVANTE']}' target='_blank' style='text-decoration:none; color:#0284C7; font-weight:bold;'>🔗 Ampliar Tela Cheia</a></div>", unsafe_allow_html=True)
-                        st.markdown("<br>", unsafe_allow_html=True)
-
-                # Exportar CSV
-                with st.sidebar:
-                    st.divider()
+                # Preenche o Botão de Exportar na Sidebar
+                with holder_exportar:
                     csv = df_grid.to_csv(index=False, sep=';').encode('utf-8-sig')
                     st.download_button("📥 Exportar Planilha (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
             else:
