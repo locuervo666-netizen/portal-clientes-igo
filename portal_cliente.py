@@ -3,8 +3,10 @@ import pandas as pd
 import gspread
 import os
 import urllib.parse
+import json
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
+from google.oauth2.credentials import Credentials
 
 FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/d71mqWDx/IGO-LOGO.png"
@@ -51,38 +53,37 @@ CLIENTES_CONFIG = {
 # 🔗 2. MOTOR DE DADOS (Conexão Blindada Render)
 # =======================================================
 @st.cache_resource
-def conectar_banco():
+def conectar_banco_seguro():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     try:
-        import json
-        import os
-        from google.oauth2.credentials import Credentials
-        
-        # Lê a senha do painel do Render
+        # 1. Tenta pegar a chave secreta do Render
         token_str = os.environ.get("google_token_json")
         
+        # 2. Se não achar, tenta o Secrets do Streamlit (modo de segurança)
         if not token_str:
-            try: token_str = st.secrets.get("google_token_json")
-            except: pass
+            try:
+                token_str = st.secrets.get("google_token_json")
+            except Exception:
+                pass
                 
         if not token_str:
-            st.error("⚠️ Senha do Google não detectada no Render.")
+            st.error("⚠️ Falha de Autenticação. Banco de dados isolado.")
             return None
             
         token_info = json.loads(token_str)
         creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
         gc = gspread.authorize(creds)
-        return gc.open("DB_IGO_Logistica")
-        
+        return gc
     except Exception as e:
-        st.error(f"Erro na leitura da chave: {e}")
-    return None
+        st.error(f"Erro Crítico de Conexão: {e}")
+        return None
 
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
     try:
-        gc = conectar_banco()
+        gc = conectar_banco_seguro()
         if not gc: return pd.DataFrame()
+        
         planilha = gc.open("DB_IGO_Logistica")
         aba_m = planilha.worksheet("Memoria_Sistema")
         dados_m = aba_m.get_all_values()
@@ -90,6 +91,8 @@ def carregar_dados_nuvem():
         if len(dados_m) > 1:
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
+            df = df.loc[:, ~df.columns.duplicated()] 
+            
             try:
                 aba_app = planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
@@ -100,13 +103,18 @@ def carregar_dados_nuvem():
                     df_app_clean.columns = ['PEDIDO', 'A_ST', 'A_OB', 'A_FO']
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
+                    
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
                     df['FOTO'] = df['A_FO'].fillna('')
-            except: pass
-            if 'DATA' in df.columns: df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+            except Exception: 
+                pass
+                
+            if 'DATA' in df.columns: 
+                df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
-    except: return pd.DataFrame()
+    except Exception: 
+        return pd.DataFrame()
 
 if 'logado' not in st.session_state: st.session_state.logado = False
 if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
@@ -125,33 +133,49 @@ if not st.session_state.logado:
             s = st.text_input("🔒 Senha", type="password")
             if st.button("🚀 Acessar Sistema", type="primary", use_container_width=True):
                 if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
-                    st.session_state.logado, st.session_state.cliente = True, u; st.rerun()
-                else: st.error("Incorreto")
+                    st.session_state.logado = True
+                    st.session_state.cliente = u
+                    st.rerun()
+                else: 
+                    st.error("❌ Credenciais Incorretas")
 else:
     df_raw = carregar_dados_nuvem()
     if not df_raw.empty:
         conf = CLIENTES_CONFIG[st.session_state.cliente]
-        df_cliente = df_raw if conf["filtro"] == "TODOS" else df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
+        
+        # Filtra apenas os dados do cliente logado
+        if conf["filtro"] == "TODOS":
+            df_cliente = df_raw.copy()
+        else:
+            df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
+            
         hoje_br = datetime.now(FUSO_BR).date()
         
         if not df_cliente.empty:
-            # Funções de Status e Fotos
+            # Lógica de Status Seguro
             def get_st(row):
                 s = str(row.get('A_ST', row.get('STATUS', ''))).upper()
                 if 'ENTREGUE' in s: return '✅ Entregue'
                 if 'FRUSTRADA' in s: return '❌ Frustrada'
+                if 'CANCELADO' in s: return '🚫 Cancelado'
                 return '⏳ Pendente'
             
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
-            df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(lambda x: f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={str(x).strip()}" if x else "")
+            
+            # Tratamento da URL da Foto
+            def tratar_link_foto(x):
+                x_str = str(x).strip()
+                if not x_str or x_str.upper() in ['NAN', 'NONE']: return ""
+                if x_str.startswith("http"): return x_str 
+                return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={x_str}"
+                
+            df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(tratar_link_foto)
 
             # --- SIDEBAR (CONFIGURAÇÃO) ---
             with st.sidebar:
                 st.image(conf["logo"], width=160)
                 st.divider()
-                st.toggle("🌙 Modo Noturno")
                 
-                # AJUSTE BRASILEIRO AQUI
                 datas_sel = st.date_input(
                     "🗓️ Período:", 
                     value=(hoje_br - timedelta(days=7), hoje_br),
@@ -164,11 +188,11 @@ else:
             # --- LÓGICA DE FILTROS ---
             df_f = df_cliente.copy()
             
-            # FILTRO DE DATA SEGURO
             if isinstance(datas_sel, (tuple, list)) and len(datas_sel) == 2:
                 df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
             
-            if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
+            if cidades_sel: 
+                df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
             # HEADER
             st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:22px;">Monitoramento {st.session_state.cliente}</h2><div class='sync-status'>🟢 Sincronizado {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
@@ -176,24 +200,27 @@ else:
             # KPIs
             ck = st.columns(5)
             def set_kpi(v): st.session_state.filtro_kpi = v
-            n_tot_k = len(df_f); n_ent_k = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])
+            n_tot_k = len(df_f)
+            n_ent_k = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])
             n_fru_k = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])
+            n_atr_k = 0 # Pode ser calculado depois com DATA_LIMITE
             
             with ck[0]: st.button(f"📦 TOTAL\n\n{n_tot_k}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
             with ck[1]: st.button(f"✅ ENTREGUES\n\n{n_ent_k}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
             with ck[2]: st.button(f"❌ FRUSTRADAS\n\n{n_fru_k}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
-            with ck[3]: st.button(f"🚨 ATRASADOS\n\n0", key="kpi_atra", use_container_width=True)
+            with ck[3]: st.button(f"🚨 ATRASADOS\n\n{n_atr_k}", key="kpi_atra", use_container_width=True)
             with ck[4]: st.button(f"📅 HOJE\n\n{len(df_f[df_f['DATA_OBJ'] == hoje_br])}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
             # PROGRESSO
             st.markdown("<br>🎯 **Progresso de Hoje**", unsafe_allow_html=True)
             df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
             if not df_h.empty:
-                tx = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada')]) / len(df_h)
+                tx = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado')]) / len(df_h)
                 st.progress(tx)
-            else: st.info("Nenhum pedido para hoje.")
+            else: 
+                st.info("Nenhum pedido despachado para hoje.")
 
-            # BUSCA E GRID
+            # BUSCA E PREPARAÇÃO DA TABELA
             st.markdown("<br>", unsafe_allow_html=True)
             busca = st.text_input("🔎 Busca Rápida:", placeholder="Pedido, laboratório, cidade...")
             
@@ -204,33 +231,35 @@ else:
                 else:
                     df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False)]
             
-            if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
+            if busca: 
+                df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
             if not df_grid.empty:
-                df_grid['STATUS'] = df_grid['STATUS_DISPLAY']
-                cols = ['DATA', 'PEDIDO', 'STATUS', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'FOTO_URL']
+                # Estruturando colunas para o cliente
+                cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'FOTO_URL']
                 df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
                 
-                # Prepara os dados e adiciona a coluna de seleção
+                # Tratamento visual
                 for col in df_final.columns: 
                     df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
+                
                 df_final['COMPROVANTE'] = df_final['FOTO_URL'].apply(lambda x: x if str(x).startswith("http") else "")
-                df_final.drop(columns=['FOTO_URL'], inplace=True)
+                df_final.drop(columns=['FOTO_URL'], inplace=True, errors='ignore')
                 df_final.insert(0, "SELECIONAR", False)
 
-                st.markdown("<p style='font-size:13px; color:#64748B;'>Selecione a caixinha do pedido para visualizar a foto do comprovante de entrega.</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size:13px; color:#64748B;'>Selecione a caixinha ao lado do pedido para visualizar a foto do comprovante de entrega.</p>", unsafe_allow_html=True)
 
-                # 🔥 TABELA NATIVA (O Retorno da Estabilidade) 🔥
+                # 🔥 TABELA NATIVA DO CLIENTE (Indestrutível e sem AgGrid) 🔥
                 tabela_renderizada = st.data_editor(
                     df_final,
                     column_config={
                         "SELECIONAR": st.column_config.CheckboxColumn("✔ VER FOTO", default=False),
-                        "STATUS": st.column_config.TextColumn("STATUS DA ENTREGA"),
-                        "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Abrir Link"),
+                        "STATUS_DISPLAY": st.column_config.TextColumn("STATUS DA ENTREGA"),
+                        "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Abrir Link Original"),
                         "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
                         "DATA": st.column_config.TextColumn("EMBARQUE"),
                         "PEDIDO": st.column_config.TextColumn("PEDIDO"),
-                        "LABORATORIO": st.column_config.TextColumn("PONTO DE COLETA"),
+                        "LABORATORIO": st.column_config.TextColumn("PONTO DE COLETA / DESTINO"),
                         "CIDADE": st.column_config.TextColumn("CIDADE")
                     },
                     disabled=[c for c in df_final.columns if c != "SELECIONAR"],
@@ -244,20 +273,24 @@ else:
                 if not linhas_selecionadas.empty:
                     selecionados_com_foto = linhas_selecionadas[linhas_selecionadas["COMPROVANTE"].astype(str).str.startswith("http")]
                     if not selecionados_com_foto.empty:
-                        st.markdown("<h4 style='color:#0F172A; margin-top: 15px;'>📸 Comprovantes de Entrega Selecionados</h4>", unsafe_allow_html=True)
+                        st.markdown("<h4 style='color:#0F172A; margin-top: 15px; border-top: 1px solid #E2E8F0; padding-top: 15px;'>📸 Comprovantes de Entrega Selecionados</h4>", unsafe_allow_html=True)
                         cols_fotos = st.columns(min(len(selecionados_com_foto), 4)) 
                         for i, (_, row) in enumerate(selecionados_com_foto.iterrows()):
                             with cols_fotos[i % 4]:
                                 with st.container(border=True):
                                     st.markdown(f"**Pedido:** {row['PEDIDO']}")
                                     st.image(row["COMPROVANTE"], use_container_width=True)
-                                    st.markdown(f"<div style='text-align:center;'><a href='{row['COMPROVANTE']}' target='_blank' style='text-decoration:none; color:#0284C7; font-weight:bold;'>🔗 Ampliar Original</a></div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='text-align:center;'><a href='{row['COMPROVANTE']}' target='_blank' style='text-decoration:none; color:#0284C7; font-weight:bold;'>🔗 Ampliar Tela Cheia</a></div>", unsafe_allow_html=True)
                         st.markdown("<br>", unsafe_allow_html=True)
+            else:
+                st.info("Nenhum dado encontrado para os filtros selecionados.")
 
-            # SIDEBAR FINAL
+            # SIDEBAR FINAL EXPORT
             with st.sidebar:
                 csv = df_grid.to_csv(index=False, sep=';').encode('utf-8-sig')
                 st.download_button("📥 Exportar Relatório (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
                 if st.button("🚪 Sair do Sistema", use_container_width=True): 
                     st.session_state.logado = False
                     st.rerun()
+    else:
+        st.warning("⚠️ Base de dados temporariamente indisponível ou vazia.")
