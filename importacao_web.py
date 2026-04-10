@@ -740,11 +740,13 @@ if menu == "📊 GRID":
         if busca: 
             df_grid = df_grid[df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)]
 
-        # 🔥 NOVIDADE: Mapeando os nomes amigáveis antes de jogar na tela
+        # 🔥 Mapeando o Nome Amigável do Motorista
         dict_nomes_grid = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         df_grid['AGENTE_NOME'] = df_grid['AGENTE_RAW'].apply(lambda x: dict_nomes_grid.get(str(x).strip().lower(), str(x).upper()) if str(x).strip() else "")
 
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'AGENTE_NOME', 'AGENTE_RAW', 'DATA_ENTREGA', 'COMPROVANTE']
+        # Movendo AGENTE_NOME para o final e mantendo AGENTE_RAW na lista (ficará invisível)
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW']
+        
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
         df_grid_final = df_grid_final[df_grid_final['PEDIDO'].astype(str).str.strip() != ""] 
         
@@ -758,15 +760,15 @@ if menu == "📊 GRID":
         st.markdown(f"<p style='color:#059669; font-weight:600; font-size:12px; margin-bottom: 5px;'>🟢 Sincronizado: {datetime.now(FUSO_BR).strftime('%H:%M:%S')} | Selecione as caixinhas na tabela para liberar os botões.</p>", unsafe_allow_html=True)
         box_botoes = st.empty()
 
-        # 🔥 TABELA NATIVA (Com nome amigável e ID blindado) 🔥
+        # 🔥 TABELA NATIVA (O Retorno da Estabilidade) 🔥
         tabela_renderizada = st.data_editor(
             df_grid_final,
             column_config={
                 "SELECIONAR": st.column_config.CheckboxColumn("✔ AÇÃO", default=False),
                 "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
                 "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Ver Foto"),
-                "AGENTE_NOME": st.column_config.TextColumn("MOTORISTA"), 
-                "AGENTE_RAW": None, # 🔥 Esconde a coluna feia do ID, mas os botões de Zap continuam lendo ela perfeitamente por trás dos panos!
+                "AGENTE_NOME": st.column_config.TextColumn("MOTORISTA"), # Nome bonito aparece
+                "AGENTE_RAW": None, # ID feio fica oculto, mas não deletado (os botões precisam dele)
                 "DATA_ENTREGA": st.column_config.TextColumn("ENTREGA"),
                 "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
                 "DATA": st.column_config.TextColumn("DATA"),
