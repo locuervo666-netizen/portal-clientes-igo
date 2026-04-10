@@ -95,16 +95,23 @@ if not st.session_state.autenticado:
     st.stop()
 
 # =============================================================================
-# 🔗 2. CONEXÃO (Versão Atualizada Render)
+# 🔗 2. CONEXÃO (Versão Definitiva Render)
 # =============================================================================
 @st.cache_resource
 def conectar_banco():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     try:
-        if "google_token_json" in st.secrets:
-            import json
-            from google.oauth2.credentials import Credentials
-            token_info = json.loads(st.secrets["google_token_json"])
+        import json
+        import os
+        from google.oauth2.credentials import Credentials
+        
+        # Procura a senha primeiro no Render (os.environ), depois tenta o antigo (st.secrets)
+        token_str = os.environ.get("google_token_json")
+        if not token_str and "google_token_json" in st.secrets:
+            token_str = st.secrets["google_token_json"]
+            
+        if token_str:
+            token_info = json.loads(token_str)
             creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
             gc = gspread.authorize(creds)
             return gc.open("DB_IGO_Logistica")
