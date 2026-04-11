@@ -75,7 +75,6 @@ st.markdown("""
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
-# 🔥 Memória de curto prazo para o Log de Triagem 🔥
 if 'log_triagem' not in st.session_state:
     st.session_state.log_triagem = []
 
@@ -348,13 +347,16 @@ def calcular_data_limite(data_ini, prazo):
         return dt.strftime("%d/%m/%Y")
     except: return data_ini
 
+# 🔥 NOVA INTELIGÊNCIA DE STATUS DA VAN AQUI 🔥
 def calc_status_display(row):
     status_final = str(row.get('STATUS', '')).strip().upper()
     previsao = str(row.get('DATA_LIMITE', '')).strip()
     res = '⏳ Pendente'
+    
     if 'ENTREGUE' in status_final: res = '✅ Entregue'
     elif 'COLETADO' in status_final: res = '📦 Coletado'
-    elif 'ROTA' in status_final: res = '🚚 Em Rota'
+    elif 'ROTA DE COLETA' in status_final: res = '🚐 Rota de Coleta'
+    elif 'ROTA' in status_final: res = '🚚 Em Rota de Entrega'
     elif 'CONFERIDO' in status_final: res = '☑️ Conferido'
     elif 'FRUSTRADA' in status_final: res = '❌ Frustrada'
     elif 'CANCELADO' in status_final: res = '🚫 Cancelado'
@@ -532,7 +534,6 @@ st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:9
 if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
     if not df_raw.empty:
-        # 🔥 PUXANDO O MOTIVO / DETALHES DA FRUSTRAÇÃO 🔥
         def get_detalhes(row):
             obs = str(row.get('A_OB', row.get('OBSERVACOES', ''))).strip()
             if obs and obs.upper() != 'NAN': return obs
@@ -592,7 +593,6 @@ if menu == "📊 GRID":
         dict_nomes_grid = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         df_grid['AGENTE_NOME'] = df_grid['AGENTE_RAW'].apply(lambda x: dict_nomes_grid.get(str(x).strip().lower(), str(x).upper()) if str(x).strip() else "")
 
-        # 🔥 COLUNA DETALHES INSERIDA (Sem o CNPJ para ganhar espaço no CCO) 🔥
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'DETALHES', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW']
         
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
@@ -826,7 +826,7 @@ if menu == "📊 GRID":
                                             if enviar_whatsapp_zapi(tel, msg_final):
                                                 time.sleep(2.0)
                                                 pdf_bytes = gerar_pdf_rota_whatsapp(nom, data_str, df_ag)
-                                                enviar_pdf_zapi(telefone, pdf_bytes, f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
+                                                enviar_pdf_zapi(telefone, pdf_bytes, f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
                                                 if ag_login in ag_xls:
                                                     time.sleep(3.0)
                                                     xls_bytes = gerar_excel_rota_whatsapp(df_ag)
@@ -1103,7 +1103,6 @@ elif menu == "🔬 Triagem":
         with t1:
             st.info("💡 A auditoria de triagem aceita apenas materiais **COLETADOS** pelo aplicativo.")
             
-            # 🔥 NOVO LAYOUT DA TRIAGEM: Formulário na Esquerda, Log na Direita 🔥
             col_bip_esq, col_bip_dir = st.columns([1.5, 1])
 
             with col_bip_esq:
@@ -1128,7 +1127,6 @@ elif menu == "🔬 Triagem":
                                         df_nuvem.loc[mask_nuvem, 'STATUS'] = 'CONFERIDO'
                                         aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                         
-                                        # 📝 ALIMENTANDO A MEMÓRIA DO LOG 📝
                                         st.session_state.log_triagem.insert(0, {
                                             'PEDIDO': str(df_raw.at[idx, 'PEDIDO']),
                                             'TOMADOR': str(df_raw.at[idx, 'TOMADOR']),
@@ -1143,11 +1141,10 @@ elif menu == "🔬 Triagem":
                         else: st.error("❌ Assinatura não reconhecida.")
 
             with col_bip_dir:
-                # 🔥 CAIXA DO LOG VISUAL 🔥
                 st.markdown("<div style='border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; background-color: #F8FAFC; height: 130px; overflow-y: auto;'>", unsafe_allow_html=True)
                 st.markdown("<p style='margin-bottom: 5px; font-weight: bold; color: #0F172A; font-size: 14px;'>⏱️ Últimos Bips Realizados:</p>", unsafe_allow_html=True)
                 if st.session_state.log_triagem:
-                    for item in st.session_state.log_triagem[:5]: # Mostra os 5 mais recentes
+                    for item in st.session_state.log_triagem[:5]: 
                         st.markdown(f"<div style='font-size: 12px; color: #334155; margin-bottom: 3px;'>🟢 <b>{item['PEDIDO']}</b> - {item['TOMADOR']} - {item['CIDADE']} <span style='color: #94A3B8;'>({item['HORA']})</span></div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<p style='font-size: 12px; color: #94A3B8;'>Nenhum volume bipado ainda.</p>", unsafe_allow_html=True)
