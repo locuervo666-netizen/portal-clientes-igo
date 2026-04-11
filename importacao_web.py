@@ -27,7 +27,6 @@ FUSO_BR = timezone(timedelta(hours=-3))
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS AJUSTADO: Fundo 100% Branco para remover a faixa cinza 🔥
 st.markdown("""
     <style>
     #MainMenu { visibility: hidden !important; }
@@ -38,7 +37,6 @@ st.markdown("""
     
     .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
     
-    /* AQUI ESTÁ A CORREÇÃO DO FUNDO CINZA (AGORA É TUDO BRANCO) */
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
@@ -76,6 +74,10 @@ st.markdown("""
 
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
+
+# 🔥 Memória de curto prazo para o Log de Triagem 🔥
+if 'log_triagem' not in st.session_state:
+    st.session_state.log_triagem = []
 
 if not st.session_state.autenticado:
     col_vazia1, col_login, col_vazia2 = st.columns([1, 1.5, 1])
@@ -858,7 +860,6 @@ elif menu == "📝 Pedido Manual":
     if 'm_uf' not in st.session_state: st.session_state['m_uf'] = ""
     if 'cep_busca_input' not in st.session_state: st.session_state['cep_busca_input'] = ""
 
-    # 🔥 GATILHO INTELIGENTE: Busca o CEP automaticamente ao apertar Enter
     def buscar_cep_callback():
         cep_limpo = re.sub(r'\D', '', st.session_state.cep_busca_input)
         if len(cep_limpo) == 8:
@@ -933,7 +934,6 @@ elif menu == "📝 Pedido Manual":
                             
                             if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
                             
-                            # 🔥 BALÕES NA CRIAÇÃO DE PEDIDO 🔥
                             st.balloons()
                             st.success(f"🎉 Pedido {m_pedido} criado com sucesso!")
                             time.sleep(3.5)
@@ -1083,7 +1083,6 @@ elif menu == "📥 Importações":
                                 lista_app.append(dict_app)
                         if lista_app: despachar_para_appsheet(lista_app)
                         
-                        # 🔥 BALÕES NA IMPORTAÇÃO E MENSAGEM MAIS LONGA 🔥
                         st.balloons()
                         st.success(f"🎉 SUCESSO ABSOLUTO! {len(df_ok)} pedidos foram importados e salvos no banco de dados com segurança.")
                         time.sleep(3.5) 
@@ -1103,31 +1102,56 @@ elif menu == "🔬 Triagem":
         
         with t1:
             st.info("💡 A auditoria de triagem aceita apenas materiais **COLETADOS** pelo aplicativo.")
-            with st.form("form_bip", clear_on_submit=True):
-                col_bip, col_btn = st.columns([4, 1])
-                bip_input = col_bip.text_input("🔍 Bipar QR Code de Validação:")
-                if col_btn.form_submit_button("Auditar", use_container_width=True) and bip_input:
-                    termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
-                    df_raw['PED_LIMPO'] = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
-                    mask = (df_raw['PED_LIMPO'] == termo)
-                    if 'QR_CODE' in df_raw.columns:
-                        df_raw['QR_LIMPO'] = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
-                        mask = mask | (df_raw['QR_LIMPO'] == termo)
-                    if mask.any():
-                        idx = df_raw[mask].index[-1]
-                        if str(df_raw.at[idx, 'STATUS']).strip().upper() == 'COLETADO':
-                            try:
-                                aba = planilha_db.worksheet("Memoria_Sistema")
-                                df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                mask_nuvem = df_nuvem['PEDIDO'] == str(df_raw.at[idx, 'PEDIDO'])
-                                if mask_nuvem.any():
-                                    df_nuvem.loc[mask_nuvem, 'STATUS'] = 'CONFERIDO'
-                                    aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    st.success(f"✅ Pedido {str(df_raw.at[idx, 'PEDIDO'])} VALIDADO!")
-                                    time.sleep(1.0); carregar_dados_completos.clear(); st.rerun() 
-                            except Exception as e: st.error(f"Erro: {e}")
-                        else: st.error("❌ Volume não está com status COLETADO.")
-                    else: st.error("❌ Assinatura não reconhecida.")
+            
+            # 🔥 NOVO LAYOUT DA TRIAGEM: Formulário na Esquerda, Log na Direita 🔥
+            col_bip_esq, col_bip_dir = st.columns([1.5, 1])
+
+            with col_bip_esq:
+                with st.form("form_bip", clear_on_submit=True):
+                    col_bip, col_btn = st.columns([3, 1])
+                    bip_input = col_bip.text_input("🔍 Bipar QR Code de Validação:")
+                    if col_btn.form_submit_button("Auditar", use_container_width=True) and bip_input:
+                        termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
+                        df_raw['PED_LIMPO'] = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
+                        mask = (df_raw['PED_LIMPO'] == termo)
+                        if 'QR_CODE' in df_raw.columns:
+                            df_raw['QR_LIMPO'] = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
+                            mask = mask | (df_raw['QR_LIMPO'] == termo)
+                        if mask.any():
+                            idx = df_raw[mask].index[-1]
+                            if str(df_raw.at[idx, 'STATUS']).strip().upper() == 'COLETADO':
+                                try:
+                                    aba = planilha_db.worksheet("Memoria_Sistema")
+                                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                    mask_nuvem = df_nuvem['PEDIDO'] == str(df_raw.at[idx, 'PEDIDO'])
+                                    if mask_nuvem.any():
+                                        df_nuvem.loc[mask_nuvem, 'STATUS'] = 'CONFERIDO'
+                                        aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                        
+                                        # 📝 ALIMENTANDO A MEMÓRIA DO LOG 📝
+                                        st.session_state.log_triagem.insert(0, {
+                                            'PEDIDO': str(df_raw.at[idx, 'PEDIDO']),
+                                            'TOMADOR': str(df_raw.at[idx, 'TOMADOR']),
+                                            'CIDADE': str(df_raw.at[idx, 'CIDADE']),
+                                            'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S')
+                                        })
+                                        
+                                        st.success(f"✅ Pedido {str(df_raw.at[idx, 'PEDIDO'])} VALIDADO!")
+                                        time.sleep(1.0); carregar_dados_completos.clear(); st.rerun() 
+                                except Exception as e: st.error(f"Erro: {e}")
+                            else: st.error("❌ Volume não está com status COLETADO.")
+                        else: st.error("❌ Assinatura não reconhecida.")
+
+            with col_bip_dir:
+                # 🔥 CAIXA DO LOG VISUAL 🔥
+                st.markdown("<div style='border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; background-color: #F8FAFC; height: 130px; overflow-y: auto;'>", unsafe_allow_html=True)
+                st.markdown("<p style='margin-bottom: 5px; font-weight: bold; color: #0F172A; font-size: 14px;'>⏱️ Últimos Bips Realizados:</p>", unsafe_allow_html=True)
+                if st.session_state.log_triagem:
+                    for item in st.session_state.log_triagem[:5]: # Mostra os 5 mais recentes
+                        st.markdown(f"<div style='font-size: 12px; color: #334155; margin-bottom: 3px;'>🟢 <b>{item['PEDIDO']}</b> - {item['TOMADOR']} - {item['CIDADE']} <span style='color: #94A3B8;'>({item['HORA']})</span></div>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<p style='font-size: 12px; color: #94A3B8;'>Nenhum volume bipado ainda.</p>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown("---")
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
@@ -1359,7 +1383,6 @@ elif menu == "📁 Relatórios":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        # Puxa os detalhes da frustração para os relatórios também
         def get_detalhes_rel(row):
             obs = str(row.get('A_OB', row.get('OBSERVACOES', ''))).strip()
             if obs and obs.upper() != 'NAN': return obs
@@ -1382,19 +1405,16 @@ elif menu == "📁 Relatórios":
         df_export_base = df_export_base.rename(columns={'AGENTE_RAW': 'MOTORISTA'})
         col_rel1, col_rel2, col_rel3 = st.columns(3)
         
-        # Filtro RJ/JF Baseado na data
         df_rj = df_export_base[df_export_base['UF'].str.upper() == 'RJ'] if 'UF' in df_export_base.columns else pd.DataFrame()
         df_jf = df_export_base[df_export_base['CIDADE'].str.upper().str.contains('JUIZ DE FORA', na=False)] if 'CIDADE' in df_export_base.columns else pd.DataFrame()
         df_rjjf = pd.concat([df_rj, df_jf]).drop_duplicates(subset=['PEDIDO'])
         if not df_rjjf.empty: col_rel1.download_button(f"📥 Extrair Bloco RJ/JF ({len(df_rjjf)} col.)", data=gerar_excel_memoria(df_rjjf), file_name=f"RJ_JF_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
         else: col_rel1.button("📥 Extrair Bloco RJ/JF (Vazio)", disabled=True, use_container_width=True)
         
-        # Filtro Ludmila Baseado na data
         df_lud = df_export_base[df_export_base['MOTORISTA'].str.lower().str.contains('ludmila|veloz', na=False)] if 'MOTORISTA' in df_export_base.columns else pd.DataFrame()
         if not df_lud.empty: col_rel2.download_button(f"📥 Extrair Ludmila/Veloz ({len(df_lud)} col.)", data=gerar_excel_memoria(df_lud), file_name=f"Ludmila_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
         else: col_rel2.button("📥 Extrair Ludmila/Veloz (Vazio)", disabled=True, use_container_width=True)
         
-        # Backup Geral ignorando filtro de data
         df_full_bkp = df_raw[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'DETALHES', 'DATA_ENTREGA', 'AGENTE_RAW', 'DATA_LIMITE']].copy()
         df_full_bkp = df_full_bkp.rename(columns={'AGENTE_RAW': 'MOTORISTA'})
         col_rel3.download_button("☁️ Backup Completo (Toda a Nuvem)", data=gerar_excel_memoria(df_full_bkp), file_name=f"BKP_COMPLETO_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary", use_container_width=True)
