@@ -46,7 +46,8 @@ st.markdown("""
 CLIENTES_CONFIG = {
     "GRALAB": {"senha": "123", "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png", "filtro": "GRALAB"},
     "IGO_LOGISTICA": {"senha": "admin", "logo": LOGO_IGO, "filtro": "TODOS"},
-    "LOGISTICA.LABEST": {"senha": "123", "logo": "logo_labest.png", "filtro": "LABEST"}
+    "LOGISTICA.LABEST": {"senha": "123", "logo": "logo_labest.png", "filtro": "LABEST"},
+    "SYNVIA": {"senha": "123", "logo": LOGO_IGO, "filtro": "SYNVIA"}
 }
 
 # =======================================================
@@ -183,7 +184,6 @@ else:
             with holder_cidades:
                 cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
 
-            # 🔥 Funções de Status, Fotos e DETALHES/OBSERVAÇÕES
             def get_st(row):
                 s = str(row.get('A_ST', row.get('STATUS', ''))).upper()
                 if 'ENTREGUE' in s: return '✅ Entregue'
@@ -193,7 +193,6 @@ else:
             
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
             
-            # Puxa o motivo da frustração (Observações do App ou do Banco)
             def get_detalhes(row):
                 obs = str(row.get('A_OB', row.get('OBSERVACOES', ''))).strip()
                 if obs and obs.upper() != 'NAN':
@@ -252,9 +251,13 @@ else:
                 df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
             if not df_grid.empty:
-                # 🔥 Coluna DETALHES adicionada antes da Foto!
-                cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DETALHES', 'FOTO_URL']
+                # 🔥 COLUNA CNPJ INSERIDA NA VISUALIZAÇÃO 🔥
+                cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CNPJ', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DETALHES', 'FOTO_URL']
                 df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
+                
+                # Se o banco antigo não tem CNPJ ainda, cria vazia para não dar erro
+                if 'CNPJ' not in df_final.columns:
+                    df_final['CNPJ'] = "-"
                 
                 for col in df_final.columns: 
                     df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
@@ -272,6 +275,7 @@ else:
                         "DATA": st.column_config.TextColumn("DATA PEDIDO"),
                         "PEDIDO": st.column_config.TextColumn("PEDIDO"),
                         "LABORATORIO": st.column_config.TextColumn("PCL"),
+                        "CNPJ": st.column_config.TextColumn("CNPJ"),
                         "CIDADE": st.column_config.TextColumn("CIDADE")
                     },
                     disabled=True, 
