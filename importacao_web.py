@@ -27,18 +27,19 @@ FUSO_BR = timezone(timedelta(hours=-3))
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
+# 🔥 CSS AJUSTADO: Fundo 100% Branco para remover a faixa cinza 🔥
 st.markdown("""
     <style>
-    /* Oculta apenas o menu e rodapé padrão com segurança */
     #MainMenu { visibility: hidden !important; }
     footer { visibility: hidden !important; }
     .stAppDeployButton { display: none !important; }
     
-    /* 🔥 SIDEBAR BRANCA 🔥 */
     [data-testid="stSidebar"] { background-color: #FFFFFF !important; border-right: 1px solid #E2E8F0; }
     
     .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
-    [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
+    
+    /* AQUI ESTÁ A CORREÇÃO DO FUNDO CINZA (AGORA É TUDO BRANCO) */
+    [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
         border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
@@ -529,6 +530,13 @@ st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:9
 if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
     if not df_raw.empty:
+        # 🔥 PUXANDO O MOTIVO / DETALHES DA FRUSTRAÇÃO 🔥
+        def get_detalhes(row):
+            obs = str(row.get('A_OB', row.get('OBSERVACOES', ''))).strip()
+            if obs and obs.upper() != 'NAN': return obs
+            return "-"
+        df_raw['DETALHES'] = df_raw.apply(get_detalhes, axis=1)
+        
         def tratar_link_foto(x):
             x_str = str(x).strip()
             if not x_str or x_str.upper() in ['NAN', 'NONE']: return ""
@@ -582,8 +590,8 @@ if menu == "📊 GRID":
         dict_nomes_grid = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         df_grid['AGENTE_NOME'] = df_grid['AGENTE_RAW'].apply(lambda x: dict_nomes_grid.get(str(x).strip().lower(), str(x).upper()) if str(x).strip() else "")
 
-        # 🔥 COLUNA CNPJ REMOVIDA DA VISUALIZAÇÃO DO C.C.O (FICA SÓ NOS BASTIDORES) 🔥
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW']
+        # 🔥 COLUNA DETALHES INSERIDA (Sem o CNPJ para ganhar espaço no CCO) 🔥
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'DETALHES', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW']
         
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
             
@@ -602,6 +610,7 @@ if menu == "📊 GRID":
             column_config={
                 "SELECIONAR": st.column_config.CheckboxColumn("✔ AÇÃO", default=False),
                 "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
+                "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large"),
                 "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Abrir Foto"),
                 "AGENTE_NOME": st.column_config.TextColumn("MOTORISTA"), 
                 "AGENTE_RAW": None, 
@@ -819,7 +828,7 @@ if menu == "📊 GRID":
                                                 if ag_login in ag_xls:
                                                     time.sleep(3.0)
                                                     xls_bytes = gerar_excel_rota_whatsapp(df_ag)
-                                                    enviar_excel_zapi(tel, xls_bytes, f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx")
+                                                    enviar_excel_zapi(tel, xls_bytes, f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx")
                                                 sucessos += 1
                                                 try:
                                                     aba = planilha_db.worksheet("Memoria_Sistema")
@@ -1343,32 +1352,55 @@ elif menu == "📱 WhatsApp":
     else: st.warning("O banco de dados está vazio.")
 
 # =============================================================================
-# 📥 MÓDULO 4: EXPORTAR RELATÓRIOS
+# 📥 MÓDULO 4: EXPORTAR RELATÓRIOS (NOVO E INTELIGENTE)
 # =============================================================================
 elif menu == "📁 Relatórios":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining e Exportação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        df_export_base = df_raw[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'DATA_ENTREGA', 'AGENTE_RAW', 'DATA_LIMITE']].copy()
+        # Puxa os detalhes da frustração para os relatórios também
+        def get_detalhes_rel(row):
+            obs = str(row.get('A_OB', row.get('OBSERVACOES', ''))).strip()
+            if obs and obs.upper() != 'NAN': return obs
+            return "-"
+        df_raw['DETALHES'] = df_raw.apply(get_detalhes_rel, axis=1)
+
+        # 🔥 1. FILTRO INTELIGENTE DE DATAS 🔥
+        st.markdown("#### 📅 1. Selecione o Período Base")
+        col_data = st.columns([1, 2])[0]
+        periodo_rel = col_data.date_input("Filtro de Datas para os Relatórios:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY")
+
+        df_filtered = df_raw.copy()
+        if isinstance(periodo_rel, (tuple, list)) and len(periodo_rel) == 2:
+            df_filtered = df_filtered[(df_filtered['DATA_OBJ'] >= periodo_rel[0]) & (df_filtered['DATA_OBJ'] <= periodo_rel[1])]
+
+        st.markdown("---")
+        st.markdown("#### 📊 2. Extrações Rápidas (Baseado no período selecionado)")
+        
+        df_export_base = df_filtered[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'DETALHES', 'DATA_ENTREGA', 'AGENTE_RAW', 'DATA_LIMITE']].copy()
         df_export_base = df_export_base.rename(columns={'AGENTE_RAW': 'MOTORISTA'})
         col_rel1, col_rel2, col_rel3 = st.columns(3)
         
+        # Filtro RJ/JF Baseado na data
         df_rj = df_export_base[df_export_base['UF'].str.upper() == 'RJ'] if 'UF' in df_export_base.columns else pd.DataFrame()
         df_jf = df_export_base[df_export_base['CIDADE'].str.upper().str.contains('JUIZ DE FORA', na=False)] if 'CIDADE' in df_export_base.columns else pd.DataFrame()
         df_rjjf = pd.concat([df_rj, df_jf]).drop_duplicates(subset=['PEDIDO'])
+        if not df_rjjf.empty: col_rel1.download_button(f"📥 Extrair Bloco RJ/JF ({len(df_rjjf)} col.)", data=gerar_excel_memoria(df_rjjf), file_name=f"RJ_JF_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        else: col_rel1.button("📥 Extrair Bloco RJ/JF (Vazio)", disabled=True, use_container_width=True)
         
-        if not df_rjjf.empty: col_rel1.download_button("📥 Minerar Bloco RJ / JF", data=gerar_excel_memoria(df_rjjf), file_name=f"RJ_JF_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-        else: col_rel1.button("📥 Minerar Bloco RJ / JF (Zero)", disabled=True, use_container_width=True)
-        
+        # Filtro Ludmila Baseado na data
         df_lud = df_export_base[df_export_base['MOTORISTA'].str.lower().str.contains('ludmila|veloz', na=False)] if 'MOTORISTA' in df_export_base.columns else pd.DataFrame()
+        if not df_lud.empty: col_rel2.download_button(f"📥 Extrair Ludmila/Veloz ({len(df_lud)} col.)", data=gerar_excel_memoria(df_lud), file_name=f"Ludmila_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        else: col_rel2.button("📥 Extrair Ludmila/Veloz (Vazio)", disabled=True, use_container_width=True)
         
-        if not df_lud.empty: col_rel2.download_button("📥 Minerar Ludmila / Veloz", data=gerar_excel_memoria(df_lud), file_name=f"Ludmila_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-        else: col_rel2.button("📥 Minerar Ludmila / Veloz (Zero)", disabled=True, use_container_width=True)
-        
-        col_rel3.download_button("📥 Extração Completa (Nuvem)", data=gerar_excel_memoria(df_export_base), file_name=f"BKP_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary", use_container_width=True)
+        # Backup Geral ignorando filtro de data
+        df_full_bkp = df_raw[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'DETALHES', 'DATA_ENTREGA', 'AGENTE_RAW', 'DATA_LIMITE']].copy()
+        df_full_bkp = df_full_bkp.rename(columns={'AGENTE_RAW': 'MOTORISTA'})
+        col_rel3.download_button("☁️ Backup Completo (Toda a Nuvem)", data=gerar_excel_memoria(df_full_bkp), file_name=f"BKP_COMPLETO_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary", use_container_width=True)
         
         st.markdown("---")
+        st.markdown("#### 🔎 3. Pesquisa Customizada (No período selecionado)")
         with st.form("form_rel_custom"):
             cf1, cf2 = st.columns(2)
             c_ag = cf1.text_input("👤 Codinome do Agente:")
@@ -1382,8 +1414,12 @@ elif menu == "📁 Relatórios":
                 if c_cid and 'CIDADE' in df_custom.columns: df_custom = df_custom[df_custom['CIDADE'].str.upper().str.contains(c_cid.upper(), na=False)]
                 if c_uf and 'UF' in df_custom.columns: df_custom = df_custom[df_custom['UF'].str.upper() == c_uf.upper()]
                 if c_base: df_custom = df_custom[df_custom['TOMADOR'].str.upper().str.contains(c_base.upper(), na=False) | df_custom['LABORATORIO'].str.upper().str.contains(c_base.upper(), na=False)]
-                if not df_custom.empty: st.download_button("📥 Fazer Download do Relatório Cru (Excel)", data=gerar_excel_memoria(df_custom), file_name=f"Pesquisa_Customizada_IGO.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                else: st.warning("Nenhum dado encontrado.")
+                
+                if not df_custom.empty: 
+                    st.success(f"✅ Encontrados {len(df_custom)} registros.")
+                    st.download_button("📥 Fazer Download do Relatório Cru (Excel)", data=gerar_excel_memoria(df_custom), file_name=f"Pesquisa_Customizada_IGO.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
+                else: 
+                    st.warning("Nenhum dado encontrado para os filtros e período selecionados.")
     else: st.warning("O banco de dados está vazio.")
 
 # =============================================================================
