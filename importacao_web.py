@@ -27,18 +27,14 @@ FUSO_BR = timezone(timedelta(hours=-3))
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
+# 🔥 CSS 100% LIMPO: NENHUMA REGRA QUE ESCONDA O CABEÇALHO OU O BOTÃO DA SIDEBAR 🔥
 st.markdown("""
     <style>
-    header { background-color: transparent !important; }
-    [data-testid="collapsedControl"] { display: flex !important; visibility: visible !important; z-index: 999999 !important; }
-    #MainMenu { visibility: hidden !important; }
-    footer { visibility: hidden !important; }
-    .stAppDeployButton { display: none !important; }
-    [data-testid="stToolbar"] { visibility: hidden !important; }
-    
+    /* Ajustes básicos de tela e fundo (sem tocar na barra superior do Streamlit) */
     .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
     [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
     
+    /* Botões KPI coloridos */
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
         border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
@@ -52,6 +48,7 @@ st.markdown("""
         color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
     }
     
+    /* Estilização dos Popovers (Botões da Tabela) */
     div[data-testid="stPopover"] > button, button[kind="secondary"] {
         white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
     }
@@ -62,6 +59,7 @@ st.markdown("""
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
     .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
     
+    /* Botão de Sair em Destaque na Sidebar */
     div[data-testid="stSidebar"] button[kind="primary"] {
         background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%) !important;
         color: white !important;
@@ -144,7 +142,7 @@ def carregar_dados_completos(_planilha):
             df = df.loc[:, ~df.columns.duplicated()].dropna(how='all') 
             
             if 'ZAP_ENVIADO' not in df.columns: df['ZAP_ENVIADO'] = ""
-            if 'CNPJ' not in df.columns: df['CNPJ'] = "" # Garante que a coluna existe na leitura
+            if 'CNPJ' not in df.columns: df['CNPJ'] = "" 
 
             try:
                 aba_app = _planilha.worksheet("App_Tarefas")
@@ -581,19 +579,14 @@ if menu == "📊 GRID":
         dict_nomes_grid = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         df_grid['AGENTE_NOME'] = df_grid['AGENTE_RAW'].apply(lambda x: dict_nomes_grid.get(str(x).strip().lower(), str(x).upper()) if str(x).strip() else "")
 
-        # 🔥 CNPJ ADICIONADO À COLUNA MOSTRAR
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CNPJ', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW']
         
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
         
-        # Garante que não quebre se o banco ainda não tiver a coluna CNPJ preenchida
-        if 'CNPJ' not in df_grid_final.columns:
-            df_grid_final['CNPJ'] = ""
+        if 'CNPJ' not in df_grid_final.columns: df_grid_final['CNPJ'] = ""
             
         df_grid_final = df_grid_final[df_grid_final['PEDIDO'].astype(str).str.strip() != ""] 
-        
-        for col in df_grid_final.columns: 
-            df_grid_final[col] = df_grid_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
+        for col in df_grid_final.columns: df_grid_final[col] = df_grid_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
         
         df_grid_final['COMPROVANTE'] = df_grid_final['COMPROVANTE'].apply(lambda x: x if str(x).startswith("http") else "")
         df_grid_final = df_grid_final.reset_index(drop=True)
@@ -805,8 +798,7 @@ if menu == "📊 GRID":
                                             cid_counts = df_ag['CIDADE'].value_counts()
                                             tot_qtd = 0
                                             for cid, count in cid_counts.items():
-                                                msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}")
-                                                tot_qtd += count
+                                                msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}"); tot_qtd += count
                                             msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
                                             for cid, group in df_ag.groupby('CIDADE'):
                                                 msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
@@ -878,8 +870,6 @@ elif menu == "📝 Pedido Manual":
             m_tomador = col1.selectbox("Laboratório Solicitante *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
             m_data = col2.date_input("Data *", format="DD/MM/YYYY", value=hoje_br)
             m_lab = st.text_input("Ponto de Coleta *")
-            
-            # 🔥 INSERIDO O CAMPO CNPJ NO PEDIDO MANUAL 🔥
             m_cnpj = st.text_input("CNPJ / Documento (Opcional)")
             m_rua = st.text_input("Logradouro *", value=st.session_state['m_rua'])
             
@@ -974,7 +964,7 @@ elif menu == "📥 Importações":
                             
                             if c_upper in ['Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in ['N', 'NO', 'NR', 'NUM', 'NUMERO']: mapa[c] = 'NUMERO'
                             elif any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': mapa[c] = 'PEDIDO'
-                            elif any(x in cl for x in ['CNPJ', 'CPF', 'DOCUMENTO', 'DOC']): mapa[c] = 'CNPJ' # 🔥 MAPEAMENTO DO CNPJ AQUI
+                            elif any(x in cl for x in ['CNPJ', 'CPF', 'DOCUMENTO', 'DOC']): mapa[c] = 'CNPJ' 
                             elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): mapa[c] = 'LABORATORIO'
                             elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): mapa[c] = 'ENDERECO'
                             elif 'BAIRRO' in cl: mapa[c] = 'BAIRRO'
@@ -984,7 +974,6 @@ elif menu == "📥 Importações":
                                 
                         df_limpo.rename(columns=mapa, inplace=True)
                         
-                        # 🔥 CNPJ INCLUÍDO NA LISTA DE VERIFICAÇÃO PARA NÃO DAR ERRO
                         for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
                             if c not in df_limpo.columns: df_limpo[c] = ""
                                 
