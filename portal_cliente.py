@@ -184,11 +184,17 @@ else:
             with holder_cidades:
                 cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
 
+            # 🔥 NOVA INTELIGÊNCIA DE STATUS AQUI 🔥
             def get_st(row):
                 s = str(row.get('A_ST', row.get('STATUS', ''))).upper()
                 if 'ENTREGUE' in s: return '✅ Entregue'
+                if 'COLETADO' in s: return '📦 Coletado'
+                if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
+                if 'ROTA' in s: return '🚚 Em Rota de Entrega'
+                if 'CONFERIDO' in s: return '☑️ Conferido'
                 if 'FRUSTRADA' in s: return '❌ Frustrada'
                 if 'CANCELADO' in s: return '🚫 Cancelado'
+                if 'PROBLEMA' in s: return '🚨 Problema'
                 return '⏳ Pendente'
             
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
@@ -251,11 +257,9 @@ else:
                 df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
             if not df_grid.empty:
-                # 🔥 COLUNA CNPJ INSERIDA NA VISUALIZAÇÃO 🔥
                 cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CNPJ', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DETALHES', 'FOTO_URL']
                 df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
                 
-                # Se o banco antigo não tem CNPJ ainda, cria vazia para não dar erro
                 if 'CNPJ' not in df_final.columns:
                     df_final['CNPJ'] = "-"
                 
