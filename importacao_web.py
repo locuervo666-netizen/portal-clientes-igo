@@ -27,14 +27,19 @@ FUSO_BR = timezone(timedelta(hours=-3))
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 CSS 100% LIMPO: NENHUMA REGRA QUE ESCONDA O CABEÇALHO OU O BOTÃO DA SIDEBAR 🔥
 st.markdown("""
     <style>
-    /* Ajustes básicos de tela e fundo (sem tocar na barra superior do Streamlit) */
-    .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
-    [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
+    /* Oculta apenas o menu e rodapé padrão com segurança */
+    #MainMenu { visibility: hidden !important; }
+    footer { visibility: hidden !important; }
+    .stAppDeployButton { display: none !important; }
     
-    /* Botões KPI coloridos */
+    /* 🔥 SIDEBAR BRANCA 🔥 */
+    [data-testid="stSidebar"] { background-color: #FFFFFF !important; border-right: 1px solid #E2E8F0; }
+    
+    .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
+    [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; }
+    
     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
         border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
@@ -48,7 +53,6 @@ st.markdown("""
         color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
     }
     
-    /* Estilização dos Popovers (Botões da Tabela) */
     div[data-testid="stPopover"] > button, button[kind="secondary"] {
         white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
     }
@@ -59,7 +63,6 @@ st.markdown("""
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
     .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
     
-    /* Botão de Sair em Destaque na Sidebar */
     div[data-testid="stSidebar"] button[kind="primary"] {
         background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%) !important;
         color: white !important;
@@ -579,11 +582,10 @@ if menu == "📊 GRID":
         dict_nomes_grid = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         df_grid['AGENTE_NOME'] = df_grid['AGENTE_RAW'].apply(lambda x: dict_nomes_grid.get(str(x).strip().lower(), str(x).upper()) if str(x).strip() else "")
 
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CNPJ', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW']
+        # 🔥 COLUNA CNPJ REMOVIDA DA VISUALIZAÇÃO DO C.C.O (FICA SÓ NOS BASTIDORES) 🔥
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW']
         
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
-        
-        if 'CNPJ' not in df_grid_final.columns: df_grid_final['CNPJ'] = ""
             
         df_grid_final = df_grid_final[df_grid_final['PEDIDO'].astype(str).str.strip() != ""] 
         for col in df_grid_final.columns: df_grid_final[col] = df_grid_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
@@ -609,7 +611,6 @@ if menu == "📊 GRID":
                 "PEDIDO": st.column_config.TextColumn("PEDIDO"),
                 "TOMADOR": st.column_config.TextColumn("TOMADOR"),
                 "LABORATORIO": st.column_config.TextColumn("LABORATÓRIO"),
-                "CNPJ": st.column_config.TextColumn("CNPJ/DOC"),
                 "CIDADE": st.column_config.TextColumn("CIDADE")
             },
             disabled=[c for c in df_grid_final.columns if c != "SELECIONAR"],
@@ -846,23 +847,27 @@ elif menu == "📝 Pedido Manual":
     if 'm_bai' not in st.session_state: st.session_state['m_bai'] = ""
     if 'm_cid' not in st.session_state: st.session_state['m_cid'] = ""
     if 'm_uf' not in st.session_state: st.session_state['m_uf'] = ""
+    if 'cep_busca_input' not in st.session_state: st.session_state['cep_busca_input'] = ""
+
+    # 🔥 GATILHO INTELIGENTE: Busca o CEP automaticamente ao apertar Enter
+    def buscar_cep_callback():
+        cep_limpo = re.sub(r'\D', '', st.session_state.cep_busca_input)
+        if len(cep_limpo) == 8:
+            try:
+                resp = requests.get(f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
+                if "erro" not in resp:
+                    st.session_state['m_rua'] = padronizar_texto(resp.get("logradouro", ""))
+                    st.session_state['m_bai'] = padronizar_texto(resp.get("bairro", ""))
+                    st.session_state['m_cid'] = padronizar_texto(resp.get("localidade", ""))
+                    st.session_state['m_uf'] = padronizar_texto(resp.get("uf", ""))
+            except Exception: pass
 
     with st.container(border=True):
         cc1, cc2, cc3 = st.columns([2, 1, 3], vertical_alignment="bottom")
-        cep_input = cc1.text_input("Digite o CEP", max_chars=9)
+        cc1.text_input("Digite o CEP e aperte ENTER", max_chars=9, key="cep_busca_input", on_change=buscar_cep_callback)
         
         if cc2.button("🔍 Buscar CEP", use_container_width=True):
-            cep_limpo = re.sub(r'\D', '', cep_input)
-            if len(cep_limpo) == 8:
-                try:
-                    resp = requests.get(f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
-                    if "erro" not in resp:
-                        st.session_state['m_rua'] = padronizar_texto(resp.get("logradouro", ""))
-                        st.session_state['m_bai'] = padronizar_texto(resp.get("bairro", ""))
-                        st.session_state['m_cid'] = padronizar_texto(resp.get("localidade", ""))
-                        st.session_state['m_uf'] = padronizar_texto(resp.get("uf", ""))
-                        st.rerun()
-                except Exception as e: st.error(f"Erro: {e}")
+            buscar_cep_callback()
         
         st.markdown("---")
         with st.form("form_manual_page", clear_on_submit=True):
@@ -907,7 +912,7 @@ elif menu == "📝 Pedido Manual":
                                 'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 
                                 'LABORATORIO': lab_limpo, 'CNPJ': padronizar_texto(m_cnpj), 'ENDERECO': rua_limpa, 'NUMERO': "", 
                                 'BAIRRO': bai_limpo, 'CIDADE': cid_limpa, 'UF': uf_limpa, 
-                                'CEP': cep_limpo if 'cep_limpo' in locals() else "", 'STATUS': 'PENDENTE', 
+                                'CEP': re.sub(r'\D', '', st.session_state.cep_busca_input), 'STATUS': 'PENDENTE', 
                                 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 
                                 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': "", 'ZAP_ENVIADO': ""
                             }
@@ -918,9 +923,15 @@ elif menu == "📝 Pedido Manual":
                             aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
                             
                             if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
-                            st.success(f"🎉 Pedido {m_pedido} criado!")
+                            
+                            # 🔥 BALÕES NA CRIAÇÃO DE PEDIDO 🔥
+                            st.balloons()
+                            st.success(f"🎉 Pedido {m_pedido} criado com sucesso!")
+                            time.sleep(3.5)
+                            
                             carregar_dados_completos.clear()
-                            st.session_state['m_rua'] = ""; st.session_state['m_bai'] = ""; st.session_state['m_cid'] = ""; st.session_state['m_uf'] = ""
+                            st.session_state['m_rua'] = ""; st.session_state['m_bai'] = ""; st.session_state['m_cid'] = ""; st.session_state['m_uf'] = ""; st.session_state['cep_busca_input'] = ""
+                            st.rerun()
                         except Exception as e: st.error(f"Erro: {e}")
 
 # =============================================================================
@@ -1062,8 +1073,13 @@ elif menu == "📥 Importações":
                                 }
                                 lista_app.append(dict_app)
                         if lista_app: despachar_para_appsheet(lista_app)
-                        st.success(f"🎉 SUCESSO! {len(df_ok)} pedidos importados.")
-                        time.sleep(2.5); st.session_state.df_preview = pd.DataFrame(); carregar_dados_completos.clear(); st.rerun()
+                        
+                        # 🔥 BALÕES NA IMPORTAÇÃO E MENSAGEM MAIS LONGA 🔥
+                        st.balloons()
+                        st.success(f"🎉 SUCESSO ABSOLUTO! {len(df_ok)} pedidos foram importados e salvos no banco de dados com segurança.")
+                        time.sleep(3.5) 
+                        
+                        st.session_state.df_preview = pd.DataFrame(); carregar_dados_completos.clear(); st.rerun()
                     except Exception as e: st.error(f"Erro: {e}")
 
 # =============================================================================
