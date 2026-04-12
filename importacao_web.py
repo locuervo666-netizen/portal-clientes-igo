@@ -122,7 +122,7 @@ def conectar_banco():
         st.error(f"Erro na leitura da chave: {e}")
     return None
 
-# 🔥 NOVA CONEXÃO BLINDADA PARA O AMBIENTE PARALELO 🔥
+# 🔥 CONEXÃO BLINDADA PARA O AMBIENTE PARALELO 🔥
 @st.cache_resource
 def conectar_sandbox():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -544,7 +544,6 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 with st.sidebar:
     st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=160)
     st.divider()
-    # Adicionada a opção "📥 Importação Umove" na Sidebar
     menu = st.radio("Navegação Operacional:", ["📊 GRID", "📝 Pedido Manual", "📥 Importações", "📥 Importação Umove", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"])
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
@@ -1117,34 +1116,58 @@ elif menu == "📥 Importações":
 # =============================================================================
 elif menu == "📥 Importação Umove":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Laboratório de Testes (Sandbox Umove)</h3></div>", unsafe_allow_html=True)
-    st.info("🔒 **Ambiente Blindado:** Os dados processados aqui são salvos apenas na planilha 'Import_Umove'. O sistema principal não será afetado.")
+    st.info("🔒 **Ambiente Blindado:** Lógica idêntica ao oficial. Os arquivos são gerados a partir do ID **700000** e gravados apenas no Google Drive 'Import_Umove'.")
     
     if planilha_sandbox is None:
-        st.error("❌ Não foi possível conectar com a planilha 'Import_Umove' no Drive. Verifique se ela foi criada.")
+        st.error("❌ Não foi possível conectar com a planilha 'Import_Umove' no Drive. Verifique as permissões.")
         st.stop()
         
     if "df_sandbox_mem" not in st.session_state: 
         st.session_state.df_sandbox_mem = pd.DataFrame()
 
     with st.container(border=True):
-        st.markdown("#### 1. Faça o Upload do arquivo exportado")
-        uploaded_file = st.file_uploader("Selecione o arquivo Excel ou CSV", type=["xlsx", "csv", "xls"])
-        col_tom, col_dt = st.columns(2)
-        tom_sandbox = col_tom.selectbox("🏢 Tomador Base (Para preenchimento):", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="sb_tom")
-        dt_sandbox = col_dt.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br, key="sb_dt")
+        st.markdown("#### 1. Mapeamento de Planilha e Colagem (Legado Umove)")
+        c1_sb, c2_sb, c3_sb = st.columns([1, 1, 2])
+        with c1_sb: tom_sandbox = st.selectbox("🏢 Tomador Central:", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="tom_sb")
+        with c2_sb: dt_sandbox = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br, key="dt_sb")
+            
+        txt_sb = st.text_area("📋 Cole os dados (Ctrl+V) do sistema legado:", height=150, key="txt_sb")
 
-        if st.button("🚀 Ler e Injetar na Sandbox", type="primary", use_container_width=True):
-            if uploaded_file is None or tom_sandbox == "Selecione...":
-                st.warning("⚠️ Selecione o arquivo e o Tomador antes de continuar.")
+        if st.columns([1, 2])[0].button("🔍 1. Processar e Gerar Preview", type="primary", use_container_width=True):
+            if not txt_sb or tom_sandbox == "Selecione...":
+                st.warning("⚠️ Preencha o Tomador e cole os dados!")
             else:
-                with st.spinner("Processando e limpando dados..."):
+                with st.spinner("Processando dados e associando motoristas..."):
                     try:
-                        if uploaded_file.name.endswith('.csv'):
-                            df_raw_sb = pd.read_csv(uploaded_file, sep=None, engine='python', dtype=str).fillna("")
-                        else:
-                            df_raw_sb = pd.read_excel(uploaded_file, dtype=str).fillna("")
-                            
-                        df_limpo_sb = df_raw_sb.copy()
+                        # Recupera ou inicializa o contador do Sandbox (700000)
+                        prox_id_sb = 700000
+                        try:
+                            aba_contador = planilha_sandbox.worksheet("Contador")
+                            val = aba_contador.acell('A1').value
+                            if val and str(val).isdigit():
+                                prox_id_sb = int(val)
+                            else:
+                                aba_contador.update("A1", [["700000"]])
+                        except Exception:
+                            # Se a aba não existir, usa a session state para não quebrar
+                            if 'contador_temp' in st.session_state:
+                                prox_id_sb = st.session_state.contador_temp
+                            else:
+                                st.session_state.contador_temp = 700000
+
+                        delim = '\t' if '\t' in txt_sb else (';' if ';' in txt_sb else ',')
+                        df_raw_sb = pd.read_csv(io.StringIO(txt_sb), sep=delim, header=None, dtype=str).fillna("")
+                        
+                        idx_h, max_matches = 0, 0
+                        for i in range(min(15, len(df_raw_sb))):
+                            row_str = unicodedata.normalize('NFKD', " ".join(df_raw_sb.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
+                            matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP'] if kw in row_str)
+                            if matches > max_matches: max_matches, idx_h = matches, i
+                                
+                        df_limpo_sb = df_raw_sb.iloc[idx_h+1:].copy()
+                        df_limpo_sb.columns = [str(c).strip() for c in df_raw_sb.iloc[idx_h].values]
+                        df_limpo_sb = df_limpo_sb.loc[:, ~df_limpo_sb.columns.duplicated()] 
+                        
                         for col in df_limpo_sb.columns: df_limpo_sb[col] = df_limpo_sb[col].apply(tratar_texto_global)
                         
                         mapa_sb = {}
@@ -1167,7 +1190,13 @@ elif menu == "📥 Importação Umove":
                         for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
                             if c not in df_limpo_sb.columns: df_limpo_sb[c] = ""
                                 
+                        # Injeção da sequencia a partir de 700000+
+                        df_limpo_sb['PEDIDO'] = ""
                         for idx, row in df_limpo_sb.iterrows():
+                            # Se for vazio, injeta o ID gerado para gerar LOC e AGD depois
+                            df_limpo_sb.at[idx, 'PEDIDO'] = str(prox_id_sb)
+                            prox_id_sb += 1
+                            
                             e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
                             if e and (not n or not b):
                                 cep_m = re.search(r'(\d{5}-?\d{3})', e)
@@ -1183,18 +1212,26 @@ elif menu == "📥 Importação Umove":
                         df_limpo_sb['TOMADOR'] = tom_sandbox
                         df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
                         
-                        # Cruza com a aba "Agentes" do banco principal (Inteligência Híbrida)
+                        # Cruza com a aba "Agentes" do banco principal
                         df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
                         
                         df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
                         
+                        # Atualiza o contador geral no Drive
+                        try:
+                            aba_contador.update("A1", [[str(prox_id_sb)]])
+                        except:
+                            st.session_state.contador_temp = prox_id_sb
+
                         # Grava na Planilha Paralela (Sandbox)
-                        aba_sb = planilha_sandbox.sheet1
-                        aba_sb.clear()
-                        aba_sb.update("A1", [df_final_sb.columns.tolist()] + df_final_sb.fillna("").astype(str).values.tolist())
+                        try:
+                            aba_sb = planilha_sandbox.sheet1
+                            aba_sb.clear()
+                            aba_sb.update("A1", [df_final_sb.columns.tolist()] + df_final_sb.fillna("").astype(str).values.tolist())
+                        except: pass
                         
                         st.session_state.df_sandbox_mem = df_final_sb
-                        st.success("✅ Processado e salvo no Sandbox Drive com sucesso!")
+                        st.success("✅ Processado com sucesso! Os IDs a partir de 700000 foram gerados.")
                         time.sleep(1); st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao processar arquivo Sandbox: {e}")
@@ -1204,8 +1241,11 @@ elif menu == "📥 Importação Umove":
         df_sb = st.session_state.df_sandbox_mem
         
         st.markdown("---")
-        st.markdown("### 📊 Mini-Painel de Auditoria")
-        
+        col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
+        col_tit.markdown("### 👀 2. Preview e Auditoria da Carga Umove")
+        if col_canc.button("❌ Cancelar / Limpar", type="secondary", use_container_width=True, key="canc_sb"):
+            st.session_state.df_sandbox_mem = pd.DataFrame(); st.rerun()
+
         c_kpi1, c_kpi2 = st.columns([1, 4])
         total_sb = len(df_sb)
         c_kpi1.metric("TOTAL DE PEDIDOS", total_sb)
@@ -1215,8 +1255,8 @@ elif menu == "📥 Importação Umove":
         resumo_str = " | ".join([f"**{row['LABORATORIO']}**: {row['QTD']}" for _, row in resumo_lab.iterrows()])
         c_kpi2.info(f"**Detalhamento:**\n{resumo_str}")
         
-        st.markdown("### 🕵️‍♂️ Grid Interativa de Homologação")
-        st.markdown("<p style='font-size:12px; color:#64748B;'>Dê dois cliques em qualquer célula para corrigir nomes de agentes ou endereços antes da exportação final.</p>", unsafe_allow_html=True)
+        st.markdown("#### 🕵️‍♂️ Grid Interativa de Homologação")
+        st.markdown("<p style='font-size:12px; color:#64748B;'>Dê dois cliques na tabela para corrigir agentes ou endereços (Os IDs da coluna PEDIDO serão usados no LOC/AGD).</p>", unsafe_allow_html=True)
         
         # Grid Editável
         df_editado_sb = st.data_editor(
@@ -1239,9 +1279,8 @@ elif menu == "📥 Importação Umove":
             agd_lines = ["ID_AGENDAMENTO;ID_LOCALIDADE;TOMADOR;DATA;MOTORISTA;STATUS"]
             
             for idx, row in df.iterrows():
-                # Simulando IDs para o sistema legado
-                id_loc = f"LOC{idx+1000}"
-                id_agd = f"AGD{idx+1000}" if not row.get('PEDIDO') else str(row['PEDIDO'])
+                id_agd = str(row['PEDIDO'])
+                id_loc = f"LOC{id_agd}" # Criando a relacao logica
                 
                 linha_loc = f"{id_loc};{row.get('LABORATORIO','')};{row.get('ENDERECO','')};{row.get('NUMERO','')};{row.get('BAIRRO','')};{row.get('CIDADE','')};{row.get('UF','')};{row.get('CEP','')}"
                 linha_agd = f"{id_agd};{id_loc};{row.get('TOMADOR','')};{row.get('DATA','')};{row.get('AGENTE_RAW','')};PENDENTE"
@@ -1257,22 +1296,22 @@ elif menu == "📥 Importação Umove":
             st.download_button(
                 "💾 1. Baixar Arquivo .LOC",
                 data=bytes_loc,
-                file_name=f"ARQUIVO_LOC_{dt_sandbox.strftime('%d%m%Y')}.txt",
+                file_name=f"ARQUIVO_LOC_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.txt",
                 mime="text/plain",
                 use_container_width=True
             )
             st.download_button(
                 "💾 2. Baixar Arquivo .AGD",
                 data=bytes_agd,
-                file_name=f"ARQUIVO_AGD_{dt_sandbox.strftime('%d%m%Y')}.txt",
+                file_name=f"ARQUIVO_AGD_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.txt",
                 mime="text/plain",
                 use_container_width=True
             )
 
         # 2. Disparo de WhatsApp SandBox
         with col_cmd2.popover("📲 Disparar WhatsApp (API)", use_container_width=True):
-            st.markdown("Isso disparará as rotas configuradas na Grid acima para os WhatsApps dos Motoristas.")
-            if st.button("🚀 Confirmar Disparos"):
+            st.markdown("Isso disparará as rotas homologadas acima para os Motoristas (usando os IDs de 700000+).")
+            if st.button("🚀 Confirmar Disparos", use_container_width=True):
                 with st.spinner("Enviando rotas de teste/homologação..."):
                     dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
                     dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
@@ -1287,7 +1326,7 @@ elif menu == "📥 Importação Umove":
                         nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
                         
                         if tel:
-                            data_str = dt_sandbox.strftime('%d/%m/%Y')
+                            data_str = datetime.now(FUSO_BR).strftime('%d/%m/%Y')
                             msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
                             tot_qtd = 0
                             for cid, count in df_ag_sb['CIDADE'].value_counts().items():
@@ -1304,18 +1343,18 @@ elif menu == "📥 Importação Umove":
                                 
                             if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
                                 time.sleep(2.0)
-                                # Gera PDF do Sandbox e envia
                                 pdf_bytes_sb = gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb)
-                                enviar_pdf_zapi(tel, pdf_bytes_sb, f"ROTA_IGO_{nom.replace(' ', '_')}_{dt_sandbox.strftime('%d%m')}.pdf")
+                                enviar_pdf_zapi(tel, pdf_bytes_sb, f"ROTA_IGO_{nom.replace(' ', '_')}_{datetime.now(FUSO_BR).strftime('%d%m')}.pdf")
                                 sucessos_sb += 1
                                 
                     if sucessos_sb > 0: st.success(f"✅ Disparo Sandbox concluído para {sucessos_sb} agente(s)!")
-                    else: st.error("🚨 Nenhum envio realizado.")
+                    else: st.error("🚨 Nenhum envio realizado. Verifique as configurações na aba de Agentes.")
 
         # 3. Limpar Sandbox
         if col_cmd3.button("🗑️ Limpar Sandbox e Resetar", type="secondary", use_container_width=True):
             st.session_state.df_sandbox_mem = pd.DataFrame()
-            planilha_sandbox.sheet1.clear()
+            try: planilha_sandbox.sheet1.clear()
+            except: pass
             st.rerun()
 
 # =============================================================================
