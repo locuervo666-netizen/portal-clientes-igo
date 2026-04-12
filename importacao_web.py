@@ -1110,8 +1110,7 @@ elif menu == "📥 Importações":
 # 🔥 MÓDULO SANDBOX (PARALELO): IMPORTAÇÃO UMOVE 🔥
 # =============================================================================
 elif menu == "📥 Importação Umove":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Laboratório de Testes (Sandbox Umove)</h3></div>", unsafe_allow_html=True)
-    st.info("🔒 **Ambiente Blindado (Carrinho):** Processe vários Tomadores. Eles serão acumulados aqui antes da geração dos arquivos e disparo do WhatsApp.")
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Zona de Importação</h3></div>", unsafe_allow_html=True)
     
     if planilha_sandbox is None:
         st.error("❌ Não foi possível conectar com a planilha 'Import_Umove' no Drive. Verifique as permissões.")
@@ -1119,6 +1118,9 @@ elif menu == "📥 Importação Umove":
         
     if "df_sandbox_mem" not in st.session_state: 
         st.session_state.df_sandbox_mem = pd.DataFrame()
+
+    if "txt_sb" not in st.session_state:
+        st.session_state.txt_sb = ""
 
     with st.container(border=True):
         st.markdown("#### 1. Colagem da Matriz do Cliente")
@@ -1128,7 +1130,13 @@ elif menu == "📥 Importação Umove":
             
         txt_sb = st.text_area("📋 Cole os dados (Ctrl+V) do sistema legado:", height=150, key="txt_sb")
 
-        if st.columns([1, 2])[0].button("➕ Adicionar ao Carrinho de Importação", type="primary", use_container_width=True):
+        col_btn_add, col_btn_clear = st.columns([3, 1])
+
+        if col_btn_clear.button("🧹 Limpar Campo", type="secondary", use_container_width=True):
+            st.session_state.txt_sb = ""
+            st.rerun()
+
+        if col_btn_add.button("➕ Adicionar ao Carrinho de Importação", type="primary", use_container_width=True):
             if not txt_sb or tom_sandbox == "Selecione...":
                 st.warning("⚠️ Preencha o Tomador e cole os dados!")
             else:
@@ -1227,6 +1235,7 @@ elif menu == "📥 Importação Umove":
                             aba_sb.update("A1", [st.session_state.df_sandbox_mem.columns.tolist()] + st.session_state.df_sandbox_mem.fillna("").astype(str).values.tolist())
                         except: pass
                         
+                        st.session_state.txt_sb = "" # Limpa a caixa de texto apos sucesso!
                         st.success(f"✅ {len(df_final_sb)} pedidos do {tom_sandbox} adicionados ao carrinho!")
                         time.sleep(1); st.rerun()
                     except Exception as e:
@@ -1295,10 +1304,13 @@ elif menu == "📥 Importação Umove":
             
         bytes_loc, bytes_agd = criar_arquivos_legados(df_editado_sb)
         
+        def notify_loc(): st.toast("✅ Download do arquivo .LOC iniciado com sucesso!", icon="💾")
+        def notify_agd(): st.toast("✅ Download do arquivo .AGD iniciado com sucesso!", icon="💾")
+
         with col_cmd1:
-            st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True)
+            st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
         with col_cmd2:
-            st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True)
+            st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
 
         with col_cmd3.popover("📲 3. Disparar WhatsApp", use_container_width=True):
             st.markdown("Isso disparará as rotas de todos os clientes no carrinho para os motoristas.")
@@ -1338,7 +1350,11 @@ elif menu == "📥 Importação Umove":
                                 enviar_pdf_zapi(tel, pdf_bytes_sb, f"ROTA_IGO_{nom.replace(' ', '_')}_{dt_sandbox.strftime('%d%m')}.pdf")
                                 sucessos_sb += 1
                                 
-                    if sucessos_sb > 0: st.success(f"✅ Disparo Sandbox concluído para {sucessos_sb} motorista(s)!")
+                    if sucessos_sb > 0: 
+                        st.balloons()
+                        st.success(f"🎉 SUCESSO ABSOLUTO! Disparo concluído para {sucessos_sb} motorista(s)!")
+                        time.sleep(3.5)
+                        st.rerun()
                     else: st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
 
 # =============================================================================
@@ -1349,7 +1365,7 @@ elif menu == "🔬 Triagem":
     df_raw = carregar_dados_completos(planilha_db)
     
     if not df_raw.empty:
-        t1, t2, t3 = tabs(["📦 1. Validação Manual & Bipar", "🚚 2. Gerar Documento de Romaneio", "🕒 3. Histórico de Varredura"])
+        t1, t2, t3 = st.tabs(["📦 1. Validação Manual & Bipar", "🚚 2. Gerar Documento de Romaneio", "🕒 3. Histórico de Varredura"])
         
         with t1:
             st.info("💡 A auditoria de triagem aceita apenas materiais **COLETADOS** pelo aplicativo.")
