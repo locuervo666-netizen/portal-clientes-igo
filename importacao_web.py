@@ -144,7 +144,7 @@ def conectar_sandbox():
 planilha_db = conectar_banco()
 planilha_sandbox = conectar_sandbox()
 
-# 🔹 LISTA DE CLIENTES AUTORIZADOS AGORA EM ORDEM ALFABÉTICA 🔹
+# 🔹 LISTA DE CLIENTES AUTORIZADOS EM ORDEM ALFABÉTICA 🔹
 CLIENTES_AUTORIZADOS = sorted(["CAEP", "MB_CAEP", "CUNHA", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"])
 
 @st.cache_data(ttl=20)
@@ -540,7 +540,7 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 with st.sidebar:
     st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=160)
     st.divider()
-    menu = st.radio("Navegação Operacional:", ["📊 GRID", "📝 Pedido Manual", "📥 Importações", "📥 Importação Umove", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"])
+    menu = st.radio("Navegação Operacional:", ["📊 GRID", "📝 Pedido Manual", "📥 Importações", "📥 Importações Umove", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"])
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
@@ -605,12 +605,17 @@ if menu == "📊 GRID":
             
         df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(definir_prioridade)
         df_grid = df_grid.sort_values(by=['PRIORIDADE', 'PEDIDO'], ascending=[True, False]).drop(columns=['PRIORIDADE'])
-        if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: busca.upper() in x.str.upper().values, axis=1)]
+        
+        # 🔹 Busca Rápida aprimorada e garantida
+        if busca:
+            mask = df_grid.apply(lambda row: row.astype(str).str.contains(busca, case=False).any(), axis=1)
+            df_grid = df_grid[mask]
 
         dict_nomes_grid = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         df_grid['AGENTE_NOME'] = df_grid['AGENTE_RAW'].apply(lambda x: dict_nomes_grid.get(str(x).strip().lower(), str(x).upper()) if str(x).strip() else "")
 
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'DETALHES', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW']
+        # 🔹 Coluna DETALHES realocada para depois da COMPROVANTE (FOTO) 🔹
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'DETALHES', 'AGENTE_NOME', 'AGENTE_RAW']
         
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
             
@@ -629,8 +634,8 @@ if menu == "📊 GRID":
             column_config={
                 "SELECIONAR": st.column_config.CheckboxColumn("✔ AÇÃO", default=False),
                 "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
-                "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large"),
                 "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Abrir Foto"),
+                "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large"),
                 "AGENTE_NOME": st.column_config.TextColumn("MOTORISTA"), 
                 "AGENTE_RAW": None, 
                 "DATA_ENTREGA": st.column_config.TextColumn("ENTREGA"),
@@ -805,16 +810,19 @@ if menu == "📊 GRID":
                         with st.form("form_zap_grid"):
                             st.markdown(f"**{len(linhas_pendentes)}** volumes válidos selecionados para envio.")
                             if st.form_submit_button("🚀 Disparar para Motorista(s)", type="primary", use_container_width=True):
-                                with st.spinner("Enviando rotas via satélite..."):
-                                    p_ids_pendentes = linhas_pendentes["PEDIDO"].astype(str).tolist()
-                                    df_raw_pendentes = df_raw[df_raw['PEDIDO'].isin(p_ids_pendentes)]
-                                    dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
-                                    dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
-                                    ag_xls = ['veloz.express', 'robson.melo', 'william.bertoldo']
-                                    sucessos = 0
-                                    agentes_selecionados = df_raw_pendentes['AGENTE_RAW'].dropna().unique()
+                                p_ids_pendentes = linhas_pendentes["PEDIDO"].astype(str).tolist()
+                                df_raw_pendentes = df_raw[df_raw['PEDIDO'].isin(p_ids_pendentes)]
+                                dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
+                                dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
+                                ag_xls = ['veloz.express', 'robson.melo', 'william.bertoldo', 'ludmila']
+                                sucessos = 0
+                                agentes_selecionados = df_raw_pendentes['AGENTE_RAW'].dropna().unique()
+                                
+                                if len(agentes_selecionados) > 0:
+                                    progress_bar = st.progress(0)
+                                    status_text = st.empty()
                                     
-                                    for ag in agentes_selecionados:
+                                    for idx_ag, ag in enumerate(agentes_selecionados):
                                         if not str(ag).strip(): continue
                                         df_ag = df_raw_pendentes[df_raw_pendentes['AGENTE_RAW'] == ag]
                                         tel = dict_tel.get(str(ag).strip().lower(), "")
@@ -822,6 +830,7 @@ if menu == "📊 GRID":
                                         ag_login = str(ag).strip().lower()
                                         
                                         if tel:
+                                            status_text.markdown(f"**Enviando rota para:** {nom} ({idx_ag+1}/{len(agentes_selecionados)})...")
                                             data_str = hoje_br.strftime('%d/%m/%Y')
                                             msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
                                             cid_counts = df_ag['CIDADE'].value_counts()
@@ -858,8 +867,12 @@ if menu == "📊 GRID":
                                                     aba.clear()
                                                     aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                                 except Exception as e: st.error(f"Erro ao carimbar envio: {e}")
+                                        
+                                        progress_bar.progress((idx_ag + 1) / len(agentes_selecionados))
+                                    
+                                    status_text.markdown("✅ **Processo finalizado!**")
                                     if sucessos > 0:
-                                        st.success(f"✅ Disparo concluído para {sucessos} agente(s)!")
+                                        st.success(f"🎉 Disparo concluído para {sucessos} agente(s)!")
                                         time.sleep(2.0); carregar_dados_completos.clear(); st.rerun()
                                     else: st.error("🚨 Nenhum envio realizado. Verifique os contatos.")
 
@@ -1106,9 +1119,9 @@ elif menu == "📥 Importações":
                     except Exception as e: st.error(f"Erro: {e}")
 
 # =============================================================================
-# 🔥 MÓDULO SANDBOX (PARALELO): IMPORTAÇÃO UMOVE 🔥
+# 🔥 MÓDULO SANDBOX (PARALELO): IMPORTAÇÕES UMOVE 🔥
 # =============================================================================
-elif menu == "📥 Importação Umove":
+elif menu == "📥 Importações Umove":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Zona de Importação</h3></div>", unsafe_allow_html=True)
     
     if planilha_sandbox is None:
@@ -1127,7 +1140,6 @@ elif menu == "📥 Importação Umove":
         with c1_sb: tom_sandbox = st.selectbox("🏢 Tomador Desta Carga:", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="tom_sb")
         with c2_sb: dt_sandbox = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br, key="dt_sb")
             
-        # O botão Limpar foi removido. Para limpar, basta dar Ctrl+A e apagar na caixa abaixo.
         txt_sb = st.text_area("📋 Cole os dados (Ctrl+V) do sistema legado:", height=150)
 
         if st.button("🔍 Processar Matriz", type="primary", use_container_width=True):
@@ -1197,7 +1209,7 @@ elif menu == "📥 Importação Umove":
                     except Exception as e:
                         st.error(f"Erro ao processar a matriz: {e}")
 
-    # PREVIEW DA MATRIZ ATUAL (Etapa de Segurança)
+    # PREVIEW DA MATRIZ ATUAL (Etapa de Segurança Rigorosa)
     if not st.session_state.df_preview_sb.empty:
         st.markdown("---")
         df_preview = st.session_state.df_preview_sb
@@ -1219,21 +1231,21 @@ elif menu == "📥 Importação Umove":
             st.success(f"✅ Preview validado! {len(df_ok)} pedidos com motoristas atrelados.")
             st.dataframe(df_ok, hide_index=True)
             if st.button("➕ Adicionar ao Carrinho (Cumulativo)", type="primary", key="add_carrinho_sb"):
-                with st.spinner("Gerando IDs 700005+ e adicionando ao carrinho..."):
+                with st.spinner("Gerando IDs 700020+ e adicionando ao carrinho..."):
                     try:
-                        prox_id_sb = 700005
+                        prox_id_sb = 700020
                         try:
                             aba_contador = planilha_sandbox.worksheet("Contador")
                             val = aba_contador.acell('A1').value
                             if val and str(val).isdigit():
                                 prox_id_sb = int(val)
                             else:
-                                aba_contador.update("A1", [["700005"]])
+                                aba_contador.update("A1", [["700020"]])
                         except Exception:
                             if 'contador_temp' in st.session_state:
                                 prox_id_sb = st.session_state.contador_temp
                             else:
-                                st.session_state.contador_temp = 700005
+                                st.session_state.contador_temp = 700020
 
                         for idx, row in df_ok.iterrows():
                             df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
@@ -1323,22 +1335,25 @@ elif menu == "📥 Importação Umove":
         def notify_agd(): st.toast("✅ Download do arquivo .AGD finalizado com sucesso!", icon="💾")
 
         with col_cmd1:
-            st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{datetime.now(FUSO_BR).strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
+            st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
         with col_cmd2:
-            st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{datetime.now(FUSO_BR).strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
+            st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
 
         with col_cmd3.popover("📲 3. Disparar WhatsApp", use_container_width=True):
             st.markdown("Isso disparará as rotas de todos os clientes no carrinho para os motoristas.")
             if st.button("🚀 Confirmar Disparos", use_container_width=True):
-                with st.spinner("Enviando rotas unificadas..."):
-                    dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
-                    dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
-                    
-                    agentes_selecionados = df_editado_sb['AGENTE_RAW'].dropna().unique()
-                    sucessos_sb = 0
-                    agentes_xls_sb = ['veloz.express', 'robson.melo', 'william.bertoldo']
-                    
-                    for ag in agentes_selecionados:
+                dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
+                dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
+                
+                agentes_selecionados = df_editado_sb['AGENTE_RAW'].dropna().unique()
+                sucessos_sb = 0
+                agentes_xls_sb = ['veloz.express', 'robson.melo', 'william.bertoldo', 'ludmila']
+                
+                if len(agentes_selecionados) > 0:
+                    progress_bar = st.progress(0)
+                    status_txt = st.empty()
+                
+                    for idx_ag, ag in enumerate(agentes_selecionados):
                         if not str(ag).strip(): continue
                         df_ag_sb = df_editado_sb[df_editado_sb['AGENTE_RAW'] == ag]
                         tel = dict_tel.get(str(ag).strip().lower(), "")
@@ -1346,7 +1361,8 @@ elif menu == "📥 Importação Umove":
                         ag_login = str(ag).strip().lower()
                         
                         if tel:
-                            data_str = datetime.now(FUSO_BR).strftime('%d/%m/%Y')
+                            status_txt.markdown(f"**Enviando rota para:** {nom} ({idx_ag+1}/{len(agentes_selecionados)})...")
+                            data_str = dt_sandbox.strftime('%d/%m/%Y')
                             msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
                             tot_qtd = 0
                             for cid, count in df_ag_sb['CIDADE'].value_counts().items():
@@ -1373,8 +1389,11 @@ elif menu == "📥 Importação Umove":
                                 
                                 sucessos_sb += 1
                                 
+                        progress_bar.progress((idx_ag + 1) / len(agentes_selecionados))
+                    
+                    status_txt.markdown("✅ **Processo finalizado!**")
                     if sucessos_sb > 0: 
-                        st.success(f"🎉 SUCESSO ABSOLUTO! Disparo concluído para {sucessos_sb} motorista(s)!")
+                        st.success(f"🎉 Disparo Sandbox concluído para {sucessos_sb} motorista(s)!")
                         time.sleep(3.5)
                         st.rerun()
                     else: st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
@@ -1525,7 +1544,7 @@ elif menu == "📱 WhatsApp":
         
         dict_telefones = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip() and re.sub(r'\D', '', str(r.get('TELEFONE', '')))}
         dict_nomes = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
-        agentes_xls = ['veloz.express', 'robson.melo', 'william.bertoldo']
+        agentes_xls = ['veloz.express', 'robson.melo', 'william.bertoldo', 'ludmila']
 
         with col_esq:
             if df_pendentes.empty: st.success(f"Nenhum volume PENDENTE aguardando envio na data {data_filtro.strftime('%d/%m/%Y')}.")
@@ -1536,10 +1555,14 @@ elif menu == "📱 WhatsApp":
                 if agentes_para_enviar:
                     st.info(f"🚀 Existem {len(agentes_para_enviar)} motoristas aguardando o envio da rota oficial.")
                     if st.button("🚀 DISPARAR ROTAS PARA TODOS AGORA", type="primary", use_container_width=True):
-                        with st.spinner("Iniciando disparos em massa..."):
-                            pedidos_atualizados = []
-                            sucessos = 0
-                            for agente in agentes_para_enviar:
+                        pedidos_atualizados = []
+                        sucessos = 0
+                        
+                        if len(agentes_para_enviar) > 0:
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+                        
+                            for idx_ag, agente in enumerate(agentes_para_enviar):
                                 mask_agente = (df_pendentes['AGENTE_RAW'] == agente) & (~df_pendentes['ZAP_ENVIADO'].astype(str).apply(lambda x: str(x).startswith('SIM')))
                                 df_agente = df_pendentes[mask_agente]
                                 telefone = dict_telefones.get(str(agente).strip().lower(), "")
@@ -1547,6 +1570,7 @@ elif menu == "📱 WhatsApp":
                                 agente_login = str(agente).strip().lower()
                                 
                                 if telefone:
+                                    status_text.markdown(f"**Enviando para:** {nome_amigavel} ({idx_ag+1}/{len(agentes_para_enviar)})...")
                                     data_str = data_filtro.strftime('%d/%m/%Y')
                                     msg_parts = [f"Bom dia, {nome_amigavel}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
                                     cid_counts = df_agente['CIDADE'].value_counts()
@@ -1573,8 +1597,11 @@ elif menu == "📱 WhatsApp":
                                             enviar_excel_zapi(telefone, gerar_excel_rota_whatsapp(df_agente), f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx")
                                         sucessos += 1
                                         pedidos_atualizados.extend(df_agente['PEDIDO'].tolist())
+                                
+                                progress_bar.progress((idx_ag + 1) / len(agentes_para_enviar))
                                 time.sleep(1.5) 
                             
+                            status_text.markdown("✅ **Todos os disparos foram processados!**")
                             if pedidos_atualizados:
                                 try:
                                     aba = planilha_db.worksheet("Memoria_Sistema")
