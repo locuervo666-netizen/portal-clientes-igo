@@ -144,6 +144,7 @@ def conectar_sandbox():
 planilha_db = conectar_banco()
 planilha_sandbox = conectar_sandbox()
 
+# 🔹 LISTA DE CLIENTES AUTORIZADOS EM ORDEM ALFABÉTICA 🔹
 CLIENTES_AUTORIZADOS = sorted(["CAEP", "MB_CAEP", "CUNHA", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"])
 
 @st.cache_data(ttl=20)
@@ -348,8 +349,16 @@ def obter_proximo_id(df):
         return int(nums.max() + 1) if not nums.empty else 1
     except: return 1
 
-def calcular_sla_dias(uf, cidade):
+# 🔥 LÓGICA DE PRAZO (SLA) COM REGRA SOUZA CRUZ 🔥
+def calcular_sla_dias(uf, cidade, tomador=""):
     uf, cidade = str(uf).upper().strip(), padronizar_texto(cidade)
+    tomador = str(tomador).upper().strip()
+    
+    if "SOUZA CRUZ" in tomador:
+        if uf == 'SP' or cidade == 'DUQUE DE CAXIAS': 
+            return 3
+        return 5
+        
     if uf == 'SP': return 1
     if uf == 'RJ': return 2 if cidade in ['ANGRA DOS REIS', 'CAMPOS DOS GOYTACAZES'] else 1
     return 2 if uf in ['GO', 'DF', 'SC', 'RS'] else 3 
@@ -761,7 +770,7 @@ if menu == "📊 GRID":
                                             l_orig['PEDIDO'] = novo_id; l_orig['DATA'] = clone_data.strftime("%d/%m/%Y")
                                             l_orig['STATUS'] = "PENDENTE"; l_orig['DATA_ENTREGA'] = ""; l_orig['FOTO'] = ""; l_orig['ROMANEIO'] = ""; l_orig['ZAP_ENVIADO'] = ""
                                             if clone_mot != "Manter Original": l_orig['AGENTE_RAW'] = clone_mot
-                                            prazo = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')))
+                                            prazo = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')), str(l_orig.get('TOMADOR', '')))
                                             l_orig['PRAZO_DIAS'] = str(prazo); l_orig['DATA_LIMITE'] = str(calcular_data_limite(l_orig['DATA'], prazo))
                                             l_orig = l_orig.astype(str)
                                             df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
@@ -932,7 +941,7 @@ elif menu == "📝 Pedido Manual":
                         if m_agente_escolha == "Automático (Por Rota)": m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES)
                         else: m_agente = m_agente_escolha
                             
-                        m_prazo = str(calcular_sla_dias(uf_limpa, cid_limpa))
+                        m_prazo = str(calcular_sla_dias(uf_limpa, cid_limpa, m_tomador))
                         m_limite = str(calcular_data_limite(m_data.strftime("%d/%m/%Y"), int(m_prazo)))
                         
                         try:
@@ -1099,7 +1108,7 @@ elif menu == "📥 Importações":
                             if not str(row['PEDIDO']).strip(): 
                                 df_ok.at[idx, 'PEDIDO'] = str(prox_id); prox_id += 1
                                 
-                        df_ok['PRAZO_DIAS'] = df_ok.apply(lambda r: str(calcular_sla_dias(r['UF'], r['CIDADE'])), axis=1)
+                        df_ok['PRAZO_DIAS'] = df_ok.apply(lambda r: str(calcular_sla_dias(r['UF'], r['CIDADE'], r['TOMADOR'])), axis=1)
                         df_ok['DATA_LIMITE'] = df_ok.apply(lambda r: str(calcular_data_limite(r['DATA'], int(r['PRAZO_DIAS']))), axis=1)
                         df_ok['STATUS'] = 'PENDENTE'; df_ok['DATA_ENTREGA'] = ''; df_ok['FOTO'] = ''; df_ok['ROMANEIO'] = ''; df_ok['ZAP_ENVIADO'] = ''
                         
