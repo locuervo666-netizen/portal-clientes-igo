@@ -144,7 +144,7 @@ def conectar_sandbox():
 planilha_db = conectar_banco()
 planilha_sandbox = conectar_sandbox()
 
-CLIENTES_AUTORIZADOS = ["CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
+CLIENTES_AUTORIZADOS = ["CAEP", "MB_CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
 
 @st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
@@ -1269,7 +1269,7 @@ elif menu == "📥 Importação Umove":
             df_sb,
             num_rows="dynamic",
             use_container_width=True,
-            key="grid_sandbox"
+            key="sandbox_grid_master"
         )
         
         st.markdown("---")
