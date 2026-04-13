@@ -1311,7 +1311,7 @@ elif menu == "📥 Importação Umove":
                 linha_loc = f"{id_loc};{id_loc};{corp_name};{row.get('UF','')};{row.get('CIDADE','')};{row.get('BAIRRO','')};{row.get('ENDERECO','')};{row.get('NUMERO','')};{cep};{tomador};;{cnpj};1"
                 loc_lines.append(linha_loc)
                 
-                schedule_type = "visita_tox" if "SODRE" in tomador or "INNOVATOX" in tomador or "CAEP" in tomador else "visita"
+                schedule_type = "visita_tox"
                 linha_agd = f";{id_loc};{schedule_type};7;1;{row.get('DATA','')};00:10;;{id_agd};{row.get('AGENTE_RAW','')};"
                 agd_lines.append(linha_agd)
                 
