@@ -144,7 +144,8 @@ def conectar_sandbox():
 planilha_db = conectar_banco()
 planilha_sandbox = conectar_sandbox()
 
-CLIENTES_AUTORIZADOS = ["CAEP", "MB_CAEP", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
+# ADDED MB_CAEP and CUNHA
+CLIENTES_AUTORIZADOS = ["CAEP", "MB_CAEP", "CUNHA", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
 
 @st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
@@ -1119,6 +1120,9 @@ elif menu == "📥 Importação Umove":
     if "df_sandbox_mem" not in st.session_state: 
         st.session_state.df_sandbox_mem = pd.DataFrame()
 
+    if "df_preview_sb" not in st.session_state:
+        st.session_state.df_preview_sb = pd.DataFrame()
+
     if "txt_sb_input" not in st.session_state:
         st.session_state.txt_sb_input = ""
 
@@ -1134,28 +1138,15 @@ elif menu == "📥 Importação Umove":
 
         if col_btn_clear.button("🧹 Limpar Campo", type="secondary", use_container_width=True):
             st.session_state.txt_sb_input = ""
+            st.session_state.df_preview_sb = pd.DataFrame()
             st.rerun()
 
-        if col_btn_add.button("➕ Adicionar ao Carrinho de Importação", type="primary", use_container_width=True):
+        if col_btn_add.button("🔍 Processar Matriz", type="primary", use_container_width=True):
             if not txt_sb or tom_sandbox == "Selecione...":
                 st.warning("⚠️ Preencha o Tomador e cole os dados!")
             else:
-                with st.spinner("Processando e empilhando dados..."):
+                with st.spinner("Lendo dados colados..."):
                     try:
-                        prox_id_sb = 700005
-                        try:
-                            aba_contador = planilha_sandbox.worksheet("Contador")
-                            val = aba_contador.acell('A1').value
-                            if val and str(val).isdigit():
-                                prox_id_sb = int(val)
-                            else:
-                                aba_contador.update("A1", [["700005"]])
-                        except Exception:
-                            if 'contador_temp' in st.session_state:
-                                prox_id_sb = st.session_state.contador_temp
-                            else:
-                                st.session_state.contador_temp = 700005
-
                         delim = '\t' if '\t' in txt_sb else (';' if ';' in txt_sb else ',')
                         df_raw_sb = pd.read_csv(io.StringIO(txt_sb), sep=delim, header=None, dtype=str).fillna("")
                         
@@ -1193,9 +1184,6 @@ elif menu == "📥 Importação Umove":
                                 
                         df_limpo_sb['PEDIDO'] = ""
                         for idx, row in df_limpo_sb.iterrows():
-                            df_limpo_sb.at[idx, 'PEDIDO'] = str(prox_id_sb)
-                            prox_id_sb += 1
-                            
                             e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
                             if e and (not n or not b):
                                 cep_m = re.search(r'(\d{5}-?\d{3})', e)
@@ -1214,35 +1202,89 @@ elif menu == "📥 Importação Umove":
                         df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
                         df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
                         
+                        st.session_state.df_preview_sb = df_final_sb
+                        st.success("✅ Matriz processada! Verifique o preview abaixo.")
+                        time.sleep(1); st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao processar a matriz: {e}")
+
+    # PREVIEW DA MATRIZ ATUAL (Etapa de Segurança Igual à Oficial)
+    if not st.session_state.df_preview_sb.empty:
+        st.markdown("---")
+        df_preview = st.session_state.df_preview_sb
+        mask_err = (df_preview['AGENTE_RAW'].astype(str).str.strip() == "") | (df_preview['AGENTE_RAW'].astype(str).str.upper() == "NAN")
+        df_err = df_preview[mask_err]; df_ok = df_preview[~mask_err]
+
+        if not df_err.empty:
+            st.error(f"🚨 **Atenção:** {len(df_err)} pedido(s) não encontraram motorista automático. Corrija abaixo para liberar o botão.")
+            with st.form("form_correcao_agentes_sb"):
+                correcoes = {}; logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                for idx, row in df_err.iterrows():
+                    st.markdown(f"**Local:** {row['LABORATORIO']} | **Cidade:** {row['CIDADE']}")
+                    correcoes[idx] = st.selectbox(f"Motorista:", ["Selecione..."] + logins_disp, key=f"fix_mot_sb_{idx}")
+                if st.form_submit_button("💾 Validar Motoristas", type="primary"):
+                    for idx, novo_mot in correcoes.items():
+                        if novo_mot != "Selecione...": st.session_state.df_preview_sb.at[idx, 'AGENTE_RAW'] = novo_mot
+                    st.rerun()
+        else:
+            st.success(f"✅ Preview validado! {len(df_ok)} pedidos com motoristas atrelados.")
+            st.dataframe(df_ok, hide_index=True)
+            if st.button("➕ Adicionar ao Carrinho (Cumulativo)", type="primary", key="add_carrinho_sb"):
+                with st.spinner("Gerando IDs 700005+ e adicionando ao carrinho..."):
+                    try:
+                        # 1. Recupera o Contador da Nuvem ou Inicia em 700005
+                        prox_id_sb = 700005
                         try:
-                            aba_contador.update("A1", [[str(prox_id_sb)]])
-                        except:
-                            st.session_state.contador_temp = prox_id_sb
+                            aba_contador = planilha_sandbox.worksheet("Contador")
+                            val = aba_contador.acell('A1').value
+                            if val and str(val).isdigit():
+                                prox_id_sb = int(val)
+                            else:
+                                aba_contador.update("A1", [["700005"]])
+                        except Exception:
+                            if 'contador_temp' in st.session_state:
+                                prox_id_sb = st.session_state.contador_temp
+                            else:
+                                st.session_state.contador_temp = 700005
 
-                        if st.session_state.df_sandbox_mem.empty:
-                            st.session_state.df_sandbox_mem = df_final_sb
-                        else:
-                            st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_final_sb], ignore_index=True)
+                        # Atribui os IDs finais para a carga que foi aprovada
+                        for idx, row in df_ok.iterrows():
+                            df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
+                            prox_id_sb += 1
+                            
+                        # Atualiza o contador geral no Drive
+                        try: aba_contador.update("A1", [[str(prox_id_sb)]])
+                        except: st.session_state.contador_temp = prox_id_sb
 
+                        # Lógica Cumulativa (O Carrinho)
+                        if st.session_state.df_sandbox_mem.empty: st.session_state.df_sandbox_mem = df_ok
+                        else: st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_ok], ignore_index=True)
+
+                        # Salva o carrinho todo no Drive
                         try:
                             aba_sb = planilha_sandbox.sheet1
                             aba_sb.clear()
                             aba_sb.update("A1", [st.session_state.df_sandbox_mem.columns.tolist()] + st.session_state.df_sandbox_mem.fillna("").astype(str).values.tolist())
                         except: pass
                         
+                        # Limpa o Preview e a Caixa de Texto apos adicionar
+                        st.session_state.df_preview_sb = pd.DataFrame()
                         st.session_state.txt_sb_input = "" 
-                        st.success(f"✅ {len(df_final_sb)} pedidos do {tom_sandbox} adicionados ao carrinho!")
-                        time.sleep(1); st.rerun()
+                        
+                        st.balloons()
+                        st.success("✅ Pedidos adicionados ao carrinho com sucesso!")
+                        time.sleep(1.5); st.rerun()
                     except Exception as e:
-                        st.error(f"Erro ao processar arquivo Sandbox: {e}")
+                        st.error(f"Erro ao adicionar ao carrinho: {e}")
 
+    # Painel Principal do Sandbox (Aparece se tiver algo no carrinho)
     if not st.session_state.df_sandbox_mem.empty:
         df_sb = st.session_state.df_sandbox_mem
         
         st.markdown("---")
         col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
         col_tit.markdown("### 🛒 2. Carrinho de Expedição Umove")
-        if col_canc.button("🗑️ Esvaziar Carrinho (Reset)", type="secondary", use_container_width=True, key="canc_sb"):
+        if col_canc.button("🗑️ Esvaziar Carrinho", type="secondary", use_container_width=True, key="canc_carrinho_sb"):
             st.session_state.df_sandbox_mem = pd.DataFrame()
             try: planilha_sandbox.sheet1.clear()
             except: pass
@@ -1257,13 +1299,13 @@ elif menu == "📥 Importação Umove":
         c_kpi2.info(f"**Detalhamento por Cliente:**\n{resumo_str}")
         
         st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
-        st.markdown("<p style='font-size:12px; color:#64748B;'>Esta tabela exibe todos os lotes que você adicionou até agora. Dê dois cliques para corrigir agentes.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size:12px; color:#64748B;'>Esta tabela exibe todos os lotes que você adicionou até agora. Dê dois cliques para editar.</p>", unsafe_allow_html=True)
         
         df_editado_sb = st.data_editor(
             df_sb,
             num_rows="dynamic",
             use_container_width=True,
-            key="sandbox_grid_master_v2"
+            key="sandbox_grid_master_fix"
         )
         
         st.markdown("---")
@@ -1297,13 +1339,13 @@ elif menu == "📥 Importação Umove":
             
         bytes_loc, bytes_agd = criar_arquivos_legados(df_editado_sb)
         
-        def notify_loc(): st.toast("✅ Download do arquivo .LOC iniciado com sucesso!", icon="💾")
-        def notify_agd(): st.toast("✅ Download do arquivo .AGD iniciado com sucesso!", icon="💾")
+        def notify_loc(): st.toast("✅ Download do arquivo .LOC finalizado com sucesso!", icon="💾")
+        def notify_agd(): st.toast("✅ Download do arquivo .AGD finalizado com sucesso!", icon="💾")
 
         with col_cmd1:
-            st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
+            st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{datetime.now(FUSO_BR).strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
         with col_cmd2:
-            st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
+            st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{datetime.now(FUSO_BR).strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
 
         with col_cmd3.popover("📲 3. Disparar WhatsApp", use_container_width=True):
             st.markdown("Isso disparará as rotas de todos os clientes no carrinho para os motoristas.")
@@ -1322,7 +1364,7 @@ elif menu == "📥 Importação Umove":
                         nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
                         
                         if tel:
-                            data_str = dt_sandbox.strftime('%d/%m/%Y')
+                            data_str = datetime.now(FUSO_BR).strftime('%d/%m/%Y')
                             msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
                             tot_qtd = 0
                             for cid, count in df_ag_sb['CIDADE'].value_counts().items():
@@ -1340,7 +1382,7 @@ elif menu == "📥 Importação Umove":
                             if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
                                 time.sleep(2.0)
                                 pdf_bytes_sb = gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb)
-                                enviar_pdf_zapi(tel, pdf_bytes_sb, f"ROTA_IGO_{nom.replace(' ', '_')}_{dt_sandbox.strftime('%d%m')}.pdf")
+                                enviar_pdf_zapi(tel, pdf_bytes_sb, f"ROTA_IGO_{nom.replace(' ', '_')}_{datetime.now(FUSO_BR).strftime('%d%m')}.pdf")
                                 sucessos_sb += 1
                                 
                     if sucessos_sb > 0: 
