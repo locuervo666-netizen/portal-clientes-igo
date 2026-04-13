@@ -144,7 +144,6 @@ def conectar_sandbox():
 planilha_db = conectar_banco()
 planilha_sandbox = conectar_sandbox()
 
-# ADDED MB_CAEP and CUNHA
 CLIENTES_AUTORIZADOS = ["CAEP", "MB_CAEP", "CUNHA", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
 
 @st.cache_data(ttl=20)
@@ -1123,25 +1122,15 @@ elif menu == "📥 Importação Umove":
     if "df_preview_sb" not in st.session_state:
         st.session_state.df_preview_sb = pd.DataFrame()
 
-    if "txt_sb_input" not in st.session_state:
-        st.session_state.txt_sb_input = ""
-
     with st.container(border=True):
         st.markdown("#### 1. Colagem da Matriz do Cliente")
         c1_sb, c2_sb, c3_sb = st.columns([1, 1, 2])
         with c1_sb: tom_sandbox = st.selectbox("🏢 Tomador Desta Carga:", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="tom_sb")
         with c2_sb: dt_sandbox = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br, key="dt_sb")
             
-        txt_sb = st.text_area("📋 Cole os dados (Ctrl+V) do sistema legado:", height=150, key="txt_sb_input")
+        txt_sb = st.text_area("📋 Cole os dados (Ctrl+V) do sistema legado:", height=150)
 
-        col_btn_add, col_btn_clear = st.columns([3, 1])
-
-        if col_btn_clear.button("🧹 Limpar Campo", type="secondary", use_container_width=True):
-            st.session_state.txt_sb_input = ""
-            st.session_state.df_preview_sb = pd.DataFrame()
-            st.rerun()
-
-        if col_btn_add.button("🔍 Processar Matriz", type="primary", use_container_width=True):
+        if st.columns([1, 2])[0].button("🔍 Processar Matriz", type="primary", use_container_width=True):
             if not txt_sb or tom_sandbox == "Selecione...":
                 st.warning("⚠️ Preencha o Tomador e cole os dados!")
             else:
@@ -1208,7 +1197,7 @@ elif menu == "📥 Importação Umove":
                     except Exception as e:
                         st.error(f"Erro ao processar a matriz: {e}")
 
-    # PREVIEW DA MATRIZ ATUAL (Etapa de Segurança Igual à Oficial)
+    # PREVIEW DA MATRIZ ATUAL (Etapa de Segurança)
     if not st.session_state.df_preview_sb.empty:
         st.markdown("---")
         df_preview = st.session_state.df_preview_sb
@@ -1232,7 +1221,6 @@ elif menu == "📥 Importação Umove":
             if st.button("➕ Adicionar ao Carrinho (Cumulativo)", type="primary", key="add_carrinho_sb"):
                 with st.spinner("Gerando IDs 700005+ e adicionando ao carrinho..."):
                     try:
-                        # 1. Recupera o Contador da Nuvem ou Inicia em 700005
                         prox_id_sb = 700005
                         try:
                             aba_contador = planilha_sandbox.worksheet("Contador")
@@ -1247,37 +1235,30 @@ elif menu == "📥 Importação Umove":
                             else:
                                 st.session_state.contador_temp = 700005
 
-                        # Atribui os IDs finais para a carga que foi aprovada
                         for idx, row in df_ok.iterrows():
                             df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
                             prox_id_sb += 1
                             
-                        # Atualiza o contador geral no Drive
                         try: aba_contador.update("A1", [[str(prox_id_sb)]])
                         except: st.session_state.contador_temp = prox_id_sb
 
-                        # Lógica Cumulativa (O Carrinho)
                         if st.session_state.df_sandbox_mem.empty: st.session_state.df_sandbox_mem = df_ok
                         else: st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_ok], ignore_index=True)
 
-                        # Salva o carrinho todo no Drive
                         try:
                             aba_sb = planilha_sandbox.sheet1
                             aba_sb.clear()
                             aba_sb.update("A1", [st.session_state.df_sandbox_mem.columns.tolist()] + st.session_state.df_sandbox_mem.fillna("").astype(str).values.tolist())
                         except: pass
                         
-                        # Limpa o Preview e a Caixa de Texto apos adicionar
                         st.session_state.df_preview_sb = pd.DataFrame()
-                        st.session_state.txt_sb_input = "" 
-                        
                         st.balloons()
                         st.success("✅ Pedidos adicionados ao carrinho com sucesso!")
                         time.sleep(1.5); st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao adicionar ao carrinho: {e}")
 
-    # Painel Principal do Sandbox (Aparece se tiver algo no carrinho)
+    # CARRINHO DE EXPEDIÇÃO
     if not st.session_state.df_sandbox_mem.empty:
         df_sb = st.session_state.df_sandbox_mem
         
@@ -1343,9 +1324,9 @@ elif menu == "📥 Importação Umove":
         def notify_agd(): st.toast("✅ Download do arquivo .AGD finalizado com sucesso!", icon="💾")
 
         with col_cmd1:
-            st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{datetime.now(FUSO_BR).strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
+            st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
         with col_cmd2:
-            st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{datetime.now(FUSO_BR).strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
+            st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
 
         with col_cmd3.popover("📲 3. Disparar WhatsApp", use_container_width=True):
             st.markdown("Isso disparará as rotas de todos os clientes no carrinho para os motoristas.")
@@ -1356,15 +1337,17 @@ elif menu == "📥 Importação Umove":
                     
                     agentes_selecionados = df_editado_sb['AGENTE_RAW'].dropna().unique()
                     sucessos_sb = 0
+                    agentes_xls_sb = ['veloz.express', 'robson.melo', 'william.bertoldo']
                     
                     for ag in agentes_selecionados:
                         if not str(ag).strip(): continue
                         df_ag_sb = df_editado_sb[df_editado_sb['AGENTE_RAW'] == ag]
                         tel = dict_tel.get(str(ag).strip().lower(), "")
                         nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
+                        ag_login = str(ag).strip().lower()
                         
                         if tel:
-                            data_str = datetime.now(FUSO_BR).strftime('%d/%m/%Y')
+                            data_str = dt_sandbox.strftime('%d/%m/%Y')
                             msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
                             tot_qtd = 0
                             for cid, count in df_ag_sb['CIDADE'].value_counts().items():
@@ -1382,7 +1365,13 @@ elif menu == "📥 Importação Umove":
                             if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
                                 time.sleep(2.0)
                                 pdf_bytes_sb = gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb)
-                                enviar_pdf_zapi(tel, pdf_bytes_sb, f"ROTA_IGO_{nom.replace(' ', '_')}_{datetime.now(FUSO_BR).strftime('%d%m')}.pdf")
+                                enviar_pdf_zapi(tel, pdf_bytes_sb, f"ROTA_IGO_{nom.replace(' ', '_')}_{dt_sandbox.strftime('%d%m')}.pdf")
+                                
+                                if ag_login in agentes_xls_sb:
+                                    time.sleep(3.0)
+                                    xls_bytes_sb = gerar_excel_rota_whatsapp(df_ag_sb)
+                                    enviar_excel_zapi(tel, xls_bytes_sb, f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{dt_sandbox.strftime('%d%m')}.xlsx")
+                                
                                 sucessos_sb += 1
                                 
                     if sucessos_sb > 0: 
