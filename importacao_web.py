@@ -144,7 +144,8 @@ def conectar_sandbox():
 planilha_db = conectar_banco()
 planilha_sandbox = conectar_sandbox()
 
-CLIENTES_AUTORIZADOS = ["CAEP", "MB_CAEP", "CUNHA", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"]
+# 🔹 LISTA DE CLIENTES AUTORIZADOS AGORA EM ORDEM ALFABÉTICA 🔹
+CLIENTES_AUTORIZADOS = sorted(["CAEP", "MB_CAEP", "CUNHA", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"])
 
 @st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
@@ -950,7 +951,6 @@ elif menu == "📝 Pedido Manual":
                             
                             if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
                             
-                            st.balloons()
                             st.success(f"🎉 Pedido {m_pedido} criado com sucesso!")
                             time.sleep(3.5)
                             
@@ -1099,7 +1099,6 @@ elif menu == "📥 Importações":
                                 lista_app.append(dict_app)
                         if lista_app: despachar_para_appsheet(lista_app)
                         
-                        st.balloons()
                         st.success(f"🎉 SUCESSO! {len(df_ok)} pedidos importados no C.C.O.")
                         time.sleep(3.5) 
                         
@@ -1128,9 +1127,10 @@ elif menu == "📥 Importação Umove":
         with c1_sb: tom_sandbox = st.selectbox("🏢 Tomador Desta Carga:", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="tom_sb")
         with c2_sb: dt_sandbox = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br, key="dt_sb")
             
+        # O botão Limpar foi removido. Para limpar, basta dar Ctrl+A e apagar na caixa abaixo.
         txt_sb = st.text_area("📋 Cole os dados (Ctrl+V) do sistema legado:", height=150)
 
-        if st.columns([1, 2])[0].button("🔍 Processar Matriz", type="primary", use_container_width=True):
+        if st.button("🔍 Processar Matriz", type="primary", use_container_width=True):
             if not txt_sb or tom_sandbox == "Selecione...":
                 st.warning("⚠️ Preencha o Tomador e cole os dados!")
             else:
@@ -1252,7 +1252,6 @@ elif menu == "📥 Importação Umove":
                         except: pass
                         
                         st.session_state.df_preview_sb = pd.DataFrame()
-                        st.balloons()
                         st.success("✅ Pedidos adicionados ao carrinho com sucesso!")
                         time.sleep(1.5); st.rerun()
                     except Exception as e:
@@ -1324,9 +1323,9 @@ elif menu == "📥 Importação Umove":
         def notify_agd(): st.toast("✅ Download do arquivo .AGD finalizado com sucesso!", icon="💾")
 
         with col_cmd1:
-            st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
+            st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{datetime.now(FUSO_BR).strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
         with col_cmd2:
-            st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
+            st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{datetime.now(FUSO_BR).strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
 
         with col_cmd3.popover("📲 3. Disparar WhatsApp", use_container_width=True):
             st.markdown("Isso disparará as rotas de todos os clientes no carrinho para os motoristas.")
@@ -1347,7 +1346,7 @@ elif menu == "📥 Importação Umove":
                         ag_login = str(ag).strip().lower()
                         
                         if tel:
-                            data_str = dt_sandbox.strftime('%d/%m/%Y')
+                            data_str = datetime.now(FUSO_BR).strftime('%d/%m/%Y')
                             msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
                             tot_qtd = 0
                             for cid, count in df_ag_sb['CIDADE'].value_counts().items():
@@ -1375,7 +1374,6 @@ elif menu == "📥 Importação Umove":
                                 sucessos_sb += 1
                                 
                     if sucessos_sb > 0: 
-                        st.balloons()
                         st.success(f"🎉 SUCESSO ABSOLUTO! Disparo concluído para {sucessos_sb} motorista(s)!")
                         time.sleep(3.5)
                         st.rerun()
