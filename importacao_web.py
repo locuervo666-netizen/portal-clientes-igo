@@ -1119,8 +1119,8 @@ elif menu == "📥 Importação Umove":
     if "df_sandbox_mem" not in st.session_state: 
         st.session_state.df_sandbox_mem = pd.DataFrame()
 
-    if "txt_sb" not in st.session_state:
-        st.session_state.txt_sb = ""
+    if "txt_sb_input" not in st.session_state:
+        st.session_state.txt_sb_input = ""
 
     with st.container(border=True):
         st.markdown("#### 1. Colagem da Matriz do Cliente")
@@ -1128,12 +1128,12 @@ elif menu == "📥 Importação Umove":
         with c1_sb: tom_sandbox = st.selectbox("🏢 Tomador Desta Carga:", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="tom_sb")
         with c2_sb: dt_sandbox = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br, key="dt_sb")
             
-        txt_sb = st.text_area("📋 Cole os dados (Ctrl+V) do sistema legado:", height=150, key="txt_sb")
+        txt_sb = st.text_area("📋 Cole os dados (Ctrl+V) do sistema legado:", height=150, key="txt_sb_input")
 
         col_btn_add, col_btn_clear = st.columns([3, 1])
 
         if col_btn_clear.button("🧹 Limpar Campo", type="secondary", use_container_width=True):
-            st.session_state.txt_sb = ""
+            st.session_state.txt_sb_input = ""
             st.rerun()
 
         if col_btn_add.button("➕ Adicionar ao Carrinho de Importação", type="primary", use_container_width=True):
@@ -1142,20 +1142,19 @@ elif menu == "📥 Importação Umove":
             else:
                 with st.spinner("Processando e empilhando dados..."):
                     try:
-                        # 1. Recupera o Contador da Nuvem
-                        prox_id_sb = 700000
+                        prox_id_sb = 700005
                         try:
                             aba_contador = planilha_sandbox.worksheet("Contador")
                             val = aba_contador.acell('A1').value
                             if val and str(val).isdigit():
                                 prox_id_sb = int(val)
                             else:
-                                aba_contador.update("A1", [["700000"]])
+                                aba_contador.update("A1", [["700005"]])
                         except Exception:
                             if 'contador_temp' in st.session_state:
                                 prox_id_sb = st.session_state.contador_temp
                             else:
-                                st.session_state.contador_temp = 700000
+                                st.session_state.contador_temp = 700005
 
                         delim = '\t' if '\t' in txt_sb else (';' if ';' in txt_sb else ',')
                         df_raw_sb = pd.read_csv(io.StringIO(txt_sb), sep=delim, header=None, dtype=str).fillna("")
@@ -1194,7 +1193,6 @@ elif menu == "📥 Importação Umove":
                                 
                         df_limpo_sb['PEDIDO'] = ""
                         for idx, row in df_limpo_sb.iterrows():
-                            # Usa e incrementa o ID
                             df_limpo_sb.at[idx, 'PEDIDO'] = str(prox_id_sb)
                             prox_id_sb += 1
                             
@@ -1216,32 +1214,28 @@ elif menu == "📥 Importação Umove":
                         df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
                         df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
                         
-                        # 2. Devolve o novo limite máximo do Contador para o Sheets
                         try:
                             aba_contador.update("A1", [[str(prox_id_sb)]])
                         except:
                             st.session_state.contador_temp = prox_id_sb
 
-                        # 3. Lógica Cumulativa (O Carrinho)
                         if st.session_state.df_sandbox_mem.empty:
                             st.session_state.df_sandbox_mem = df_final_sb
                         else:
                             st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_final_sb], ignore_index=True)
 
-                        # Salva o carrinho todo no Drive
                         try:
                             aba_sb = planilha_sandbox.sheet1
                             aba_sb.clear()
                             aba_sb.update("A1", [st.session_state.df_sandbox_mem.columns.tolist()] + st.session_state.df_sandbox_mem.fillna("").astype(str).values.tolist())
                         except: pass
                         
-                        st.session_state.txt_sb = "" # Limpa a caixa de texto apos sucesso!
+                        st.session_state.txt_sb_input = "" 
                         st.success(f"✅ {len(df_final_sb)} pedidos do {tom_sandbox} adicionados ao carrinho!")
                         time.sleep(1); st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao processar arquivo Sandbox: {e}")
 
-    # Painel Principal do Sandbox (Aparece se tiver algo no carrinho)
     if not st.session_state.df_sandbox_mem.empty:
         df_sb = st.session_state.df_sandbox_mem
         
@@ -1269,14 +1263,13 @@ elif menu == "📥 Importação Umove":
             df_sb,
             num_rows="dynamic",
             use_container_width=True,
-            key="sandbox_grid_master"
+            key="sandbox_grid_master_v2"
         )
         
         st.markdown("---")
         st.markdown("### 🎛️ Mesa de Comando de Saída")
         col_cmd1, col_cmd2, col_cmd3 = st.columns([1, 1, 1])
         
-        # Gerador dos arquivos
         def criar_arquivos_legados(df):
             loc_lines = ["alternativeIdentifier;description;corporateName;state;city;cityNeighborhood;street;streetNumber;zipCode;CF_loc_responsavel_cliente;CF_loc_whats;CF_CNPJ;active"]
             agd_lines = ["C", "command;serviceLocal;scheduleType;activitiesOrigin;active;date;hour;situation;alternativeIdentifier;agent;CF_tar_valor"]
