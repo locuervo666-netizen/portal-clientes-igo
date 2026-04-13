@@ -144,7 +144,6 @@ def conectar_sandbox():
 planilha_db = conectar_banco()
 planilha_sandbox = conectar_sandbox()
 
-# 🔹 LISTA DE CLIENTES AUTORIZADOS EM ORDEM ALFABÉTICA 🔹
 CLIENTES_AUTORIZADOS = sorted(["CAEP", "MB_CAEP", "CUNHA", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"])
 
 @st.cache_data(ttl=20)
@@ -606,7 +605,6 @@ if menu == "📊 GRID":
         df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(definir_prioridade)
         df_grid = df_grid.sort_values(by=['PRIORIDADE', 'PEDIDO'], ascending=[True, False]).drop(columns=['PRIORIDADE'])
         
-        # 🔹 Busca Rápida aprimorada e garantida
         if busca:
             mask = df_grid.apply(lambda row: row.astype(str).str.contains(busca, case=False).any(), axis=1)
             df_grid = df_grid[mask]
@@ -614,7 +612,6 @@ if menu == "📊 GRID":
         dict_nomes_grid = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         df_grid['AGENTE_NOME'] = df_grid['AGENTE_RAW'].apply(lambda x: dict_nomes_grid.get(str(x).strip().lower(), str(x).upper()) if str(x).strip() else "")
 
-        # 🔹 Coluna DETALHES realocada para depois da COMPROVANTE (FOTO) 🔹
         colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'DETALHES', 'AGENTE_NOME', 'AGENTE_RAW']
         
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
@@ -997,7 +994,7 @@ elif menu == "📥 Importações":
                         idx_h, max_matches = 0, 0
                         for i in range(min(15, len(df_raw_import))):
                             row_str = unicodedata.normalize('NFKD', " ".join(df_raw_import.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
-                            matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP'] if kw in row_str)
+                            matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP', 'HORARIO', 'FUNCIONAMENTO', 'OBSERVA'] if kw in row_str)
                             if matches > max_matches: max_matches, idx_h = matches, i
                                 
                         df_limpo = df_raw_import.iloc[idx_h+1:].copy()
@@ -1020,11 +1017,23 @@ elif menu == "📥 Importações":
                             elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa[c] = 'CIDADE'
                             elif any(x in cl for x in ['ESTADO', 'UF']): mapa[c] = 'UF'
                             elif 'CEP' in cl: mapa[c] = 'CEP'
+                            elif any(x in cl for x in ['HORARIO', 'HORA', 'FUNCIONAMENTO', 'PERIODO']): mapa[c] = 'HORARIO'
+                            elif any(x in cl for x in ['OBSERVA', 'OBS', 'NOTA']): mapa[c] = 'OBSERVACOES'
                                 
                         df_limpo.rename(columns=mapa, inplace=True)
                         
-                        for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
+                        for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
                             if c not in df_limpo.columns: df_limpo[c] = ""
+
+                        if 'HORARIO' in df_limpo.columns:
+                            for idx, row in df_limpo.iterrows():
+                                horario_val = str(row['HORARIO']).strip()
+                                obs_val = str(row['OBSERVACOES']).strip()
+                                if horario_val and horario_val.upper() not in ['NAN', 'NONE']:
+                                    nova_obs = f"[COLETA: {horario_val}]"
+                                    if obs_val and obs_val.upper() not in ['NAN', 'NONE']:
+                                        nova_obs += f" - {obs_val}"
+                                    df_limpo.at[idx, 'OBSERVACOES'] = nova_obs
                                 
                         df_limpo['PEDIDO'] = ""
                             
@@ -1045,7 +1054,7 @@ elif menu == "📥 Importações":
                         df_limpo['DATA'] = dt_c.strftime("%d/%m/%Y")
                         df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
                         
-                        st.session_state.df_preview_oficial = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
+                        st.session_state.df_preview_oficial = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
                         st.success("✅ Processamento Concluído!")
                         time.sleep(1); st.rerun()
                     except Exception as e: st.error(f"Erro no processamento: {e}")
@@ -1107,7 +1116,7 @@ elif menu == "📥 Importações":
                                     'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'], 
                                     'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'], 
                                     'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'], 
-                                    'TOMADOR': r['TOMADOR']
+                                    'TOMADOR': r['TOMADOR'], 'OBSERVACOES': r.get('OBSERVACOES', '')
                                 }
                                 lista_app.append(dict_app)
                         if lista_app: despachar_para_appsheet(lista_app)
@@ -1154,7 +1163,7 @@ elif menu == "📥 Importações Umove":
                         idx_h, max_matches = 0, 0
                         for i in range(min(15, len(df_raw_sb))):
                             row_str = unicodedata.normalize('NFKD', " ".join(df_raw_sb.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
-                            matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP'] if kw in row_str)
+                            matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP', 'HORARIO', 'FUNCIONAMENTO', 'OBSERVA'] if kw in row_str)
                             if matches > max_matches: max_matches, idx_h = matches, i
                                 
                         df_limpo_sb = df_raw_sb.iloc[idx_h+1:].copy()
@@ -1177,11 +1186,23 @@ elif menu == "📥 Importações Umove":
                             elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa_sb[c] = 'CIDADE'
                             elif any(x in cl for x in ['ESTADO', 'UF']): mapa_sb[c] = 'UF'
                             elif 'CEP' in cl: mapa_sb[c] = 'CEP'
+                            elif any(x in cl for x in ['HORARIO', 'HORA', 'FUNCIONAMENTO', 'PERIODO']): mapa_sb[c] = 'HORARIO'
+                            elif any(x in cl for x in ['OBSERVA', 'OBS', 'NOTA']): mapa_sb[c] = 'OBSERVACOES'
                                 
                         df_limpo_sb.rename(columns=mapa_sb, inplace=True)
                         
-                        for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF']:
+                        for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
                             if c not in df_limpo_sb.columns: df_limpo_sb[c] = ""
+
+                        if 'HORARIO' in df_limpo_sb.columns:
+                            for idx, row in df_limpo_sb.iterrows():
+                                horario_val = str(row['HORARIO']).strip()
+                                obs_val = str(row['OBSERVACOES']).strip()
+                                if horario_val and horario_val.upper() not in ['NAN', 'NONE']:
+                                    nova_obs = f"[COLETA: {horario_val}]"
+                                    if obs_val and obs_val.upper() not in ['NAN', 'NONE']:
+                                        nova_obs += f" - {obs_val}"
+                                    df_limpo_sb.at[idx, 'OBSERVACOES'] = nova_obs
                                 
                         df_limpo_sb['PEDIDO'] = ""
                         for idx, row in df_limpo_sb.iterrows():
@@ -1201,7 +1222,7 @@ elif menu == "📥 Importações Umove":
                         df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
                         
                         df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
-                        df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'AGENTE_RAW']]
+                        df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
                         
                         st.session_state.df_preview_sb = df_final_sb
                         st.success("✅ Matriz processada! Verifique o preview abaixo.")
@@ -1374,6 +1395,8 @@ elif menu == "📥 Importações Umove":
                                 items = []
                                 for _, row in group.iterrows():
                                     item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                    obs = str(row.get('OBSERVACOES', '')).strip()
+                                    if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                     items.append(item_str)
                                 msg_parts.append("\n\n      . . . . .\n\n".join(items) + "\n")
                                 
@@ -1393,7 +1416,7 @@ elif menu == "📥 Importações Umove":
                     
                     status_txt.markdown("✅ **Processo finalizado!**")
                     if sucessos_sb > 0: 
-                        st.success(f"🎉 Disparo Sandbox concluído para {sucessos_sb} motorista(s)!")
+                        st.success(f"🎉 SUCESSO ABSOLUTO! Disparo concluído para {sucessos_sb} motorista(s)!")
                         time.sleep(3.5)
                         st.rerun()
                     else: st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
