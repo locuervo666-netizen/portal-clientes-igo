@@ -1086,9 +1086,32 @@ elif menu == "📥 Importações":
                 for idx, row in df_err.iterrows():
                     st.markdown(f"**Local:** {row['LABORATORIO']} | **Cidade:** {row['CIDADE']}")
                     correcoes[idx] = st.selectbox(f"Motorista:", ["Selecione..."] + logins_disp, key=f"fix_mot_of_{idx}")
-                if st.form_submit_button("💾 Validar", type="primary"):
+                if st.form_submit_button("💾 Validar Motoristas", type="primary"):
+                    novas_rotas = []
                     for idx, novo_mot in correcoes.items():
-                        if novo_mot != "Selecione...": st.session_state.df_preview_oficial.at[idx, 'AGENTE_RAW'] = novo_mot
+                        if novo_mot != "Selecione...":
+                            st.session_state.df_preview_oficial.at[idx, 'AGENTE_RAW'] = novo_mot
+                            # Aprende a nova rota
+                            r_cid = str(st.session_state.df_preview_oficial.at[idx, 'CIDADE'])
+                            r_bai = str(st.session_state.df_preview_oficial.at[idx, 'BAIRRO'])
+                            rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai)] if p])
+                            if not DF_AGENTES.empty:
+                                dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == novo_mot].iloc[0]
+                                novas_rotas.append({"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": novo_mot, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']})
+                    
+                    if novas_rotas:
+                        try:
+                            df_novas_rotas = pd.DataFrame(novas_rotas)
+                            aba_agentes = planilha_db.worksheet("Agentes")
+                            dados_atuais_ag = aba_agentes.get_all_values()
+                            df_ag_atual = pd.DataFrame(dados_atuais_ag[1:], columns=dados_atuais_ag[0]) if len(dados_atuais_ag) > 1 else pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
+                            df_novo = pd.concat([df_ag_atual, df_novas_rotas], ignore_index=True).drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+                            aba_agentes.clear()
+                            aba_agentes.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                            carregar_dados_agentes.clear()
+                        except Exception as e:
+                            st.warning(f"Erro ao salvar rota inteligente: {e}")
+                            
                     st.rerun()
         else:
             st.success(f"✅ Lote validado! {len(df_ok)} pedidos prontos.")
@@ -1253,9 +1276,33 @@ elif menu == "📥 Importações Umove":
                 for idx, row in df_err.iterrows():
                     st.markdown(f"**Local:** {row['LABORATORIO']} | **Cidade:** {row['CIDADE']}")
                     correcoes[idx] = st.selectbox(f"Motorista:", ["Selecione..."] + logins_disp, key=f"fix_mot_sb_{idx}")
+                
                 if st.form_submit_button("💾 Validar Motoristas", type="primary"):
+                    novas_rotas = []
                     for idx, novo_mot in correcoes.items():
-                        if novo_mot != "Selecione...": st.session_state.df_preview_sb.at[idx, 'AGENTE_RAW'] = novo_mot
+                        if novo_mot != "Selecione...":
+                            st.session_state.df_preview_sb.at[idx, 'AGENTE_RAW'] = novo_mot
+                            # Aprende a nova rota
+                            r_cid = str(st.session_state.df_preview_sb.at[idx, 'CIDADE'])
+                            r_bai = str(st.session_state.df_preview_sb.at[idx, 'BAIRRO'])
+                            rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai)] if p])
+                            if not DF_AGENTES.empty:
+                                dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == novo_mot].iloc[0]
+                                novas_rotas.append({"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": novo_mot, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']})
+                    
+                    if novas_rotas:
+                        try:
+                            df_novas_rotas = pd.DataFrame(novas_rotas)
+                            aba_agentes = planilha_db.worksheet("Agentes")
+                            dados_atuais_ag = aba_agentes.get_all_values()
+                            df_ag_atual = pd.DataFrame(dados_atuais_ag[1:], columns=dados_atuais_ag[0]) if len(dados_atuais_ag) > 1 else pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
+                            df_novo = pd.concat([df_ag_atual, df_novas_rotas], ignore_index=True).drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+                            aba_agentes.clear()
+                            aba_agentes.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                            carregar_dados_agentes.clear()
+                        except Exception as e:
+                            st.warning(f"Erro ao salvar rota inteligente: {e}")
+                    
                     st.rerun()
         else:
             st.success(f"✅ Preview validado! {len(df_ok)} pedidos com motoristas atrelados.")
@@ -1263,26 +1310,37 @@ elif menu == "📥 Importações Umove":
             if st.button("➕ Adicionar ao Carrinho (Cumulativo)", type="primary", key="add_carrinho_sb"):
                 with st.spinner("Gerando IDs 700020+ e adicionando ao carrinho..."):
                     try:
-                        prox_id_sb = 700020
+                        # Inteligência anti-reset para a aba Contador
                         try:
                             aba_contador = planilha_sandbox.worksheet("Contador")
+                        except Exception:
+                            try:
+                                aba_contador = planilha_sandbox.add_worksheet(title="Contador", rows=100, cols=20)
+                                aba_contador.update("A1", [["700020"]])
+                            except Exception as e:
+                                st.error(f"Erro ao criar aba Contador: {e}")
+                                aba_contador = None
+
+                        prox_id_sb = 700020
+                        if aba_contador:
                             val = aba_contador.acell('A1').value
                             if val and str(val).isdigit():
                                 prox_id_sb = int(val)
                             else:
                                 aba_contador.update("A1", [["700020"]])
-                        except Exception:
-                            if 'contador_temp' in st.session_state:
-                                prox_id_sb = st.session_state.contador_temp
-                            else:
-                                st.session_state.contador_temp = 700020
+                        else:
+                            # Fallback para o session_state apenas se o drive falhar completamente
+                            if 'contador_temp' in st.session_state: prox_id_sb = st.session_state.contador_temp
 
                         for idx, row in df_ok.iterrows():
                             df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
                             prox_id_sb += 1
                             
-                        try: aba_contador.update("A1", [[str(prox_id_sb)]])
-                        except: st.session_state.contador_temp = prox_id_sb
+                        # Atualiza o novo número na nuvem
+                        if aba_contador:
+                            try: aba_contador.update("A1", [[str(prox_id_sb)]])
+                            except: pass
+                        st.session_state.contador_temp = prox_id_sb
 
                         if st.session_state.df_sandbox_mem.empty: st.session_state.df_sandbox_mem = df_ok
                         else: st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_ok], ignore_index=True)
@@ -1349,7 +1407,10 @@ elif menu == "📥 Importações Umove":
                 cnpj = str(row.get('CNPJ', ''))
                 if cnpj: cnpj = f"'{cnpj}"
                 
-                linha_loc = f"{id_loc};{id_loc};{corp_name};{row.get('UF','')};{row.get('CIDADE','')};{row.get('BAIRRO','')};{row.get('ENDERECO','')};{row.get('NUMERO','')};{cep};{tomador};;{cnpj};1"
+                # BLINDAGEM DO .LOC - Filtro Regex destruidor de letras na coluna número
+                numero_limpo = re.sub(r'\D', '', str(row.get('NUMERO', '')))
+                
+                linha_loc = f"{id_loc};{id_loc};{corp_name};{row.get('UF','')};{row.get('CIDADE','')};{row.get('BAIRRO','')};{row.get('ENDERECO','')};{numero_limpo};{cep};{tomador};;{cnpj};1"
                 loc_lines.append(linha_loc)
                 
                 schedule_type = "visita_tox"
