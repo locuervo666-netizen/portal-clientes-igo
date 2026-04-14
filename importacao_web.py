@@ -581,19 +581,26 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
     return pdf_bytes
 
 # =============================================================================
-# 📊 SIDEBAR & AUTO-REFRESH CONDICIONADO
+# 🧭 NAVEGAÇÃO
 # =============================================================================
-if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
-
 with st.sidebar:
     st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=160)
     st.divider()
-    menu = st.radio("Navegação Operacional:", ["📊 GRID", "💰 Faturamento", "📝 Pedido Manual", "📥 Importações", "📥 Importações Umove", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"])
+    menu = st.radio("Navegação Operacional:", [
+        "📊 GRID",
+        "💰 Faturamento", 
+        "📥 Importações", 
+        "📥 Importações Umove", 
+        "📝 Pedido Manual", 
+        "📁 Relatórios", 
+        "⚙️ Rotas", 
+        "🔬 Triagem", 
+        "📱 WhatsApp"
+    ])
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
         st.session_state.autenticado = False; st.rerun()
-
 # ✅ AUTO-REFRESH SÓ NA GRID! (Impede corte de disparos do WhatsApp)
 if menu == "📊 GRID":
     st_autorefresh(interval=120000, limit=None, key="refresh_timer")
