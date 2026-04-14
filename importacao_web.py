@@ -25,7 +25,6 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # 🔗 1. CONFIGURAÇÃO DA PÁGINA E ESTILOS NATIVOS
 # =============================================================================
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
-# ❌ AUTO-REFRESH GLOBAL REMOVIDO DAQUI PARA NÃO CORTAR OS DISPAROS
 
 st.markdown("""
     <style>
@@ -1879,7 +1878,8 @@ elif menu == "📁 Relatórios":
 # =============================================================================
 elif menu == "⚙️ Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
-tab_agente, tab_rota, tab_tabela, tab_transferencia, tab_sistema = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico", "🔄 Transferir Rotas", "⚠️ Sistema"])    
+    tab_agente, tab_rota, tab_tabela, tab_transferencia, tab_sistema = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico", "🔄 Transferir Rotas", "⚠️ Sistema"])
+    
     with tab_agente:
         with st.form("form_novo_agente", clear_on_submit=True):
             c1, c2 = st.columns(2)
@@ -1972,7 +1972,8 @@ tab_agente, tab_rota, tab_tabela, tab_transferencia, tab_sistema = st.tabs(["�
                             time.sleep(0.5); carregar_dados_agentes.clear(); st.rerun()
                         except Exception as e: st.error(f"Erro ao remover: {e}")
         else: st.warning("Nenhum dado encontrado.")
-            with tab_transferencia:
+
+    with tab_transferencia:
         st.markdown("#### 🔄 Transferência em Massa de Rotas")
         st.info("Transfira todas as rotas de um motorista que saiu da operação para um novo com um único clique.")
         
@@ -1997,23 +1998,17 @@ tab_agente, tab_rota, tab_tabela, tab_transferencia, tab_sistema = st.tabs(["�
                             st.warning(f"O motorista '{agente_origem}' não possui rotas atreladas para transferir.")
                         else:
                             with st.spinner(f"Transferindo {len(rotas_origem)} rotas no banco de dados..."):
-                                # Pega os dados cadastrais do novo motorista
                                 dados_destino = df_rotas[df_rotas['LOGIN DO AGENTE'] == agente_destino].iloc[0]
-                                
-                                # Aplica a substituição em massa na memória
                                 mask = df_rotas['LOGIN DO AGENTE'] == agente_origem
                                 df_rotas.loc[mask, 'LOGIN DO AGENTE'] = agente_destino
                                 df_rotas.loc[mask, 'NOME DO AGENTE'] = dados_destino['NOME DO AGENTE']
                                 df_rotas.loc[mask, 'TELEFONE'] = dados_destino['TELEFONE']
-                                
-                                # Remove duplicatas caso o novo motorista já tivesse alguma das rotas
                                 df_rotas = df_rotas.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
                                 
                                 try:
                                     aba_agentes = planilha_db.worksheet("Agentes")
                                     aba_agentes.clear()
                                     aba_agentes.update("A1", [df_rotas.columns.tolist()] + df_rotas.fillna("").astype(str).values.tolist())
-                                    
                                     st.success(f"🎉 Sucesso! {len(rotas_origem)} rotas foram transferidas para {agente_destino}.")
                                     time.sleep(2)
                                     carregar_dados_agentes.clear()
