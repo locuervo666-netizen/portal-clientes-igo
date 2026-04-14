@@ -20,6 +20,10 @@ from streamlit_autorefresh import st_autorefresh
 from fpdf import FPDF
 
 FUSO_BR = timezone(timedelta(hours=-3))
+# =============================================================================
+# ⚙️ CONFIGURAÇÕES GERAIS DO SISTEMA
+# =============================================================================
+AGENTES_XLS_AUTORIZADOS = ['veloz.express', 'robson.melo', 'william.bertoldo', 'ludmila', 'helio.frade']
 
 # =============================================================================
 # 🔗 1. CONFIGURAÇÃO DA PÁGINA E ESTILOS NATIVOS
@@ -878,7 +882,7 @@ if menu == "📊 GRID":
                                 df_raw_pendentes = df_raw[df_raw['PEDIDO'].isin(p_ids_pendentes)]
                                 dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
                                 dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
-                                ag_xls = ['veloz.express', 'robson.melo', 'william.bertoldo', 'ludmila']
+                                ag_xls = AGENTES_XLS_AUTORIZADOS
                                 sucessos = 0
                                 agentes_selecionados = df_raw_pendentes['AGENTE_RAW'].dropna().unique()
                                 
@@ -1709,7 +1713,7 @@ elif menu == "📥 Importações Umove":
                 
                 agentes_selecionados = df_editado_sb['AGENTE_RAW'].dropna().unique()
                 sucessos_sb = 0
-                agentes_xls_sb = ['veloz.express', 'robson.melo', 'william.bertoldo', 'ludmila']
+                agentes_xls_sb = AGENTES_XLS_AUTORIZADOS
                 
                 if len(agentes_selecionados) > 0:
                     progress_bar = st.progress(0)
@@ -1908,7 +1912,7 @@ elif menu == "📱 WhatsApp":
         
         dict_telefones = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip() and re.sub(r'\D', '', str(r.get('TELEFONE', '')))}
         dict_nomes = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
-        agentes_xls = ['veloz.express', 'robson.melo', 'william.bertoldo', 'ludmila']
+        agentes_xls = AGENTES_XLS_AUTORIZADOS
 
         with col_esq:
             if df_pendentes.empty: st.success(f"Nenhum volume PENDENTE aguardando envio na data {data_filtro.strftime('%d/%m/%Y')}.")
