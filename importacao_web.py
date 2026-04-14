@@ -1034,24 +1034,101 @@ elif menu == "💰 Faturamento":
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
+# =============================================================================
+# 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
+# =============================================================================
 elif menu == "📝 Pedido Manual":
-    st.markdown("### 📝 Novo Pedido")
-    with st.form("f_man", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        tom = c1.selectbox("Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS); cid = c2.text_input("Cidade *")
-        lab = st.text_input("Ponto Coleta *"); bai, rua = st.columns(2); b = bai.text_input("Bairro"); r = rua.text_input("Endereço")
-        if st.form_submit_button("🚀 INJETAR"):
-            if tom != "Selecione..." and cid and lab:
-                aba_m = planilha_db.worksheet("Memoria_Sistema")
-                df_up = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-                n_id = str(obter_proximo_id(planilha_db, "Memoria_Sistema"))
-                ag = obter_login_agente(cid, b, lab, r)
-                novo = pd.DataFrame([{'DATA': hoje_br.strftime("%d/%m/%Y"), 'PEDIDO': n_id, 'TOMADOR': tom, 'LABORATORIO': padronizar_texto(lab), 'CIDADE': padronizar_texto(cid), 'BAIRRO': padronizar_texto(b), 'ENDERECO': padronizar_texto(r), 'STATUS': 'PENDENTE', 'AGENTE_RAW': ag, 'ZAP_ENVIADO': '', 'FATURA': ''}])
-                df_up = pd.concat([df_up, novo])
-                aba_m.clear(); aba_m.update("A1", [df_up.columns.tolist()] + df_up.fillna("").astype(str).values.tolist())
-                despachar_para_appsheet([novo.iloc[0].to_dict()])
-                st.success(f"Pedido {n_id} salvo!"); time.sleep(1); carregar_dados_completos.clear(); st.rerun()
-            else: st.error("Preencha campos obrigatórios.")
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
+    
+    if 'm_rua' not in st.session_state: st.session_state['m_rua'] = ""
+    if 'm_bai' not in st.session_state: st.session_state['m_bai'] = ""
+    if 'm_cid' not in st.session_state: st.session_state['m_cid'] = ""
+    if 'm_uf' not in st.session_state: st.session_state['m_uf'] = ""
+    if 'cep_busca_input' not in st.session_state: st.session_state['cep_busca_input'] = ""
+
+    def buscar_cep_callback():
+        cep_limpo = re.sub(r'\D', '', st.session_state.cep_busca_input)
+        if len(cep_limpo) == 8:
+            try:
+                resp = requests.get(f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
+                if "erro" not in resp:
+                    st.session_state['m_rua'] = padronizar_texto(resp.get("logradouro", ""))
+                    st.session_state['m_bai'] = padronizar_texto(resp.get("bairro", ""))
+                    st.session_state['m_cid'] = padronizar_texto(resp.get("localidade", ""))
+                    st.session_state['m_uf'] = padronizar_texto(resp.get("uf", ""))
+            except Exception: pass
+
+    with st.container(border=True):
+        cc1, cc2, cc3 = st.columns([2, 1, 3], vertical_alignment="bottom")
+        cc1.text_input("Digite o CEP e aperte ENTER", max_chars=9, key="cep_busca_input", on_change=buscar_cep_callback)
+        
+        if cc2.button("🔍 Buscar CEP", use_container_width=True):
+            buscar_cep_callback()
+        
+        st.markdown("---")
+        with st.form("form_manual_page", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            m_tomador = col1.selectbox("Laboratório Solicitante *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+            m_data = col2.date_input("Data *", format="DD/MM/YYYY", value=hoje_br)
+            m_lab = st.text_input("Ponto de Coleta *")
+            m_cnpj = st.text_input("CNPJ / Documento (Opcional)")
+            m_rua = st.text_input("Logradouro *", value=st.session_state['m_rua'])
+            
+            col3, col4, col5 = st.columns([2, 2, 1])
+            m_bai = col3.text_input("Bairro *", value=st.session_state['m_bai'])
+            m_cid = col4.text_input("Cidade *", value=st.session_state['m_cid'])
+            m_uf = col5.text_input("UF *", value=st.session_state['m_uf'])
+            
+            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+            m_agente_escolha = st.selectbox("Agente Designado:", ["Automático (Por Rota)"] + logins_disp)
+            
+            if st.form_submit_button("🚀 Injetar na Base", type="primary", use_container_width=True):
+                if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
+                    st.error("⚠️ Preencha todos os campos!")
+                else:
+                    with st.spinner("Injetando pedido no sistema..."):
+                        lab_limpo, rua_limpa, bai_limpo, cid_limpa, uf_limpa = padronizar_texto(m_lab), padronizar_texto(m_rua), padronizar_texto(m_bai), padronizar_texto(m_cid), padronizar_texto(m_uf)
+                        if m_agente_escolha == "Automático (Por Rota)": m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa)
+                        else: m_agente = m_agente_escolha
+                            
+                        m_prazo = str(calcular_sla_dias(uf_limpa, cid_limpa, m_tomador))
+                        m_limite = str(calcular_data_limite(m_data.strftime("%d/%m/%Y"), int(m_prazo)))
+                        
+                        try:
+                            aba_memoria = planilha_db.worksheet("Memoria_Sistema")
+                            dados_atuais = aba_memoria.get_all_values()
+                            df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
+                            
+                            if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
+                            if 'CNPJ' not in df_nuvem.columns: df_nuvem['CNPJ'] = ""
+                            if 'FATURA' not in df_nuvem.columns: df_nuvem['FATURA'] = ""
+                                
+                            # INTELIGÊNCIA: Ler o maior número direto da nuvem
+                            m_pedido = str(obter_proximo_id(planilha_db, "Memoria_Sistema"))
+                            
+                            novo_ped_dict = {
+                                'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 
+                                'LABORATORIO': lab_limpo, 'CNPJ': padronizar_texto(m_cnpj), 'ENDERECO': rua_limpa, 'NUMERO': "", 
+                                'BAIRRO': bai_limpo, 'CIDADE': cid_limpa, 'UF': uf_limpa, 
+                                'CEP': re.sub(r'\D', '', st.session_state.cep_busca_input), 'STATUS': 'PENDENTE', 
+                                'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 
+                                'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': "", 'ZAP_ENVIADO': "", 'FATURA': ""
+                            }
+                            
+                            novo_ped = pd.DataFrame([novo_ped_dict]).astype(str)
+                            df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
+                            aba_memoria.clear()
+                            aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
+                            
+                            if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
+                            
+                            st.success(f"🎉 Pedido {m_pedido} criado com sucesso!")
+                            time.sleep(3.5)
+                            
+                            carregar_dados_completos.clear()
+                            st.session_state['m_rua'] = ""; st.session_state['m_bai'] = ""; st.session_state['m_cid'] = ""; st.session_state['m_uf'] = ""; st.session_state['cep_busca_input'] = ""
+                            st.rerun()
+                        except Exception as e: st.error(f"Erro: {e}")
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES (OFICIAL)
 # =============================================================================
