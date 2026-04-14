@@ -1029,9 +1029,12 @@ elif menu == "💰 Faturamento":
                     if df_precos.empty: st.error(f"⚠️ Aba '{f_tom}' não encontrada no Faturamento_Log.")
                     else:
                         df_fin['VALOR (R$)'] = df_fin.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS'], df_precos), axis=1)
-                        df_show = df_fin[['DATA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)']].copy()
+                        # Deixamos o DATA_OBJ acessível internamente para calcular o menor e maior dia exato
+                        df_show = df_fin[['DATA_OBJ', 'DATA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)']].copy()
                         df_show.insert(0, "FATURAR", True)
-                        editado = st.data_editor(df_show, hide_index=True, use_container_width=True, disabled=['DATA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)'])
+                        
+                        # Ocultamos o DATA_OBJ da tela, ele serve só para o cálculo inteligente do período
+                        editado = st.data_editor(df_show, column_config={"DATA_OBJ": None}, hide_index=True, use_container_width=True, disabled=['DATA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)'])
                         
                         sel_f = editado[editado["FATURAR"]]
                         total_f = sel_f['VALOR (R$)'].sum()
@@ -1041,7 +1044,12 @@ elif menu == "💰 Faturamento":
                             if not sel_f.empty:
                                 with st.spinner("Carimbando e salvando histórico..."):
                                     id_fat = f"FAT-{f_tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
-                                    periodo_str = f"{f_per[0].strftime('%d/%m/%Y')} a {f_per[1].strftime('%d/%m/%Y')}" if isinstance(f_per, (tuple, list)) and len(f_per) == 2 else "Data Única"
+                                    
+                                    # LÓGICA INTELIGENTE: Pega a menor e maior data EXATAMENTE dos pedidos selecionados
+                                    datas_selecionadas = pd.to_datetime(sel_f['DATA_OBJ'])
+                                    min_data = datas_selecionadas.min().strftime('%d/%m/%Y')
+                                    max_data = datas_selecionadas.max().strftime('%d/%m/%Y')
+                                    periodo_fatura = f"{min_data} a {max_data}" if min_data != max_data else min_data
 
                                     # 1. Carimba Memoria_Sistema
                                     aba_m = planilha_db.worksheet("Memoria_Sistema")
@@ -1049,18 +1057,18 @@ elif menu == "💰 Faturamento":
                                     df_nuvem.loc[df_nuvem['PEDIDO'].isin(sel_f['PEDIDO'].astype(str)), 'FATURA'] = id_fat
                                     aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     
-                                    # 2. Salva no Histórico (Livro Caixa) com Período e Valor Novo
+                                    # 2. Salva no Histórico na Nova Ordem de Colunas
+                                    # ID Fatura | Data Da Emissão | Tomador | Total Pedidos (Volumes) | Valor Total | Periodo
                                     try: aba_h = planilha_financeiro.worksheet("Historico_Faturas")
                                     except: 
                                         aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 6)
-                                        aba_h.update("A1", [["ID_FATURA", "TOMADOR", "DATA_EMISSAO", "PERIODO", "VOLUMES", "VALOR_TOTAL_R$"]])
+                                        aba_h.update("A1", [["ID_FATURA", "DATA_EMISSAO", "TOMADOR", "TOTAL_PEDIDOS", "VALOR_TOTAL_R$", "PERIODO"]])
                                     
-                                    # Corrige a falha anterior e injeta os 6 dados na ordem exata
-                                    aba_h.append_row([id_fat, f_tom, hoje_br.strftime("%d/%m/%Y"), periodo_str, len(sel_f), round(total_f, 2)])
+                                    aba_h.append_row([id_fat, hoje_br.strftime("%d/%m/%Y"), f_tom, len(sel_f), round(total_f, 2), periodo_fatura])
                                     
-                                    # 3. Prepara downloads
+                                    # 3. Prepara downloads (removendo as colunas de controle para não sujar o Excel)
                                     st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f)
-                                    st.session_state.fatura_xls = gerar_excel_memoria(sel_f)
+                                    st.session_state.fatura_xls = gerar_excel_memoria(sel_f.drop(columns=['DATA_OBJ', 'FATURAR']))
                                     st.session_state.fatura_id = id_fat
                                     st.session_state.fatura_sucesso = True; st.rerun()
 
@@ -1073,10 +1081,9 @@ elif menu == "💰 Faturamento":
             if len(dados_h) <= 1: 
                 st.info("Nenhuma fatura emitida ainda.")
             else:
-                # Transforma em DataFrame garantindo que os cabeçalhos estão certos
                 df_h = pd.DataFrame(dados_h[1:], columns=dados_h[0])
                 
-                # Interface bonita: formata a moeda em R$ se a coluna existir
+                # Formata a moeda em R$ para ficar visualmente profissional na Grid
                 df_h_display = df_h.copy()
                 if 'VALOR_TOTAL_R$' in df_h_display.columns:
                     def formata_moeda(val):
@@ -1112,7 +1119,7 @@ elif menu == "💰 Faturamento":
                                 total_rec = df_fatura_rec['VALOR (R$)'].sum()
                                 
                                 pdf_rec = gerar_pdf_fatura(fat_selecionada, tomador_rec, df_fatura_rec.reset_index(drop=True), total_rec)
-                                xls_rec = gerar_excel_memoria(df_fatura_rec.reset_index(drop=True))
+                                xls_rec = gerar_excel_memoria(df_fatura_rec[['DATA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)']].reset_index(drop=True))
                                 
                                 c_down1, c_down2 = st.columns(2)
                                 c_down1.download_button("📥 Baixar 2ª Via PDF", data=pdf_rec, file_name=f"{fat_selecionada}_2via.pdf", mime="application/pdf", use_container_width=True)
