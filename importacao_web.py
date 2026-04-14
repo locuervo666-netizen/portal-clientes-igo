@@ -588,7 +588,8 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 with st.sidebar:
     st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=160)
     st.divider()
-menu = st.radio("Navegação Operacional:", ["📊 GRID", "💰 Faturamento", "📝 Pedido Manual", "📥 Importações", "📥 Importações Umove", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"])    st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
+    menu = st.radio("Navegação Operacional:", ["📊 GRID", "💰 Faturamento", "📝 Pedido Manual", "📥 Importações", "📥 Importações Umove", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"])
+    st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
         st.session_state.autenticado = False; st.rerun()
