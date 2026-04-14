@@ -140,8 +140,27 @@ def conectar_sandbox():
         st.error(f"⚠️ Planilha Sandbox 'Import_Umove' não encontrada no Drive. Erro: {e}")
         return None
 
+@st.cache_resource
+def conectar_financeiro():
+    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    try:
+        import json
+        from google.oauth2.credentials import Credentials
+        token_str = os.environ.get("google_token_json")
+        if not token_str:
+            try: token_str = st.secrets.get("google_token_json")
+            except: pass
+        if not token_str: return None
+        token_info = json.loads(token_str)
+        creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
+        gc = gspread.authorize(creds)
+        return gc.open_by_key("1yaVC8MnF3BiwnNDw1DXRu6cxsG4Hnylu2Uv-WVwt1TQ")
+    except Exception as e:
+        return None
+
 planilha_db = conectar_banco()
 planilha_sandbox = conectar_sandbox()
+planilha_financeiro = conectar_financeiro()
 
 # 🔹 LISTA DE CLIENTES AUTORIZADOS EM ORDEM ALFABÉTICA 🔹
 CLIENTES_AUTORIZADOS = sorted(["CAEP", "MB_CAEP", "CUNHA", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"])
@@ -569,8 +588,7 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 with st.sidebar:
     st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=160)
     st.divider()
-    menu = st.radio("Navegação Operacional:", ["📊 GRID", "📝 Pedido Manual", "📥 Importações", "📥 Importações Umove", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"])
-    st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
+menu = st.radio("Navegação Operacional:", ["📊 GRID", "💰 Faturamento", "📝 Pedido Manual", "📥 Importações", "📥 Importações Umove", "🔬 Triagem", "📱 WhatsApp", "📁 Relatórios", "⚙️ Rotas"])    st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
         st.session_state.autenticado = False; st.rerun()
@@ -915,100 +933,107 @@ if menu == "📊 GRID":
             col_b7.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
 
 # =============================================================================
+# 💰 MÓDULO 2: FATURAMENTO (NOVO)
+# =============================================================================
+elif menu == "💰 Faturamento":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>💰 Backoffice Financeiro</h3></div>", unsafe_allow_html=True)
+    df_raw = carregar_dados_completos(planilha_db)
+    
+    if planilha_financeiro is None:
+        st.error("⚠️ Planilha 'Faturamento_Log' não conectada. Verifique as permissões de compartilhamento com o e-mail de serviço.")
+    elif not df_raw.empty:
+        @st.cache_data(ttl=60)
+        def carregar_precos(tomador):
+            try:
+                # Juramento: Força a busca pela aba certa
+                aba_nome = tomador.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if tomador in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else tomador
+                aba = planilha_financeiro.worksheet(aba_nome)
+                df_p = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                df_p['VALOR_CHEIO'] = df_p['VALOR_CHEIO'].astype(str).str.replace(',', '.').astype(float)
+                df_p['MULT_FRUSTRADA'] = df_p['MULT_FRUSTRADA'].astype(str).str.replace(',', '.').astype(float)
+                df_p['CIDADE'] = df_p['CIDADE'].apply(padronizar_texto)
+                df_p['BAIRRO'] = df_p['BAIRRO'].apply(padronizar_texto)
+                df_p['ENDERECO'] = df_p['ENDERECO'].apply(padronizar_texto)
+                return df_p
+            except: return pd.DataFrame()
+
+        def calcular_valor(cid, bai, end, status, df_p):
+            if df_p.empty: return 0.0
+            c, b, e = padronizar_texto(cid), padronizar_texto(bai), padronizar_texto(end)
+            match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == b) & (df_p['ENDERECO'] == e)]
+            if match.empty: match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == b) & (df_p['ENDERECO'] == "")]
+            if match.empty: match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == "") & (df_p['ENDERECO'] == "")]
+            
+            if not match.empty:
+                v_base = float(match.iloc[0]['VALOR_CHEIO'])
+                mult = float(match.iloc[0]['MULT_FRUSTRADA'])
+                return v_base if status == "ENTREGUE" else (v_base * mult)
+            return 0.0
+
+        with st.container(border=True):
+            c1, c2, c3 = st.columns([1, 1, 1])
+            f_tom = c1.selectbox("🏢 Selecionar Tomador:", CLIENTES_AUTORIZADOS)
+            f_per = c2.date_input("📅 Período de Entrega:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY")
+            
+            if 'FATURA' not in df_raw.columns: df_raw['FATURA'] = ""
+            
+            # Juramento de interface
+            df_raw['LABORATORIO'] = df_raw['LABORATORIO'].apply(lambda x: str(x).replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB'))
+            df_raw['TOMADOR'] = df_raw['TOMADOR'].apply(lambda x: str(x).replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB'))
+
+            df_fin = df_raw[(df_raw['TOMADOR'] == f_tom) & 
+                            (df_raw['STATUS'].isin(['ENTREGUE', 'FRUSTRADA'])) & 
+                            (df_raw['FATURA'].astype(str).str.strip() == "")].copy()
+            
+            if isinstance(f_per, (tuple, list)) and len(f_per) == 2:
+                df_fin = df_fin[(df_fin['DATA_OBJ'] >= f_per[0]) & (df_fin['DATA_OBJ'] <= f_per[1])]
+                
+            if df_fin.empty:
+                st.info(f"✅ Nenhum pedido pendente de faturamento para {f_tom} neste período.")
+            else:
+                df_precos = carregar_precos(f_tom)
+                if df_precos.empty:
+                    st.error(f"⚠️ A aba para o cliente '{f_tom}' não existe ou está vazia na planilha 'Faturamento_Log'.")
+                else:
+                    df_fin['VALOR (R$)'] = df_fin.apply(lambda r: calcular_valor(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS'], df_precos), axis=1)
+                    st.write(f"🔍 Encontrados **{len(df_fin)}** pedidos passíveis de cobrança.")
+                    
+                    df_show = df_fin[['DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'BAIRRO', 'STATUS', 'VALOR (R$)']].copy()
+                    df_show.insert(0, "FATURAR", True)
+                    
+                    editado = st.data_editor(df_show, hide_index=True, use_container_width=True, disabled=['DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'BAIRRO', 'STATUS', 'VALOR (R$)'])
+                    
+                    selecionados = editado[editado["FATURAR"]]
+                    total_fatura = selecionados['VALOR (R$)'].sum()
+                    
+                    st.divider()
+                    sc1, sc2 = st.columns(2)
+                    sc1.metric("Total do Lote de Faturamento", f"R$ {total_fatura:,.2f}")
+                    
+                    if sc2.button("🚀 CARIMBAR COMO FATURADO", type="primary", use_container_width=True):
+                        with st.spinner("Blindando pedidos contra dupla cobrança..."):
+                            id_fat = f"FAT-{f_tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
+                            p_ids = selecionados['PEDIDO'].astype(str).tolist()
+                            
+                            try:
+                                aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                                if 'FATURA' not in df_nuvem.columns: df_nuvem['FATURA'] = ""
+                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'FATURA'] = id_fat
+                                aba_m.clear()
+                                aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                
+                                st.success(f"🎉 Pedidos selados com o Lote: {id_fat}!")
+                                time.sleep(2)
+                                carregar_dados_completos.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao salvar faturamento: {e}")
+
+# =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
 elif menu == "📝 Pedido Manual":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📝 Inserir Novo Pedido Manual</h3></div>", unsafe_allow_html=True)
-    
-    if 'm_rua' not in st.session_state: st.session_state['m_rua'] = ""
-    if 'm_bai' not in st.session_state: st.session_state['m_bai'] = ""
-    if 'm_cid' not in st.session_state: st.session_state['m_cid'] = ""
-    if 'm_uf' not in st.session_state: st.session_state['m_uf'] = ""
-    if 'cep_busca_input' not in st.session_state: st.session_state['cep_busca_input'] = ""
-
-    def buscar_cep_callback():
-        cep_limpo = re.sub(r'\D', '', st.session_state.cep_busca_input)
-        if len(cep_limpo) == 8:
-            try:
-                resp = requests.get(f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
-                if "erro" not in resp:
-                    st.session_state['m_rua'] = padronizar_texto(resp.get("logradouro", ""))
-                    st.session_state['m_bai'] = padronizar_texto(resp.get("bairro", ""))
-                    st.session_state['m_cid'] = padronizar_texto(resp.get("localidade", ""))
-                    st.session_state['m_uf'] = padronizar_texto(resp.get("uf", ""))
-            except Exception: pass
-
-    with st.container(border=True):
-        cc1, cc2, cc3 = st.columns([2, 1, 3], vertical_alignment="bottom")
-        cc1.text_input("Digite o CEP e aperte ENTER", max_chars=9, key="cep_busca_input", on_change=buscar_cep_callback)
-        
-        if cc2.button("🔍 Buscar CEP", use_container_width=True):
-            buscar_cep_callback()
-        
-        st.markdown("---")
-        with st.form("form_manual_page", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            m_tomador = col1.selectbox("Laboratório Solicitante *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
-            m_data = col2.date_input("Data *", format="DD/MM/YYYY", value=hoje_br)
-            m_lab = st.text_input("Ponto de Coleta *")
-            m_cnpj = st.text_input("CNPJ / Documento (Opcional)")
-            m_rua = st.text_input("Logradouro *", value=st.session_state['m_rua'])
-            
-            col3, col4, col5 = st.columns([2, 2, 1])
-            m_bai = col3.text_input("Bairro *", value=st.session_state['m_bai'])
-            m_cid = col4.text_input("Cidade *", value=st.session_state['m_cid'])
-            m_uf = col5.text_input("UF *", value=st.session_state['m_uf'])
-            
-            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-            m_agente_escolha = st.selectbox("Agente Designado:", ["Automático (Por Rota)"] + logins_disp)
-            
-            if st.form_submit_button("🚀 Injetar na Base", type="primary", use_container_width=True):
-                if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
-                    st.error("⚠️ Preencha todos os campos!")
-                else:
-                    with st.spinner("Injetando pedido no sistema..."):
-                        lab_limpo, rua_limpa, bai_limpo, cid_limpa, uf_limpa = padronizar_texto(m_lab), padronizar_texto(m_rua), padronizar_texto(m_bai), padronizar_texto(m_cid), padronizar_texto(m_uf)
-                        if m_agente_escolha == "Automático (Por Rota)": m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES)
-                        else: m_agente = m_agente_escolha
-                            
-                        m_prazo = str(calcular_sla_dias(uf_limpa, cid_limpa, m_tomador))
-                        m_limite = str(calcular_data_limite(m_data.strftime("%d/%m/%Y"), int(m_prazo)))
-                        
-                        try:
-                            aba_memoria = planilha_db.worksheet("Memoria_Sistema")
-                            dados_atuais = aba_memoria.get_all_values()
-                            df_nuvem = pd.DataFrame(dados_atuais[1:], columns=dados_atuais[0]) if len(dados_atuais) > 1 else pd.DataFrame()
-                            
-                            if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
-                            if 'CNPJ' not in df_nuvem.columns: df_nuvem['CNPJ'] = ""
-                                
-                            # INTELIGÊNCIA: Ler o maior número direto da nuvem
-                            m_pedido = str(obter_proximo_id(df_nuvem))
-                            
-                            novo_ped_dict = {
-                                'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 
-                                'LABORATORIO': lab_limpo, 'CNPJ': padronizar_texto(m_cnpj), 'ENDERECO': rua_limpa, 'NUMERO': "", 
-                                'BAIRRO': bai_limpo, 'CIDADE': cid_limpa, 'UF': uf_limpa, 
-                                'CEP': re.sub(r'\D', '', st.session_state.cep_busca_input), 'STATUS': 'PENDENTE', 
-                                'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 
-                                'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': "", 'ZAP_ENVIADO': ""
-                            }
-                            
-                            novo_ped = pd.DataFrame([novo_ped_dict]).astype(str)
-                            df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
-                            aba_memoria.clear()
-                            aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
-                            
-                            if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
-                            
-                            st.success(f"🎉 Pedido {m_pedido} criado com sucesso!")
-                            time.sleep(3.5)
-                            
-                            carregar_dados_completos.clear()
-                            st.session_state['m_rua'] = ""; st.session_state['m_bai'] = ""; st.session_state['m_cid'] = ""; st.session_state['m_uf'] = ""; st.session_state['cep_busca_input'] = ""
-                            st.rerun()
-                        except Exception as e: st.error(f"Erro: {e}")
-
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES (OFICIAL)
 # =============================================================================
