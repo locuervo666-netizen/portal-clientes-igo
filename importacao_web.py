@@ -934,7 +934,7 @@ if menu == "📊 GRID":
             col_b7.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
 
 # =============================================================================
-# 💰 MÓDULO 2: FATURAMENTO PREMIUM (COM HISTÓRICO E PERÍODO)
+# 💰 MÓDULO 2: FATURAMENTO PREMIUM (COM HISTÓRICO, MOEDA E 2ª VIA)
 # =============================================================================
 elif menu == "💰 Faturamento":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>💰 Backoffice Financeiro</h3></div>", unsafe_allow_html=True)
@@ -1049,11 +1049,13 @@ elif menu == "💰 Faturamento":
                                     df_nuvem.loc[df_nuvem['PEDIDO'].isin(sel_f['PEDIDO'].astype(str)), 'FATURA'] = id_fat
                                     aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     
-                                    # 2. Salva no Histórico (Livro Caixa) com Período
+                                    # 2. Salva no Histórico (Livro Caixa) com Período e Valor Novo
                                     try: aba_h = planilha_financeiro.worksheet("Historico_Faturas")
                                     except: 
                                         aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 6)
                                         aba_h.update("A1", [["ID_FATURA", "TOMADOR", "DATA_EMISSAO", "PERIODO", "VOLUMES", "VALOR_TOTAL_R$"]])
+                                    
+                                    # Corrige a falha anterior e injeta os 6 dados na ordem exata
                                     aba_h.append_row([id_fat, f_tom, hoje_br.strftime("%d/%m/%Y"), periodo_str, len(sel_f), round(total_f, 2)])
                                     
                                     # 3. Prepara downloads
@@ -1066,16 +1068,59 @@ elif menu == "💰 Faturamento":
         st.markdown("#### 📖 Consulta ao Livro Caixa (Faturas Emitidas)")
         try:
             aba_h = planilha_financeiro.worksheet("Historico_Faturas")
-            df_h = pd.DataFrame(aba_h.get_all_values()[1:], columns=aba_h.get_all_values()[0])
-            if df_h.empty: st.info("Nenhuma fatura emitida ainda.")
+            dados_h = aba_h.get_all_values()
+            
+            if len(dados_h) <= 1: 
+                st.info("Nenhuma fatura emitida ainda.")
             else:
+                # Transforma em DataFrame garantindo que os cabeçalhos estão certos
+                df_h = pd.DataFrame(dados_h[1:], columns=dados_h[0])
+                
+                # Interface bonita: formata a moeda em R$ se a coluna existir
+                df_h_display = df_h.copy()
+                if 'VALOR_TOTAL_R$' in df_h_display.columns:
+                    def formata_moeda(val):
+                        try: return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                        except: return val
+                    df_h_display['VALOR_TOTAL_R$'] = df_h_display['VALOR_TOTAL_R$'].apply(formata_moeda)
+                
                 c_h1, c_h2 = st.columns(2)
                 f_h_tom = c_h1.selectbox("Filtrar Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS, key="h_tom")
-                if f_h_tom != "Todos": df_h = df_h[df_h['TOMADOR'] == f_h_tom]
+                if f_h_tom != "Todos": df_h_display = df_h_display[df_h_display['TOMADOR'] == f_h_tom]
                 
-                st.dataframe(df_h.sort_index(ascending=False), use_container_width=True, hide_index=True)
-                st.caption("As faturas são listadas da mais recente para a mais antiga.")
-        except: st.warning("O histórico de faturas será ativado automaticamente após a primeira emissão.")
+                st.dataframe(df_h_display.sort_index(ascending=False), use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+                st.markdown("#### 🖨️ Reemitir Fatura (2ª Via)")
+                faturas_disponiveis = df_h['ID_FATURA'].dropna().unique().tolist()
+                fat_selecionada = st.selectbox("Selecione a Fatura para baixar os arquivos novamente:", ["Selecione..."] + faturas_disponiveis)
+                
+                if fat_selecionada != "Selecione...":
+                    # Busca os dados originais dessa fatura na Memória do Sistema
+                    df_fatura_rec = df_raw[df_raw['FATURA'] == fat_selecionada].copy()
+                    
+                    if df_fatura_rec.empty:
+                        st.warning("⚠️ Os pedidos dessa fatura já foram movidos para o Arquivo Morto ou não foram encontrados.")
+                    else:
+                        with st.spinner("Compilando 2ª Via..."):
+                            tomador_rec = df_fatura_rec.iloc[0]['TOMADOR']
+                            df_precos_rec = carregar_tabela_precos(tomador_rec)
+                            
+                            if not df_precos_rec.empty:
+                                # Recalcula os valores para exibir no PDF
+                                df_fatura_rec['VALOR (R$)'] = df_fatura_rec.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS'], df_precos_rec), axis=1)
+                                total_rec = df_fatura_rec['VALOR (R$)'].sum()
+                                
+                                pdf_rec = gerar_pdf_fatura(fat_selecionada, tomador_rec, df_fatura_rec.reset_index(drop=True), total_rec)
+                                xls_rec = gerar_excel_memoria(df_fatura_rec.reset_index(drop=True))
+                                
+                                c_down1, c_down2 = st.columns(2)
+                                c_down1.download_button("📥 Baixar 2ª Via PDF", data=pdf_rec, file_name=f"{fat_selecionada}_2via.pdf", mime="application/pdf", use_container_width=True)
+                                c_down2.download_button("📥 Baixar 2ª Via Excel", data=xls_rec, file_name=f"{fat_selecionada}_2via.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                            else:
+                                st.error("Tabela de preços não encontrada para recálculo.")
+                                
+        except Exception as e: st.warning(f"O histórico de faturas será ativado automaticamente após a primeira emissão. Detalhe: {e}")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
