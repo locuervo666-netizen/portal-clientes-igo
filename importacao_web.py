@@ -146,6 +146,13 @@ planilha_sandbox = conectar_sandbox()
 # 🔹 LISTA DE CLIENTES AUTORIZADOS EM ORDEM ALFABÉTICA 🔹
 CLIENTES_AUTORIZADOS = sorted(["CAEP", "MB_CAEP", "CUNHA", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"])
 
+def corrigir_nomes_relatorio(texto):
+    if pd.isna(texto): return ""
+    t = str(texto)
+    t = re.sub(r'\bCAEP\b', 'SYNVIA', t, flags=re.IGNORECASE)
+    t = re.sub(r'\bCUNHA\b', 'GRALAB', t, flags=re.IGNORECASE)
+    return t
+
 @st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
     if not _planilha: return pd.DataFrame()
@@ -263,13 +270,6 @@ hoje_br = datetime.now(FUSO_BR).date()
 def padronizar_texto(texto):
     if pd.isna(texto) or not texto: return ""
     return unicodedata.normalize('NFKD', str(texto).strip()).encode('ASCII', 'ignore').decode('utf-8').upper()
-
-def corrigir_nomes_relatorio(texto):
-    if pd.isna(texto): return ""
-    t = str(texto)
-    t = re.sub(r'\bCAEP\b', 'SYNVIA', t, flags=re.IGNORECASE)
-    t = re.sub(r'\bCUNHA\b', 'GRALAB', t, flags=re.IGNORECASE)
-    return t
 
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts: return False
@@ -562,7 +562,7 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
     return pdf_bytes
 
 # =============================================================================
-# 📊 MÓDULO GRID PRINCIPAL E SIDEBAR
+# 📊 SIDEBAR & AUTO-REFRESH CONDICIONADO
 # =============================================================================
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
@@ -575,12 +575,15 @@ with st.sidebar:
     if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
         st.session_state.autenticado = False; st.rerun()
 
-# ✅ AUTO-REFRESH CONDICIONADO: SÓ RODA NA ABA GRID!
+# ✅ AUTO-REFRESH SÓ NA GRID! (Impede corte de disparos do WhatsApp)
 if menu == "📊 GRID":
     st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:24px; color:#0F172A;">Central de Controle Operacional</h2><div class='sync-status'>🟢 Online: {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
 
+# =============================================================================
+# 📊 MÓDULO GRID
+# =============================================================================
 if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
     if not df_raw.empty:
@@ -786,7 +789,9 @@ if menu == "📊 GRID":
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
                                     if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
-                                    prox_id = obter_proximo_id(df_nuvem)
+                                    
+                                    prox_id = obter_proximo_id(df_nuvem) # Pega o próximo ID real
+                                    
                                     clones_app = []
                                     for pid in p_ids:
                                         if pid in df_nuvem['PEDIDO'].values:
@@ -977,6 +982,7 @@ elif menu == "📝 Pedido Manual":
                             if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
                             if 'CNPJ' not in df_nuvem.columns: df_nuvem['CNPJ'] = ""
                                 
+                            # INTELIGÊNCIA: Ler o maior número direto da nuvem
                             m_pedido = str(obter_proximo_id(df_nuvem))
                             
                             novo_ped_dict = {
@@ -1116,7 +1122,6 @@ elif menu == "📥 Importações":
                     for idx, novo_mot in correcoes.items():
                         if novo_mot != "Selecione...":
                             st.session_state.df_preview_oficial.at[idx, 'AGENTE_RAW'] = novo_mot
-                            # Aprende a nova rota
                             r_cid = str(st.session_state.df_preview_oficial.at[idx, 'CIDADE'])
                             r_bai = str(st.session_state.df_preview_oficial.at[idx, 'BAIRRO'])
                             rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai)] if p])
@@ -1151,6 +1156,7 @@ elif menu == "📥 Importações":
                         if 'ZAP_ENVIADO' not in df_up.columns: df_up['ZAP_ENVIADO'] = ""
                         if 'CNPJ' not in df_up.columns: df_up['CNPJ'] = ""
                         
+                        # INTELIGÊNCIA: Ler o maior número direto da nuvem
                         prox_id = obter_proximo_id(df_up)
                         for idx, row in df_ok.iterrows():
                             if not str(row['PEDIDO']).strip(): 
@@ -1307,7 +1313,6 @@ elif menu == "📥 Importações Umove":
                     for idx, novo_mot in correcoes.items():
                         if novo_mot != "Selecione...":
                             st.session_state.df_preview_sb.at[idx, 'AGENTE_RAW'] = novo_mot
-                            # Aprende a nova rota
                             r_cid = str(st.session_state.df_preview_sb.at[idx, 'CIDADE'])
                             r_bai = str(st.session_state.df_preview_sb.at[idx, 'BAIRRO'])
                             rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai)] if p])
@@ -1335,7 +1340,7 @@ elif menu == "📥 Importações Umove":
             if st.button("➕ Adicionar ao Carrinho (Cumulativo)", type="primary", key="add_carrinho_sb"):
                 with st.spinner("Gerando IDs 700020+ e adicionando ao carrinho..."):
                     try:
-                        # Inteligência anti-reset para a aba Contador
+                        # CONTADOR BLINDADO (Aba Controlador na Umove)
                         try:
                             aba_contador = planilha_sandbox.worksheet("Contador")
                         except Exception:
@@ -1354,14 +1359,12 @@ elif menu == "📥 Importações Umove":
                             else:
                                 aba_contador.update("A1", [["700020"]])
                         else:
-                            # Fallback para o session_state apenas se o drive falhar completamente
                             if 'contador_temp' in st.session_state: prox_id_sb = st.session_state.contador_temp
 
                         for idx, row in df_ok.iterrows():
                             df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
                             prox_id_sb += 1
                             
-                        # Atualiza o novo número na nuvem
                         if aba_contador:
                             try: aba_contador.update("A1", [[str(prox_id_sb)]])
                             except: pass
@@ -1432,7 +1435,7 @@ elif menu == "📥 Importações Umove":
                 cnpj = str(row.get('CNPJ', ''))
                 if cnpj: cnpj = f"'{cnpj}"
                 
-                # BLINDAGEM DO .LOC - Filtro Regex destruidor de letras na coluna número
+                # BLINDAGEM DO .LOC - Destruidor de letras na coluna número
                 numero_limpo = re.sub(r'\D', '', str(row.get('NUMERO', '')))
                 
                 linha_loc = f"{id_loc};{id_loc};{corp_name};{row.get('UF','')};{row.get('CIDADE','')};{row.get('BAIRRO','')};{row.get('ENDERECO','')};{numero_limpo};{cep};{tomador};;{cnpj};1"
@@ -1878,7 +1881,7 @@ elif menu == "📁 Relatórios":
 # =============================================================================
 elif menu == "⚙️ Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
-    tab_agente, tab_rota, tab_tabela, tab_transferencia, tab_sistema = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista Específico", "🔄 Transferir Rotas", "⚠️ Sistema"])
+    tab_agente, tab_rota, tab_tabela, tab_transfer, tab_sistema = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista", "🔄 Transferir Massa", "⚠️ Manutenção"])
     
     with tab_agente:
         with st.form("form_novo_agente", clear_on_submit=True):
@@ -1973,87 +1976,75 @@ elif menu == "⚙️ Rotas":
                         except Exception as e: st.error(f"Erro ao remover: {e}")
         else: st.warning("Nenhum dado encontrado.")
 
-    with tab_transferencia:
+    with tab_transfer:
         st.markdown("#### 🔄 Transferência em Massa de Rotas")
         st.info("Transfira todas as rotas de um motorista que saiu da operação para um novo com um único clique.")
-        
         if not DF_AGENTES.empty:
-            logins_disponiveis = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist())
-            
-            with st.form("form_transferencia_rotas"):
+            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist())
+            with st.form("form_transf"):
                 c1, c2 = st.columns(2)
-                agente_origem = c1.selectbox("🚗 De (Motorista Antigo):", ["Selecione..."] + logins_disponiveis)
-                agente_destino = c2.selectbox("🚙 Para (Novo Motorista):", ["Selecione..."] + logins_disponiveis)
+                de_ag = c1.selectbox("De (Motorista Saindo):", ["Selecione..."] + logins_disp)
+                para_ag = c2.selectbox("Para (Motorista Entrando):", ["Selecione..."] + logins_disp)
                 
-                if st.form_submit_button("🔄 Transferir Todas as Rotas", type="primary", use_container_width=True):
-                    if agente_origem == "Selecione..." or agente_destino == "Selecione...":
-                        st.error("⚠️ Selecione os dois motoristas para continuar.")
-                    elif agente_origem == agente_destino:
-                        st.error("⚠️ O motorista de origem e destino não podem ser a mesma pessoa!")
+                if st.form_submit_button("EXECUTAR TRANSFERÊNCIA", type="primary", use_container_width=True):
+                    if de_ag == "Selecione..." or para_ag == "Selecione...": st.error("⚠️ Selecione origem e destino.")
+                    elif de_ag == para_ag: st.error("⚠️ Origem e destino não podem ser iguais.")
                     else:
                         df_rotas = DF_AGENTES.copy()
-                        rotas_origem = df_rotas[df_rotas['LOGIN DO AGENTE'] == agente_origem]
+                        rotas_origem = df_rotas[df_rotas['LOGIN DO AGENTE'] == de_ag]
                         
-                        if rotas_origem.empty:
-                            st.warning(f"O motorista '{agente_origem}' não possui rotas atreladas para transferir.")
+                        if rotas_origem.empty: st.warning(f"'{de_ag}' não possui rotas para transferir.")
                         else:
-                            with st.spinner(f"Transferindo {len(rotas_origem)} rotas no banco de dados..."):
-                                dados_destino = df_rotas[df_rotas['LOGIN DO AGENTE'] == agente_destino].iloc[0]
-                                mask = df_rotas['LOGIN DO AGENTE'] == agente_origem
-                                df_rotas.loc[mask, 'LOGIN DO AGENTE'] = agente_destino
-                                df_rotas.loc[mask, 'NOME DO AGENTE'] = dados_destino['NOME DO AGENTE']
-                                df_rotas.loc[mask, 'TELEFONE'] = dados_destino['TELEFONE']
+                            with st.spinner(f"Transferindo {len(rotas_origem)} rotas..."):
+                                dados_novo = df_rotas[df_rotas['LOGIN DO AGENTE'] == para_ag].iloc[0]
+                                df_rotas.loc[df_rotas['LOGIN DO AGENTE'] == de_ag, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [para_ag, dados_novo['NOME DO AGENTE'], dados_novo['TELEFONE']]
                                 df_rotas = df_rotas.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
-                                
                                 try:
-                                    aba_agentes = planilha_db.worksheet("Agentes")
-                                    aba_agentes.clear()
-                                    aba_agentes.update("A1", [df_rotas.columns.tolist()] + df_rotas.fillna("").astype(str).values.tolist())
-                                    st.success(f"🎉 Sucesso! {len(rotas_origem)} rotas foram transferidas para {agente_destino}.")
-                                    time.sleep(2)
-                                    carregar_dados_agentes.clear()
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Erro ao transferir rotas no Sheets: {e}")
-        else:
-            st.warning("O banco de agentes está vazio.")
+                                    aba_ag = planilha_db.worksheet("Agentes")
+                                    aba_ag.clear(); aba_ag.update("A1", [df_rotas.columns.tolist()] + df_rotas.fillna("").astype(str).values.tolist())
+                                    st.success(f"🎉 Sucesso! {len(rotas_origem)} rotas transferidas para {para_ag}."); time.sleep(2); carregar_dados_agentes.clear(); st.rerun()
+                                except Exception as e: st.error(f"Erro na transferência: {e}")
+        else: st.warning("O banco de agentes está vazio.")
 
     with tab_sistema:
-        st.markdown("#### 🧹 Manutenção: Limpeza Inteligente de 30 Dias")
-        st.info("💡 **Recomendado:** Esta ação varre o banco de dados e exclui apenas os pedidos com data superior a 30 dias.")
+        st.markdown("#### 🧹 Faxina Inteligente & Arquivo Morto")
+        st.info("💡 Move pedidos finalizados com mais de 30 dias para a aba 'ARQUIVO_MORTO'. O CCO fica rápido e a contagem de IDs não se perde.")
         with st.form("form_limpeza_30_dias"):
-            senha_limpeza = st.text_input("🔑 Senha de Confirmação (Digite: 123):", type="password", key="senha_30d")
-            if st.form_submit_button("🧹 REALIZAR LIMPEZA DE 30 DIAS", type="primary", use_container_width=True):
+            senha_limpeza = st.text_input("🔑 Senha de Confirmação (Digite: 123):", type="password")
+            if st.form_submit_button("🚀 EXECUTAR ARQUIVAMENTO DE 30 DIAS", type="primary", use_container_width=True):
                 if senha_limpeza == "123":
-                    with st.spinner("Analisando linha do tempo e removendo histórico antigo..."):
+                    with st.spinner("Analisando linha do tempo e arquivando histórico antigo..."):
                         try:
                             aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            dados_m = aba_m.get_all_values()
-                            if len(dados_m) > 1:
-                                df_m = pd.DataFrame(dados_m[1:], columns=dados_m[0])
-                                df_m['DATA_TEMP'] = pd.to_datetime(df_m['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
-                                data_corte = hoje_br - timedelta(days=30)
-                                mask_manter = (df_m['DATA_TEMP'] >= data_corte) | (df_m['DATA_TEMP'].isna())
-                                df_m_novo = df_m[mask_manter].drop(columns=['DATA_TEMP'])
-                                pedidos_preservados = df_m_novo['PEDIDO'].astype(str).tolist()
-                                qtd_removidos = len(df_m) - len(df_m_novo)
-                                if qtd_removidos > 0:
-                                    aba_m.clear(); aba_m.update("A1", [df_m_novo.columns.tolist()] + df_m_novo.fillna("").astype(str).values.tolist())
-                                    try:
-                                        aba_app = planilha_db.worksheet("App_Tarefas")
-                                        dados_app = aba_app.get_all_values()
-                                        if len(dados_app) > 1:
-                                            df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
-                                            if 'PEDIDO' in df_app.columns:
-                                                df_app_novo = df_app[df_app['PEDIDO'].astype(str).isin(pedidos_preservados)]
-                                                aba_app.clear(); aba_app.update("A1", [df_app_novo.columns.tolist()] + df_app_novo.fillna("").astype(str).values.tolist())
-                                    except Exception: pass
-                                    st.success(f"✅ Limpeza concluída! 🗑️ {qtd_removidos} registros antigos foram apagados.")
-                                else: st.info("👍 A base já está leve! Não foram encontrados pedidos com mais de 30 dias.")
+                            df_m = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                            df_m['DT_TEMP'] = pd.to_datetime(df_m['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+                            corte = hoje_br - timedelta(days=30)
+                            
+                            df_velhos = df_m[df_m['DT_TEMP'] < corte].drop(columns=['DT_TEMP'])
+                            df_novos = df_m[df_m['DT_TEMP'] >= corte].drop(columns=['DT_TEMP'])
+                            
+                            if not df_velhos.empty:
+                                try: aba_morto = planilha_db.worksheet("ARQUIVO_MORTO")
+                                except: aba_morto = planilha_db.add_worksheet("ARQUIVO_MORTO", 100, 20); aba_morto.update("A1", [df_velhos.columns.tolist()])
+                                
+                                aba_morto.append_rows(df_velhos.fillna("").astype(str).values.tolist())
+                                aba_m.clear(); aba_m.update("A1", [df_novos.columns.tolist()] + df_novos.fillna("").astype(str).values.tolist())
+                                
+                                pedidos_preservados = df_novos['PEDIDO'].astype(str).tolist()
+                                try:
+                                    aba_app = planilha_db.worksheet("App_Tarefas")
+                                    df_app = pd.DataFrame(aba_app.get_all_values()[1:], columns=aba_app.get_all_values()[0])
+                                    if 'PEDIDO' in df_app.columns:
+                                        df_app_novo = df_app[df_app['PEDIDO'].astype(str).isin(pedidos_preservados)]
+                                        aba_app.clear(); aba_app.update("A1", [df_app_novo.columns.tolist()] + df_app_novo.fillna("").astype(str).values.tolist())
+                                except: pass
+                                
+                                st.success(f"✅ Limpeza concluída! 🗑️ {len(df_velhos)} registros antigos foram movidos para o Arquivo Morto.")
+                            else: st.info("👍 A base já está leve! Não foram encontrados pedidos antigos.")
                             time.sleep(2.5); carregar_dados_completos.clear(); st.rerun()
                         except Exception as e: st.error(f"Erro ao realizar a limpeza: {e}")
                 else:
-                    if senha_limpeza: st.error("❌ Senha incorreta. Ação bloqueada.")
+                    if senha_limpeza: st.error("❌ Senha incorreta.")
 
         st.markdown("---")
         st.markdown("#### 🚨 Zona de Perigo: Reset Total do Banco")
