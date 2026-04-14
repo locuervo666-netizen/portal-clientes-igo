@@ -1041,10 +1041,10 @@ elif menu == "📝 Pedido Manual":
     if 'm_bai' not in st.session_state: st.session_state['m_bai'] = ""
     if 'm_cid' not in st.session_state: st.session_state['m_cid'] = ""
     if 'm_uf' not in st.session_state: st.session_state['m_uf'] = ""
-    if 'cep_input_novo' not in st.session_state: st.session_state['cep_input_novo'] = ""
+    if 'cep_input_final' not in st.session_state: st.session_state['cep_input_final'] = ""
 
     def buscar_cep_callback():
-        cep_limpo = re.sub(r'\D', '', st.session_state.cep_input_novo)
+        cep_limpo = re.sub(r'\D', '', st.session_state.cep_input_final)
         if len(cep_limpo) == 8:
             try:
                 resp = requests.get(f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
@@ -1057,13 +1057,13 @@ elif menu == "📝 Pedido Manual":
 
     with st.container(border=True):
         cc1, cc2, cc3 = st.columns([2, 1, 3], vertical_alignment="bottom")
-        cc1.text_input("Digite o CEP e aperte ENTER", max_chars=9, key="cep_input_novo", on_change=buscar_cep_callback)
+        cc1.text_input("Digite o CEP e aperte ENTER", max_chars=9, key="cep_input_final", on_change=buscar_cep_callback)
         
         if cc2.button("🔍 Buscar CEP", use_container_width=True):
             buscar_cep_callback()
         
         st.markdown("---")
-        with st.form("form_manual_unico", clear_on_submit=True):
+        with st.form("form_manual_definitivo", clear_on_submit=True):
             col1, col2 = st.columns(2)
             m_tomador = col1.selectbox("Laboratório Solicitante *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
             m_data = col2.date_input("Data *", format="DD/MM/YYYY", value=hoje_br)
@@ -1084,48 +1084,61 @@ elif menu == "📝 Pedido Manual":
                     st.error("⚠️ Preencha todos os campos obrigatórios!")
                 else:
                     with st.spinner("Injetando pedido no sistema..."):
-                        lab_limpo, rua_limpa, bai_limpo, cid_limpa, uf_limpa = padronizar_texto(m_lab), padronizar_texto(m_rua), padronizar_texto(m_bai), padronizar_texto(m_cid), padronizar_texto(m_uf)
-                        if m_agente_escolha == "Automático (Por Rota)": m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa)
-                        else: m_agente = m_agente_escolha
+                        lab_limpo = padronizar_texto(m_lab)
+                        rua_limpa = padronizar_texto(m_rua)
+                        bai_limpo = padronizar_texto(m_bai)
+                        cid_limpa = padronizar_texto(m_cid)
+                        uf_limpa = padronizar_texto(m_uf)
+                        
+                        if m_agente_escolha == "Automático (Por Rota)": 
+                            m_agente = obter_login_agente(cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES)
+                        else: 
+                            m_agente = m_agente_escolha
                             
                         m_prazo = str(calcular_sla_dias(uf_limpa, cid_limpa, m_tomador))
                         m_limite = str(calcular_data_limite(m_data.strftime("%d/%m/%Y"), int(m_prazo)))
                         
                         try:
-                            aba_memoria = planilha_db.worksheet("Memoria_Sistema")
-                            df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0]) if len(aba_m.get_all_values()) > 1 else pd.DataFrame()
+                            # 1. Conecta na aba
+                            aba_m_manual = planilha_db.worksheet("Memoria_Sistema")
                             
-                            # Usa a função com a lógica original que você usa na importação
-                            m_pedido = str(obter_proximo_id(df_nuvem))
+                            # 2. Puxa dados para gerar o ID sequencial
+                            dados_nuvem = aba_m_manual.get_all_values()
+                            df_nuvem_local = pd.DataFrame(dados_nuvem[1:], columns=dados_nuvem[0]) if len(dados_nuvem) > 1 else pd.DataFrame()
+                            
+                            m_pedido = str(obter_proximo_id(df_nuvem_local))
                             
                             novo_ped_dict = {
                                 'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 
                                 'LABORATORIO': lab_limpo, 'CNPJ': padronizar_texto(m_cnpj), 'ENDERECO': rua_limpa, 'NUMERO': "", 
                                 'BAIRRO': bai_limpo, 'CIDADE': cid_limpa, 'UF': uf_limpa, 
-                                'CEP': re.sub(r'\D', '', st.session_state.cep_input_novo), 'STATUS': 'PENDENTE', 
+                                'CEP': re.sub(r'\D', '', st.session_state.cep_input_final), 'STATUS': 'PENDENTE', 
                                 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 
                                 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': "", 'ZAP_ENVIADO': "", 'FATURA': ""
                             }
                             
-                            novo_ped = pd.DataFrame([novo_ped_dict]).astype(str)
-                            df_atual = pd.concat([df_nuvem, novo_ped], ignore_index=True) if not df_nuvem.empty else novo_ped
+                            # 3. Transforma em lista para o Google Sheets respeitando as colunas existentes
+                            if not df_nuvem_local.empty:
+                                nova_linha = []
+                                for col in df_nuvem_local.columns:
+                                    nova_linha.append(novo_ped_dict.get(col, ""))
+                                aba_m_manual.append_row(nova_linha, value_input_option='USER_ENTERED')
+                            else:
+                                # Caso a planilha esteja zerada
+                                aba_m_manual.append_row(list(novo_ped_dict.keys()))
+                                aba_m_manual.append_row(list(novo_ped_dict.values()))
                             
-                            # Certifica que colunas essenciais existem antes de salvar
-                            for col_req in ['FATURA', 'ZAP_ENVIADO', 'CNPJ']:
-                                if col_req not in df_atual.columns: df_atual[col_req] = ""
-                            
-                            aba_memoria.clear()
-                            aba_memoria.update("A1", [df_atual.columns.tolist()] + df_atual.fillna("").astype(str).values.tolist())
-                            
-                            if m_agente: despachar_para_appsheet([novo_ped.iloc[0].to_dict()])
+                            if m_agente: 
+                                despachar_para_appsheet([novo_ped_dict])
                             
                             st.success(f"🎉 Pedido {m_pedido} criado com sucesso!")
                             time.sleep(2.0)
                             
                             carregar_dados_completos.clear()
-                            st.session_state['m_rua'] = ""; st.session_state['m_bai'] = ""; st.session_state['m_cid'] = ""; st.session_state['m_uf'] = ""; st.session_state['cep_input_novo'] = ""
+                            st.session_state['m_rua'] = ""; st.session_state['m_bai'] = ""; st.session_state['m_cid'] = ""; st.session_state['m_uf'] = ""; st.session_state['cep_input_final'] = ""
                             st.rerun()
-                        except Exception as e: st.error(f"Erro ao injetar: {e}")
+                        except Exception as e: 
+                            st.error(f"Erro ao injetar pedido: {e}")
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES (OFICIAL)
 # =============================================================================
