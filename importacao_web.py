@@ -25,7 +25,7 @@ FUSO_BR = timezone(timedelta(hours=-3))
 # 🔗 1. CONFIGURAÇÃO DA PÁGINA E ESTILOS NATIVOS
 # =============================================================================
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
-st_autorefresh(interval=120000, limit=None, key="refresh_timer")
+# ❌ AUTO-REFRESH GLOBAL REMOVIDO DAQUI PARA NÃO CORTAR OS DISPAROS
 
 st.markdown("""
     <style>
@@ -265,6 +265,13 @@ def padronizar_texto(texto):
     if pd.isna(texto) or not texto: return ""
     return unicodedata.normalize('NFKD', str(texto).strip()).encode('ASCII', 'ignore').decode('utf-8').upper()
 
+def corrigir_nomes_relatorio(texto):
+    if pd.isna(texto): return ""
+    t = str(texto)
+    t = re.sub(r'\bCAEP\b', 'SYNVIA', t, flags=re.IGNORECASE)
+    t = re.sub(r'\bCUNHA\b', 'GRALAB', t, flags=re.IGNORECASE)
+    return t
+
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts: return False
     try:
@@ -415,19 +422,29 @@ def obter_login_agente(cidade, bairro, laboratorio, endereco="", base_rotas_df=p
 
 def gerar_excel_memoria(df):
     output = io.BytesIO()
+    df_rep = df.copy()
+    for col in df_rep.columns:
+        if df_rep[col].dtype == object:
+            df_rep[col] = df_rep[col].apply(lambda x: corrigir_nomes_relatorio(x) if isinstance(x, str) else x)
+
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, sheet_name='Relatorio', index=False)
+        df_rep.to_excel(writer, sheet_name='Relatorio', index=False)
         worksheet = writer.sheets['Relatorio']
         worksheet.hide_gridlines(2)
-        if df.shape[0] > 0:
-            worksheet.add_table(0, 0, df.shape[0], df.shape[1] - 1, {'columns': [{'header': str(col)} for col in df.columns], 'style': 'Table Style Medium 2'})
-            for i, col in enumerate(df.columns): 
-                worksheet.set_column(i, i, min(max(df[col].astype(str).map(len).max(), len(str(col))) + 2, 40))
+        if df_rep.shape[0] > 0:
+            worksheet.add_table(0, 0, df_rep.shape[0], df_rep.shape[1] - 1, {'columns': [{'header': str(col)} for col in df_rep.columns], 'style': 'Table Style Medium 2'})
+            for i, col in enumerate(df_rep.columns): 
+                worksheet.set_column(i, i, min(max(df_rep[col].astype(str).map(len).max(), len(str(col))) + 2, 40))
     return output.getvalue()
 
 def gerar_excel_rota_whatsapp(df_agente):
     output = io.BytesIO()
     df_xls = df_agente.copy()
+    
+    for col in df_xls.columns:
+        if df_xls[col].dtype == object:
+            df_xls[col] = df_xls[col].apply(lambda x: corrigir_nomes_relatorio(x) if isinstance(x, str) else x)
+
     cols_desejadas = ['PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CEP', 'TOMADOR', 'OBSERVACOES']
     for c in cols_desejadas:
         if c not in df_xls.columns: df_xls[c] = ""
@@ -488,8 +505,10 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
             pdf.cell(8, 5, "OK", 1, 0, "C", True); pdf.cell(20, 5, "PEDIDO", 1, 0, "C", True); pdf.cell(60, 5, "LABORATORIO", 1, 0, "L", True); pdf.cell(77, 5, "ENDERECO", 1, 0, "L", True); pdf.cell(25, 5, "TOMADOR", 1, 1, "C", True)
             pdf.set_text_color(51, 65, 85); pdf.set_font("Arial", "", 7)
             for _, row in group_bai.iterrows():
-                ped = padronizar_texto(str(row.get('PEDIDO',''))); lab = padronizar_texto(str(row.get('LABORATORIO','')))[:35]
-                end = padronizar_texto(f"{str(row.get('ENDERECO',''))}, {str(row.get('NUMERO',''))}")[:48]; tom = padronizar_texto(str(row.get('TOMADOR','')))[:15]
+                ped = padronizar_texto(str(row.get('PEDIDO','')))
+                lab = corrigir_nomes_relatorio(padronizar_texto(str(row.get('LABORATORIO',''))))[:35]
+                end = padronizar_texto(f"{str(row.get('ENDERECO',''))}, {str(row.get('NUMERO',''))}")[:48]
+                tom = corrigir_nomes_relatorio(padronizar_texto(str(row.get('TOMADOR',''))))[:15]
                 pdf.cell(8, 5, "[  ]", 1, 0, "C"); pdf.cell(20, 5, ped, 1, 0, "C"); pdf.cell(60, 5, lab, 1, 0, "L"); pdf.cell(77, 5, end, 1, 0, "L"); pdf.cell(25, 5, tom, 1, 1, "C")
         pdf.ln(2)
         
@@ -528,7 +547,10 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
         pdf.set_fill_color(241, 245, 249) if fill else pdf.set_fill_color(255, 255, 255)
         qr_val = str(item.get('QR_CODE', ''))
         if qr_val.upper() == 'NAN' or not qr_val: qr_val = "-"
-        pdf.cell(10, 5, str(idx), 1, 0, "C", True); pdf.cell(25, 5, str(item.get('PEDIDO','')), 1, 0, "C", True); pdf.cell(30, 5, qr_val, 1, 0, "C", True); pdf.cell(80, 5, padronizar_texto(str(item.get('LABORATORIO','')))[:48], 1, 0, "L", True); pdf.cell(35, 5, padronizar_texto(str(item.get('CIDADE','')))[:22], 1, 0, "L", True); pdf.cell(10, 5, str(item.get('UF','')), 1, 1, "C", True)
+        
+        lab = corrigir_nomes_relatorio(padronizar_texto(str(item.get('LABORATORIO',''))))[:48]
+        
+        pdf.cell(10, 5, str(idx), 1, 0, "C", True); pdf.cell(25, 5, str(item.get('PEDIDO','')), 1, 0, "C", True); pdf.cell(30, 5, qr_val, 1, 0, "C", True); pdf.cell(80, 5, lab, 1, 0, "L", True); pdf.cell(35, 5, padronizar_texto(str(item.get('CIDADE','')))[:22], 1, 0, "L", True); pdf.cell(10, 5, str(item.get('UF','')), 1, 1, "C", True)
         
     pdf.ln(4); pdf.set_font("Arial", "B", 8); pdf.set_text_color(15, 23, 42)
     pdf.cell(0, 5, f"TOTAL DE VOLUMES CONFERIDOS E EMBARCADOS: {len(sel_lista)}", ln=True, align="R")
@@ -553,6 +575,10 @@ with st.sidebar:
     st.divider()
     if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
         st.session_state.autenticado = False; st.rerun()
+
+# ✅ AUTO-REFRESH CONDICIONADO: SÓ RODA NA ABA GRID!
+if menu == "📊 GRID":
+    st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:24px; color:#0F172A;">Central de Controle Operacional</h2><div class='sync-status'>🟢 Online: {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
 
