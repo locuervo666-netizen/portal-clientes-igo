@@ -1035,6 +1035,23 @@ elif menu == "💰 Faturamento":
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
 elif menu == "📝 Pedido Manual":
+    st.markdown("### 📝 Novo Pedido")
+    with st.form("f_man", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        tom = c1.selectbox("Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS); cid = c2.text_input("Cidade *")
+        lab = st.text_input("Ponto Coleta *"); bai, rua = st.columns(2); b = bai.text_input("Bairro"); r = rua.text_input("Endereço")
+        if st.form_submit_button("🚀 INJETAR"):
+            if tom != "Selecione..." and cid and lab:
+                aba_m = planilha_db.worksheet("Memoria_Sistema")
+                df_up = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                n_id = str(obter_proximo_id(planilha_db, "Memoria_Sistema"))
+                ag = obter_login_agente(cid, b, lab, r)
+                novo = pd.DataFrame([{'DATA': hoje_br.strftime("%d/%m/%Y"), 'PEDIDO': n_id, 'TOMADOR': tom, 'LABORATORIO': padronizar_texto(lab), 'CIDADE': padronizar_texto(cid), 'BAIRRO': padronizar_texto(b), 'ENDERECO': padronizar_texto(r), 'STATUS': 'PENDENTE', 'AGENTE_RAW': ag, 'ZAP_ENVIADO': '', 'FATURA': ''}])
+                df_up = pd.concat([df_up, novo])
+                aba_m.clear(); aba_m.update("A1", [df_up.columns.tolist()] + df_up.fillna("").astype(str).values.tolist())
+                despachar_para_appsheet([novo.iloc[0].to_dict()])
+                st.success(f"Pedido {n_id} salvo!"); time.sleep(1); carregar_dados_completos.clear(); st.rerun()
+            else: st.error("Preencha campos obrigatórios.")
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES (OFICIAL)
 # =============================================================================
