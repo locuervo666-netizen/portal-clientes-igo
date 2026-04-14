@@ -934,7 +934,7 @@ if menu == "📊 GRID":
             col_b7.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
 
 # =============================================================================
-# 💰 MÓDULO 2: FATURAMENTO PREMIUM (COM HISTÓRICO)
+# 💰 MÓDULO 2: FATURAMENTO PREMIUM (COM HISTÓRICO E PERÍODO)
 # =============================================================================
 elif menu == "💰 Faturamento":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>💰 Backoffice Financeiro</h3></div>", unsafe_allow_html=True)
@@ -984,25 +984,32 @@ elif menu == "💰 Faturamento":
                             if not sel_f.empty:
                                 with st.spinner("Carimbando e salvando histórico..."):
                                     id_fat = f"FAT-{f_tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
+                                    
+                                    # Formata o período visualmente para o histórico
+                                    periodo_str = f"{f_per[0].strftime('%d/%m/%Y')} a {f_per[1].strftime('%d/%m/%Y')}" if isinstance(f_per, (tuple, list)) and len(f_per) == 2 else "Data Única"
+
                                     # 1. Carimba Memoria_Sistema
                                     aba_m = planilha_db.worksheet("Memoria_Sistema")
                                     df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
                                     df_nuvem.loc[df_nuvem['PEDIDO'].isin(sel_f['PEDIDO'].astype(str)), 'FATURA'] = id_fat
                                     aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    # 2. Salva no Histórico (Livro Caixa)
+                                    
+                                    # 2. Salva no Histórico (Livro Caixa) agora com a coluna PERÍODO
                                     try: aba_h = planilha_financeiro.worksheet("Historico_Faturas")
                                     except: 
-                                        aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 5)
-                                        aba_h.update("A1", [["ID_FATURA", "TOMADOR", "DATA_EMISSAO", "VOLUMES", "VALOR_TOTAL"]])
-                                    aba_h.append_row([id_fat, f_tom, hoje_br.strftime("%d/%m/%Y"), len(sel_f), round(total_f, 2)])
+                                        aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 6)
+                                        aba_h.update("A1", [["ID_FATURA", "TOMADOR", "DATA_EMISSAO", "PERIODO", "VOLUMES", "VALOR_TOTAL_R$"]])
+                                    
+                                    aba_h.append_row([id_fat, f_tom, hoje_br.strftime("%d/%m/%Y"), periodo_str, len(sel_f), round(total_f, 2)])
+                                    
                                     # 3. Prepara downloads
-                                    st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f) # Função já existe no seu código
+                                    st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f) 
                                     st.session_state.fatura_xls = gerar_excel_memoria(sel_f)
                                     st.session_state.fatura_id = id_fat
                                     st.session_state.fatura_sucesso = True; st.rerun()
 
     with tab_historico:
-        st.markdown("#### 📖 Consulta ao Livro Caixa")
+        st.markdown("#### 📖 Consulta ao Livro Caixa (Faturas Emitidas)")
         try:
             aba_h = planilha_financeiro.worksheet("Historico_Faturas")
             df_h = pd.DataFrame(aba_h.get_all_values()[1:], columns=aba_h.get_all_values()[0])
@@ -1014,7 +1021,7 @@ elif menu == "💰 Faturamento":
                 
                 st.dataframe(df_h.sort_index(ascending=False), use_container_width=True, hide_index=True)
                 st.caption("As faturas são listadas da mais recente para a mais antiga.")
-        except: st.warning("O histórico de faturas será ativado após a primeira emissão.")
+        except: st.warning("O histórico de faturas será ativado automaticamente após a primeira emissão.")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
@@ -1120,7 +1127,13 @@ elif menu == "📝 Pedido Manual":
                             time.sleep(2.0)
                             
                             carregar_dados_completos.clear()
-                            st.session_state['m_rua'] = ""; st.session_state['m_bai'] = ""; st.session_state['m_cid'] = ""; st.session_state['m_uf'] = ""; st.session_state['cep_input_final'] = ""
+                            
+                            # Mantemos a limpeza apenas dos campos de texto comuns, deixando a chave do CEP intacta
+                            st.session_state['m_rua'] = ""
+                            st.session_state['m_bai'] = ""
+                            st.session_state['m_cid'] = ""
+                            st.session_state['m_uf'] = ""
+                            
                             st.rerun()
                         except Exception as e: 
                             st.error(f"Erro ao injetar pedido: {e}")
