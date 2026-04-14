@@ -944,6 +944,63 @@ elif menu == "💰 Faturamento":
     df_raw = carregar_dados_completos(planilha_db)
     if 'fatura_sucesso' not in st.session_state: st.session_state.fatura_sucesso = False
 
+    # --- FUNÇÕES INTERNAS BLINDADAS DO FATURAMENTO ---
+    @st.cache_data(ttl=60)
+    def carregar_tabela_precos(tomador):
+        if planilha_financeiro is None: return pd.DataFrame()
+        try:
+            aba_nome = tomador.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if tomador in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else tomador
+            aba = planilha_financeiro.worksheet(aba_nome)
+            df_p = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+            if 'VALOR_CHEIO' in df_p.columns: df_p['VALOR_CHEIO'] = df_p['VALOR_CHEIO'].astype(str).str.replace(',', '.').astype(float)
+            if 'MULT_FRUSTRADA' in df_p.columns: df_p['MULT_FRUSTRADA'] = df_p['MULT_FRUSTRADA'].astype(str).str.replace(',', '.').astype(float)
+            if 'CIDADE' in df_p.columns: df_p['CIDADE'] = df_p['CIDADE'].apply(padronizar_texto)
+            if 'BAIRRO' in df_p.columns: df_p['BAIRRO'] = df_p['BAIRRO'].apply(padronizar_texto)
+            if 'ENDERECO' in df_p.columns: df_p['ENDERECO'] = df_p['ENDERECO'].apply(padronizar_texto)
+            return df_p
+        except: return pd.DataFrame()
+
+    def calcular_valor_fatura(cid, bai, end, status, df_p):
+        if df_p.empty: return 0.0
+        c, b, e = padronizar_texto(cid), padronizar_texto(bai), padronizar_texto(end)
+        match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == b) & (df_p['ENDERECO'] == e)]
+        if match.empty: match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == b) & (df_p['ENDERECO'] == "")]
+        if match.empty: match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == "") & (df_p['ENDERECO'] == "")]
+        if not match.empty:
+            v_base = float(match.iloc[0]['VALOR_CHEIO'])
+            mult = float(match.iloc[0]['MULT_FRUSTRADA'])
+            return v_base if status == "ENTREGUE" else (v_base * mult)
+        return 0.0
+
+    def gerar_pdf_fatura(id_fat, tomador, df_cobrados, total):
+        pdf = FPDF(); pdf.add_page(); pdf.set_draw_color(15, 23, 42); pdf.set_line_width(0.3); pdf.rect(5, 5, 200, 287)
+        try:
+            logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
+            if not os.path.exists(logo_path):
+                req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file: out_file.write(response.read())
+            pdf.image(logo_path, x=10, y=8, w=30) 
+        except: pass
+        pdf.set_y(15); pdf.set_font("Arial", "B", 14); pdf.set_text_color(15, 23, 42); pdf.cell(0, 6, "DEMONSTRATIVO DE FATURAMENTO - IGO LOGISTICA", ln=True, align="C") 
+        pdf.set_font("Arial", "B", 10); pdf.set_text_color(2, 132, 199); pdf.cell(0, 5, f"FATURA: {id_fat} | CLIENTE: {tomador}", ln=True, align="C")
+        pdf.set_font("Arial", "", 8); pdf.set_text_color(100, 116, 139); pdf.cell(0, 4, f"Emissao: {hoje_br.strftime('%d/%m/%Y')} | Volumes: {len(df_cobrados)}", ln=True, align="C")
+        pdf.ln(3); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(3)
+        pdf.set_fill_color(15, 23, 42); pdf.set_text_color(255, 255, 255); pdf.set_font("Arial", "B", 7)
+        pdf.cell(20, 5, "PEDIDO", 1, 0, "C", True); pdf.cell(20, 5, "DATA", 1, 0, "C", True); pdf.cell(75, 5, "PONTO DE COLETA", 1, 0, "C", True)
+        pdf.cell(40, 5, "CIDADE", 1, 0, "C", True); pdf.cell(20, 5, "STATUS", 1, 0, "C", True); pdf.cell(15, 5, "VALOR", 1, 1, "C", True)
+        pdf.set_text_color(51, 65, 85); pdf.set_font("Arial", "", 7)
+        for idx, row in df_cobrados.iterrows():
+            fill = (idx % 2 == 0)
+            pdf.set_fill_color(241, 245, 249) if fill else pdf.set_fill_color(255, 255, 255)
+            lab = str(row.get('LABORATORIO',''))[:45]; cid = str(row.get('CIDADE',''))[:22]; val_str = f"R$ {row.get('VALOR (R$)', 0):.2f}"
+            pdf.cell(20, 5, str(row.get('PEDIDO','')), 1, 0, "C", True); pdf.cell(20, 5, str(row.get('DATA_ENTREGA', row.get('DATA', ''))), 1, 0, "C", True)
+            pdf.cell(75, 5, lab, 1, 0, "L", True); pdf.cell(40, 5, cid, 1, 0, "L", True); pdf.cell(20, 5, str(row.get('STATUS','')), 1, 0, "C", True); pdf.cell(15, 5, val_str, 1, 1, "R", True)
+        pdf.ln(5); pdf.set_font("Arial", "B", 10); pdf.set_text_color(15, 23, 42); pdf.cell(0, 6, f"TOTAL GERAL DA FATURA: R$ {total:,.2f}", 0, 1, "R")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+            pdf.output(tmp_pdf.name)
+            with open(tmp_pdf.name, "rb") as f: return f.read()
+    # -----------------------------------------------------------
+
     with tab_faturar:
         if st.session_state.fatura_sucesso:
             st.success(f"🎉 Faturamento {st.session_state.fatura_id} processado!")
@@ -958,7 +1015,7 @@ elif menu == "💰 Faturamento":
                 f_tom = c1.selectbox("🏢 Tomador:", CLIENTES_AUTORIZADOS, key="fat_tom_sel")
                 f_per = c2.date_input("📅 Período:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY", key="fat_per_sel")
                 
-                # Aplicação do Juramento e Filtro
+                # Juramento reverso para exibição
                 df_raw['TOMADOR'] = df_raw['TOMADOR'].apply(lambda x: str(x).replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB'))
                 if 'FATURA' not in df_raw.columns: df_raw['FATURA'] = ""
                 
@@ -972,9 +1029,9 @@ elif menu == "💰 Faturamento":
                     if df_precos.empty: st.error(f"⚠️ Aba '{f_tom}' não encontrada no Faturamento_Log.")
                     else:
                         df_fin['VALOR (R$)'] = df_fin.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS'], df_precos), axis=1)
-                        df_show = df_fin[['DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)']].copy()
+                        df_show = df_fin[['DATA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)']].copy()
                         df_show.insert(0, "FATURAR", True)
-                        editado = st.data_editor(df_show, hide_index=True, use_container_width=True, disabled=['DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)'])
+                        editado = st.data_editor(df_show, hide_index=True, use_container_width=True, disabled=['DATA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)'])
                         
                         sel_f = editado[editado["FATURAR"]]
                         total_f = sel_f['VALOR (R$)'].sum()
@@ -984,8 +1041,6 @@ elif menu == "💰 Faturamento":
                             if not sel_f.empty:
                                 with st.spinner("Carimbando e salvando histórico..."):
                                     id_fat = f"FAT-{f_tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
-                                    
-                                    # Formata o período visualmente para o histórico
                                     periodo_str = f"{f_per[0].strftime('%d/%m/%Y')} a {f_per[1].strftime('%d/%m/%Y')}" if isinstance(f_per, (tuple, list)) and len(f_per) == 2 else "Data Única"
 
                                     # 1. Carimba Memoria_Sistema
@@ -994,16 +1049,15 @@ elif menu == "💰 Faturamento":
                                     df_nuvem.loc[df_nuvem['PEDIDO'].isin(sel_f['PEDIDO'].astype(str)), 'FATURA'] = id_fat
                                     aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     
-                                    # 2. Salva no Histórico (Livro Caixa) agora com a coluna PERÍODO
+                                    # 2. Salva no Histórico (Livro Caixa) com Período
                                     try: aba_h = planilha_financeiro.worksheet("Historico_Faturas")
                                     except: 
                                         aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 6)
                                         aba_h.update("A1", [["ID_FATURA", "TOMADOR", "DATA_EMISSAO", "PERIODO", "VOLUMES", "VALOR_TOTAL_R$"]])
-                                    
                                     aba_h.append_row([id_fat, f_tom, hoje_br.strftime("%d/%m/%Y"), periodo_str, len(sel_f), round(total_f, 2)])
                                     
                                     # 3. Prepara downloads
-                                    st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f) 
+                                    st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f)
                                     st.session_state.fatura_xls = gerar_excel_memoria(sel_f)
                                     st.session_state.fatura_id = id_fat
                                     st.session_state.fatura_sucesso = True; st.rerun()
