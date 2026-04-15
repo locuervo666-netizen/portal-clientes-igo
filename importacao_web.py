@@ -300,11 +300,14 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         aba = planilha_db.worksheet("App_Tarefas")
         linhas = []
         for p in lista_pedidos_dicts:
-            mot = str(p.get('MOTORISTA', p.get('AGENTE_RAW', '')))
+            mot_raw = str(p.get('MOTORISTA', p.get('AGENTE_RAW', '')))
+            # A MÁGICA: Corta o nome na barra "|" e manda só o login base para o AppSheet
+            mot_app = mot_raw.split('|')[0].strip() 
+            
             linhas.append([
                 str(uuid.uuid4())[:8].upper(),    
                 str(p.get('PEDIDO','')),          
-                mot,                              
+                mot_app, # <-- Login limpo entra aqui                          
                 "PENDENTE",                        
                 str(p.get('ENDERECO','')),        
                 str(p.get('NUMERO','')),          
@@ -921,7 +924,7 @@ if menu == "📊 GRID":
                                                 time.sleep(2.0)
                                                 pdf_bytes = gerar_pdf_rota_whatsapp(nom, data_str, df_ag)
                                                 enviar_pdf_zapi(tel, pdf_bytes, f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
-                                                if ag_login in ag_xls:
+                                                if ag_login in ag_xls or ag_login.split('|')[0] in ag_xls:
                                                     time.sleep(3.0)
                                                     xls_bytes = gerar_excel_rota_whatsapp(df_ag)
                                                     enviar_excel_zapi(tel, xls_bytes, f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx")
@@ -1688,8 +1691,12 @@ elif menu == "📥 Importações Umove":
                 linha_loc = f"{id_loc};{id_loc};{corp_name};{row.get('UF','')};{row.get('CIDADE','')};{row.get('BAIRRO','')};{row.get('ENDERECO','')};{numero_limpo};{cep};{tomador};;{cnpj};1"
                 loc_lines.append(linha_loc)
                 
+                # MÁGICA UMOVE: Corta o nome na barra "|" para o arquivo AGD
+                agente_raw = str(row.get('AGENTE_RAW',''))
+                agente_agd = agente_raw.split('|')[0].strip()
+                
                 schedule_type = "visita_tox"
-                linha_agd = f";{id_loc};{schedule_type};7;1;{row.get('DATA','')};00:10;;{id_agd};{row.get('AGENTE_RAW','')};"
+                linha_agd = f";{id_loc};{schedule_type};7;1;{row.get('DATA','')};00:10;;{id_agd};{agente_agd};"
                 agd_lines.append(linha_agd)
                 
             loc_lines_unique = [loc_lines[0]] + list(dict.fromkeys(loc_lines[1:]))
@@ -1750,7 +1757,7 @@ elif menu == "📥 Importações Umove":
                                 pdf_bytes_sb = gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb)
                                 enviar_pdf_zapi(tel, pdf_bytes_sb, f"ROTA_IGO_{nom.replace(' ', '_')}_{dt_sandbox.strftime('%d%m')}.pdf")
                                 
-                                if ag_login in agentes_xls_sb:
+                                if ag_login in agentes_xls_sb or ag_login.split('|')[0] in agentes_xls_sb:
                                     time.sleep(3.0)
                                     xls_bytes_sb = gerar_excel_rota_whatsapp(df_ag_sb)
                                     enviar_excel_zapi(tel, xls_bytes_sb, f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{dt_sandbox.strftime('%d%m')}.xlsx")
@@ -1960,7 +1967,7 @@ elif menu == "📱 WhatsApp":
                                         time.sleep(2.0)
                                         pdf_bytes = gerar_pdf_rota_whatsapp(nome_amigavel, data_str, df_agente)
                                         enviar_pdf_zapi(telefone, pdf_bytes, f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.pdf")
-                                        if agente_login in agentes_xls:
+                                        if agente_login in agentes_xls or agente_login.split('|')[0] in agentes_xls:
                                             time.sleep(3.0)
                                             enviar_excel_zapi(telefone, gerar_excel_rota_whatsapp(df_agente), f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx")
                                         sucessos += 1
@@ -2131,6 +2138,7 @@ elif menu == "⚙️ Rotas":
     tab_agente, tab_rota, tab_tabela, tab_transfer, tab_sistema = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista", "🔄 Transferir Massa", "⚠️ Manutenção"])
     
     with tab_agente:
+        st.info("💡 **Logins Compartilhados:** Para usar o mesmo login no app, mas separar o WhatsApp, use o separador `|`. Ex: `igo.log|edgar` e `igo.log|anderson`. O sistema envia a rota pro telefone de cada um, mas joga apenas `igo.log` no aplicativo.")
         with st.form("form_novo_agente", clear_on_submit=True):
             c1, c2 = st.columns(2)
             login_ag = c1.text_input("ID de Login", placeholder="Ex: carlos.rj")
