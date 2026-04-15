@@ -1177,7 +1177,12 @@ elif menu == "📝 Pedido Manual":
             m_data = col2.date_input("Data *", format="DD/MM/YYYY", value=hoje_br)
             m_lab = st.text_input("Ponto de Coleta *")
             m_cnpj = st.text_input("CNPJ / Documento (Opcional)")
-            m_rua = st.text_input("Logradouro *", value=st.session_state['m_rua'])
+            
+            # --- DIVIDIMOS A RUA EM DUAS COLUNAS PARA CABER O NÚMERO ---
+            col_rua, col_num = st.columns([3, 1])
+            m_rua = col_rua.text_input("Logradouro *", value=st.session_state['m_rua'])
+            m_numero = col_num.text_input("Número *", placeholder="Ex: 123 ou S/N")
+            # -----------------------------------------------------------
             
             col3, col4, col5 = st.columns([2, 2, 1])
             m_bai = col3.text_input("Bairro *", value=st.session_state['m_bai'])
@@ -1188,12 +1193,14 @@ elif menu == "📝 Pedido Manual":
             m_agente_escolha = st.selectbox("Agente Designado:", ["Automático (Por Rota)"] + logins_disp)
             
             if st.form_submit_button("🚀 Injetar na Base", type="primary", use_container_width=True):
-                if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai: 
-                    st.error("⚠️ Preencha todos os campos obrigatórios!")
+                # Adicionei a verificação de "m_numero" como obrigatório
+                if m_tomador == "Selecione..." or not m_cid or not m_lab or not m_rua or not m_bai or not m_numero: 
+                    st.error("⚠️ Preencha todos os campos obrigatórios (inclusive o Número)!")
                 else:
                     with st.spinner("Injetando pedido no sistema..."):
                         lab_limpo = padronizar_texto(m_lab)
                         rua_limpa = padronizar_texto(m_rua)
+                        num_limpo = padronizar_texto(m_numero) # Lendo o Número
                         bai_limpo = padronizar_texto(m_bai)
                         cid_limpa = padronizar_texto(m_cid)
                         uf_limpa = padronizar_texto(m_uf)
@@ -1207,10 +1214,7 @@ elif menu == "📝 Pedido Manual":
                         m_limite = str(calcular_data_limite(m_data.strftime("%d/%m/%Y"), int(m_prazo)))
                         
                         try:
-                            # 1. Conecta na aba
                             aba_m_manual = planilha_db.worksheet("Memoria_Sistema")
-                            
-                            # 2. Puxa dados para gerar o ID sequencial
                             dados_nuvem = aba_m_manual.get_all_values()
                             df_nuvem_local = pd.DataFrame(dados_nuvem[1:], columns=dados_nuvem[0]) if len(dados_nuvem) > 1 else pd.DataFrame()
                             
@@ -1218,21 +1222,20 @@ elif menu == "📝 Pedido Manual":
                             
                             novo_ped_dict = {
                                 'DATA': m_data.strftime("%d/%m/%Y"), 'PEDIDO': m_pedido, 'TOMADOR': m_tomador, 
-                                'LABORATORIO': lab_limpo, 'CNPJ': padronizar_texto(m_cnpj), 'ENDERECO': rua_limpa, 'NUMERO': "", 
+                                'LABORATORIO': lab_limpo, 'CNPJ': padronizar_texto(m_cnpj), 
+                                'ENDERECO': rua_limpa, 'NUMERO': num_limpo, # <--- SALVANDO O NÚMERO NO BANCO DE DADOS
                                 'BAIRRO': bai_limpo, 'CIDADE': cid_limpa, 'UF': uf_limpa, 
                                 'CEP': re.sub(r'\D', '', st.session_state.cep_input_final), 'STATUS': 'PENDENTE', 
                                 'AGENTE_RAW': m_agente, 'PRAZO_DIAS': m_prazo, 'DATA_LIMITE': m_limite, 
                                 'DATA_ENTREGA': "", 'FOTO': "", 'ROMANEIO': "", 'ZAP_ENVIADO': "", 'FATURA': ""
                             }
                             
-                            # 3. Transforma em lista para o Google Sheets respeitando as colunas existentes
                             if not df_nuvem_local.empty:
                                 nova_linha = []
                                 for col in df_nuvem_local.columns:
                                     nova_linha.append(novo_ped_dict.get(col, ""))
                                 aba_m_manual.append_row(nova_linha, value_input_option='USER_ENTERED')
                             else:
-                                # Caso a planilha esteja zerada
                                 aba_m_manual.append_row(list(novo_ped_dict.keys()))
                                 aba_m_manual.append_row(list(novo_ped_dict.values()))
                             
@@ -1243,13 +1246,10 @@ elif menu == "📝 Pedido Manual":
                             time.sleep(2.0)
                             
                             carregar_dados_completos.clear()
-                            
-                            # Mantemos a limpeza apenas dos campos de texto comuns, deixando a chave do CEP intacta
                             st.session_state['m_rua'] = ""
                             st.session_state['m_bai'] = ""
                             st.session_state['m_cid'] = ""
                             st.session_state['m_uf'] = ""
-                            
                             st.rerun()
                         except Exception as e: 
                             st.error(f"Erro ao injetar pedido: {e}")
