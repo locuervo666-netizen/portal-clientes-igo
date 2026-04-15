@@ -2211,21 +2211,29 @@ elif menu == "⚙️ Rotas":
                                 st.success("✅ Cadastro atualizado com sucesso!"); time.sleep(1); carregar_dados_agentes.clear(); st.rerun()
                             except Exception as e: st.error(f"Erro ao editar: {e}")
             
-            # NOVO: EXCLUSÃO DEFINITIVA DO MOTORISTA
+            # NOVO: EXCLUSÃO DEFINITIVA DO MOTORISTA (AGORA COM SENHA MASTER)
             with st.expander("🚨 Excluir Motorista Definitivamente"):
                 st.error("⚠️ Atenção: Isso apagará o login do motorista e todas as rotas atreladas a ele. Se ele tiver rotas ativas, use a aba 'Transferir' primeiro.")
-                if st.button(f"🗑️ APAGAR LOGIN '{agente_filtro}'", type="primary", use_container_width=True):
-                    with st.spinner("Excluindo registro..."):
-                        df_ag_novo = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] != agente_filtro].copy()
-                        try:
-                            aba_ag = planilha_db.worksheet("Agentes"); aba_ag.clear()
-                            # Se apagar todos, recria o cabeçalho vazio para não quebrar a planilha
-                            if df_ag_novo.empty:
-                                aba_ag.update("A1", [["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"]])
-                            else:
-                                aba_ag.update("A1", [df_ag_novo.columns.tolist()] + df_ag_novo.fillna("").astype(str).values.tolist())
-                            st.success("Motorista apagado com sucesso!"); time.sleep(1.5); carregar_dados_agentes.clear(); st.rerun()
-                        except Exception as e: st.error(f"Erro ao excluir: {e}")
+                with st.form(f"form_excluir_agente_{agente_filtro}"):
+                    senha_excluir_ag = st.text_input("🔑 Senha Master para Autorizar Exclusão:", type="password")
+                    if st.form_submit_button(f"🗑️ APAGAR LOGIN '{agente_filtro}'", type="primary", use_container_width=True):
+                        if senha_excluir_ag == "123":
+                            with st.spinner("Excluindo registro..."):
+                                df_ag_novo = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] != agente_filtro].copy()
+                                try:
+                                    aba_ag = planilha_db.worksheet("Agentes")
+                                    aba_ag.clear()
+                                    # Se apagar todos, recria o cabeçalho vazio para não quebrar a planilha
+                                    if df_ag_novo.empty:
+                                        aba_ag.update("A1", [["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"]])
+                                    else:
+                                        aba_ag.update("A1", [df_ag_novo.columns.tolist()] + df_ag_novo.fillna("").astype(str).values.tolist())
+                                    st.success("Motorista apagado com sucesso!")
+                                    time.sleep(1.5); carregar_dados_agentes.clear(); st.rerun()
+                                except Exception as e: 
+                                    st.error(f"Erro ao excluir: {e}")
+                        else:
+                            st.error("❌ Senha incorreta.")
             
             st.markdown("---")
             st.markdown("#### 📍 Rotas Atreladas ao Motorista")
