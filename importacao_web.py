@@ -752,7 +752,8 @@ if menu == "📊 GRID":
                 if not tem_sel: st.warning("Selecione um pedido!")
                 else:
                     with st.form("form_baixa_manual"):
-                        status_baixa = st.selectbox("Novo Status:", ["ENTREGUE ✅", "PROBLEMA 🚨", "CANCELADO ❌", "PENDENTE ⏳"])
+                        # ADICIONAMOS O COLETADO E A FRUSTRADA AQUI
+                        status_baixa = st.selectbox("Novo Status:", ["ENTREGUE ✅", "COLETADO 📦", "FRUSTRADA ❌", "PROBLEMA 🚨", "CANCELADO ❌", "PENDENTE ⏳"])
                         data_baixa = st.date_input("Data:", format="DD/MM/YYYY", value=hoje_br)
                         tem_entregue = df_f[df_f['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
                         senha_reversao = ""
@@ -770,8 +771,13 @@ if menu == "📊 GRID":
                                         for pid in p_ids:
                                             mask = df_nuvem['PEDIDO'] == pid
                                             df_nuvem.loc[mask, 'STATUS'] = status_limpo
-                                            if status_limpo == "ENTREGUE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
-                                            elif status_limpo == "PENDENTE": df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
+                                            
+                                            # Se marcar como entregue, salva a data. Se voltar pra Coletado/Pendente, apaga a data de entrega.
+                                            if status_limpo == "ENTREGUE": 
+                                                df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
+                                            elif status_limpo in ["PENDENTE", "COLETADO"]: 
+                                                df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
+                                                
                                         aba.clear()
                                         aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                         st.success("🎉 Atualizado!")
