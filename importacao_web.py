@@ -2129,7 +2129,9 @@ elif menu == "📁 Relatórios":
 # =============================================================================
 elif menu == "⚙️ Rotas":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>⚙️ Matriz Inteligente de Rotas e Equipe</h3></div>", unsafe_allow_html=True)
-    tab_agente, tab_rota, tab_tabela, tab_transfer, tab_sistema = st.tabs(["👤 Cadastrar Novo Agente", "📍 Adicionar Rota (Vincular)", "📋 Gerenciar Motorista", "🔄 Transferir Massa", "⚠️ Manutenção"])
+    
+    # Adicionamos a aba de "Buscar Rota" e enxugamos os nomes para caberem bem na tela
+    tab_agente, tab_rota, tab_busca, tab_tabela, tab_transfer, tab_sistema = st.tabs(["👤 Cadastrar", "📍 Vincular Rota", "🔎 Buscar Rota", "📋 Gerenciar", "🔄 Transferir", "⚠️ Sistema"])
     
     with tab_agente:
         st.info("💡 **Logins Compartilhados:** Para usar o mesmo login no app, mas separar o WhatsApp, use o separador `|`. Ex: `igo.log|edgar` e `igo.log|anderson`. O sistema envia a rota pro telefone de cada um, mas joga apenas `igo.log` no aplicativo.")
@@ -2169,11 +2171,28 @@ elif menu == "⚙️ Rotas":
                         planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                         st.success(f"✅ Rota atrelada!"); carregar_dados_agentes.clear()
                     except Exception as e: st.error(f"Erro: {e}")
+
+    # NOVA ABA: BUSCA REVERSA DE ROTAS
+    with tab_busca:
+        st.markdown("#### 🔎 Descobrir Motorista por Localidade")
+        st.info("Digite uma cidade, bairro ou rua para descobrir qual motorista atende a região.")
+        termo_busca = st.text_input("🔍 Pesquisar Local:", placeholder="Ex: ANGRA DOS REIS")
+        
+        if termo_busca:
+            mask_busca = DF_AGENTES['ROTA MAPEADA'].str.contains(padronizar_texto(termo_busca), case=False, na=False)
+            df_result = DF_AGENTES[mask_busca].copy()
+            
+            if not df_result.empty:
+                st.success(f"✅ Encontrado(s) {len(df_result)} mapeamento(s) para esta região.")
+                st.dataframe(df_result[['ROTA MAPEADA', 'NOME DO AGENTE', 'LOGIN DO AGENTE', 'TELEFONE']], hide_index=True, use_container_width=True)
+            else:
+                st.warning("⚠️ Nenhum motorista atrelado a este local. Pedidos desta região cairão para roteirização manual.")
                         
     with tab_tabela:
         if not DF_AGENTES.empty:
             agente_filtro = st.selectbox("👤 Selecione o Motorista para gerenciar:", sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()))
             dados_atuais_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
+            
             with st.expander("✏️ Editar Cadastro (Nome / Telefone)"):
                 with st.form(f"form_edit_{agente_filtro}"):
                     c_edit1, c_edit2 = st.columns(2)
@@ -2191,6 +2210,22 @@ elif menu == "⚙️ Rotas":
                                 aba_ag.update("A1", [df_ag_edit.columns.tolist()] + df_ag_edit.fillna("").astype(str).values.tolist())
                                 st.success("✅ Cadastro atualizado com sucesso!"); time.sleep(1); carregar_dados_agentes.clear(); st.rerun()
                             except Exception as e: st.error(f"Erro ao editar: {e}")
+            
+            # NOVO: EXCLUSÃO DEFINITIVA DO MOTORISTA
+            with st.expander("🚨 Excluir Motorista Definitivamente"):
+                st.error("⚠️ Atenção: Isso apagará o login do motorista e todas as rotas atreladas a ele. Se ele tiver rotas ativas, use a aba 'Transferir' primeiro.")
+                if st.button(f"🗑️ APAGAR LOGIN '{agente_filtro}'", type="primary", use_container_width=True):
+                    with st.spinner("Excluindo registro..."):
+                        df_ag_novo = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] != agente_filtro].copy()
+                        try:
+                            aba_ag = planilha_db.worksheet("Agentes"); aba_ag.clear()
+                            # Se apagar todos, recria o cabeçalho vazio para não quebrar a planilha
+                            if df_ag_novo.empty:
+                                aba_ag.update("A1", [["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"]])
+                            else:
+                                aba_ag.update("A1", [df_ag_novo.columns.tolist()] + df_ag_novo.fillna("").astype(str).values.tolist())
+                            st.success("Motorista apagado com sucesso!"); time.sleep(1.5); carregar_dados_agentes.clear(); st.rerun()
+                        except Exception as e: st.error(f"Erro ao excluir: {e}")
             
             st.markdown("---")
             st.markdown("#### 📍 Rotas Atreladas ao Motorista")
