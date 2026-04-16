@@ -66,9 +66,6 @@ CLIENTES_CONFIG = {
 def conectar_banco_seguro():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     try:
-        import json
-        import os
-        from google.oauth2.credentials import Credentials
         token_str = os.environ.get("google_token_json")
         if not token_str:
             try: token_str = st.secrets.get("google_token_json")
@@ -106,13 +103,15 @@ def carregar_dados_nuvem():
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
                     df_app.columns = [str(c).upper().strip().replace(' ', '').replace('?', '') for c in df_app.columns]
                     
+                    # Extração expandida para pegar a Data de Baixa
                     cols_to_extract = ['PEDIDO']
                     if 'STATUS' in df_app.columns: cols_to_extract.append('STATUS')
                     if 'OBSERVACOES' in df_app.columns: cols_to_extract.append('OBSERVACOES')
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
+                    if 'DATA' in df_app.columns: cols_to_extract.append('DATA')
                     
                     df_app_clean = df_app[cols_to_extract].copy()
-                    rename_map = {'STATUS': 'A_ST', 'OBSERVACOES': 'A_OB', 'FOTO': 'A_FO'}
+                    rename_map = {'STATUS': 'A_ST', 'OBSERVACOES': 'A_OB', 'FOTO': 'A_FO', 'DATA': 'A_DT'}
                     df_app_clean.rename(columns=rename_map, inplace=True)
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
@@ -148,7 +147,6 @@ if not st.session_state.logado:
             # Centralizando a logo e o título
             col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
             with col_logo2:
-                # CORREÇÃO AQUI: Atualizado para o comando novo do Streamlit
                 st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
             
             st.markdown("<h3 style='text-align: center; color: #1e293b; margin-top: -10px; margin-bottom: 20px;'>Portal do Cliente</h3>", unsafe_allow_html=True)
@@ -231,21 +229,7 @@ else:
                 if obs_app and obs_app.upper() != 'NAN': return obs_app
                 return "-"
 
-            # 🔥 AQUI ESTÁ A CHAVE: CRIANDO AS COLUNAS DE FATO
             df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
-            df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
-            
-            def tratar_link_foto(x):
-                x_str = str(x).strip()
-                if not x_str or x_str.upper() in ['NAN', 'NONE']: return ""
-                if x_str.startswith("http"): return x_str 
-                return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={x_str}"
-                
-            df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(tratar_link_foto)
-
-            # Criando a cópia para os filtros
-            df_f = df_cliente.copy()
-                
             df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
             
             def tratar_link_foto(x):
@@ -298,11 +282,22 @@ else:
                 df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
             if not df_grid.empty:
-                cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CNPJ', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DETALHES', 'FOTO_URL']
+                cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'A_DT', 'LABORATORIO', 'CNPJ', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DETALHES', 'FOTO_URL']
                 df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
                 
                 if 'CNPJ' not in df_final.columns:
                     df_final['CNPJ'] = "-"
+                
+                def formatar_data_entrega(row):
+                    st_atual = str(row.get('STATUS_DISPLAY', '')).upper()
+                    dt_entrega = str(row.get('A_DT', '')).strip()
+                    if 'ENTREGUE' in st_atual or 'FRUSTRADA' in st_atual:
+                        return dt_entrega if dt_entrega not in ['nan', 'None', ''] else "-"
+                    return "-"
+
+                df_final['DATA_EFETIVA'] = df_final.apply(formatar_data_entrega, axis=1)
+                
+                colunas_ordenadas = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'DATA_EFETIVA', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DETALHES', 'COMPROVANTE']
                 
                 for col in df_final.columns: 
                     df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
@@ -313,16 +308,18 @@ else:
                 st.data_editor(
                     df_final,
                     column_config={
-                        "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
-                        "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large"),
-                        "COMPROVANTE": st.column_config.LinkColumn("COMPROVANTE", display_text="🔎 Abrir Foto"),
-                        "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
                         "DATA": st.column_config.TextColumn("DATA PEDIDO"),
                         "PEDIDO": st.column_config.TextColumn("PEDIDO"),
+                        "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
+                        "DATA_EFETIVA": st.column_config.TextColumn("DATA ENTREGA"),
                         "LABORATORIO": st.column_config.TextColumn("PCL"),
                         "CNPJ": st.column_config.TextColumn("CNPJ"),
-                        "CIDADE": st.column_config.TextColumn("CIDADE")
+                        "CIDADE": st.column_config.TextColumn("CIDADE"),
+                        "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
+                        "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large"),
+                        "COMPROVANTE": st.column_config.LinkColumn("COMPROVANTE", display_text="🔎 Abrir Foto")
                     },
+                    column_order=colunas_ordenadas,
                     disabled=True, 
                     hide_index=True,
                     use_container_width=True,
