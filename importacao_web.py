@@ -560,7 +560,18 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
     pdf.cell(0, 5, f"LOTE DE EXPEDIÇÃO: {id_romaneio}", ln=True, align="C")
     pdf.set_font("Arial", "", 8); pdf.set_text_color(100, 116, 139) 
     dt_str = data_despacho if isinstance(data_despacho, str) else data_despacho.strftime('%d/%m/%Y')
-    pdf.cell(0, 4, f"Data do Embarque: {dt_str} | Motorista: {str(motorista_escolhido).upper()}", ln=True, align="C")
+    
+    # --- INÍCIO DA CORREÇÃO: BUSCAR NOME AMIGÁVEL ---
+    nome_amigavel = str(motorista_escolhido).upper()
+    try:
+        if not DF_AGENTES.empty:
+            match_nome = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == str(motorista_escolhido).strip().lower()]
+            if not match_nome.empty:
+                nome_amigavel = str(match_nome.iloc[0]['NOME DO AGENTE']).upper()
+    except Exception: pass
+    # --- FIM DA CORREÇÃO ---
+
+    pdf.cell(0, 4, f"Data do Embarque: {dt_str} | Motorista: {nome_amigavel}", ln=True, align="C")
     pdf.ln(3); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(3)
     
     pdf.set_fill_color(15, 23, 42); pdf.set_text_color(255, 255, 255); pdf.set_font("Arial", "B", 7)
