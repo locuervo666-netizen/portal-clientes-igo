@@ -129,14 +129,24 @@ if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 # 🔐 3. LOGIN / PAINEL
 # =======================================================
 if not st.session_state.logado:
-    st.markdown("""<style> [data-testid="stAppViewContainer"] { background-color: #f8fafc !important; } </style>""", unsafe_allow_html=True)
+    # Fundo branco puro para a logo se integrar perfeitamente
+    st.markdown("""<style> [data-testid="stAppViewContainer"] { background-color: #ffffff !important; } </style>""", unsafe_allow_html=True)
+    
     _, c2, _ = st.columns([1, 1.2, 1])
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=110)
+            # Centralizando a logo e o título
+            col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
+            with col_logo2:
+                st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_column_width=True)
+            
+            st.markdown("<h3 style='text-align: center; color: #1e293b; margin-top: -10px; margin-bottom: 20px;'>Portal do Cliente</h3>", unsafe_allow_html=True)
+            
             u = st.text_input("👤 Usuário").upper().strip()
             s = st.text_input("🔒 Senha", type="password")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🚀 Acessar Sistema", type="primary", use_container_width=True):
                 if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
                     st.session_state.logado = True
