@@ -139,7 +139,8 @@ if not st.session_state.logado:
             # Centralizando a logo e o título
             col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
             with col_logo2:
-                st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_column_width=True)
+                # CORREÇÃO AQUI: Atualizado para o comando novo do Streamlit
+                st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
             
             st.markdown("<h3 style='text-align: center; color: #1e293b; margin-top: -10px; margin-bottom: 20px;'>Portal do Cliente</h3>", unsafe_allow_html=True)
             
