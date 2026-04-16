@@ -23,7 +23,6 @@ st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { transition: background-color 0.3s ease; font-family: 'Inter', sans-serif; }
     
-    /* FORÇANDO FUNDO BRANCO NA SIDEBAR E PROTEGENDO A COR DO TEXTO */
     [data-testid="stSidebar"], [data-testid="stSidebar"] > div:first-child { 
         background-color: #ffffff !important; 
     }
@@ -31,19 +30,18 @@ st.markdown("""
         color: #1e293b !important;
     }
 
-    /* 🔥 VISUAL PREMIUM PARA O FORMULÁRIO E CAIXAS 🔥 */
     [data-testid="stSidebar"] [data-testid="stForm"] {
-        background-color: #f8fafc !important; /* Fundo super suave */
-        border: 1px solid #e2e8f0 !important; /* Borda bem discreta */
-        border-radius: 12px !important; /* Cantos mais redondos */
-        padding: 15px !important; /* Mais respiro interno */
+        background-color: #f8fafc !important; 
+        border: 1px solid #e2e8f0 !important; 
+        border-radius: 12px !important; 
+        padding: 15px !important; 
     }
     [data-testid="stSidebar"] input, [data-testid="stSidebar"] textarea {
         background-color: #ffffff !important;
-        border: 1px solid #cbd5e1 !important; /* Borda elegante */
+        border: 1px solid #cbd5e1 !important; 
         border-radius: 6px !important;
         color: #1e293b !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; /* Sombreado leve */
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; 
     }
     [data-testid="stSidebar"] input:focus, [data-testid="stSidebar"] textarea:focus {
         border-color: #3b82f6 !important;
@@ -53,7 +51,7 @@ st.markdown("""
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
-    div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button {
+    div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button, div.st-key-kpi_aguardando button {
         height: 75px !important; border-radius: 10px !important; border: none !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important; transition: all 0.2s ease !important;
         display: flex !important; justify-content: center !important; align-items: center !important;
@@ -63,9 +61,10 @@ st.markdown("""
     div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; }
     div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; }
     div.st-key-kpi_hoje button { background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; }
+    div.st-key-kpi_aguardando button { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important; } /* Laranja para o Cadeado */
     
-    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
-        font-weight: 800 !important; font-size: 15px !important; color: #ffffff !important; margin: 0 !important;
+    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p, div.st-key-kpi_aguardando button p { 
+        font-weight: 800 !important; font-size: 14px !important; color: #ffffff !important; margin: 0 !important; text-align: center !important;
     }
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
     .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
@@ -91,23 +90,17 @@ def conectar_banco_seguro():
         if not token_str:
             try: token_str = st.secrets.get("google_token_json")
             except: pass
-        if not token_str:
-            st.error("⚠️ Senha do Google não detectada no Render.")
-            return None
+        if not token_str: return None
         token_info = json.loads(token_str)
         creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
-        gc = gspread.authorize(creds)
-        return gc
-    except Exception as e:
-        st.error(f"Erro Crítico de Conexão: {e}")
-        return None
+        return gspread.authorize(creds)
+    except: return None
 
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
     try:
         gc = conectar_banco_seguro()
         if not gc: return pd.DataFrame()
-        
         planilha = gc.open("DB_IGO_Logistica")
         aba_m = planilha.worksheet("Memoria_Sistema")
         dados_m = aba_m.get_all_values()
@@ -116,39 +109,50 @@ def carregar_dados_nuvem():
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
             df = df.loc[:, ~df.columns.duplicated()] 
-            
             try:
                 aba_app = planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
                 if len(dados_app) > 1:
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
                     df_app.columns = [str(c).upper().strip().replace(' ', '').replace('?', '') for c in df_app.columns]
-                    
                     cols_to_extract = ['PEDIDO']
                     if 'STATUS' in df_app.columns: cols_to_extract.append('STATUS')
                     if 'OBSERVACOES' in df_app.columns: cols_to_extract.append('OBSERVACOES')
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
                     if 'DATA' in df_app.columns: cols_to_extract.append('DATA')
-                    
                     df_app_clean = df_app[cols_to_extract].copy()
-                    rename_map = {'STATUS': 'A_ST', 'OBSERVACOES': 'A_OB', 'FOTO': 'A_FO', 'DATA': 'A_DT'}
-                    df_app_clean.rename(columns=rename_map, inplace=True)
-                    df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
+                    df_app_clean.rename(columns={'STATUS': 'A_ST', 'OBSERVACOES': 'A_OB', 'FOTO': 'A_FO', 'DATA': 'A_DT'}, inplace=True)
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
-                    
-                    df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
-                    
                     if 'A_FO' in df.columns:
                         df['FOTO'] = df.apply(lambda r: r['A_FO'] if str(r.get('A_FO','')).strip() and str(r.get('A_FO','')).upper() != 'NAN' else r.get('FOTO',''), axis=1)
-            except Exception: pass
-                
+            except: pass
             if 'DATA' in df.columns: 
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
-    except Exception: return pd.DataFrame()
+    except: return pd.DataFrame()
 
-# FUNÇÃO Z-API PARA O PORTAL DO CLIENTE
+@st.cache_data(ttl=60)
+def carregar_base_locais():
+    try:
+        gc = conectar_banco_seguro()
+        if not gc: return pd.DataFrame()
+        planilha = gc.open("DB_IGO_Logistica")
+        aba = planilha.worksheet("Base_Clientes_Locais")
+        dados = aba.get_all_values()
+        if len(dados) > 1:
+            df = pd.DataFrame(dados[1:], columns=dados[0])
+            return df[df['STATUS'].str.upper() == 'ATIVO']
+        return pd.DataFrame()
+    except: return pd.DataFrame()
+
+def obter_proximo_id(df):
+    if df is None or df.empty or 'PEDIDO' not in df.columns: return 1
+    try:
+        nums = df['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().astype(int)
+        return int(nums.max() + 1) if not nums.empty else 1
+    except: return 1
+
 def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
     INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
     TOKEN = "2321563615C4242CB6031504"          
@@ -158,11 +162,8 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
     url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-text"
     payload = {"phone": tel_limpo, "message": texto_mensagem}
     headers = {"Accept": "application/json", "Content-Type": "application/json", "Client-Token": CLIENT_TOKEN}
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        return response.status_code in [200, 201]
-    except Exception: return False
-
+    try: requests.post(url, json=payload, headers=headers); return True
+    except: return False
 
 if 'logado' not in st.session_state: st.session_state.logado = False
 if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
@@ -172,15 +173,12 @@ if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 # =======================================================
 if not st.session_state.logado:
     st.markdown("""<style> [data-testid="stAppViewContainer"] { background-color: #ffffff !important; } </style>""", unsafe_allow_html=True)
-    
     _, c2, _ = st.columns([1, 1.2, 1])
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         with st.container(border=True):
             col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
-            with col_logo2:
-                st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
-            
+            with col_logo2: st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
             st.markdown("<h3 style='text-align: center; color: #1e293b; margin-top: -10px; margin-bottom: 20px;'>Portal do Cliente</h3>", unsafe_allow_html=True)
             u = st.text_input("👤 Usuário").upper().strip()
             s = st.text_input("🔒 Senha", type="password")
@@ -194,9 +192,9 @@ if not st.session_state.logado:
 else:
     conf = CLIENTES_CONFIG[st.session_state.cliente]
     hoje_br = datetime.now(FUSO_BR).date()
+    nome_tomador_oficial = conf["filtro"] if conf["filtro"] != "TODOS" else "MATRIZ IGO"
     
     with st.sidebar:
-        # 🔥 COLUNAS INVISÍVEIS PARA CENTRALIZAR A LOGO 🔥
         col_img1, col_img2, col_img3 = st.columns([1, 3, 1])
         with col_img2:
             try: st.image(conf["logo"], use_container_width=True)
@@ -206,42 +204,26 @@ else:
         datas_sel = st.date_input("🗓️ Período:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY")
         holder_cidades = st.empty()
         
-        # --- 🚀 SUPORTE DIRETO VIA API WHATSAPP ---
         st.divider()
         st.markdown("### 🎧 Chamado C.C.O.")
-        
         with st.form("form_chamado_zap"):
             pedido_chamado = st.text_input("Número do Pedido (Opcional):")
             msg_chamado = st.text_area("Sua Mensagem:", placeholder="Ex: Preciso de urgência neste pedido...")
-            btn_enviar_chamado = st.form_submit_button("Enviar Solicitação", use_container_width=True)
-            
-            if btn_enviar_chamado:
-                if msg_chamado.strip() == "":
-                    st.error("Digite uma mensagem!")
+            if st.form_submit_button("Enviar Solicitação", use_container_width=True):
+                if msg_chamado.strip() == "": st.error("Digite uma mensagem!")
                 else:
                     with st.spinner("Enviando para a base..."):
-                        numero_cco = "5511947996371" 
-                        
-                        nome_tomador = conf["filtro"] if conf["filtro"] != "TODOS" else "MATRIZ IGO LOGÍSTICA"
-                        
-                        texto_final = f"🚨 *CHAMADO PRIORITÁRIO - PORTAL* 🚨\n\n"
-                        texto_final += f"🏢 *Cliente:* {nome_tomador}\n"
-                        if pedido_chamado:
-                            texto_final += f"📦 *Pedido:* {pedido_chamado}\n"
-                        texto_final += f"💬 *Mensagem:* {msg_chamado}\n\n"
-                        texto_final += f"⏳ _Enviado via Portal Corporativo_"
-                        
-                        if enviar_whatsapp_zapi_cliente(numero_cco, texto_final):
-                            st.success("✅ Chamado enviado com sucesso!")
-                        else:
-                            st.error("❌ Erro de comunicação com o C.C.O.")
+                        texto_final = f"🚨 *CHAMADO PRIORITÁRIO - PORTAL* 🚨\n\n🏢 *Cliente:* {nome_tomador_oficial}\n"
+                        if pedido_chamado: texto_final += f"📦 *Pedido:* {pedido_chamado}\n"
+                        texto_final += f"💬 *Mensagem:* {msg_chamado}\n\n⏳ _Enviado via Portal Corporativo_"
+                        if enviar_whatsapp_zapi_cliente("5511947996371", texto_final): st.success("✅ Chamado enviado!")
+                        else: st.error("❌ Erro de comunicação.")
         
         st.divider()
         holder_exportar = st.empty()
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         if st.button("🚪 Sair do Sistema", use_container_width=True): 
-            st.session_state.logado = False
-            st.rerun()
+            st.session_state.logado = False; st.rerun()
             
     st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:22px;">Monitoramento Logístico | {st.session_state.cliente}</h2><div class='sync-status'>🟢 Online: {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
 
@@ -251,133 +233,215 @@ else:
         st.info("Aguardando novas informações do C.C.O na base de dados...")
     else:
         if conf["filtro"] == "TODOS": df_cliente = df_raw.copy()
-        else:
-            if 'TOMADOR' in df_raw.columns:
-                df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
-            else: df_cliente = pd.DataFrame()
+        else: df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
+
+        # 🔥 AQUI DIVIDIMOS A TELA EM DUAS ABAS 🔥
+        tab_grid, tab_solicitar = st.tabs(["📊 Meus Pedidos e Monitoramento", "➕ Solicitar Nova Coleta"])
+
+        with tab_grid:
+            if df_cliente.empty:
+                st.warning(f"Nenhum pedido registrado no sistema sob a titularidade '{conf['filtro']}'.")
+            else:
+                with holder_cidades:
+                    cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
+
+                def get_st(row):
+                    st_master = str(row.get('STATUS', '')).strip().upper()
+                    st_app = str(row.get('A_ST', '')).strip().upper()
+                    if st_master in ['', 'NAN', 'NONE', 'PENDENTE'] and st_app not in ['', 'NAN', 'NONE']: s = st_app
+                    else: s = st_master
+                    
+                    if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação' # NOVO STATUS
+                    if 'RECUSA' in s: return '🚫 Solicitação Recusada'   # NOVO STATUS
+                    if 'ENTREGUE' in s: return '✅ Entregue'
+                    if 'COLETADO' in s: return '📦 Coletado'
+                    if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
+                    if 'ROTA' in s: return '🚚 Em Rota de Entrega'
+                    if 'CONFERIDO' in s: return '☑️ Conferido'
+                    if 'FRUSTRADA' in s: return '❌ Frustrada'
+                    if 'CANCELADO' in s: return '🚫 Cancelado'
+                    if 'PROBLEMA' in s: return '🚨 Problema'
+                    return '⏳ Pendente'
                 
-        if df_cliente.empty:
-            st.warning(f"Nenhum pedido ou lote foi registrado no sistema sob a titularidade '{conf['filtro']}' até o momento.")
-        else:
-            with holder_cidades:
-                cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
-
-            def get_st(row):
-                st_master = str(row.get('STATUS', '')).strip().upper()
-                st_app = str(row.get('A_ST', '')).strip().upper()
-                if st_master in ['', 'NAN', 'NONE', 'PENDENTE'] and st_app not in ['', 'NAN', 'NONE']: s = st_app
-                else: s = st_master
-                if 'ENTREGUE' in s: return '✅ Entregue'
-                if 'COLETADO' in s: return '📦 Coletado'
-                if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
-                if 'ROTA' in s: return '🚚 Em Rota de Entrega'
-                if 'CONFERIDO' in s: return '☑️ Conferido'
-                if 'FRUSTRADA' in s: return '❌ Frustrada'
-                if 'CANCELADO' in s: return '🚫 Cancelado'
-                if 'PROBLEMA' in s: return '🚨 Problema'
-                return '⏳ Pendente'
-            
-            def get_detalhes(row):
-                obs_master = str(row.get('OBSERVACOES', '')).strip()
-                obs_app = str(row.get('A_OB', '')).strip()
-                if obs_master and obs_master.upper() != 'NAN': return obs_master
-                if obs_app and obs_app.upper() != 'NAN': return obs_app
-                return "-"
-
-            def tratar_link_foto(x):
-                x_str = str(x).strip()
-                if not x_str or x_str.upper() in ['NAN', 'NONE']: return ""
-                if x_str.startswith("http"): return x_str 
-                return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={x_str}"
-
-            df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
-            df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
-            df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(tratar_link_foto)
-
-            df_f = df_cliente.copy()
-            if isinstance(datas_sel, (tuple, list)) and len(datas_sel) == 2:
-                df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
-            
-            if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
-
-            df_f['DT_LIMITE_OBJ'] = pd.to_datetime(df_f['DATA_LIMITE'], format='%d/%m/%Y', errors='coerce').dt.date
-            
-            mask_atrasado = (
-                (~df_f['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado', case=False, na=False)) &
-                (df_f['DT_LIMITE_OBJ'] < hoje_br) &
-                (df_f['DT_LIMITE_OBJ'].notnull())
-            )
-            df_atrasados_only = df_f[mask_atrasado]
-            n_atr_k = len(df_atrasados_only)
-
-            ck = st.columns(5)
-            def set_kpi(v): st.session_state.filtro_kpi = v
-            n_tot_k, n_ent_k, n_fru_k = len(df_f), len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')]), len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])
-            
-            with ck[0]: st.button(f"📦 TOTAL\n\n{n_tot_k}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
-            with ck[1]: st.button(f"✅ ENTREGUES\n\n{n_ent_k}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
-            with ck[2]: st.button(f"❌ FRUSTRADAS\n\n{n_fru_k}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
-            with ck[3]: st.button(f"🚨 ATRASADOS\n\n{n_atr_k}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
-            with ck[4]: st.button(f"📅 HOJE\n\n{len(df_f[df_f['DATA_OBJ'] == hoje_br])}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
-
-            st.markdown("<br>🎯 **Progresso de Hoje**", unsafe_allow_html=True)
-            df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
-            if not df_h.empty:
-                tx = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado')]) / len(df_h)
-                st.progress(tx)
-            else: st.info("Nenhum pedido despachado para hoje.")
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            busca = st.text_input("🔎 Busca Rápida:", placeholder="Buscar por pedido, laboratório, cidade...")
-            
-            df_grid = df_f.copy()
-            if st.session_state.filtro_kpi != "TODOS":
-                if st.session_state.filtro_kpi == "HOJE": 
-                    df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
-                elif st.session_state.filtro_kpi == "ATRASADO":
-                    df_grid = df_atrasados_only.copy()
-                else: 
-                    df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False)]
-            
-            if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
-
-            if not df_grid.empty:
-                cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'A_DT', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DETALHES', 'FOTO_URL']
-                df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
-                
-                def formatar_data_entrega(row):
-                    st_atual = str(row.get('STATUS_DISPLAY', '')).upper()
-                    dt_entrega = str(row.get('A_DT', '')).strip()
-                    if 'ENTREGUE' in st_atual or 'FRUSTRADA' in st_atual:
-                        return dt_entrega if dt_entrega not in ['nan', 'None', ''] else "-"
+                def get_detalhes(row):
+                    obs_master = str(row.get('OBSERVACOES', '')).strip()
+                    obs_app = str(row.get('A_OB', '')).strip()
+                    if obs_master and obs_master.upper() != 'NAN': return obs_master
+                    if obs_app and obs_app.upper() != 'NAN': return obs_app
                     return "-"
 
-                df_final['DATA_EFETIVA'] = df_final.apply(formatar_data_entrega, axis=1)
-                df_final['COMPROVANTE'] = df_final['FOTO_URL'].apply(lambda x: x if str(x).startswith("http") else "")
+                df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
+                df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
 
-                colunas_ordenadas = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DATA_EFETIVA', 'COMPROVANTE', 'DETALHES']
+                df_f = df_cliente.copy()
+                if isinstance(datas_sel, (tuple, list)) and len(datas_sel) == 2:
+                    df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
+                if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
+
+                df_f['DT_LIMITE_OBJ'] = pd.to_datetime(df_f['DATA_LIMITE'], format='%d/%m/%Y', errors='coerce').dt.date
                 
-                for col in df_final.columns: 
-                    df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
-
-                st.data_editor(
-                    df_final,
-                    column_config={
-                        "DATA": st.column_config.TextColumn("DATA PEDIDO"),
-                        "PEDIDO": st.column_config.TextColumn("PEDIDO"),
-                        "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
-                        "DATA_EFETIVA": st.column_config.TextColumn("DATA ENTREGA"),
-                        "LABORATORIO": st.column_config.TextColumn("PCL"),
-                        "CIDADE": st.column_config.TextColumn("CIDADE"),
-                        "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
-                        "COMPROVANTE": st.column_config.LinkColumn("COMPROVANTE", display_text="🔎 Abrir Foto"),
-                        "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large")
-                    },
-                    column_order=colunas_ordenadas,
-                    disabled=True, hide_index=True, use_container_width=True, height=500
+                mask_atrasado = (
+                    (~df_f['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Aguardando|Recusada', case=False, na=False)) &
+                    (df_f['DT_LIMITE_OBJ'] < hoje_br) &
+                    (df_f['DT_LIMITE_OBJ'].notnull())
                 )
+                df_atrasados_only = df_f[mask_atrasado]
 
-                with holder_exportar:
-                    csv = df_grid.to_csv(index=False, sep=';').encode('utf-8-sig')
-                    st.download_button("📥 Exportar Planilha (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
-            else: st.info("Nenhum pacote encontrado para os filtros de busca informados.")
+                # 6 COLUNAS DE KPI AGORA
+                ck = st.columns(6)
+                def set_kpi(v): st.session_state.filtro_kpi = v
+                n_tot_k = len(df_f)
+                n_ent_k = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])
+                n_fru_k = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])
+                n_atr_k = len(df_atrasados_only)
+                n_agu_k = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Aguardando')])
+                n_hoje_k = len(df_f[df_f['DATA_OBJ'] == hoje_br])
+                
+                with ck[0]: st.button(f"📦 TOTAL\n\n{n_tot_k}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
+                with ck[1]: st.button(f"✅ ENTREGUES\n\n{n_ent_k}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
+                with ck[2]: st.button(f"❌ FRUSTRADAS\n\n{n_fru_k}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
+                with ck[3]: st.button(f"🚨 ATRASADOS\n\n{n_atr_k}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
+                with ck[4]: st.button(f"🔒 AGUARDANDO\n\n{n_agu_k}", key="kpi_aguardando", use_container_width=True, on_click=set_kpi, args=("Aguardando",))
+                with ck[5]: st.button(f"📅 HOJE\n\n{n_hoje_k}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
+
+                st.markdown("<br>🎯 **Progresso de Hoje**", unsafe_allow_html=True)
+                df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
+                if not df_h.empty:
+                    tx = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Recusada')]) / len(df_h)
+                    st.progress(tx)
+                else: st.info("Nenhum pedido despachado para hoje.")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                busca = st.text_input("🔎 Busca Rápida:", placeholder="Buscar por pedido, laboratório, cidade...")
+                
+                df_grid = df_f.copy()
+                if st.session_state.filtro_kpi != "TODOS":
+                    if st.session_state.filtro_kpi == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
+                    elif st.session_state.filtro_kpi == "ATRASADO": df_grid = df_atrasados_only.copy()
+                    else: df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False)]
+                
+                if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
+
+                if not df_grid.empty:
+                    cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'A_DT', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DETALHES', 'FOTO']
+                    df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
+                    
+                    def formatar_data_entrega(row):
+                        st_atual = str(row.get('STATUS_DISPLAY', '')).upper()
+                        dt_entrega = str(row.get('A_DT', '')).strip()
+                        if 'ENTREGUE' in st_atual or 'FRUSTRADA' in st_atual:
+                            return dt_entrega if dt_entrega not in ['nan', 'None', ''] else "-"
+                        return "-"
+
+                    df_final['DATA_EFETIVA'] = df_final.apply(formatar_data_entrega, axis=1)
+                    
+                    def tratar_foto(x):
+                        xs = str(x).strip()
+                        if not xs or xs.upper() in ['NAN', 'NONE']: return ""
+                        if xs.startswith("http"): return xs
+                        return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
+                    
+                    df_final['COMPROVANTE'] = df_final['FOTO'].apply(tratar_foto)
+
+                    colunas_ordenadas = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DATA_EFETIVA', 'COMPROVANTE', 'DETALHES']
+                    
+                    for col in df_final.columns: df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
+
+                    st.data_editor(
+                        df_final,
+                        column_config={
+                            "DATA": st.column_config.TextColumn("DATA PEDIDO"),
+                            "PEDIDO": st.column_config.TextColumn("PEDIDO"),
+                            "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
+                            "DATA_EFETIVA": st.column_config.TextColumn("DATA ENTREGA"),
+                            "LABORATORIO": st.column_config.TextColumn("PCL"),
+                            "CIDADE": st.column_config.TextColumn("CIDADE"),
+                            "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
+                            "COMPROVANTE": st.column_config.LinkColumn("COMPROVANTE", display_text="🔎 Abrir Foto"),
+                            "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large")
+                        },
+                        column_order=colunas_ordenadas, disabled=True, hide_index=True, use_container_width=True, height=500
+                    )
+
+                    with holder_exportar:
+                        csv = df_grid.to_csv(index=False, sep=';').encode('utf-8-sig')
+                        st.download_button("📥 Exportar Planilha (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
+
+        # 🔥 NOVO MÓDULO: AUTOATENDIMENTO DE COLETA 🔥
+        with tab_solicitar:
+            st.markdown("### ➕ Nova Solicitação de Coleta")
+            st.markdown("<p style='color: #64748B;'>Escolha o ponto de coleta desejado abaixo. A data mínima para agendamento é o próximo dia útil.</p>", unsafe_allow_html=True)
+            
+            df_locais = carregar_base_locais()
+            if df_locais.empty:
+                st.warning("O banco de dados de locais de coleta ainda não foi sincronizado ou está vazio.")
+            else:
+                df_cli_locais = df_locais[df_locais['TOMADOR'].str.upper().str.strip() == nome_tomador_oficial.upper().strip()]
+                if df_cli_locais.empty:
+                    st.warning(f"Nenhum Ponto de Coleta cadastrado no momento para a empresa {nome_tomador_oficial}.")
+                else:
+                    with st.container(border=True):
+                        with st.form("form_nova_coleta", clear_on_submit=True):
+                            lista_labs = sorted(df_cli_locais['LABORATORIO'].unique().tolist())
+                            lab_sel = st.selectbox("📍 Selecione o Ponto de Coleta (Laboratório):", ["Selecione..."] + lista_labs)
+                            
+                            c1, c2 = st.columns(2)
+                            amanha = hoje_br + timedelta(days=1)
+                            data_coleta = c1.date_input("📅 Data Desejada para Coleta:", min_value=amanha, value=amanha, format="DD/MM/YYYY")
+                            obs = st.text_area("📝 Observações / Instruções (Opcional):", placeholder="Ex: Procurar por Fulano, coletar na recepção...", height=100)
+
+                            if st.form_submit_button("🚀 Enviar Solicitação ao C.C.O.", type="primary", use_container_width=True):
+                                if lab_sel == "Selecione...":
+                                    st.error("⚠️ Por favor, selecione um Ponto de Coleta válido na lista.")
+                                else:
+                                    with st.spinner("Registrando pedido seguro e notificando o C.C.O..."):
+                                        try:
+                                            # Puxa os dados completos do local escolhido
+                                            local_data = df_cli_locais[df_cli_locais['LABORATORIO'] == lab_sel].iloc[0]
+                                            
+                                            gc = conectar_banco_seguro()
+                                            planilha = gc.open("DB_IGO_Logistica")
+                                            aba_m = planilha.worksheet("Memoria_Sistema")
+                                            
+                                            # Pega os cabeçalhos e calcula o ID
+                                            dados_m = aba_m.get_all_values()
+                                            df_m_temp = pd.DataFrame(dados_m[1:], columns=dados_m[0])
+                                            prox_id = obter_proximo_id(df_m_temp)
+                                            
+                                            # Monta o dicionário com a nova linha
+                                            nova_linha_dict = {
+                                                'DATA': data_coleta.strftime("%d/%m/%Y"),
+                                                'PEDIDO': str(prox_id),
+                                                'TOMADOR': nome_tomador_oficial,
+                                                'LABORATORIO': local_data['LABORATORIO'],
+                                                'CNPJ': local_data.get('CNPJ', ''),
+                                                'ENDERECO': local_data.get('ENDERECO', ''),
+                                                'NUMERO': local_data.get('NUMERO', ''),
+                                                'BAIRRO': local_data.get('BAIRRO', ''),
+                                                'CIDADE': local_data.get('CIDADE', ''),
+                                                'UF': local_data.get('UF', ''),
+                                                'CEP': local_data.get('CEP', ''),
+                                                'STATUS': 'AGUARDANDO APROVAÇÃO', # O Cadeado Mágico
+                                                'OBSERVACOES': obs
+                                            }
+                                            
+                                            # Insere na ordem exata das colunas
+                                            cabecalhos = dados_m[0]
+                                            linha_append = [nova_linha_dict.get(c, "") for c in cabecalhos]
+                                            aba_m.append_row(linha_append, value_input_option='USER_ENTERED')
+                                            
+                                            # Sinal de Fumaça pro WhatsApp do CCO
+                                            texto_zap = f"🔔 *NOVA SOLICITAÇÃO DE COLETA* 🔔\n\n"
+                                            texto_zap += f"🏢 *Cliente:* {nome_tomador_oficial}\n"
+                                            texto_zap += f"🔬 *Local:* {local_data['LABORATORIO']}\n"
+                                            texto_zap += f"📍 *Cidade:* {local_data.get('CIDADE', '')} - {local_data.get('UF', '')}\n"
+                                            texto_zap += f"📅 *Data Desejada:* {data_coleta.strftime('%d/%m/%Y')}\n"
+                                            texto_zap += f"📦 *ID do Pedido:* {prox_id}\n\n"
+                                            texto_zap += f"Acesse o painel do C.C.O para aprovar ou recusar a rota."
+                                            
+                                            enviar_whatsapp_zapi_cliente("5511947996371", texto_zap)
+                                            
+                                            st.success(f"🎉 Sucesso! Pedido #{prox_id} criado e aguardando aprovação do C.C.O.")
+                                            carregar_dados_nuvem.clear()
+                                        except Exception as e:
+                                            st.error(f"Erro ao processar solicitação: {e}")
