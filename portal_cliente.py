@@ -31,6 +31,22 @@ st.markdown("""
         color: #1e293b !important;
     }
 
+    /* 🔥 MELHORIA DE CONTRASTE NO FORMULÁRIO DE CHAMADO 🔥 */
+    [data-testid="stSidebar"] [data-testid="stForm"] {
+        background-color: #f8fafc !important; /* Fundo cinza clarinho */
+        border: 1px solid #cbd5e1 !important; /* Borda mais visível */
+        border-radius: 8px !important;
+    }
+    [data-testid="stSidebar"] input, [data-testid="stSidebar"] textarea {
+        background-color: #ffffff !important;
+        border: 1px solid #94a3b8 !important; /* Bordas das caixas mais escuras */
+        color: #1e293b !important;
+    }
+    [data-testid="stSidebar"] input:focus, [data-testid="stSidebar"] textarea:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 1px #3b82f6 !important;
+    }
+
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
@@ -197,14 +213,17 @@ else:
                     st.error("Digite uma mensagem!")
                 else:
                     with st.spinner("Enviando para a base..."):
-                        # ⚠️ ATENÇÃO: COLOQUE O SEU NÚMERO DE CCO AQUI ⚠️
-                        numero_cco = "5511947996371" # <- Telefone do CCO que vai RECEBER a notificação
+                        numero_cco = "5511947996371" # <- TELEFONE CCO OFICIAL ATUALIZADO
                         
-                        texto_final = f"🚨 *NOVO CHAMADO - PORTAL DO CLIENTE* 🚨\n\n"
-                        texto_final += f"🏢 *Cliente:* {st.session_state.cliente}\n"
+                        # Pegando o nome amigável do tomador configurado na linha 83
+                        nome_tomador = conf["filtro"] if conf["filtro"] != "TODOS" else "MATRIZ IGO LOGÍSTICA"
+                        
+                        texto_final = f"🚨 *CHAMADO PRIORITÁRIO - PORTAL* 🚨\n\n"
+                        texto_final += f"🏢 *Cliente:* {nome_tomador}\n"
                         if pedido_chamado:
                             texto_final += f"📦 *Pedido:* {pedido_chamado}\n"
-                        texto_final += f"💬 *Mensagem:* {msg_chamado}"
+                        texto_final += f"💬 *Mensagem:* {msg_chamado}\n\n"
+                        texto_final += f"⏳ _Enviado via Portal Corporativo_"
                         
                         if enviar_whatsapp_zapi_cliente(numero_cco, texto_final):
                             st.success("✅ Chamado enviado com sucesso!")
