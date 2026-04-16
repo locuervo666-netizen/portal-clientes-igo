@@ -47,7 +47,8 @@ CLIENTES_CONFIG = {
     "GRALAB": {"senha": "123", "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png", "filtro": "GRALAB"},
     "IGO_LOGISTICA": {"senha": "admin", "logo": LOGO_IGO, "filtro": "TODOS"},
     "LOGISTICA.LABEST": {"senha": "123", "logo": "logo_labest.png", "filtro": "LABEST"},
-    "SYNVIA": {"senha": "123", "logo": LOGO_IGO, "filtro": "SYNVIA"}
+    "SYNVIA": {"senha": "123", "logo": LOGO_IGO, "filtro": "SYNVIA"},
+    "LOGISTICA.BAT": {"senha": "123", "logo": "souza cruz.png", "filtro": "SOUZA CRUZ"}
 }
 
 # =======================================================
