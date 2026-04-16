@@ -806,7 +806,6 @@ if menu == "📊 GRID":
                                             if mask.any():
                                                 df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
                                                 df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
-                                                df_nuvem.loc[mask, 'DATA'] = nova_data_troca.strftime("%d/%m/%Y")
                                                 df_nuvem.loc[mask, 'ZAP_ENVIADO'] = "" 
                                                 l_app = df_nuvem[mask].iloc[0]
                                                 lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
@@ -1879,7 +1878,10 @@ elif menu == "🔬 Triagem":
                                 try:
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                    df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), ['STATUS', 'ROMANEIO', 'DATA', 'AGENTE_RAW']] = ['EM ROTA DE ENTREGA', id_romaneio, data_despacho.strftime("%d/%m/%Y"), motorista_escolhido]
+                                    
+                                    # CORREÇÃO: Coluna 'DATA' removida para não sobrescrever a entrada original
+                                    df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), ['STATUS', 'ROMANEIO', 'AGENTE_RAW']] = ['EM ROTA DE ENTREGA', id_romaneio, motorista_escolhido]
+                                    
                                     aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     base_tomador = tomadores_unicos[0]
                                     base_cidade = sel_lista[0].get('CIDADE', '')
