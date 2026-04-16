@@ -21,7 +21,7 @@ st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { transition: background-color 0.3s ease; font-family: 'Inter', sans-serif; }
     
-    /* 🔥 FORÇANDO FUNDO BRANCO NA SIDEBAR E PROTEGENDO A COR DO TEXTO 🔥 */
+    /* FORÇANDO FUNDO BRANCO NA SIDEBAR E PROTEGENDO A COR DO TEXTO */
     [data-testid="stSidebar"], [data-testid="stSidebar"] > div:first-child { 
         background-color: #ffffff !important; 
     }
@@ -103,7 +103,6 @@ def carregar_dados_nuvem():
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
                     df_app.columns = [str(c).upper().strip().replace(' ', '').replace('?', '') for c in df_app.columns]
                     
-                    # Extração expandida para pegar a Data de Baixa
                     cols_to_extract = ['PEDIDO']
                     if 'STATUS' in df_app.columns: cols_to_extract.append('STATUS')
                     if 'OBSERVACOES' in df_app.columns: cols_to_extract.append('OBSERVACOES')
@@ -121,14 +120,12 @@ def carregar_dados_nuvem():
                     
                     if 'A_FO' in df.columns:
                         df['FOTO'] = df.apply(lambda r: r['A_FO'] if str(r.get('A_FO','')).strip() and str(r.get('A_FO','')).upper() != 'NAN' else r.get('FOTO',''), axis=1)
-            except Exception: 
-                pass
+            except Exception: pass
                 
             if 'DATA' in df.columns: 
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
-    except Exception: 
-        return pd.DataFrame()
+    except Exception: return pd.DataFrame()
 
 if 'logado' not in st.session_state: st.session_state.logado = False
 if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
@@ -137,31 +134,26 @@ if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 # 🔐 3. LOGIN / PAINEL
 # =======================================================
 if not st.session_state.logado:
-    # Fundo branco puro para a logo se integrar perfeitamente
     st.markdown("""<style> [data-testid="stAppViewContainer"] { background-color: #ffffff !important; } </style>""", unsafe_allow_html=True)
     
     _, c2, _ = st.columns([1, 1.2, 1])
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         with st.container(border=True):
-            # Centralizando a logo e o título
             col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
             with col_logo2:
                 st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
             
             st.markdown("<h3 style='text-align: center; color: #1e293b; margin-top: -10px; margin-bottom: 20px;'>Portal do Cliente</h3>", unsafe_allow_html=True)
-            
             u = st.text_input("👤 Usuário").upper().strip()
             s = st.text_input("🔒 Senha", type="password")
-            
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🚀 Acessar Sistema", type="primary", use_container_width=True):
                 if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
                     st.session_state.logado = True
                     st.session_state.cliente = u
                     st.rerun()
-                else: 
-                    st.error("❌ Credenciais Incorretas")
+                else: st.error("❌ Credenciais Incorretas")
 else:
     conf = CLIENTES_CONFIG[st.session_state.cliente]
     hoje_br = datetime.now(FUSO_BR).date()
@@ -169,13 +161,11 @@ else:
     with st.sidebar:
         try: st.image(conf["logo"], width=160)
         except: st.markdown(f"### {st.session_state.cliente}")
-            
         st.divider()
         datas_sel = st.date_input("🗓️ Período:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY")
         holder_cidades = st.empty()
         st.divider()
         holder_exportar = st.empty()
-        
         st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
         if st.button("🚪 Sair do Sistema", use_container_width=True): 
             st.session_state.logado = False
@@ -188,13 +178,11 @@ else:
     if df_raw.empty:
         st.info("Aguardando novas informações do C.C.O na base de dados...")
     else:
-        if conf["filtro"] == "TODOS":
-            df_cliente = df_raw.copy()
+        if conf["filtro"] == "TODOS": df_cliente = df_raw.copy()
         else:
             if 'TOMADOR' in df_raw.columns:
                 df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
-            else:
-                df_cliente = pd.DataFrame()
+            else: df_cliente = pd.DataFrame()
                 
         if df_cliente.empty:
             st.warning(f"Nenhum pedido ou lote foi registrado no sistema sob a titularidade '{conf['filtro']}' até o momento.")
@@ -202,16 +190,11 @@ else:
             with holder_cidades:
                 cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
 
-            # 🔥 DEFINIÇÃO DAS REGRAS DE STATUS
             def get_st(row):
                 st_master = str(row.get('STATUS', '')).strip().upper()
                 st_app = str(row.get('A_ST', '')).strip().upper()
-                
-                if st_master in ['', 'NAN', 'NONE', 'PENDENTE'] and st_app not in ['', 'NAN', 'NONE']:
-                    s = st_app
-                else:
-                    s = st_master
-
+                if st_master in ['', 'NAN', 'NONE', 'PENDENTE'] and st_app not in ['', 'NAN', 'NONE']: s = st_app
+                else: s = st_master
                 if 'ENTREGUE' in s: return '✅ Entregue'
                 if 'COLETADO' in s: return '📦 Coletado'
                 if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
@@ -229,30 +212,25 @@ else:
                 if obs_app and obs_app.upper() != 'NAN': return obs_app
                 return "-"
 
-            df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
-            df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
-            
             def tratar_link_foto(x):
                 x_str = str(x).strip()
                 if not x_str or x_str.upper() in ['NAN', 'NONE']: return ""
                 if x_str.startswith("http"): return x_str 
                 return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={x_str}"
-                
+
+            df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
+            df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
             df_cliente['FOTO_URL'] = df_cliente['FOTO'].apply(tratar_link_foto)
 
             df_f = df_cliente.copy()
             if isinstance(datas_sel, (tuple, list)) and len(datas_sel) == 2:
                 df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
             
-            if cidades_sel: 
-                df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
+            if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
             ck = st.columns(5)
             def set_kpi(v): st.session_state.filtro_kpi = v
-            n_tot_k = len(df_f)
-            n_ent_k = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])
-            n_fru_k = len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])
-            n_atr_k = 0 
+            n_tot_k, n_ent_k, n_fru_k, n_atr_k = len(df_f), len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')]), len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')]), 0
             
             with ck[0]: st.button(f"📦 TOTAL\n\n{n_tot_k}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
             with ck[1]: st.button(f"✅ ENTREGUES\n\n{n_ent_k}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
@@ -265,28 +243,21 @@ else:
             if not df_h.empty:
                 tx = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado')]) / len(df_h)
                 st.progress(tx)
-            else: 
-                st.info("Nenhum pedido despachado para hoje.")
+            else: st.info("Nenhum pedido despachado para hoje.")
 
             st.markdown("<br>", unsafe_allow_html=True)
             busca = st.text_input("🔎 Busca Rápida:", placeholder="Buscar por pedido, laboratório, cidade...")
             
             df_grid = df_f.copy()
             if st.session_state.filtro_kpi != "TODOS":
-                if st.session_state.filtro_kpi == "HOJE":
-                    df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
-                else:
-                    df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False)]
+                if st.session_state.filtro_kpi == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
+                else: df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False)]
             
-            if busca: 
-                df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
+            if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
             if not df_grid.empty:
-                cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'A_DT', 'LABORATORIO', 'CNPJ', 'CIDADE', 'UF', 'BAIRRO', 'DATA_LIMITE', 'DETALHES', 'FOTO_URL']
+                cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'A_DT', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DETALHES', 'FOTO_URL']
                 df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
-                
-                if 'CNPJ' not in df_final.columns:
-                    df_final['CNPJ'] = "-"
                 
                 def formatar_data_entrega(row):
                     st_atual = str(row.get('STATUS_DISPLAY', '')).upper()
@@ -296,14 +267,13 @@ else:
                     return "-"
 
                 df_final['DATA_EFETIVA'] = df_final.apply(formatar_data_entrega, axis=1)
-                
-                colunas_ordenadas = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'DATA_EFETIVA', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DETALHES', 'COMPROVANTE']
+                df_final['COMPROVANTE'] = df_final['FOTO_URL'].apply(lambda x: x if str(x).startswith("http") else "")
+
+                # 🔥 ORDEM ATUALIZADA: Data Efetiva após Previsão | Detalhes após Comprovante
+                colunas_ordenadas = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DATA_EFETIVA', 'COMPROVANTE', 'DETALHES']
                 
                 for col in df_final.columns: 
                     df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
-                
-                df_final['COMPROVANTE'] = df_final['FOTO_URL'].apply(lambda x: x if str(x).startswith("http") else "")
-                df_final.drop(columns=['FOTO_URL'], inplace=True, errors='ignore')
 
                 st.data_editor(
                     df_final,
@@ -313,21 +283,16 @@ else:
                         "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
                         "DATA_EFETIVA": st.column_config.TextColumn("DATA ENTREGA"),
                         "LABORATORIO": st.column_config.TextColumn("PCL"),
-                        "CNPJ": st.column_config.TextColumn("CNPJ"),
                         "CIDADE": st.column_config.TextColumn("CIDADE"),
                         "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
-                        "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large"),
-                        "COMPROVANTE": st.column_config.LinkColumn("COMPROVANTE", display_text="🔎 Abrir Foto")
+                        "COMPROVANTE": st.column_config.LinkColumn("COMPROVANTE", display_text="🔎 Abrir Foto"),
+                        "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large")
                     },
                     column_order=colunas_ordenadas,
-                    disabled=True, 
-                    hide_index=True,
-                    use_container_width=True,
-                    height=500
+                    disabled=True, hide_index=True, use_container_width=True, height=500
                 )
 
                 with holder_exportar:
                     csv = df_grid.to_csv(index=False, sep=';').encode('utf-8-sig')
                     st.download_button("📥 Exportar Planilha (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
-            else:
-                st.info("Nenhum pacote encontrado para os filtros de busca informados.")
+            else: st.info("Nenhum pacote encontrado para os filtros de busca informados.")
