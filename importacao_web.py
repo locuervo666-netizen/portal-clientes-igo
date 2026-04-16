@@ -1906,9 +1906,36 @@ elif menu == "🔬 Triagem":
 
         with t3:
             df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper().isin(['CONFERIDO', 'EM ROTA DE ENTREGA', 'ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO'])].copy()
-            if not df_hist.empty: st.dataframe(df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']], hide_index=True, use_container_width=True)
-            else: st.warning("O arquivo histórico de varreduras está temporariamente em branco.")
-    else: st.info("O banco de dados está vazio no momento.")
+            if not df_hist.empty:
+                st.markdown("#### 🖨️ Reimpressão de Romaneio")
+                romaneios_disponiveis = [r for r in df_hist['ROMANEIO'].unique() if str(r).strip() and str(r).upper() != 'NAN']
+                
+                if romaneios_disponiveis:
+                    col_re_1, col_re_2 = st.columns([2, 1])
+                    rom_selecionado = col_re_1.selectbox("Selecione o Lote / Romaneio:", ["Selecione..."] + sorted(romaneios_disponiveis, reverse=True))
+                    
+                    if rom_selecionado != "Selecione...":
+                        df_rom = df_hist[df_hist['ROMANEIO'] == rom_selecionado].copy()
+                        agente_rom = df_rom.iloc[0].get('AGENTE_RAW', 'Desconhecido')
+                        
+                        # Gera o PDF novamente com os dados do histórico
+                        pdf_reprint = gerar_pdf_romaneio(rom_selecionado, hoje_br, agente_rom, df_rom.to_dict('records'))
+                        
+                        col_re_2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                        col_re_2.download_button(
+                            label="📥 REIMPRIMIR PDF", 
+                            data=pdf_reprint, 
+                            file_name=f"Reimpressao_{rom_selecionado}.pdf", 
+                            mime="application/pdf", 
+                            type="primary",
+                            use_container_width=True
+                        )
+                        
+                st.markdown("---")
+                st.markdown("#### 🕒 Histórico Geral de Varredura")
+                st.dataframe(df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']], hide_index=True, use_container_width=True)
+            else: 
+                st.warning("O arquivo histórico de varreduras está temporariamente em branco.")
 
 # =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP
