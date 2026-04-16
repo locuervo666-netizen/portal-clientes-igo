@@ -20,7 +20,15 @@ st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { transition: background-color 0.3s ease; font-family: 'Inter', sans-serif; }
-    [data-testid="stSidebar"] { transition: background-color 0.3s ease; }
+    
+    /* 🔥 FORÇANDO FUNDO BRANCO NA SIDEBAR E PROTEGENDO A COR DO TEXTO 🔥 */
+    [data-testid="stSidebar"], [data-testid="stSidebar"] > div:first-child { 
+        background-color: #ffffff !important; 
+    }
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] h3 {
+        color: #1e293b !important;
+    }
+
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; }
     
