@@ -164,9 +164,17 @@ else:
         st.divider()
         datas_sel = st.date_input("🗓️ Período:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY")
         holder_cidades = st.empty()
+        
+        # --- 🎧 SUPORTE DIRETO (OPÇÃO 3) ---
+        st.divider()
+        st.markdown("### 🎧 Suporte Direto")
+        # AJUSTE O NÚMERO ABAIXO PARA O SEU WHATSAPP
+        link_zap = "https://wa.me/5511947996371?text=Olá,%20preciso%20de%20ajuda%20com%20um%20pedido%20no%20Portal."
+        st.link_button("💬 Falar com C.C.O.", link_zap, use_container_width=True)
+        
         st.divider()
         holder_exportar = st.empty()
-        st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
         if st.button("🚪 Sair do Sistema", use_container_width=True): 
             st.session_state.logado = False
             st.rerun()
@@ -228,14 +236,26 @@ else:
             
             if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
+            # --- 🚀 INTELIGÊNCIA DE ATRASADOS (OPÇÃO 1) ---
+            df_f['DT_LIMITE_OBJ'] = pd.to_datetime(df_f['DATA_LIMITE'], format='%d/%m/%Y', errors='coerce').dt.date
+            
+            # Filtro: Tudo que não é status final e o prazo é menor que hoje
+            mask_atrasado = (
+                (~df_f['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado', case=False, na=False)) &
+                (df_f['DT_LIMITE_OBJ'] < hoje_br) &
+                (df_f['DT_LIMITE_OBJ'].notnull())
+            )
+            df_atrasados_only = df_f[mask_atrasado]
+            n_atr_k = len(df_atrasados_only)
+
             ck = st.columns(5)
             def set_kpi(v): st.session_state.filtro_kpi = v
-            n_tot_k, n_ent_k, n_fru_k, n_atr_k = len(df_f), len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')]), len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')]), 0
+            n_tot_k, n_ent_k, n_fru_k = len(df_f), len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')]), len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])
             
             with ck[0]: st.button(f"📦 TOTAL\n\n{n_tot_k}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
             with ck[1]: st.button(f"✅ ENTREGUES\n\n{n_ent_k}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
             with ck[2]: st.button(f"❌ FRUSTRADAS\n\n{n_fru_k}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
-            with ck[3]: st.button(f"🚨 ATRASADOS\n\n{n_atr_k}", key="kpi_atra", use_container_width=True)
+            with ck[3]: st.button(f"🚨 ATRASADOS\n\n{n_atr_k}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
             with ck[4]: st.button(f"📅 HOJE\n\n{len(df_f[df_f['DATA_OBJ'] == hoje_br])}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
             st.markdown("<br>🎯 **Progresso de Hoje**", unsafe_allow_html=True)
@@ -250,8 +270,12 @@ else:
             
             df_grid = df_f.copy()
             if st.session_state.filtro_kpi != "TODOS":
-                if st.session_state.filtro_kpi == "HOJE": df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
-                else: df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False)]
+                if st.session_state.filtro_kpi == "HOJE": 
+                    df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
+                elif st.session_state.filtro_kpi == "ATRASADO":
+                    df_grid = df_atrasados_only.copy()
+                else: 
+                    df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False)]
             
             if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
@@ -269,7 +293,6 @@ else:
                 df_final['DATA_EFETIVA'] = df_final.apply(formatar_data_entrega, axis=1)
                 df_final['COMPROVANTE'] = df_final['FOTO_URL'].apply(lambda x: x if str(x).startswith("http") else "")
 
-                # 🔥 ORDEM ATUALIZADA: Data Efetiva após Previsão | Detalhes após Comprovante
                 colunas_ordenadas = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DATA_EFETIVA', 'COMPROVANTE', 'DETALHES']
                 
                 for col in df_final.columns: 
