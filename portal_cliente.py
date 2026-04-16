@@ -204,9 +204,20 @@ else:
             with holder_cidades:
                 cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
 
-            # 🔥 NOVA INTELIGÊNCIA DE STATUS AQUI 🔥
+            # 🔥 CORREÇÃO DE HIERARQUIA: MASTER SOBRE APP 🔥
             def get_st(row):
-                s = str(row.get('A_ST', row.get('STATUS', ''))).upper()
+                # Pegamos os dois valores e limpamos espaços
+                st_master = str(row.get('STATUS', '')).strip().upper()
+                st_app = str(row.get('A_ST', '')).strip().upper()
+                
+                # Se o Master (o que você gere) já tiver um status final, ele manda!
+                # Só usaremos o status do App se o Master estiver vazio ou "PENDENTE"
+                if st_master in ['', 'NAN', 'NONE', 'PENDENTE'] and st_app not in ['', 'NAN', 'NONE']:
+                    s = st_app
+                else:
+                    s = st_master
+
+                # Mapeamento visual
                 if 'ENTREGUE' in s: return '✅ Entregue'
                 if 'COLETADO' in s: return '📦 Coletado'
                 if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
@@ -217,12 +228,15 @@ else:
                 if 'PROBLEMA' in s: return '🚨 Problema'
                 return '⏳ Pendente'
             
-            df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
-            
             def get_detalhes(row):
-                obs = str(row.get('A_OB', row.get('OBSERVACOES', ''))).strip()
-                if obs and obs.upper() != 'NAN':
-                    return obs
+                # Prioriza a observação que você escreveu na gestão
+                obs_master = str(row.get('OBSERVACOES', '')).strip()
+                obs_app = str(row.get('A_OB', '')).strip()
+                
+                if obs_master and obs_master.upper() != 'NAN':
+                    return obs_master
+                if obs_app and obs_app.upper() != 'NAN':
+                    return obs_app
                 return "-"
                 
             df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
