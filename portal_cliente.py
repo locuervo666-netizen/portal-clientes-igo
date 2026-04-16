@@ -4,6 +4,8 @@ import gspread
 import os
 import urllib.parse
 import json
+import requests
+import re
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
 from google.oauth2.credentials import Credentials
@@ -127,6 +129,22 @@ def carregar_dados_nuvem():
             return df
     except Exception: return pd.DataFrame()
 
+# FUNÇÃO Z-API PARA O PORTAL DO CLIENTE
+def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
+    INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
+    TOKEN = "2321563615C4242CB6031504"          
+    CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S" 
+    tel_limpo = re.sub(r'\D', '', str(telefone_destino))
+    if not tel_limpo.startswith('55') and len(tel_limpo) in [10, 11]: tel_limpo = '55' + tel_limpo
+    url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-text"
+    payload = {"phone": tel_limpo, "message": texto_mensagem}
+    headers = {"Accept": "application/json", "Content-Type": "application/json", "Client-Token": CLIENT_TOKEN}
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        return response.status_code in [200, 201]
+    except Exception: return False
+
+
 if 'logado' not in st.session_state: st.session_state.logado = False
 if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 
@@ -165,12 +183,33 @@ else:
         datas_sel = st.date_input("🗓️ Período:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY")
         holder_cidades = st.empty()
         
-        # --- 🎧 SUPORTE DIRETO (OPÇÃO 3) ---
+        # --- 🚀 SUPORTE DIRETO VIA API WHATSAPP ---
         st.divider()
-        st.markdown("### 🎧 Suporte Direto")
-        # AJUSTE O NÚMERO ABAIXO PARA O SEU WHATSAPP
-        link_zap = "https://wa.me/5511947996371?text=Olá,%20preciso%20de%20ajuda%20com%20um%20pedido%20no%20Portal."
-        st.link_button("💬 Falar com C.C.O.", link_zap, use_container_width=True)
+        st.markdown("### 🎧 Chamado C.C.O.")
+        
+        with st.form("form_chamado_zap"):
+            pedido_chamado = st.text_input("Número do Pedido (Opcional):")
+            msg_chamado = st.text_area("Sua Mensagem:", placeholder="Ex: Preciso de urgência neste pedido...")
+            btn_enviar_chamado = st.form_submit_button("Enviar Solicitação", use_container_width=True)
+            
+            if btn_enviar_chamado:
+                if msg_chamado.strip() == "":
+                    st.error("Digite uma mensagem!")
+                else:
+                    with st.spinner("Enviando para a base..."):
+                        # ⚠️ ATENÇÃO: COLOQUE O SEU NÚMERO DE CCO AQUI ⚠️
+                        numero_cco = "5511947996371" # <- Telefone do CCO que vai RECEBER a notificação
+                        
+                        texto_final = f"🚨 *NOVO CHAMADO - PORTAL DO CLIENTE* 🚨\n\n"
+                        texto_final += f"🏢 *Cliente:* {st.session_state.cliente}\n"
+                        if pedido_chamado:
+                            texto_final += f"📦 *Pedido:* {pedido_chamado}\n"
+                        texto_final += f"💬 *Mensagem:* {msg_chamado}"
+                        
+                        if enviar_whatsapp_zapi_cliente(numero_cco, texto_final):
+                            st.success("✅ Chamado enviado com sucesso!")
+                        else:
+                            st.error("❌ Erro de comunicação com o C.C.O.")
         
         st.divider()
         holder_exportar = st.empty()
@@ -236,10 +275,8 @@ else:
             
             if cidades_sel: df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
-            # --- 🚀 INTELIGÊNCIA DE ATRASADOS (OPÇÃO 1) ---
             df_f['DT_LIMITE_OBJ'] = pd.to_datetime(df_f['DATA_LIMITE'], format='%d/%m/%Y', errors='coerce').dt.date
             
-            # Filtro: Tudo que não é status final e o prazo é menor que hoje
             mask_atrasado = (
                 (~df_f['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado', case=False, na=False)) &
                 (df_f['DT_LIMITE_OBJ'] < hoje_br) &
