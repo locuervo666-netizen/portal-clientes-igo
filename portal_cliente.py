@@ -31,16 +31,19 @@ st.markdown("""
         color: #1e293b !important;
     }
 
-    /* 🔥 MELHORIA DE CONTRASTE NO FORMULÁRIO DE CHAMADO 🔥 */
+    /* 🔥 VISUAL PREMIUM PARA O FORMULÁRIO E CAIXAS 🔥 */
     [data-testid="stSidebar"] [data-testid="stForm"] {
-        background-color: #f8fafc !important; /* Fundo cinza clarinho */
-        border: 1px solid #cbd5e1 !important; /* Borda mais visível */
-        border-radius: 8px !important;
+        background-color: #f8fafc !important; /* Fundo super suave */
+        border: 1px solid #e2e8f0 !important; /* Borda bem discreta */
+        border-radius: 12px !important; /* Cantos mais redondos */
+        padding: 15px !important; /* Mais respiro interno */
     }
     [data-testid="stSidebar"] input, [data-testid="stSidebar"] textarea {
         background-color: #ffffff !important;
-        border: 1px solid #94a3b8 !important; /* Bordas das caixas mais escuras */
+        border: 1px solid #cbd5e1 !important; /* Borda elegante */
+        border-radius: 6px !important;
         color: #1e293b !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; /* Sombreado leve */
     }
     [data-testid="stSidebar"] input:focus, [data-testid="stSidebar"] textarea:focus {
         border-color: #3b82f6 !important;
@@ -193,8 +196,12 @@ else:
     hoje_br = datetime.now(FUSO_BR).date()
     
     with st.sidebar:
-        try: st.image(conf["logo"], width=160)
-        except: st.markdown(f"### {st.session_state.cliente}")
+        # 🔥 COLUNAS INVISÍVEIS PARA CENTRALIZAR A LOGO 🔥
+        col_img1, col_img2, col_img3 = st.columns([1, 3, 1])
+        with col_img2:
+            try: st.image(conf["logo"], use_container_width=True)
+            except: st.markdown(f"<h3 style='text-align: center;'>{st.session_state.cliente}</h3>", unsafe_allow_html=True)
+            
         st.divider()
         datas_sel = st.date_input("🗓️ Período:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY")
         holder_cidades = st.empty()
@@ -213,9 +220,8 @@ else:
                     st.error("Digite uma mensagem!")
                 else:
                     with st.spinner("Enviando para a base..."):
-                        numero_cco = "5511947996371" # <- TELEFONE CCO OFICIAL ATUALIZADO
+                        numero_cco = "5511947996371" 
                         
-                        # Pegando o nome amigável do tomador configurado na linha 83
                         nome_tomador = conf["filtro"] if conf["filtro"] != "TODOS" else "MATRIZ IGO LOGÍSTICA"
                         
                         texto_final = f"🚨 *CHAMADO PRIORITÁRIO - PORTAL* 🚨\n\n"
