@@ -1943,6 +1943,9 @@ elif menu == "🔬 Triagem":
 # =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP
 # =============================================================================
+# =============================================================================
+# 📱 MÓDULO EXTRA: DISPARO WHATSAPP
+# =============================================================================
 elif menu == "📱 WhatsApp":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
