@@ -1940,17 +1940,14 @@ elif menu == "🔬 Triagem":
 # =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP
 # =============================================================================
-# =============================================================================
-# 📱 MÓDULO EXTRA: DISPARO WHATSAPP
-# =============================================================================
-# =============================================================================
-# 📱 MÓDULO EXTRA: DISPARO WHATSAPP
-# =============================================================================
 elif menu == "📱 WhatsApp":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
-    if not df_raw.empty:
+    # MATANDO O ERRO DE SINTAXE: Verificação logo no topo!
+    if df_raw.empty:
+        st.warning("O banco de dados está vazio.")
+    else:
         data_filtro = st.date_input("📅 Cronograma da Data:", value=hoje_br, format="DD/MM/YYYY")
         st.markdown("---")
         
@@ -1964,7 +1961,7 @@ elif menu == "📱 WhatsApp":
         agentes_xls = AGENTES_XLS_AUTORIZADOS
 
         # ==========================================
-        # ABA 1: ROTAS DE COLETA (O fluxo original)
+        # ABA 1: ROTAS DE COLETA
         # ==========================================
         with tab_coletas:
             col_esq, col_dir = st.columns([2.5, 1.2])
@@ -2039,7 +2036,7 @@ elif menu == "📱 WhatsApp":
                                 st.success(f"🎉 Disparo em massa concluído! {sucessos} motoristas receberam os arquivos.")
                                 time.sleep(2.5); st.rerun()
                     else: 
-                        st.success("✅ Todos os motoristas desta data já receberam as mensagens.")
+                        st.success("✅ Todos os motoristas desta data já receberam as rotas de coleta.")
                     
                     st.markdown("---")
                     for agente in sorted(agentes_com_rota):
@@ -2052,7 +2049,7 @@ elif menu == "📱 WhatsApp":
                         selo_status = '✅ ENVIADO' if todos_enviados else '⏳ PENDENTE'
                         selo_vip = ' 🌟 [RECEBE EXCEL]' if agente_login in agentes_xls else ''
                         
-                        with st.expander(f"{selo_status} | 👤 {nome_amigavel}{selo_vip} | Volumes: {len(df_agente)}", expanded=not todos_enviados):
+                        with st.expander(f"{selo_status} | 👤 {nome_amigavel}{selo_vip} | Coletas: {len(df_agente)}", expanded=not todos_enviados):
                             st.dataframe(df_agente[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True)
                             if telefone:
                                 data_str = data_filtro.strftime('%d/%m/%Y')
@@ -2119,18 +2116,17 @@ elif menu == "📱 WhatsApp":
                         st.info("Nenhum disparo registrado.")
 
         # ==========================================
-        # ABA 2: ROMANEIOS DE ENTREGA (A NOVA INTELIGÊNCIA)
+        # ABA 2: ROMANEIOS DE ENTREGA
         # ==========================================
         with tab_entregas:
             st.markdown("#### 📦 Lotes Despachados na Triagem (Entregas)")
-            st.info("Aqui ficam os materiais que já foram bipados na triagem e agrupados por Romaneio. Clique em disparar para enviar o protocolo de entrega para o motorista.")
+            st.info("Aqui ficam os materiais bipados na triagem e agrupados por Romaneio. Clique em disparar para enviar o protocolo de entrega.")
             
             df_entregas = df_dia[df_dia['STATUS'].astype(str).str.upper() == 'EM ROTA DE ENTREGA'].copy()
             
             if df_entregas.empty: 
-                st.success(f"Nenhum romaneio de entrega pendente de disparo para a data {data_filtro.strftime('%d/%m/%Y')}.")
+                st.success(f"Nenhum romaneio de entrega pendente para a data {data_filtro.strftime('%d/%m/%Y')}.")
             else:
-                # Agrupa pelos números dos romaneios criados
                 romaneios = [r for r in df_entregas['ROMANEIO'].dropna().unique() if str(r).strip() and str(r).upper() != 'NAN']
                 
                 for rom in sorted(romaneios, reverse=True):
@@ -2140,9 +2136,7 @@ elif menu == "📱 WhatsApp":
                     telefone = dict_telefones.get(str(agente_login).strip().lower(), "")
                     tomador_lote = df_rom.iloc[0].get('TOMADOR', '')
                     
-                    # Verifica se o lote já foi enviado usando o selo da coluna ZAP_ENVIADO
                     lote_enviado = df_rom['ZAP_ENVIADO'].astype(str).apply(lambda x: str(x).startswith('SIM')).all()
-                    
                     selo_status = '✅ ENVIADO' if lote_enviado else '⏳ AGUARDANDO DISPARO'
                     
                     with st.expander(f"{selo_status} | 🔖 Lote: {rom} | 👤 {nome_amigavel} | Volumes: {len(df_rom)}", expanded=not lote_enviado):
@@ -2154,7 +2148,6 @@ elif menu == "📱 WhatsApp":
                             
                             if st.button(botao_label, key=f"zap_rom_{rom}", type=botao_type, use_container_width=True):
                                 with st.spinner(f"Enviando lote de expedição para {nome_amigavel}..."):
-                                    # TEXTO REVISADO: DIRETO E MOTORISTA-FRIENDLY
                                     msg = f"🚚 *ORDEM DE ENTREGA LIBERADA* 🚚\n\n"
                                     msg += f"Fala, *{nome_amigavel}*. A triagem finalizou o seu veículo e o romaneio está liberado para saída.\n\n"
                                     msg += f"🏢 *Destino (Entregar em):* {tomador_lote}\n"
@@ -2166,7 +2159,6 @@ elif menu == "📱 WhatsApp":
                                     
                                     if enviar_whatsapp_zapi(telefone, msg):
                                         time.sleep(2.0)
-                                        # Recria o PDF na hora com base nos dados do lote
                                         pdf_rom = gerar_pdf_romaneio(rom, data_filtro, agente_login, df_rom.to_dict('records'))
                                         enviar_pdf_zapi(telefone, pdf_rom, f"Romaneio_IGO_{rom}.pdf")
                                         
@@ -2186,8 +2178,6 @@ elif menu == "📱 WhatsApp":
                                         st.error("🚨 Falha ao conectar com o WhatsApp do motorista.")
                         else:
                             st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
-    else: 
-        st.warning("O banco de dados está vazio.")
 
         # ==========================================
         # ABA 2: ROMANEIOS DE ENTREGA (A NOVA INTELIGÊNCIA)
