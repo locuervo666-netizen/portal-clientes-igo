@@ -110,7 +110,6 @@ def carregar_dados_nuvem():
             df.columns = df.columns.str.strip().str.upper() 
             df = df.loc[:, ~df.columns.duplicated()] 
             
-            # 🔥 CORREÇÃO: ADICIONAMOS A LÓGICA INTELIGENTE DO CCO AQUI 🔥
             try:
                 aba_app = planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
@@ -151,7 +150,6 @@ def carregar_dados_nuvem():
                     if 'A_FO' in df.columns:
                         df['FOTO'] = df.apply(lambda r: r['A_FO'] if str(r.get('A_FO','')).strip() and str(r.get('A_FO','')).upper() != 'NAN' else r.get('FOTO',''), axis=1)
 
-                    # Simula a inteligência do get_true_status do C.C.O.
                     def get_true_status_portal(row):
                         s_db = str(row.get('STATUS', '')).strip().upper()
                         s_app = str(row.get('A_ST', '')).strip().upper()
@@ -170,7 +168,6 @@ def carregar_dados_nuvem():
                     
                     df['STATUS_RESOLVIDO'] = df.apply(get_true_status_portal, axis=1)
                     
-                    # Resolve data de entrega para exibir no Portal
                     def get_true_data_entrega_portal(row):
                         s_final = str(row.get('STATUS_RESOLVIDO', '')).upper()
                         if s_final not in ['ENTREGUE', 'FRUSTRADA']: return "-"
@@ -268,7 +265,8 @@ else:
             except: st.markdown(f"<h3 style='text-align: center;'>{st.session_state.cliente}</h3>", unsafe_allow_html=True)
             
         st.divider()
-        datas_sel = st.date_input("🗓️ Período:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY")
+        # 🔥 MUDANÇA: Puxando 15 dias de histórico padrão 🔥
+        datas_sel = st.date_input("🗓️ Período:", value=(hoje_br - timedelta(days=15), hoje_br), format="DD/MM/YYYY")
         holder_cidades = st.empty()
         
         st.divider()
@@ -311,10 +309,8 @@ else:
                 with holder_cidades:
                     cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
 
-                # 🔥 CORREÇÃO: AGORA O PORTAL LÊ O STATUS RESOLVIDO COM INTELIGÊNCIA 🔥
                 def get_st(row):
                     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
-                    
                     if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação' 
                     if 'RECUSA' in s: return '🚫 Solicitação Recusada'   
                     if 'ENTREGUE' in s: return '✅ Entregue'
@@ -331,17 +327,12 @@ else:
                     obs_master = str(row.get('OBSERVACOES', '')).strip()
                     obs_app = str(row.get('A_OB', '')).strip()
                     contato = str(row.get('A_CONTATO', '')).strip()
-                    
                     obs_final = obs_app if (obs_app and obs_app.upper() != 'NAN') else obs_master
-                    
                     if obs_final.upper() == 'NAN': obs_final = ""
                     if contato.upper() == 'NAN': contato = ""
-                    
                     if not obs_final and not contato: return "-"
-                    
                     if obs_final and contato and obs_final.upper() != contato.upper():
                         return f"{obs_final} (Informante: {contato})"
-                    
                     return obs_final if obs_final else f"Informante: {contato}"
 
                 df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
@@ -359,6 +350,10 @@ else:
                     (df_f['DT_LIMITE_OBJ'] < hoje_br) &
                     (df_f['DT_LIMITE_OBJ'].notnull())
                 )
+                
+                # 🔥 MUDANÇA: Exibir o "Atrasado" na cara do cliente 🔥
+                df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] = df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] + ' ⚠️ ATRASADO'
+                
                 df_atrasados_only = df_f[mask_atrasado]
 
                 ck = st.columns(6)
@@ -396,6 +391,22 @@ else:
                 if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
                 if not df_grid.empty:
+                    
+                    # 🔥 MUDANÇA: ORDENAÇÃO INTELIGENTE NA GRID 🔥
+                    def definir_prioridade_portal(status_str):
+                        s = str(status_str).upper()
+                        if 'ATRASADO' in s: return 1
+                        if 'PENDENTE' in s: return 2
+                        if 'COLETADO' in s: return 3
+                        if 'ROTA' in s: return 4
+                        if 'ENTREGUE' in s: return 5
+                        return 6
+                        
+                    df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(definir_prioridade_portal)
+                    # Ordena por Prioridade -> Data mais recente -> Pedido mais recente
+                    df_grid = df_grid.sort_values(by=['PRIORIDADE', 'DATA_OBJ', 'PEDIDO'], ascending=[True, False, False]).drop(columns=['PRIORIDADE'])
+                    # -------------------------------------------------------------
+                    
                     cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'DATA_EFETIVA', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DETALHES', 'FOTO']
                     df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
                     
