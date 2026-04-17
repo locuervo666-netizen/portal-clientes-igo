@@ -999,7 +999,6 @@ elif menu == "💰 Faturamento":
     df_raw = carregar_dados_completos(planilha_db)
     if 'fatura_sucesso' not in st.session_state: st.session_state.fatura_sucesso = False
 
-    # --- FUNÇÕES INTERNAS BLINDADAS ---
     @st.cache_data(ttl=60)
     def carregar_tabela_precos(tomador):
         if planilha_financeiro is None: return pd.DataFrame()
@@ -1026,6 +1025,7 @@ elif menu == "💰 Faturamento":
             return v_base if status == "ENTREGUE" else (v_base * mult)
         return 0.0
 
+    # 🔥 PDF ATUALIZADO: AGORA COM DATA DE COLETA 🔥
     def gerar_pdf_fatura(id_fat, tomador, df_cobrados, total, obs_texto=""):
         pdf = FPDF(); pdf.add_page(); pdf.set_draw_color(15, 23, 42); pdf.set_line_width(0.3); pdf.rect(5, 5, 200, 287)
         try:
@@ -1039,17 +1039,33 @@ elif menu == "💰 Faturamento":
         pdf.set_font("Arial", "B", 10); pdf.set_text_color(2, 132, 199); pdf.cell(0, 5, f"FATURA: {id_fat} | CLIENTE: {tomador}", ln=True, align="C")
         pdf.set_font("Arial", "", 8); pdf.set_text_color(100, 116, 139); pdf.cell(0, 4, f"Emissao: {hoje_br.strftime('%d/%m/%Y')} | Volumes: {len(df_cobrados)}", ln=True, align="C")
         pdf.ln(3); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(3)
+        
         pdf.set_fill_color(15, 23, 42); pdf.set_text_color(255, 255, 255); pdf.set_font("Arial", "B", 7)
-        pdf.cell(20, 5, "PEDIDO", 1, 0, "C", True); pdf.cell(20, 5, "ENTREGA", 1, 0, "C", True); pdf.cell(75, 5, "PONTO DE COLETA", 1, 0, "C", True)
-        pdf.cell(40, 5, "CIDADE", 1, 0, "C", True); pdf.cell(20, 5, "STATUS", 1, 0, "C", True); pdf.cell(15, 5, "VALOR", 1, 1, "C", True)
+        # Cabeçalho com as novas larguras
+        pdf.cell(18, 5, "PEDIDO", 1, 0, "C", True)
+        pdf.cell(18, 5, "COLETA", 1, 0, "C", True)
+        pdf.cell(18, 5, "ENTREGA", 1, 0, "C", True)
+        pdf.cell(64, 5, "PONTO DE COLETA", 1, 0, "C", True)
+        pdf.cell(37, 5, "CIDADE", 1, 0, "C", True)
+        pdf.cell(20, 5, "STATUS", 1, 0, "C", True)
+        pdf.cell(15, 5, "VALOR", 1, 1, "C", True)
+        
         pdf.set_text_color(51, 65, 85); pdf.set_font("Arial", "", 7)
         for idx, row in df_cobrados.iterrows():
             fill = (idx % 2 == 0); pdf.set_fill_color(241, 245, 249) if fill else pdf.set_fill_color(255, 255, 255)
-            d_ent = str(row.get('DATA_ENTREGA', row.get('DATA', ''))).split(' ')[0]
+            
+            d_col = str(row.get('DATA', '')).split(' ')[0]
+            d_ent = str(row.get('DATA_ENTREGA', '')).split(' ')[0]
             val_str = f"R$ {row.get('VALOR (R$)', 0):.2f}"
-            pdf.cell(20, 5, str(row.get('PEDIDO','')), 1, 0, "C", True); pdf.cell(20, 5, d_ent, 1, 0, "C", True)
-            pdf.cell(75, 5, str(row.get('LABORATORIO',''))[:45], 1, 0, "L", True); pdf.cell(40, 5, str(row.get('CIDADE',''))[:22], 1, 0, "L", True)
-            pdf.cell(20, 5, str(row.get('STATUS','')), 1, 0, "C", True); pdf.cell(15, 5, val_str, 1, 1, "R", True)
+            
+            pdf.cell(18, 5, str(row.get('PEDIDO','')), 1, 0, "C", True)
+            pdf.cell(18, 5, d_col, 1, 0, "C", True)
+            pdf.cell(18, 5, d_ent, 1, 0, "C", True)
+            pdf.cell(64, 5, str(row.get('LABORATORIO',''))[:42], 1, 0, "L", True)
+            pdf.cell(37, 5, str(row.get('CIDADE',''))[:22], 1, 0, "L", True)
+            pdf.cell(20, 5, str(row.get('STATUS','')), 1, 0, "C", True)
+            pdf.cell(15, 5, val_str, 1, 1, "R", True)
+            
         pdf.ln(5); pdf.set_font("Arial", "B", 10); pdf.set_text_color(15, 23, 42); pdf.cell(0, 6, f"TOTAL GERAL DA FATURA: R$ {total:,.2f}", 0, 1, "R")
         if obs_texto:
             pdf.ln(5); pdf.set_font("Arial", "B", 8); pdf.set_text_color(15, 23, 42); pdf.cell(0, 5, "OBSERVACOES:", ln=True)
@@ -1060,7 +1076,7 @@ elif menu == "💰 Faturamento":
 
     with tab_faturar:
         if st.session_state.fatura_sucesso:
-            st.success(f"🎉 Faturamento {st.session_state.fatura_id} finalizado!")
+            st.success(f"🎉 Faturamento finalizado!")
             c_b1, c_b2, c_b3 = st.columns(3)
             c_b1.download_button("📥 Baixar PDF Premium", data=st.session_state.fatura_pdf, file_name=f"{st.session_state.fatura_id}.pdf", use_container_width=True, type="primary")
             c_b2.download_button("📥 Baixar Excel Financeiro", data=st.session_state.fatura_xls, file_name=f"{st.session_state.fatura_id}.xlsx", use_container_width=True)
@@ -1070,7 +1086,7 @@ elif menu == "💰 Faturamento":
             with st.container(border=True):
                 c1, c2, c3 = st.columns([1, 1, 1])
                 f_tom = c1.selectbox("🏢 Selecionar Tomador:", CLIENTES_AUTORIZADOS, key="fat_tom_sel")
-                f_per = c2.date_input("📅 Período de Entrega:", value=(hoje_br - timedelta(days=7), hoje_br), format="DD/MM/YYYY", key="fat_per_sel")
+                f_per = c2.date_input("📅 Período de Entrega:", value=(hoje_br - timedelta(days=15), hoje_br), format="DD/MM/YYYY", key="fat_per_sel")
                 df_raw['TOMADOR'] = df_raw['TOMADOR'].apply(lambda x: str(x).replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB'))
                 if 'FATURA' not in df_raw.columns: df_raw['FATURA'] = ""
                 df_fin = df_raw[(df_raw['TOMADOR'] == f_tom) & (df_raw['STATUS'].isin(['ENTREGUE', 'FRUSTRADA'])) & (df_raw['FATURA'].astype(str).str.strip() == "")].copy()
@@ -1083,15 +1099,16 @@ elif menu == "💰 Faturamento":
                     if df_p.empty: st.error(f"⚠️ Aba '{f_tom}' não encontrada no Faturamento_Log.")
                     else:
                         df_fin['VALOR (R$)'] = df_fin.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS'], df_p), axis=1)
+                        # Atualizei a GRID de visualização para você ver a COLETA e a ENTREGA antes de faturar
                         df_show = df_fin[['DATA_OBJ', 'DATA', 'DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)']].copy()
                         df_show['DATA_ENTREGA'] = df_show['DATA_ENTREGA'].apply(lambda x: str(x).split(' ')[0])
                         df_show.insert(0, "SELECIONAR", True)
-                        edit = st.data_editor(df_show, column_config={"DATA_OBJ": None}, hide_index=True, use_container_width=True, disabled=[c for c in df_show.columns if c != "SELECIONAR"])
+                        edit = st.data_editor(df_show, column_config={"DATA_OBJ": None, "DATA": "COLETA", "DATA_ENTREGA": "ENTREGA"}, hide_index=True, use_container_width=True, disabled=[c for c in df_show.columns if c != "SELECIONAR"])
                         sel_f = edit[edit["SELECIONAR"]]
                         total_f = sel_f['VALOR (R$)'].sum()
                         
                         st.markdown("---")
-                        obs_fat = st.text_area("📝 Observação Customizada (Opcional - Sai no PDF):", placeholder="Ex: Dados para depósito: Banco X, Agência Y...")
+                        obs_fat = st.text_area("📝 Observação Customizada (Opcional):", placeholder="Ex: Dados para pagamento...")
                         sc1, sc2 = st.columns(2)
                         sc1.metric("Total do Lote", f"R$ {total_f:,.2f}")
                         if sc2.button("⚙️ GERAR FATURA AGORA", type="primary", use_container_width=True):
@@ -1099,26 +1116,20 @@ elif menu == "💰 Faturamento":
                             else:
                                 with st.spinner("Carimbando e gerando arquivos..."):
                                     id_fat = f"FAT-{f_tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
-                                    d_sel = pd.to_datetime(sel_f['DATA'], format='%d/%m/%Y', errors='coerce').dropna()
-                                    periodo_f = f"{d_sel.min().strftime('%d/%m/%Y')} a {d_sel.max().strftime('%d/%m/%Y')}" if not d_sel.empty else "Data Única"
-                                    
-                                    # 1. Carimba Memória Principal
                                     aba_m = planilha_db.worksheet("Memoria_Sistema")
                                     df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
                                     df_nuvem.loc[df_nuvem['PEDIDO'].isin(sel_f['PEDIDO'].astype(str)), 'FATURA'] = id_fat
                                     aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     
-                                    # 2. Salva no Histórico (Livro Caixa)
                                     try: aba_h = planilha_financeiro.worksheet("Historico_Faturas")
                                     except: 
                                         aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 7)
                                         aba_h.update("A1", [["ID_FATURA", "DATA_EMISSAO", "TOMADOR", "TOTAL_PEDIDOS", "VALOR_TOTAL_R$", "PERIODO", "STATUS_PAGAMENTO"]])
-                                    aba_h.append_row([id_fat, hoje_br.strftime("%d/%m/%Y"), f_tom, len(sel_f), round(total_f, 2), periodo_f, "⏳ AGUARDANDO"])
+                                    aba_h.append_row([id_fat, hoje_br.strftime("%d/%m/%Y"), f_tom, len(sel_f), round(total_f, 2), "Diversos", "⏳ AGUARDANDO"])
                                     
                                     st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f, obs_fat)
                                     st.session_state.fatura_xls = gerar_excel_memoria(sel_f.drop(columns=['DATA_OBJ', 'SELECIONAR']))
                                     st.session_state.fatura_id = id_fat; st.session_state.fatura_sucesso = True; st.rerun()
-
     with tab_historico:
         st.markdown("#### 📖 Livro Caixa Eletrônico")
         try:
