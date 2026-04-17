@@ -78,7 +78,6 @@ CLIENTES_CONFIG = {
     "SYNVIA": {"senha": "123", "logo": LOGO_IGO, "filtro": "SYNVIA"},
     "LOGISTICA.BAT": {"senha": "123", "logo": "souza cruz.png", "filtro": "SOUZA CRUZ"}
 }
-}
 
 # =======================================================
 # 🔗 2. MOTOR DE DADOS
