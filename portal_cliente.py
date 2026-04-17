@@ -61,7 +61,7 @@ st.markdown("""
     div.st-key-kpi_frus button { background: linear-gradient(135deg, #9A3412 0%, #F59E0B 100%) !important; }
     div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #EF4444 100%) !important; }
     div.st-key-kpi_hoje button { background: linear-gradient(135deg, #4C1D95 0%, #8B5CF6 100%) !important; }
-    div.st-key-kpi_aguardando button { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important; } /* Laranja para o Cadeado */
+    div.st-key-kpi_aguardando button { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important; }
     
     div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p, div.st-key-kpi_aguardando button p { 
         font-weight: 800 !important; font-size: 14px !important; color: #ffffff !important; margin: 0 !important; text-align: center !important;
@@ -74,9 +74,9 @@ st.markdown("""
 CLIENTES_CONFIG = {
     "GRALAB": {"senha": "123", "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png", "filtro": "GRALAB"},
     "IGO_LOGISTICA": {"senha": "admin", "logo": LOGO_IGO, "filtro": "TODOS"},
-    "LOGISTICA.LABEST": {"senha": "123", "logo": "logo_labest.png", "filtro": "LABEST"},
+    "LOGISTICA.LABEST": {"senha": "123", "logo": "https://i.postimg.cc/k4yvNpH0/labest.png", "filtro": "LABEST"},
     "SYNVIA": {"senha": "123", "logo": LOGO_IGO, "filtro": "SYNVIA"},
-    "LOGISTICA.BAT": {"senha": "123", "logo": "souza cruz.png", "filtro": "SOUZA CRUZ"}
+    "LOGISTICA.BAT": {"senha": "123", "logo": "https://i.postimg.cc/5NBvXyv7/souza-cruz.png", "filtro": "SOUZA CRUZ"}
 }
 
 # =======================================================
@@ -109,6 +109,8 @@ def carregar_dados_nuvem():
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper() 
             df = df.loc[:, ~df.columns.duplicated()] 
+            
+            # 🔥 CORREÇÃO: ADICIONAMOS A LÓGICA INTELIGENTE DO CCO AQUI 🔥
             try:
                 aba_app = planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
@@ -121,8 +123,8 @@ def carregar_dados_nuvem():
                     if 'OBSERVACOES' in df_app.columns: cols_to_extract.append('OBSERVACOES')
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
                     if 'DATA' in df_app.columns: cols_to_extract.append('DATA')
+                    if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
                     
-                    # 🔥 NOVO: Agora o sistema procura explicitamente pela coluna 'DETALHES'
                     col_nome = None
                     for c in ['DETALHES', 'RECEBEDOR', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
                         if c in df_app.columns:
@@ -132,17 +134,66 @@ def carregar_dados_nuvem():
                             
                     df_app_clean = df_app[cols_to_extract].copy()
                     
-                    # Renomeia as colunas para o padrão do sistema
-                    rename_dict = {'STATUS': 'A_ST', 'OBSERVACOES': 'A_OB', 'FOTO': 'A_FO', 'DATA': 'A_DT'}
+                    rename_dict = {'STATUS': 'A_ST', 'OBSERVACOES': 'A_OB', 'FOTO': 'A_FO', 'DATA': 'A_DT', 'DATA_ENTREGA': 'A_DT_ENTREGA'}
                     if col_nome: rename_dict[col_nome] = 'A_CONTATO'
                     
                     df_app_clean.rename(columns=rename_dict, inplace=True)
+                    
+                    # 🔥 INTELIGÊNCIA DE ROMANEIOS NO PORTAL 🔥
+                    rom_mask = df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)
+                    rom_dict = df_app_clean[rom_mask].set_index('PEDIDO').to_dict('index')
+                    
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
+                    
+                    df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
                     
                     if 'A_FO' in df.columns:
                         df['FOTO'] = df.apply(lambda r: r['A_FO'] if str(r.get('A_FO','')).strip() and str(r.get('A_FO','')).upper() != 'NAN' else r.get('FOTO',''), axis=1)
-            except: pass
+
+                    # Simula a inteligência do get_true_status do C.C.O.
+                    def get_true_status_portal(row):
+                        s_db = str(row.get('STATUS', '')).strip().upper()
+                        s_app = str(row.get('A_ST', '')).strip().upper()
+                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        
+                        if rom_id in rom_dict:
+                            s_rom = str(rom_dict[rom_id].get('A_ST', '')).strip().upper()
+                            if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']: return s_rom
+                            
+                        if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_db
+                        if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_app
+                        if s_db in ['EM ROTA DE ENTREGA', 'CONFERIDO', 'COLETADO']: return s_db
+                        if s_app == 'COLETADO': return s_app
+                        if s_app and s_app != 'NAN': return s_app
+                        return s_db
+                    
+                    df['STATUS_RESOLVIDO'] = df.apply(get_true_status_portal, axis=1)
+                    
+                    # Resolve data de entrega para exibir no Portal
+                    def get_true_data_entrega_portal(row):
+                        s_final = str(row.get('STATUS_RESOLVIDO', '')).upper()
+                        if s_final not in ['ENTREGUE', 'FRUSTRADA']: return "-"
+                        
+                        d_db = str(row.get('DATA_ENTREGA', '')).strip()
+                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        
+                        if rom_id in rom_dict:
+                            d_rom = str(rom_dict[rom_id].get('A_DT_ENTREGA', '')).strip()
+                            if d_rom and d_rom.upper() != 'NAN': return d_rom
+                        
+                        if 'A_DT_ENTREGA' in row:
+                            d_app = str(row.get('A_DT_ENTREGA', '')).strip()
+                            if d_app and d_app.upper() != 'NAN': return d_app
+                            
+                        return d_db if d_db.upper() != 'NAN' else "-"
+                        
+                    df['DATA_EFETIVA'] = df.apply(get_true_data_entrega_portal, axis=1)
+            except Exception as e:
+                print(f"Erro AppSheet: {e}")
+                df['STATUS_RESOLVIDO'] = df['STATUS'] # Fallback
+                df['DATA_EFETIVA'] = "-"
+                
             if 'DATA' in df.columns: 
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             return df
@@ -251,7 +302,6 @@ else:
         if conf["filtro"] == "TODOS": df_cliente = df_raw.copy()
         else: df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
 
-        # 🔥 AQUI DIVIDIMOS A TELA EM DUAS ABAS 🔥
         tab_grid, tab_solicitar = st.tabs(["📊 Meus Pedidos e Monitoramento", "➕ Solicitar Nova Coleta"])
 
         with tab_grid:
@@ -261,11 +311,9 @@ else:
                 with holder_cidades:
                     cidades_sel = st.multiselect("📍 Cidades:", sorted(df_cliente['CIDADE'].dropna().unique().tolist()))
 
+                # 🔥 CORREÇÃO: AGORA O PORTAL LÊ O STATUS RESOLVIDO COM INTELIGÊNCIA 🔥
                 def get_st(row):
-                    st_master = str(row.get('STATUS', '')).strip().upper()
-                    st_app = str(row.get('A_ST', '')).strip().upper()
-                    if st_master in ['', 'NAN', 'NONE', 'PENDENTE'] and st_app not in ['', 'NAN', 'NONE']: s = st_app
-                    else: s = st_master
+                    s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
                     
                     if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação' 
                     if 'RECUSA' in s: return '🚫 Solicitação Recusada'   
@@ -279,7 +327,6 @@ else:
                     if 'PROBLEMA' in s: return '🚨 Problema'
                     return '⏳ Pendente'
                 
-                # 🔥 NOVO: Concatenação mais inteligente
                 def get_detalhes(row):
                     obs_master = str(row.get('OBSERVACOES', '')).strip()
                     obs_app = str(row.get('A_OB', '')).strip()
@@ -292,7 +339,6 @@ else:
                     
                     if not obs_final and not contato: return "-"
                     
-                    # Evita duplicar se a pessoa escreveu o mesmo texto nas duas colunas
                     if obs_final and contato and obs_final.upper() != contato.upper():
                         return f"{obs_final} (Informante: {contato})"
                     
@@ -350,17 +396,8 @@ else:
                 if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
                 if not df_grid.empty:
-                    cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'A_DT', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DETALHES', 'FOTO']
+                    cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'DATA_EFETIVA', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DETALHES', 'FOTO']
                     df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
-                    
-                    def formatar_data_entrega(row):
-                        st_atual = str(row.get('STATUS_DISPLAY', '')).upper()
-                        dt_entrega = str(row.get('A_DT', '')).strip()
-                        if 'ENTREGUE' in st_atual or 'FRUSTRADA' in st_atual:
-                            return dt_entrega if dt_entrega not in ['nan', 'None', ''] else "-"
-                        return "-"
-
-                    df_final['DATA_EFETIVA'] = df_final.apply(formatar_data_entrega, axis=1)
                     
                     def tratar_foto(x):
                         xs = str(x).strip()
