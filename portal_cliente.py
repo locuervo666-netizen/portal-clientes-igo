@@ -122,9 +122,9 @@ def carregar_dados_nuvem():
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
                     if 'DATA' in df_app.columns: cols_to_extract.append('DATA')
                     
-                    # 🔥 NOVO: Busca do Recebedor/Informante
+                    # 🔥 NOVO: Agora o sistema procura explicitamente pela coluna 'DETALHES'
                     col_nome = None
-                    for c in ['RECEBEDOR', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
+                    for c in ['DETALHES', 'RECEBEDOR', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
                         if c in df_app.columns:
                             cols_to_extract.append(c)
                             col_nome = c
@@ -279,7 +279,7 @@ else:
                     if 'PROBLEMA' in s: return '🚨 Problema'
                     return '⏳ Pendente'
                 
-                # 🔥 NOVO: Concatenação de Observação + Recebedor
+                # 🔥 NOVO: Concatenação mais inteligente
                 def get_detalhes(row):
                     obs_master = str(row.get('OBSERVACOES', '')).strip()
                     obs_app = str(row.get('A_OB', '')).strip()
@@ -292,7 +292,8 @@ else:
                     
                     if not obs_final and not contato: return "-"
                     
-                    if obs_final and contato:
+                    # Evita duplicar se a pessoa escreveu o mesmo texto nas duas colunas
+                    if obs_final and contato and obs_final.upper() != contato.upper():
                         return f"{obs_final} (Informante: {contato})"
                     
                     return obs_final if obs_final else f"Informante: {contato}"
