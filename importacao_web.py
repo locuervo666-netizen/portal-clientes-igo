@@ -999,19 +999,47 @@ elif menu == "💰 Faturamento":
     df_raw = carregar_dados_completos(planilha_db)
     if 'fatura_sucesso' not in st.session_state: st.session_state.fatura_sucesso = False
 
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=5) # Reduzi para 5 segundos para o teste ser instantâneo
     def carregar_tabela_precos(tomador):
-        if planilha_financeiro is None: return pd.DataFrame()
+        if planilha_financeiro is None: 
+            st.error("❌ Conexão com a planilha 'Faturamento_Log' não estabelecida.")
+            return pd.DataFrame()
         try:
-            aba_nome = tomador.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if tomador in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else tomador
-            aba = planilha_financeiro.worksheet(aba_nome)
-            df_p = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-            for col in ['VALOR_CHEIO', 'MULT_FRUSTRADA']:
-                if col in df_p.columns: df_p[col] = df_p[col].astype(str).str.replace(',', '.').astype(float)
-            for col in ['CIDADE', 'BAIRRO', 'ENDERECO']:
-                if col in df_p.columns: df_p[col] = df_p[col].apply(padronizar_texto)
-            return df_p
-        except: return pd.DataFrame()
+            # 1. Nome que o sistema procura (ex: LABEST)
+            buscado = tomador.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if tomador in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else tomador
+            buscado = buscado.strip().upper()
+            
+            # 2. Pega todas as abas que existem de facto no ficheiro
+            todas_abas = planilha_financeiro.worksheets()
+            # Cria um mapa: "NOME_LIMPO": Aba_Real
+            mapa_abas = {aba.title.strip().upper(): aba for aba in todas_abas}
+            
+            # 3. Tenta encontrar por nome limpo
+            if buscado in mapa_abas:
+                aba = mapa_abas[buscado]
+                dados = aba.get_all_values()
+                if len(dados) > 1:
+                    df_p = pd.DataFrame(dados[1:], columns=dados[0])
+                    for col in ['VALOR_CHEIO', 'MULT_FRUSTRADA']:
+                        if col in df_p.columns:
+                            # Limpa vírgulas e espaços nos valores de dinheiro
+                            df_p[col] = df_p[col].astype(str).str.replace(',', '.').str.replace('R$', '').str.strip()
+                            df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0.0)
+                    for col in ['CIDADE', 'BAIRRO', 'ENDERECO']:
+                        if col in df_p.columns:
+                            df_p[col] = df_p[col].apply(padronizar_texto)
+                    return df_p
+                else:
+                    st.warning(f"⚠️ A aba '{tomador}' foi encontrada, mas parece estar vazia.")
+            else:
+                # MENSAGEM DE DIAGNÓSTICO (Caso falhe de novo)
+                nomes_reais = [a.title for a in todas_abas]
+                st.error(f"🚫 Aba '{buscado}' não encontrada. Abas detetadas no ficheiro: {', '.join(nomes_reais)}")
+                
+            return pd.DataFrame()
+        except Exception as e:
+            st.error(f"❌ Erro técnico ao ler aba de preços: {e}")
+            return pd.DataFrame()
 
     def calcular_valor_fatura(cid, bai, end, status, df_p):
         if df_p.empty: return 0.0
