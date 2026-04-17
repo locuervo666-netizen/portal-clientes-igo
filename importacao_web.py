@@ -999,22 +999,15 @@ elif menu == "💰 Faturamento":
     df_raw = carregar_dados_completos(planilha_db)
     if 'fatura_sucesso' not in st.session_state: st.session_state.fatura_sucesso = False
 
-    @st.cache_data(ttl=5) # Reduzi para 5 segundos para o teste ser instantâneo
+    @st.cache_data(ttl=60)
     def carregar_tabela_precos(tomador):
-        if planilha_financeiro is None: 
-            st.error("❌ Conexão com a planilha 'Faturamento_Log' não estabelecida.")
-            return pd.DataFrame()
+        if planilha_financeiro is None: return pd.DataFrame()
         try:
-            # 1. Nome que o sistema procura (ex: LABEST)
             buscado = tomador.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if tomador in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else tomador
             buscado = buscado.strip().upper()
-            
-            # 2. Pega todas as abas que existem de facto no ficheiro
             todas_abas = planilha_financeiro.worksheets()
-            # Cria um mapa: "NOME_LIMPO": Aba_Real
             mapa_abas = {aba.title.strip().upper(): aba for aba in todas_abas}
             
-            # 3. Tenta encontrar por nome limpo
             if buscado in mapa_abas:
                 aba = mapa_abas[buscado]
                 dados = aba.get_all_values()
@@ -1022,24 +1015,13 @@ elif menu == "💰 Faturamento":
                     df_p = pd.DataFrame(dados[1:], columns=dados[0])
                     for col in ['VALOR_CHEIO', 'MULT_FRUSTRADA']:
                         if col in df_p.columns:
-                            # Limpa vírgulas e espaços nos valores de dinheiro
                             df_p[col] = df_p[col].astype(str).str.replace(',', '.').str.replace('R$', '').str.strip()
                             df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0.0)
                     for col in ['CIDADE', 'BAIRRO', 'ENDERECO']:
-                        if col in df_p.columns:
-                            df_p[col] = df_p[col].apply(padronizar_texto)
+                        if col in df_p.columns: df_p[col] = df_p[col].apply(padronizar_texto)
                     return df_p
-                else:
-                    st.warning(f"⚠️ A aba '{tomador}' foi encontrada, mas parece estar vazia.")
-            else:
-                # MENSAGEM DE DIAGNÓSTICO (Caso falhe de novo)
-                nomes_reais = [a.title for a in todas_abas]
-                st.error(f"🚫 Aba '{buscado}' não encontrada. Abas detetadas no ficheiro: {', '.join(nomes_reais)}")
-                
             return pd.DataFrame()
-        except Exception as e:
-            st.error(f"❌ Erro técnico ao ler aba de preços: {e}")
-            return pd.DataFrame()
+        except Exception: return pd.DataFrame()
 
     def calcular_valor_fatura(cid, bai, end, status, df_p):
         if df_p.empty: return 0.0
@@ -1053,7 +1035,6 @@ elif menu == "💰 Faturamento":
             return v_base if status == "ENTREGUE" else (v_base * mult)
         return 0.0
 
-    # 🔥 PDF ATUALIZADO: AGORA COM DATA DE COLETA 🔥
     def gerar_pdf_fatura(id_fat, tomador, df_cobrados, total, obs_texto=""):
         pdf = FPDF(); pdf.add_page(); pdf.set_draw_color(15, 23, 42); pdf.set_line_width(0.3); pdf.rect(5, 5, 200, 287)
         try:
@@ -1069,7 +1050,6 @@ elif menu == "💰 Faturamento":
         pdf.ln(3); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(3)
         
         pdf.set_fill_color(15, 23, 42); pdf.set_text_color(255, 255, 255); pdf.set_font("Arial", "B", 7)
-        # Cabeçalho com as novas larguras
         pdf.cell(18, 5, "PEDIDO", 1, 0, "C", True)
         pdf.cell(18, 5, "COLETA", 1, 0, "C", True)
         pdf.cell(18, 5, "ENTREGA", 1, 0, "C", True)
@@ -1081,7 +1061,6 @@ elif menu == "💰 Faturamento":
         pdf.set_text_color(51, 65, 85); pdf.set_font("Arial", "", 7)
         for idx, row in df_cobrados.iterrows():
             fill = (idx % 2 == 0); pdf.set_fill_color(241, 245, 249) if fill else pdf.set_fill_color(255, 255, 255)
-            
             d_col = str(row.get('DATA', '')).split(' ')[0]
             d_ent = str(row.get('DATA_ENTREGA', '')).split(' ')[0]
             val_str = f"R$ {row.get('VALOR (R$)', 0):.2f}"
@@ -1103,14 +1082,44 @@ elif menu == "💰 Faturamento":
             with open(tmp.name, "rb") as f: return f.read()
 
     with tab_faturar:
+        # 🔥 NOVA TELA DE SUCESSO RICA E VISUAL 🔥
         if st.session_state.fatura_sucesso:
-            st.success(f"🎉 Faturamento finalizado!")
-            c_b1, c_b2, c_b3 = st.columns(3)
-            c_b1.download_button("📥 Baixar PDF Premium", data=st.session_state.fatura_pdf, file_name=f"{st.session_state.fatura_id}.pdf", use_container_width=True, type="primary")
-            c_b2.download_button("📥 Baixar Excel Financeiro", data=st.session_state.fatura_xls, file_name=f"{st.session_state.fatura_id}.xlsx", use_container_width=True)
-            if c_b3.button("🔄 Iniciar Novo Lote", use_container_width=True):
-                st.session_state.fatura_sucesso = False; st.rerun()
+            if 'fatura_zip' in st.session_state:
+                st.markdown("### 📦 Resumo do Fechamento Global")
+                st.success(f"🎉 Fechamento de Lote finalizado com sucesso! {st.session_state.get('fatura_qtd_lotes', 0)} faturas geradas.")
+                with st.container(border=True):
+                    col_z1, col_z2 = st.columns(2)
+                    col_z1.metric("📄 Total de Faturas Geradas", st.session_state.get('fatura_qtd_lotes', 0))
+                    col_z2.metric("💰 Valor Global Projetado", f"R$ {st.session_state.get('fatura_total_lote', 0):,.2f}")
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                col_b1, col_b2 = st.columns([2, 1])
+                col_b1.download_button("📦 BAIXAR PACOTE DE FECHAMENTO (ARQUIVO .ZIP)", data=st.session_state.fatura_zip, file_name=f"Fechamento_Lote_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.zip", use_container_width=True, type="primary")
+                if col_b2.button("🔄 Iniciar Novo Lote", use_container_width=True):
+                    st.session_state.fatura_sucesso = False; st.rerun()
+
+            else:
+                st.markdown("### 🧾 Resumo do Faturamento")
+                st.success(f"🎉 Fatura gerada com sucesso e salva no Livro Caixa!")
+                
+                with st.container(border=True):
+                    st.markdown(f"<p style='color:#64748B; font-size:12px; margin-bottom:0px;'>Nº DO DOCUMENTO</p><h4 style='margin-top:0px; color:#0F172A;'>{st.session_state.get('fatura_id', 'FAT-000')}</h4>", unsafe_allow_html=True)
+                    st.divider()
+                    col_s1, col_s2, col_s3 = st.columns(3)
+                    col_s1.metric("🏢 Cliente (Tomador)", st.session_state.get('fatura_tomador', '-'))
+                    col_s2.metric("📦 Volumes Faturados", st.session_state.get('fatura_qtd', 0))
+                    col_s3.metric("💰 Total do Lote", f"R$ {st.session_state.get('fatura_total', 0):,.2f}")
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                c_b1, c_b2, c_b3 = st.columns(3)
+                c_b1.download_button("📥 Baixar Fatura (PDF)", data=st.session_state.fatura_pdf, file_name=f"{st.session_state.get('fatura_id', 'Fatura')}.pdf", use_container_width=True, type="primary")
+                c_b2.download_button("📥 Baixar Relatório (Excel)", data=st.session_state.fatura_xls, file_name=f"{st.session_state.get('fatura_id', 'Relatorio')}.xlsx", use_container_width=True)
+                if c_b3.button("🔄 Voltar / Novo Faturamento", use_container_width=True):
+                    st.session_state.fatura_sucesso = False; st.rerun()
+        
+        # TELA NORMAL DE GERAÇÃO
         else:
+            st.markdown("#### 👤 Faturamento Individual")
             with st.container(border=True):
                 c1, c2, c3 = st.columns([1, 1, 1])
                 f_tom = c1.selectbox("🏢 Selecionar Tomador:", CLIENTES_AUTORIZADOS, key="fat_tom_sel")
@@ -1124,10 +1133,9 @@ elif menu == "💰 Faturamento":
                 if df_fin.empty: st.info(f"✅ Nenhum pedido pendente para {f_tom}.")
                 else:
                     df_p = carregar_tabela_precos(f_tom)
-                    if df_p.empty: st.error(f"⚠️ Aba '{f_tom}' não encontrada no Faturamento_Log.")
+                    if df_p.empty: st.error(f"⚠️ Aba de preços '{f_tom}' vazia ou não encontrada no financeiro.")
                     else:
                         df_fin['VALOR (R$)'] = df_fin.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS'], df_p), axis=1)
-                        # Atualizei a GRID de visualização para você ver a COLETA e a ENTREGA antes de faturar
                         df_show = df_fin[['DATA_OBJ', 'DATA', 'DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)']].copy()
                         df_show['DATA_ENTREGA'] = df_show['DATA_ENTREGA'].apply(lambda x: str(x).split(' ')[0])
                         df_show.insert(0, "SELECIONAR", True)
@@ -1136,13 +1144,14 @@ elif menu == "💰 Faturamento":
                         total_f = sel_f['VALOR (R$)'].sum()
                         
                         st.markdown("---")
-                        obs_fat = st.text_area("📝 Observação Customizada (Opcional):", placeholder="Ex: Dados para pagamento...")
+                        obs_fat = st.text_area("📝 Observação Customizada (Opcional - Sai no PDF):", placeholder="Ex: Dados bancários para depósito...")
                         sc1, sc2 = st.columns(2)
-                        sc1.metric("Total do Lote", f"R$ {total_f:,.2f}")
+                        sc1.metric("Total Projetado", f"R$ {total_f:,.2f}")
+                        
                         if sc2.button("⚙️ GERAR FATURA AGORA", type="primary", use_container_width=True):
-                            if sel_f.empty: st.warning("Selecione pedidos!")
+                            if sel_f.empty: st.warning("Selecione os pedidos para faturar!")
                             else:
-                                with st.spinner("Carimbando e gerando arquivos..."):
+                                with st.spinner("Registrando fatura no Livro Caixa..."):
                                     id_fat = f"FAT-{f_tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
                                     aba_m = planilha_db.worksheet("Memoria_Sistema")
                                     df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
@@ -1153,17 +1162,101 @@ elif menu == "💰 Faturamento":
                                     except: 
                                         aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 7)
                                         aba_h.update("A1", [["ID_FATURA", "DATA_EMISSAO", "TOMADOR", "TOTAL_PEDIDOS", "VALOR_TOTAL_R$", "PERIODO", "STATUS_PAGAMENTO"]])
-                                    aba_h.append_row([id_fat, hoje_br.strftime("%d/%m/%Y"), f_tom, len(sel_f), round(total_f, 2), "Diversos", "⏳ AGUARDANDO"])
                                     
+                                    d_sel = pd.to_datetime(sel_f['DATA'], format='%d/%m/%Y', errors='coerce').dropna()
+                                    periodo_f = f"{d_sel.min().strftime('%d/%m/%Y')} a {d_sel.max().strftime('%d/%m/%Y')}" if not d_sel.empty else "Data Única"
+                                    
+                                    aba_h.append_row([id_fat, hoje_br.strftime("%d/%m/%Y"), f_tom, len(sel_f), round(total_f, 2), periodo_f, "⏳ AGUARDANDO"])
+                                    
+                                    # Armazenar dados na sessão para a tela de Sucesso
                                     st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f, obs_fat)
                                     st.session_state.fatura_xls = gerar_excel_memoria(sel_f.drop(columns=['DATA_OBJ', 'SELECIONAR']))
-                                    st.session_state.fatura_id = id_fat; st.session_state.fatura_sucesso = True; st.rerun()
+                                    st.session_state.fatura_id = id_fat
+                                    st.session_state.fatura_tomador = f_tom
+                                    st.session_state.fatura_qtd = len(sel_f)
+                                    st.session_state.fatura_total = total_f
+                                    
+                                    # Remove resquícios de ZIP se houver
+                                    if 'fatura_zip' in st.session_state: del st.session_state['fatura_zip']
+                                    
+                                    st.session_state.fatura_sucesso = True; st.rerun()
+
+            st.markdown("---")
+            st.markdown("#### 🚀 Fechamento Global (Em Lote)")
+            st.info("O sistema varre TODOS os clientes pendentes no período, gera as faturas, empacota em um arquivo ZIP e atualiza o Livro Caixa.")
+            
+            f_per_lote = st.date_input("📅 Período para o Fechamento Global:", value=(hoje_br - timedelta(days=15), hoje_br), format="DD/MM/YYYY", key="fat_per_lote")
+            
+            if st.button("⚡ EXECUTAR FECHAMENTO GLOBAL EM LOTE", type="primary", use_container_width=True):
+                with st.spinner("Processando todos os clientes e empacotando faturas..."):
+                    df_raw_lote = df_raw.copy()
+                    df_raw_lote['TOMADOR'] = df_raw_lote['TOMADOR'].apply(lambda x: str(x).replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB'))
+                    if 'FATURA' not in df_raw_lote.columns: df_raw_lote['FATURA'] = ""
+                    
+                    df_pendentes_lote = df_raw_lote[(df_raw_lote['STATUS'].isin(['ENTREGUE', 'FRUSTRADA'])) & (df_raw_lote['FATURA'].astype(str).str.strip() == "")].copy()
+                    if isinstance(f_per_lote, (tuple, list)) and len(f_per_lote) == 2:
+                        df_pendentes_lote = df_pendentes_lote[(df_pendentes_lote['DATA_OBJ'] >= f_per_lote[0]) & (df_pendentes_lote['DATA_OBJ'] <= f_per_lote[1])]
+                        
+                    if df_pendentes_lote.empty:
+                        st.warning("Nenhum pedido pendente no período selecionado.")
+                    else:
+                        import zipfile
+                        tomadores_pendentes = df_pendentes_lote['TOMADOR'].unique()
+                        zip_buffer = io.BytesIO()
+                        novos_historicos = []
+                        faturas_geradas = 0
+                        total_lote_global = 0.0
+                        
+                        aba_m = planilha_db.worksheet("Memoria_Sistema")
+                        df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                        
+                        with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                            for tom in tomadores_pendentes:
+                                df_cli = df_pendentes_lote[df_pendentes_lote['TOMADOR'] == tom].copy()
+                                df_p = carregar_tabela_precos(tom)
+                                
+                                if not df_p.empty:
+                                    df_cli['VALOR (R$)'] = df_cli.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS'], df_p), axis=1)
+                                    total_f = df_cli['VALOR (R$)'].sum()
+                                    
+                                    if total_f > 0:
+                                        id_fat = f"FAT-{tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M%S')}-{random.randint(10,99)}"
+                                        df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_cli['PEDIDO'].astype(str)), 'FATURA'] = id_fat
+                                        
+                                        pdf_b = gerar_pdf_fatura(id_fat, tom, df_cli, total_f, "Fatura gerada no Fechamento Global.")
+                                        xls_b = gerar_excel_memoria(df_cli.drop(columns=['DATA_OBJ']))
+                                        
+                                        zip_file.writestr(f"{tom}/{id_fat}.pdf", pdf_b)
+                                        zip_file.writestr(f"{tom}/{id_fat}_Relatorio.xlsx", xls_b)
+                                        
+                                        d_sel = pd.to_datetime(df_cli['DATA'], format='%d/%m/%Y', errors='coerce').dropna()
+                                        periodo_f = f"{d_sel.min().strftime('%d/%m/%Y')} a {d_sel.max().strftime('%d/%m/%Y')}" if not d_sel.empty else "Data Única"
+                                        novos_historicos.append([id_fat, hoje_br.strftime("%d/%m/%Y"), tom, len(df_cli), round(total_f, 2), periodo_f, "⏳ AGUARDANDO"])
+                                        
+                                        faturas_geradas += 1
+                                        total_lote_global += total_f
+                        
+                        if faturas_geradas > 0:
+                            aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                            try: aba_h = planilha_financeiro.worksheet("Historico_Faturas")
+                            except: 
+                                aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 7)
+                                aba_h.update("A1", [["ID_FATURA", "DATA_EMISSAO", "TOMADOR", "TOTAL_PEDIDOS", "VALOR_TOTAL_R$", "PERIODO", "STATUS_PAGAMENTO"]])
+                            aba_h.append_rows(novos_historicos, value_input_option='USER_ENTERED')
+                            
+                            st.session_state.fatura_zip = zip_buffer.getvalue()
+                            st.session_state.fatura_qtd_lotes = faturas_geradas
+                            st.session_state.fatura_total_lote = total_lote_global
+                            st.session_state.fatura_sucesso = True
+                            carregar_dados_completos.clear(); st.rerun()
+                        else: st.warning("⚠️ Nenhuma fatura gerada. Verifique as abas de preços no Financeiro.")
+
     with tab_historico:
         st.markdown("#### 📖 Livro Caixa Eletrônico")
         try:
             aba_h = planilha_financeiro.worksheet("Historico_Faturas")
             dados_h = aba_h.get_all_values()
-            if len(dados_h) <= 1: st.info("Nenhuma fatura emitida.")
+            if len(dados_h) <= 1: st.info("Nenhuma fatura emitida no Livro Caixa.")
             else:
                 df_h = pd.DataFrame(dados_h[1:], columns=dados_h[0])
                 df_h_disp = df_h.copy()
@@ -1200,16 +1293,14 @@ elif menu == "💰 Faturamento":
                         if st.button("❌ EXECUTAR ESTORNO", type="primary", use_container_width=True):
                             if senha_estorno == "123":
                                 with st.spinner("Limpando carimbos e histórico..."):
-                                    # Limpa Memoria_Sistema
                                     aba_m = planilha_db.worksheet("Memoria_Sistema")
                                     df_m_est = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
                                     df_m_est.loc[df_m_est['FATURA'] == fat_sel, 'FATURA'] = ""
                                     aba_m.clear(); aba_m.update("A1", [df_m_est.columns.tolist()] + df_m_est.fillna("").astype(str).values.tolist())
-                                    # Apaga do Histórico
                                     aba_h.delete_rows(df_h[df_h['ID_FATURA'] == fat_sel].index[0] + 2)
                                     st.success("Estorno concluído!"); time.sleep(2); carregar_dados_completos.clear(); st.rerun()
                             else: st.error("Senha incorreta!")
-        except Exception as e: st.warning(f"Histórico pronto para o próximo faturamento. (Aba sendo criada)")
+        except Exception: st.warning("Histórico pronto para o próximo faturamento. (Aba sendo criada)")
 
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
