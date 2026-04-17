@@ -674,7 +674,7 @@ if menu == "📊 GRID":
         
         col_f1, col_f2 = st.columns(2)
         f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
-        f_data = col_f2.date_input("📅 Período:", value=(hoje_br - timedelta(days=2), hoje_br), format="DD/MM/YYYY")
+        f_data = col_f2.date_input("📅 Período:", value=(hoje_br - timedelta(days=15), hoje_br), format="DD/MM/YYYY")
         
         df_f = df_raw.copy()
         if f_cli != "Todos": df_f = df_f[df_f['TOMADOR'] == f_cli]
