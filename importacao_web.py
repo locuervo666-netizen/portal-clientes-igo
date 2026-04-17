@@ -2169,7 +2169,7 @@ elif menu == "📱 WhatsApp":
                                         st.error("🚨 Falha ao conectar com o WhatsApp do motorista.")
                         else:
                             st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
-    else: st.warning("O banco de dados está vazio.")
+        else: st.warning("O banco de dados está vazio.")
 
         # ==========================================
         # ABA 2: ROMANEIOS DE ENTREGA (A NOVA INTELIGÊNCIA)
