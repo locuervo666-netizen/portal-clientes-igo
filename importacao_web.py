@@ -1936,6 +1936,7 @@ elif menu == "🔬 Triagem":
                 st.warning("O arquivo histórico de varreduras está temporariamente em branco.")
 
 # =============================================================================
+# =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP
 # =============================================================================
 elif menu == "📱 WhatsApp":
@@ -1946,17 +1947,21 @@ elif menu == "📱 WhatsApp":
         st.warning("O banco de dados está vazio.")
         st.stop()
         
-    data_filtro = st.date_input("📅 Cronograma da Data:", value=hoje_br, format="DD/MM/YYYY")
+    data_filtro = st.date_input("📅 Cronograma da Data (Filtra apenas Coletas):", value=hoje_br, format="DD/MM/YYYY")
     st.markdown("---")
     
     tab_coletas, tab_entregas = st.tabs(["🚐 1. Disparar Rotas de Coleta", "📦 2. Disparar Romaneios de Entrega"])
     
+    # O df_dia só afeta a aba de coletas agora
     df_dia = df_raw[df_raw['DATA_OBJ'] == data_filtro].copy()
     
     dict_telefones = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip() and re.sub(r'\D', '', str(r.get('TELEFONE', '')))}
     dict_nomes = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
     agentes_xls = AGENTES_XLS_AUTORIZADOS
 
+    # ==========================================
+    # ABA 1: ROTAS DE COLETA
+    # ==========================================
     with tab_coletas:
         col_esq, col_dir = st.columns([2.5, 1.2])
         df_pendentes = df_dia[df_dia['STATUS'].astype(str).str.upper() == 'PENDENTE'].copy()
@@ -1987,9 +1992,8 @@ elif menu == "📱 WhatsApp":
                                     status_text.markdown(f"**Enviando para:** {nome_amigavel}...")
                                     data_str = data_filtro.strftime('%d/%m/%Y')
                                     msg_parts = [f"Bom dia, {nome_amigavel}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
-                                    cid_counts = df_agente['CIDADE'].value_counts()
                                     tot_qtd = 0
-                                    for cid, count in cid_counts.items():
+                                    for cid, count in df_agente['CIDADE'].value_counts().items():
                                         msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}")
                                         tot_qtd += count
                                     msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
@@ -2014,9 +2018,8 @@ elif menu == "📱 WhatsApp":
                                         pedidos_atualizados.extend(df_agente['PEDIDO'].tolist())
                                 
                                 progress_bar.progress((idx_ag + 1) / len(agentes_para_enviar))
-                                time.sleep(1.5) 
                             
-                            status_text.markdown("✅ **Todos os disparos foram processados!**")
+                            status_text.markdown("✅ **Processo finalizado!**")
                             if pedidos_atualizados:
                                 try:
                                     aba = planilha_db.worksheet("Memoria_Sistema")
@@ -2110,16 +2113,17 @@ elif menu == "📱 WhatsApp":
                     st.info("Nenhum disparo registrado.")
 
     # ==========================================
-    # ABA 2: ROMANEIOS DE ENTREGA
+    # ABA 2: ROMANEIOS DE ENTREGA (A NOVA INTELIGÊNCIA)
     # ==========================================
     with tab_entregas:
         st.markdown("#### 📦 Lotes Despachados na Triagem (Entregas)")
         st.info("Aqui ficam os materiais bipados na triagem e agrupados por Romaneio. Clique em disparar para enviar o protocolo de entrega.")
         
-        df_entregas = df_dia[df_dia['STATUS'].astype(str).str.upper() == 'EM ROTA DE ENTREGA'].copy()
+        # A MÁGICA ESTÁ AQUI: Usa df_raw (banco inteiro) para achar as entregas em andamento, ignorando o filtro de data lá do topo!
+        df_entregas = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'EM ROTA DE ENTREGA'].copy()
         
         if df_entregas.empty: 
-            st.success(f"Nenhum romaneio de entrega pendente para a data {data_filtro.strftime('%d/%m/%Y')}.")
+            st.success("Nenhum romaneio de entrega pendente no momento.")
         else:
             romaneios = [r for r in df_entregas['ROMANEIO'].dropna().unique() if str(r).strip() and str(r).upper() != 'NAN']
             
@@ -2153,7 +2157,8 @@ elif menu == "📱 WhatsApp":
                                 
                                 if enviar_whatsapp_zapi(telefone, msg):
                                     time.sleep(2.0)
-                                    pdf_rom = gerar_pdf_romaneio(rom, data_filtro, agente_login, df_rom.to_dict('records'))
+                                    # Usa o 'hoje_br' pra não datar o PDF com a data errada se o usuário mudar o filtro lá em cima
+                                    pdf_rom = gerar_pdf_romaneio(rom, hoje_br, agente_login, df_rom.to_dict('records'))
                                     enviar_pdf_zapi(telefone, pdf_rom, f"Romaneio_IGO_{rom}.pdf")
                                     
                                     try:
