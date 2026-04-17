@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 import requests
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone'
 import random
 import gspread
 import uuid
@@ -656,6 +656,89 @@ st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:9
 if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
     if not df_raw.empty:
+        
+        # 🔥 CAIXA DE ENTRADA (INBOX) DO PORTAL DO CLIENTE 🔥
+        df_aprovacao = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'AGUARDANDO APROVAÇÃO'].copy()
+        if not df_aprovacao.empty:
+            st.error(f"🚨 **Atenção:** Existem {len(df_aprovacao)} solicitação(ões) de coleta do Portal do Cliente aguardando aprovação!")
+            with st.expander("🔔 INBOX: Analisar e Aprovar Coletas", expanded=True):
+                df_aprovacao_show = df_aprovacao[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'OBSERVACOES']].copy()
+                df_aprovacao_show.insert(0, "SELECIONAR", False)
+                
+                tabela_aprov = st.data_editor(
+                    df_aprovacao_show, 
+                    hide_index=True, 
+                    disabled=['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'OBSERVACOES'], 
+                    use_container_width=True, 
+                    key="grid_aprovacao_inbox"
+                )
+                
+                sel_aprov = tabela_aprov[tabela_aprov["SELECIONAR"]]
+                
+                if not sel_aprov.empty:
+                    c_mot, c_btn1, c_btn2 = st.columns([2, 1, 1])
+                    logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                    mot_aprov = c_mot.selectbox("👤 Atribuir Motorista (Agente):", ["Automático (Por Rota)"] + logins_disp)
+                    
+                    if c_btn1.button("✅ Aprovar e Roteirizar", type="primary", use_container_width=True):
+                        with st.spinner("Aprovando, destrancando cadeado e enviando para o App..."):
+                            try:
+                                aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                                
+                                pedidos_aprov = sel_aprov['PEDIDO'].astype(str).tolist()
+                                lista_para_app = []
+                                
+                                for pid in pedidos_aprov:
+                                    mask = df_nuvem['PEDIDO'] == pid
+                                    if mask.any():
+                                        l_orig = df_nuvem[mask].iloc[0].copy()
+                                        
+                                        # Inteligência de Roteirização Automática ou Manual
+                                        if mot_aprov == "Automático (Por Rota)":
+                                            mot_final = obter_login_agente(l_orig.get('CIDADE',''), l_orig.get('BAIRRO',''), l_orig.get('LABORATORIO',''), l_orig.get('ENDERECO',''), DF_AGENTES)
+                                        else:
+                                            mot_final = mot_aprov
+                                            
+                                        # Muda o status destrancando o pedido
+                                        df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
+                                        df_nuvem.loc[mask, 'AGENTE_RAW'] = mot_final
+                                        
+                                        # Prepara pacote para o AppSheet do motorista
+                                        d_app = l_orig.to_dict()
+                                        d_app['MOTORISTA'] = mot_final
+                                        lista_para_app.append(d_app)
+                                        
+                                aba_m.clear()
+                                aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                
+                                if lista_para_app:
+                                    despachar_para_appsheet(lista_para_app)
+                                    
+                                st.success("🎉 Solicitações aprovadas e injetadas na operação!")
+                                time.sleep(2)
+                                carregar_dados_completos.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao aprovar: {e}")
+                                
+                    if c_btn2.button("❌ Recusar Solicitação", use_container_width=True):
+                        with st.spinner("Recusando..."):
+                            try:
+                                aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                                pedidos_aprov = sel_aprov['PEDIDO'].astype(str).tolist()
+                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(pedidos_aprov), 'STATUS'] = "RECUSADA"
+                                aba_m.clear()
+                                aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                st.success("Solicitações recusadas e arquivadas.")
+                                time.sleep(2)
+                                carregar_dados_completos.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao recusar: {e}")
+        # 🔥 FIM DA CAIXA DE ENTRADA 🔥
+        
         def get_detalhes(row):
             obs = str(row.get('A_OB', row.get('OBSERVACOES', ''))).strip()
             if obs and obs.upper() != 'NAN': return obs
@@ -987,7 +1070,6 @@ if menu == "📊 GRID":
                                     else: st.error("🚨 Nenhum envio realizado. Verifique os contatos.")
 
             col_b7.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
-
 # =============================================================================
 # 💰 MÓDULO 2: FATURAMENTO MASTER (ERP LOGÍSTICO COMPLETO)
 # =============================================================================
