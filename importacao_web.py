@@ -690,7 +690,7 @@ if menu == "📊 GRID":
                     mot_aprov = c_mot.selectbox("👤 Atribuir Motorista (Agente):", ["Automático (Por Rota)"] + logins_disp, key="sel_mot_aprov")
                     
                     if c_btn1.button("✅ Aprovar e Roteirizar", type="primary", use_container_width=True):
-                        with st.spinner("Aprovando, destrancando cadeado e enviando notificação..."):
+                        with st.spinner("Aprovando, calculando prazos e enviando notificação..."):
                             try:
                                 aba_m = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
@@ -708,6 +708,14 @@ if menu == "📊 GRID":
                                             mot_final = obter_login_agente(l_orig.get('CIDADE',''), l_orig.get('BAIRRO',''), l_orig.get('LABORATORIO',''), l_orig.get('ENDERECO',''), DF_AGENTES)
                                         else:
                                             mot_final = mot_aprov
+
+                                        # 🔥 NOVO: INTELIGÊNCIA DE PRAZO (SLA) 🔥
+                                        prazo_calc = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')), str(l_orig.get('TOMADOR', '')))
+                                        data_limite_calc = calcular_data_limite(str(l_orig.get('DATA', hoje_br.strftime("%d/%m/%Y"))), prazo_calc)
+                                        
+                                        df_nuvem.loc[mask, 'PRAZO_DIAS'] = str(prazo_calc)
+                                        df_nuvem.loc[mask, 'DATA_LIMITE'] = str(data_limite_calc)
+                                        # ----------------------------------------
                                             
                                         # Muda o status destrancando o pedido
                                         df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
@@ -718,7 +726,7 @@ if menu == "📊 GRID":
                                         d_app['MOTORISTA'] = mot_final
                                         lista_para_app.append(d_app)
 
-                                        # --- NOTIFICAÇÃO VIA WHATSAPP (SE HOUVER MOTORISTA VINCULADO) ---
+                                        # --- NOTIFICAÇÃO VIA WHATSAPP ---
                                         if mot_final:
                                             tel_row = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == mot_final]
                                             if not tel_row.empty:
@@ -742,7 +750,7 @@ if menu == "📊 GRID":
                                 if lista_para_app:
                                     despachar_para_appsheet(lista_para_app)
                                     
-                                st.success("🎉 Solicitações aprovadas, injetadas na operação e motoristas notificados!")
+                                st.success("🎉 Solicitações aprovadas, prazos calculados e motoristas notificados!")
                                 time.sleep(2)
                                 carregar_dados_completos.clear()
                                 st.rerun()
