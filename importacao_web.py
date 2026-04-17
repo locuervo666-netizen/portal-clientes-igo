@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 import requests
 import time
-from datetime import datetime, timedelta, timezone'
+from datetime import datetime, timedelta, timezone
 import random
 import gspread
 import uuid
