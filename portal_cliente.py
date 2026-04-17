@@ -115,15 +115,31 @@ def carregar_dados_nuvem():
                 if len(dados_app) > 1:
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
                     df_app.columns = [str(c).upper().strip().replace(' ', '').replace('?', '') for c in df_app.columns]
+                    
                     cols_to_extract = ['PEDIDO']
                     if 'STATUS' in df_app.columns: cols_to_extract.append('STATUS')
                     if 'OBSERVACOES' in df_app.columns: cols_to_extract.append('OBSERVACOES')
                     if 'FOTO' in df_app.columns: cols_to_extract.append('FOTO')
                     if 'DATA' in df_app.columns: cols_to_extract.append('DATA')
+                    
+                    # 🔥 NOVO: Busca do Recebedor/Informante
+                    col_nome = None
+                    for c in ['RECEBEDOR', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
+                        if c in df_app.columns:
+                            cols_to_extract.append(c)
+                            col_nome = c
+                            break
+                            
                     df_app_clean = df_app[cols_to_extract].copy()
-                    df_app_clean.rename(columns={'STATUS': 'A_ST', 'OBSERVACOES': 'A_OB', 'FOTO': 'A_FO', 'DATA': 'A_DT'}, inplace=True)
+                    
+                    # Renomeia as colunas para o padrão do sistema
+                    rename_dict = {'STATUS': 'A_ST', 'OBSERVACOES': 'A_OB', 'FOTO': 'A_FO', 'DATA': 'A_DT'}
+                    if col_nome: rename_dict[col_nome] = 'A_CONTATO'
+                    
+                    df_app_clean.rename(columns=rename_dict, inplace=True)
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
+                    
                     if 'A_FO' in df.columns:
                         df['FOTO'] = df.apply(lambda r: r['A_FO'] if str(r.get('A_FO','')).strip() and str(r.get('A_FO','')).upper() != 'NAN' else r.get('FOTO',''), axis=1)
             except: pass
@@ -251,8 +267,8 @@ else:
                     if st_master in ['', 'NAN', 'NONE', 'PENDENTE'] and st_app not in ['', 'NAN', 'NONE']: s = st_app
                     else: s = st_master
                     
-                    if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação' # NOVO STATUS
-                    if 'RECUSA' in s: return '🚫 Solicitação Recusada'   # NOVO STATUS
+                    if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação' 
+                    if 'RECUSA' in s: return '🚫 Solicitação Recusada'   
                     if 'ENTREGUE' in s: return '✅ Entregue'
                     if 'COLETADO' in s: return '📦 Coletado'
                     if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
@@ -263,12 +279,23 @@ else:
                     if 'PROBLEMA' in s: return '🚨 Problema'
                     return '⏳ Pendente'
                 
+                # 🔥 NOVO: Concatenação de Observação + Recebedor
                 def get_detalhes(row):
                     obs_master = str(row.get('OBSERVACOES', '')).strip()
                     obs_app = str(row.get('A_OB', '')).strip()
-                    if obs_master and obs_master.upper() != 'NAN': return obs_master
-                    if obs_app and obs_app.upper() != 'NAN': return obs_app
-                    return "-"
+                    contato = str(row.get('A_CONTATO', '')).strip()
+                    
+                    obs_final = obs_app if (obs_app and obs_app.upper() != 'NAN') else obs_master
+                    
+                    if obs_final.upper() == 'NAN': obs_final = ""
+                    if contato.upper() == 'NAN': contato = ""
+                    
+                    if not obs_final and not contato: return "-"
+                    
+                    if obs_final and contato:
+                        return f"{obs_final} (Informante: {contato})"
+                    
+                    return obs_final if obs_final else f"Informante: {contato}"
 
                 df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
                 df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
@@ -287,7 +314,6 @@ else:
                 )
                 df_atrasados_only = df_f[mask_atrasado]
 
-                # 6 COLUNAS DE KPI AGORA
                 ck = st.columns(6)
                 def set_kpi(v): st.session_state.filtro_kpi = v
                 n_tot_k = len(df_f)
@@ -396,19 +422,16 @@ else:
                                 else:
                                     with st.spinner("Registrando pedido seguro e notificando o C.C.O..."):
                                         try:
-                                            # Puxa os dados completos do local escolhido
                                             local_data = df_cli_locais[df_cli_locais['LABORATORIO'] == lab_sel].iloc[0]
                                             
                                             gc = conectar_banco_seguro()
                                             planilha = gc.open("DB_IGO_Logistica")
                                             aba_m = planilha.worksheet("Memoria_Sistema")
                                             
-                                            # Pega os cabeçalhos e calcula o ID
                                             dados_m = aba_m.get_all_values()
                                             df_m_temp = pd.DataFrame(dados_m[1:], columns=dados_m[0])
                                             prox_id = obter_proximo_id(df_m_temp)
                                             
-                                            # Monta o dicionário com a nova linha
                                             nova_linha_dict = {
                                                 'DATA': data_coleta.strftime("%d/%m/%Y"),
                                                 'PEDIDO': str(prox_id),
@@ -421,16 +444,14 @@ else:
                                                 'CIDADE': local_data.get('CIDADE', ''),
                                                 'UF': local_data.get('UF', ''),
                                                 'CEP': local_data.get('CEP', ''),
-                                                'STATUS': 'AGUARDANDO APROVAÇÃO', # O Cadeado Mágico
+                                                'STATUS': 'AGUARDANDO APROVAÇÃO',
                                                 'OBSERVACOES': obs
                                             }
                                             
-                                            # Insere na ordem exata das colunas
                                             cabecalhos = dados_m[0]
                                             linha_append = [nova_linha_dict.get(c, "") for c in cabecalhos]
                                             aba_m.append_row(linha_append, value_input_option='USER_ENTERED')
                                             
-                                            # Sinal de Fumaça pro WhatsApp do CCO
                                             texto_zap = f"🔔 *NOVA SOLICITAÇÃO DE COLETA* 🔔\n\n"
                                             texto_zap += f"🏢 *Cliente:* {nome_tomador_oficial}\n"
                                             texto_zap += f"🔬 *Local:* {local_data['LABORATORIO']}\n"
