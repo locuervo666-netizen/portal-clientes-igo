@@ -690,10 +690,11 @@ if menu == "📊 GRID":
                     mot_aprov = c_mot.selectbox("👤 Atribuir Motorista (Agente):", ["Automático (Por Rota)"] + logins_disp, key="sel_mot_aprov")
                     
                     if c_btn1.button("✅ Aprovar e Roteirizar", type="primary", use_container_width=True):
-                        with st.spinner("Aprovando e destrancando cadeado..."):
+                        with st.spinner("Aprovando, destrancando cadeado e enviando notificação..."):
                             try:
                                 aba_m = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                                
                                 pedidos_aprov = sel_aprov['PEDIDO'].astype(str).tolist()
                                 lista_para_app = []
                                 
@@ -702,17 +703,38 @@ if menu == "📊 GRID":
                                     if mask.any():
                                         l_orig = df_nuvem[mask].iloc[0].copy()
                                         
+                                        # Inteligência de Roteirização Automática ou Manual
                                         if mot_aprov == "Automático (Por Rota)":
                                             mot_final = obter_login_agente(l_orig.get('CIDADE',''), l_orig.get('BAIRRO',''), l_orig.get('LABORATORIO',''), l_orig.get('ENDERECO',''), DF_AGENTES)
                                         else:
                                             mot_final = mot_aprov
                                             
+                                        # Muda o status destrancando o pedido
                                         df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
                                         df_nuvem.loc[mask, 'AGENTE_RAW'] = mot_final
                                         
+                                        # Prepara pacote para o AppSheet do motorista
                                         d_app = l_orig.to_dict()
                                         d_app['MOTORISTA'] = mot_final
                                         lista_para_app.append(d_app)
+
+                                        # --- NOTIFICAÇÃO VIA WHATSAPP (SE HOUVER MOTORISTA VINCULADO) ---
+                                        if mot_final:
+                                            tel_row = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == mot_final]
+                                            if not tel_row.empty:
+                                                tel_motorista = tel_row.iloc[0]['TELEFONE']
+                                                nome_motorista = tel_row.iloc[0]['NOME DO AGENTE']
+                                                
+                                                msg_zap = f"🚨 *NOVA COLETA APROVADA - URGENTE* 🚨\n\n"
+                                                msg_zap += f"Olá, {nome_motorista}!\nUm novo pedido acabou de ser aprovado e adicionado à sua rota.\n\n"
+                                                msg_zap += f"📦 *Pedido:* {pid}\n"
+                                                msg_zap += f"🏢 *Cliente:* {l_orig.get('TOMADOR', '')}\n"
+                                                msg_zap += f"🔬 *Laboratório:* {l_orig.get('LABORATORIO', '')}\n"
+                                                msg_zap += f"📍 *Cidade:* {l_orig.get('CIDADE', '')}\n\n"
+                                                msg_zap += "Por favor, verifique o seu aplicativo para mais detalhes."
+                                                
+                                                enviar_whatsapp_zapi(tel_motorista, msg_zap)
+                                        # ---------------------------------------------------------------
                                         
                                 aba_m.clear()
                                 aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
@@ -720,12 +742,15 @@ if menu == "📊 GRID":
                                 if lista_para_app:
                                     despachar_para_appsheet(lista_para_app)
                                     
-                                st.success("🎉 Aprovado e injetado na operação!"); time.sleep(2); carregar_dados_completos.clear(); st.rerun()
+                                st.success("🎉 Solicitações aprovadas, injetadas na operação e motoristas notificados!")
+                                time.sleep(2)
+                                carregar_dados_completos.clear()
+                                st.rerun()
                             except Exception as e:
                                 st.error(f"Erro ao aprovar: {e}")
                                 
-                    if c_btn2.button("❌ Recusar", use_container_width=True):
-                        with st.spinner("Recusando..."):
+                    if c_btn2.button("❌ Recusar Solicitação", use_container_width=True):
+                        with st.spinner("Recusando e arquivando..."):
                             try:
                                 aba_m = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
@@ -733,9 +758,12 @@ if menu == "📊 GRID":
                                 df_nuvem.loc[df_nuvem['PEDIDO'].isin(pedidos_aprov), 'STATUS'] = "RECUSADA"
                                 aba_m.clear()
                                 aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                st.success("Solicitações recusadas."); time.sleep(2); carregar_dados_completos.clear(); st.rerun()
+                                st.success("Solicitações recusadas e arquivadas. O cliente verá no portal.")
+                                time.sleep(2)
+                                carregar_dados_completos.clear()
+                                st.rerun()
                             except Exception as e:
-                                st.error(f"Erro: {e}")
+                                st.error(f"Erro ao recusar: {e}")
         # 🔥 FIM DA CAIXA DE ENTRADA 🔥
         
         def get_detalhes(row):
