@@ -649,10 +649,8 @@ with st.sidebar:
 if menu == "📊 GRID":
     st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
-# 🔥 ESCONDE O CABEÇALHO GLOBAL SE ESTIVER NO DASHBOARD (PARA CABER NA TV) 🔥
 if menu != "📈 Dashboard":
-    
-st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:24px; color:#0F172A;">Central de Controle Operacional</h2><div class='sync-status'>🟢 Online: {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:24px; color:#0F172A;">Central de Controle Operacional</h2><div class='sync-status'>🟢 Online: {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
 
 # =============================================================================
 # 📊 MÓDULO GRID
