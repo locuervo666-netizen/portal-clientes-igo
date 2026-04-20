@@ -2743,7 +2743,7 @@ elif menu == "📈 Dashboard":
         # =============================================================================
         # 🔥 CÉREBROS DE INTEGRAÇÃO EXTERNA (CLIMA & VOOS) 🔥
         # =============================================================================
-        @st.cache_data(ttl=3600) # Cache de 1h
+        @st.cache_data(ttl=3600) 
         def buscar_alertas_climaticos(cidades):
             alertas = []
             for cidade in cidades:
@@ -2755,11 +2755,14 @@ elif menu == "📈 Dashboard":
                         dados = resp.json()
                         condicao = str(dados['current_condition'][0]['weatherDesc'][0]['value']).lower()
                         if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder', 'drizzle']):
-                            alertas.append(f"⛈️ RADAR IGO: Chuva detectada na operação de {str(cidade).upper()}. Possíveis impactos logísticos!")
+                            alertas.append(f"⛈️ RADAR IGO: Chuva detectada na operação de {str(cidade).upper()}. Risco de lentidão!")
+                        else:
+                            # Adicionado temporariamente para você ver que está funcionando!
+                            alertas.append(f"☀️ RADAR IGO: Tempo estável detectado na operação de {str(cidade).upper()}.")
                 except: continue
             return alertas
 
-        @st.cache_data(ttl=900) # Reduzido para 15 min (Cache mais rápido para testes)
+        @st.cache_data(ttl=900)
         def buscar_status_voos(lista_voos):
             alertas_voos = []
             headers = {
@@ -2769,7 +2772,6 @@ elif menu == "📈 Dashboard":
             for voo in lista_voos:
                 try:
                     url = "https://flightera-flight-data.p.rapidapi.com/flight/info"
-                    # Normaliza o número do voo (sempre maiúsculo e sem espaços)
                     v_query = str(voo).upper().replace(" ", "")
                     resp = requests.get(url, headers=headers, params={"flnr": v_query}, timeout=7)
                     
@@ -2778,18 +2780,23 @@ elif menu == "📈 Dashboard":
                         if dados and isinstance(dados, list) and len(dados) > 0:
                             v = dados[0]
                             status = str(v.get('status', 'UNK')).upper()
-                            # Tenta pegar horário de partida agendado
                             partida_raw = str(v.get('scheduled_departure_time', ''))
                             partida = partida_raw[11:16] if len(partida_raw) > 16 else "---"
                             
                             if "SCHEDULED" in status:
-                                alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} CONFIRMADO para {partida}. Sem atrasos reportados.")
+                                alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} CONFIRMADO para as {partida}. Sem atrasos reportados.")
                             elif "DELAYED" in status:
                                 alertas_voos.append(f"🚨 ALERTA AÉREO: Voo {v_query} consta como ATRASADO no radar!")
                             elif "CANCELLED" in status:
                                 alertas_voos.append(f"🚫 CRÍTICO: Voo {v_query} foi CANCELADO!")
                             elif "EN ROUTE" in status or "LIVE" in status:
                                 alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} está EM VOO neste momento.")
+                            elif "ARRIVED" in status or "LANDED" in status:
+                                # Adicionado para mapear voos que já chegaram
+                                alertas_voos.append(f"✅ RADAR AÉREO: Voo {v_query} já POUSOU no destino.")
+                            else:
+                                # Caso a API devolva um status maluco, a gente exibe ele aqui
+                                alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} informa status: {status}.")
                 except: continue
             return alertas_voos
 
