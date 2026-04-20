@@ -645,9 +645,13 @@ with st.sidebar:
     st.divider()
     if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
         st.session_state.autenticado = False; st.rerun()
-# ✅ AUTO-REFRESH SÓ NA GRID! (Impede corte de disparos do WhatsApp)
+# ✅ AUTO-REFRESH SÓ NA GRID!
 if menu == "📊 GRID":
     st_autorefresh(interval=120000, limit=None, key="refresh_timer")
+
+# 🔥 ESCONDE O CABEÇALHO GLOBAL SE ESTIVER NO DASHBOARD (PARA CABER NA TV) 🔥
+if menu != "📈 Dashboard":
+    st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:24px; color:#0F172A;">Central de Controle Operacional</h2><div class='sync-status'>🟢 Online: {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
 
 st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:24px; color:#0F172A;">Central de Controle Operacional</h2><div class='sync-status'>🟢 Online: {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
 
@@ -2650,13 +2654,14 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL CCO - V3.0)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO)
 # =============================================================================
 elif menu == "📈 Dashboard":
-    # ⏱️ ATUALIZAÇÃO AUTOMÁTICA: 300.000ms = 5 Minutos
+    # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
     st_autorefresh(interval=300000, limit=None, key="refresh_dashboard")
     
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📈 Painel Executivo C.C.O</h3></div>", unsafe_allow_html=True)
+    # NOME AJUSTADO PARA GANHAR ESPAÇO
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📈 Painel de Controle</h3></div>", unsafe_allow_html=True)
     
     df_raw = carregar_dados_completos(planilha_db)
     
@@ -2695,7 +2700,7 @@ elif menu == "📈 Dashboard":
         
         v_tot_str, c_tot, s_tot = calc_variacao(vol_total_h, vol_total_o)
         
-        # --- BLOCO: COMPARATIVO POR TOMADOR (SOLICITADO) ---
+        # --- BLOCO: COMPARATIVO POR TOMADOR ---
         counts_h = df_hoje['TOMADOR'].value_counts().reset_index(name='Hoje')
         counts_o = df_ontem['TOMADOR'].value_counts().reset_index(name='Ontem')
         df_comp = pd.merge(counts_h, counts_o, on='TOMADOR', how='left').fillna(0)
@@ -2708,15 +2713,14 @@ elif menu == "📈 Dashboard":
 
         df_comp['Variação'] = df_comp.apply(format_delta, axis=1)
 
-        # 3. BARRA DE ROLAGEM ESTILO CNN (20s - RÁPIDA)
+        # 3. BARRA DE ROLAGEM ESTILO CNN (20s - RÁPIDA E LIMPA)
         manchetes = [
             f"🕒 ATUALIZAÇÃO AUTOMÁTICA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}",
-            f"📅 COMPARATIVO BASEADO NO ÚLTIMO DIA ÚTIL: {ontem_util.strftime('%d/%m/%Y')}",
+            f"📅 COMP. ÚLTIMO DIA ÚTIL: {ontem_util.strftime('%d/%m/%Y')}",
             f"📦 CARGA TOTAL: {vol_total_h} VOLUMES ({s_tot} {v_tot_str})",
             f"🚀 CLIENTE LÍDER HOJE: {df_hoje['TOMADOR'].mode()[0] if not df_hoje.empty else '---'}"
         ]
         
-        # Adiciona destaques de motoristas
         for ag in df_hoje['AGENTE_RAW'].dropna().unique():
             if not str(ag).strip(): continue
             df_ag = df_hoje[df_hoje['AGENTE_RAW'] == ag]
@@ -2728,12 +2732,10 @@ elif menu == "📈 Dashboard":
 
         st.markdown(f"""
             <style>
-            .nasdaq-container {{ background-color: #0F172A; color: #F8FAFC; padding: 12px 0; border-radius: 6px; margin-bottom: 25px; white-space: nowrap; overflow: hidden; border-left: 5px solid #10B981; position: relative; }}
+            .nasdaq-container {{ background-color: #0F172A; color: #F8FAFC; padding: 12px 0; border-radius: 6px; margin-bottom: 25px; white-space: nowrap; overflow: hidden; border-left: 5px solid #10B981; position: relative; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
             .nasdaq-scroller {{ display: inline-block; animation: scroll-left 20s linear infinite; }}
-            .nasdaq-item {{ display: inline-block; font-size: 14px; font-weight: 600; }}
+            .nasdaq-item {{ display: inline-block; font-size: 14px; font-weight: 600; font-family: 'Segoe UI', Roboto, sans-serif; letter-spacing: 0.5px; }}
             @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
-            .val-up {{ color: #10B981; font-weight: 900; }}
-            .val-down {{ color: #EF4444; font-weight: 900; }}
             </style>
             <div class="nasdaq-container">
                 <div style="position: absolute; left: 0; top: 0; bottom: 0; background: #DC2626; padding: 12px 15px; font-weight: 900; z-index: 10; display: flex; align-items: center; box-shadow: 2px 0 5px rgba(0,0,0,0.3);">PLANTÃO IGO</div>
@@ -2741,7 +2743,7 @@ elif menu == "📈 Dashboard":
             </div>
         """, unsafe_allow_html=True)
 
-        # 4. GRID DE 8 BLOCOS
+        # 4. GRID DE 8 BLOCOS (INDICADORES VISUAIS)
         st.markdown("#### 🎯 Indicadores de Performance Operacional")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("VOLUME TOTAL", vol_total_h, v_tot_str)
@@ -2758,7 +2760,7 @@ elif menu == "📈 Dashboard":
 
         st.markdown("---")
 
-        # 5. COMPARATIVO DE CLIENTES E PERFORMANCE
+        # 5. COMPARATIVO DE CLIENTES E PERFORMANCE DA FROTA
         col_rel, col_perf = st.columns([1.2, 1])
         
         with col_rel:
@@ -2780,21 +2782,33 @@ elif menu == "📈 Dashboard":
 
         with col_perf:
             st.markdown("#### 🏃‍♂️ Status da Rota por Agente")
-            # Inteligência de progresso motoristas
+            
+            # --- INTELIGÊNCIA DOS MOTORISTAS ---
+            dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
+            frota_stats = {}
+            if not df_hoje.empty:
+                for ag in df_hoje['AGENTE_RAW'].dropna().unique():
+                    if not str(ag).strip() or str(ag).upper() == 'NAN': continue
+                    nome_amigavel = dict_nomes_dash.get(str(ag).strip().lower(), str(ag).upper().split('|')[0])
+                    df_ag = df_hoje[df_hoje['AGENTE_RAW'] == ag]
+                    total_ag = len(df_ag)
+                    concluidos_ag = len(df_ag[df_ag['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema', case=False)])
+                    perc_ag = int((concluidos_ag / total_ag) * 100) if total_ag > 0 else 0
+                    frota_stats[nome_amigavel] = {"perc": perc_ag, "conc": concluidos_ag, "total": total_ag}
+            
+            # Renderiza as barras
             for nome, s in sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True):
                 bar_color = "#10B981" if s['perc'] == 100 else ("#0284C7" if s['perc'] > 50 else "#F59E0B")
                 st.markdown(f"""
-                    <div style='margin-bottom: 10px;'>
-                        <div style='display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #334155;'>
+                    <div style='margin-bottom: 12px;'>
+                        <div style='display: flex; justify-content: space-between; font-size: 13px; font-weight: bold; color: #334155; margin-bottom: 4px;'>
                             <span>{nome}</span>
-                            <span>{s['perc']}%</span>
+                            <span>{s['conc']}/{s['total']} ({s['perc']}%)</span>
                         </div>
-                        <div style='width: 100%; background-color: #E2E8F0; border-radius: 4px; height: 6px;'>
-                            <div style='width: {s['perc']}%; background-color: {bar_color}; height: 6px; border-radius: 4px;'></div>
+                        <div style='width: 100%; background-color: #E2E8F0; border-radius: 4px; height: 8px;'>
+                            <div style='width: {s['perc']}%; background-color: {bar_color}; height: 8px; border-radius: 4px; transition: width 1s ease-in-out;'></div>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
-
-        if st.button("🔄 Forçar Atualização Agora", use_container_width=True):
-            carregar_dados_completos.clear()
-            st.rerun()
+                
+        # (BOTÃO REMOVIDO PARA DEIXAR A TELA DA TV IMPECÁVEL E LIMPA)
