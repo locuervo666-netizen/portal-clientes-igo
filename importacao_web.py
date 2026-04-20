@@ -2650,7 +2650,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL CCO / ESTILO NASDAQ)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL CCO / ESTILO CNN)
 # =============================================================================
 elif menu == "📈 Dashboard":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📈 Painel Executivo C.C.O</h3></div>", unsafe_allow_html=True)
@@ -2666,11 +2666,9 @@ elif menu == "📈 Dashboard":
         hoje = hoje_br
         ontem = hoje - timedelta(days=1)
         
-        # Filtra os DataFrames
-        df_hoje = df_raw[df_raw['DATA_OBJ'] == hoje]
-        df_ontem = df_raw[df_raw['DATA_OBJ'] == ontem]
+        df_hoje = df_raw[df_raw['DATA_OBJ'] == hoje].copy()
+        df_ontem = df_raw[df_raw['DATA_OBJ'] == ontem].copy()
         
-        # Função para calcular variação percentual
         def calc_variacao(val_hoje, val_ontem):
             if val_ontem == 0:
                 return "+100%", "val-up" if val_hoje > 0 else "val-neu", "▲" if val_hoje > 0 else "-"
@@ -2679,22 +2677,68 @@ elif menu == "📈 Dashboard":
             elif var < 0: return f"{var:.1f}%", "val-down", "▼"
             return "0%", "val-neu", "-"
 
-        # 2. Cálculos dos KPIs (Hoje vs Ontem)
+        # 2. Cálculos dos KPIs Macro (Hoje vs Ontem)
         vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
-        ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue')])
-        ent_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue')])
-        pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota')])
-        pend_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Pendente|Rota')])
-        frus_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema')])
-        frus_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Frustrada|Problema')])
+        ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
+        ent_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
+        pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
+        pend_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
+        frus_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
+        frus_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
         
-        # Puxa a variação
         v_tot_str, c_tot, s_tot = calc_variacao(vol_total_h, vol_total_o)
         v_ent_str, c_ent, s_ent = calc_variacao(ent_h, ent_o)
         v_pend_str, c_pend, s_pend = calc_variacao(pend_h, pend_o)
         v_frus_str, c_frus, s_frus = calc_variacao(frus_h, frus_o)
 
-        # 3. BARRA DE ROLAGEM ESTILO NASDAQ (CSS + HTML)
+        # --- INTELIGÊNCIA DOS MOTORISTAS (PARA A BARRA CNN E O PAINEL DE PROGRESSO) ---
+        dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
+        
+        frota_stats = {}
+        if not df_hoje.empty:
+            for ag in df_hoje['AGENTE_RAW'].dropna().unique():
+                if not str(ag).strip() or str(ag).upper() == 'NAN': continue
+                
+                nome_amigavel = dict_nomes_dash.get(str(ag).strip().lower(), str(ag).upper().split('|')[0])
+                df_ag = df_hoje[df_hoje['AGENTE_RAW'] == ag]
+                
+                total_ag = len(df_ag)
+                concluidos_ag = len(df_ag[df_ag['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema', case=False)])
+                pendentes_ag = total_ag - concluidos_ag
+                perc_ag = int((concluidos_ag / total_ag) * 100) if total_ag > 0 else 0
+                
+                frota_stats[nome_amigavel] = {"total": total_ag, "conc": concluidos_ag, "pend": pendentes_ag, "perc": perc_ag}
+
+        # --- CRIANDO AS MANCHETES TIPO CNN ---
+        manchetes = [f"📅 RESUMO CORPORATIVO: {hoje.strftime('%d/%m/%Y')}"]
+        
+        # Analisa performance da frota para as notícias
+        campeoes = []
+        em_alerta = []
+        for nome, stats in frota_stats.items():
+            if stats['perc'] == 100 and stats['total'] > 0:
+                campeoes.append(f"🟢 DESTAQUE: {nome} concluiu 100% da sua rota ({stats['total']} vols)!")
+            elif stats['perc'] >= 80:
+                campeoes.append(f"⚡ {nome} na reta final: {stats['perc']}% concluído (faltam {stats['pend']}).")
+            elif stats['perc'] == 0 and stats['total'] > 0:
+                em_alerta.append(f"⏳ {nome} iniciou a rota de {stats['total']} volumes.")
+
+        manchetes.extend(campeoes)
+        manchetes.extend(em_alerta)
+
+        # Alertas de Atraso
+        atrasados_hoje = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
+        if atrasados_hoje > 0:
+            manchetes.append(f"🚨 URGENTE: {atrasados_hoje} pacote(s) com SLA estourado hoje! Necessário intervenção do CCO.")
+        
+        if frus_h > 0:
+            manchetes.append(f"⚠️ ATENÇÃO: {frus_h} ocorrência(s) de devolução/frustrada detectadas hoje.")
+
+        manchetes.append("🌐 IGO LOGÍSTICA CORPORATE")
+        
+        ticker_text = " &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
+
+        # 3. BARRA DE ROLAGEM ESTILO CNN/NASDAQ (CSS + HTML)
         html_ticker = f"""
         <style>
         .nasdaq-container {{
@@ -2705,19 +2749,22 @@ elif menu == "📈 Dashboard":
             margin-bottom: 25px;
             white-space: nowrap;
             overflow: hidden;
-            border-left: 5px solid #0284C7;
+            border-left: 5px solid #10B981;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: relative;
         }}
         .nasdaq-scroller {{
             display: inline-block;
-            animation: scroll-left 25s linear infinite;
+            animation: scroll-left 40s linear infinite;
+        }}
+        .nasdaq-scroller:hover {{
+            animation-play-state: paused;
         }}
         .nasdaq-item {{
             display: inline-block;
-            margin-right: 50px;
-            font-size: 15px;
-            font-family: 'Courier New', Courier, monospace;
-            font-weight: bold;
+            font-size: 14px;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-weight: 600;
             letter-spacing: 0.5px;
         }}
         .val-up {{ color: #10B981; font-weight: 900; }}
@@ -2731,25 +2778,21 @@ elif menu == "📈 Dashboard":
         </style>
         
         <div class="nasdaq-container">
-            <div class="nasdaq-scroller">
-                <span class="nasdaq-item">📊 DATA BASE: {hoje.strftime('%d/%m/%Y')}</span>
-                <span class="nasdaq-item">📦 VOLUME TOTAL: {vol_total_h} <span class="{c_tot}">{s_tot} {v_tot_str}</span></span>
-                <span class="nasdaq-item">✅ SUCESSO (ENTREGAS): {ent_h} <span class="{c_ent}">{s_ent} {v_ent_str}</span></span>
-                <span class="nasdaq-item">⏳ PENDÊNCIAS EM ROTA: {pend_h} <span class="{c_pend}">{s_pend} {v_pend_str}</span></span>
-                <span class="nasdaq-item">🚨 OCORRÊNCIAS / FRUSTRADAS: {frus_h} <span class="{c_frus}">{s_frus} {v_frus_str}</span></span>
-                <span class="nasdaq-item">🌐 IGO LOGÍSTICA CORPORATE</span>
+            <div style="position: absolute; left: 0; top: 0; bottom: 0; background: #DC2626; padding: 12px 15px; font-weight: 900; z-index: 10; display: flex; align-items: center; box-shadow: 2px 0 5px rgba(0,0,0,0.3);">PLANTÃO IGO</div>
+            <div class="nasdaq-scroller" style="padding-left: 140px;">
+                {ticker_text}
             </div>
         </div>
         """
         st.markdown(html_ticker, unsafe_allow_html=True)
 
-        # 4. PAINEL DE CARTÕES EXECUTIVOS
+        # 4. PAINEL DE CARTÕES EXECUTIVOS (LINHA 1)
         col_k1, col_k2, col_k3, col_k4 = st.columns(4)
         
         with col_k1:
             st.markdown(f"""
-            <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 15px; border-radius: 8px; text-align: center;">
-                <p style="margin:0; font-size:12px; font-weight:bold; color:#64748B;">MÉTRICA GLOBAL</p>
+            <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <p style="margin:0; font-size:12px; font-weight:bold; color:#64748B;">MÉTRICA GLOBAL DO DIA</p>
                 <h2 style="margin:5px 0; color:#0F172A; font-size:32px;">{vol_total_h}</h2>
                 <p style="margin:0; font-size:12px; font-weight:bold;" class="{c_tot}">{s_tot} {v_tot_str} vs Ontem</p>
             </div>
@@ -2757,8 +2800,8 @@ elif menu == "📈 Dashboard":
             
         with col_k2:
             st.markdown(f"""
-            <div style="background-color: #F0FDF4; border: 1px solid #A7F3D0; padding: 15px; border-radius: 8px; text-align: center;">
-                <p style="margin:0; font-size:12px; font-weight:bold; color:#065F46;">ENTREGAS CONFIRMADAS</p>
+            <div style="background-color: #F0FDF4; border: 1px solid #A7F3D0; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <p style="margin:0; font-size:12px; font-weight:bold; color:#065F46;">ENTREGAS E COLETAS</p>
                 <h2 style="margin:5px 0; color:#059669; font-size:32px;">{ent_h}</h2>
                 <p style="margin:0; font-size:12px; font-weight:bold;" class="{c_ent}">{s_ent} {v_ent_str} vs Ontem</p>
             </div>
@@ -2766,7 +2809,7 @@ elif menu == "📈 Dashboard":
             
         with col_k3:
             st.markdown(f"""
-            <div style="background-color: #FFFBEB; border: 1px solid #FDE68A; padding: 15px; border-radius: 8px; text-align: center;">
+            <div style="background-color: #FFFBEB; border: 1px solid #FDE68A; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                 <p style="margin:0; font-size:12px; font-weight:bold; color:#92400E;">EM ROTA / PENDENTES</p>
                 <h2 style="margin:5px 0; color:#D97706; font-size:32px;">{pend_h}</h2>
                 <p style="margin:0; font-size:12px; font-weight:bold;" class="{c_pend}">{s_pend} {v_pend_str} vs Ontem</p>
@@ -2775,8 +2818,8 @@ elif menu == "📈 Dashboard":
             
         with col_k4:
             st.markdown(f"""
-            <div style="background-color: #FEF2F2; border: 1px solid #FECACA; padding: 15px; border-radius: 8px; text-align: center;">
-                <p style="margin:0; font-size:12px; font-weight:bold; color:#991B1B;">TAXA DE FRUSTRAÇÃO</p>
+            <div style="background-color: #FEF2F2; border: 1px solid #FECACA; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <p style="margin:0; font-size:12px; font-weight:bold; color:#991B1B;">TAXA DE DEVOLUÇÃO</p>
                 <h2 style="margin:5px 0; color:#DC2626; font-size:32px;">{frus_h}</h2>
                 <p style="margin:0; font-size:12px; font-weight:bold;" class="{c_frus}">{s_frus} {v_frus_str} vs Ontem</p>
             </div>
@@ -2784,36 +2827,48 @@ elif menu == "📈 Dashboard":
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 5. GRÁFICOS E RANKINGS (Estilo Limpo)
-        col_g1, col_g2 = st.columns([2, 1.5])
+        # 5. LINHA 2: DETALHAMENTO DE PERFORMANCE DA FROTA & GRÁFICOS
+        col_g1, col_g2 = st.columns([1.5, 2])
         
         with col_g1:
-            st.markdown("#### 🏢 Demandas por Laboratório (Top 10 Hoje)")
-            if not df_hoje.empty:
-                df_labs = df_hoje['LABORATORIO'].value_counts().head(10).reset_index()
-                df_labs.columns = ['Laboratório', 'Volumes']
-                st.bar_chart(data=df_labs, x='Laboratório', y='Volumes', color="#0284C7", height=350)
+            st.markdown("#### 🏃‍♂️ Engajamento da Frota (Progresso Hoje)")
+            if frota_stats:
+                html_progress = "<div style='background-color: #FFFFFF; border: 1px solid #E2E8F0; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);'>"
+                
+                # Ordena pelos que tem mais entregas/percentual
+                frota_ordenada = dict(sorted(frota_stats.items(), key=lambda item: item[1]['perc'], reverse=True))
+                
+                for nome, s in frota_ordenada.items():
+                    bar_color = "#10B981" if s['perc'] == 100 else ("#0284C7" if s['perc'] > 50 else "#F59E0B")
+                    html_progress += f"""
+                    <div style='margin-bottom: 12px;'>
+                        <div style='display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 4px;'>
+                            <span>{nome}</span>
+                            <span>{s['conc']}/{s['total']} ({s['perc']}%)</span>
+                        </div>
+                        <div style='width: 100%; background-color: #E2E8F0; border-radius: 4px; height: 8px;'>
+                            <div style='width: {s['perc']}%; background-color: {bar_color}; height: 8px; border-radius: 4px; transition: width 1s ease-in-out;'></div>
+                        </div>
+                    </div>
+                    """
+                html_progress += "</div>"
+                st.markdown(html_progress, unsafe_allow_html=True)
             else:
-                st.info("Sem demandas registradas para hoje ainda.")
+                st.info("Aguardando roteirização e início das coletas do dia.")
                 
         with col_g2:
-            st.markdown("#### 🏃‍♂️ Engajamento da Frota (Entregas x Motorista)")
+            st.markdown("#### 🏢 Volume Demandado por Hub (Top 10)")
             if not df_hoje.empty:
-                df_entregues_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue')]
-                if not df_entregues_hj.empty:
-                    df_mot = df_entregues_hj['AGENTE_RAW'].value_counts().reset_index()
-                    df_mot.columns = ['Motorista', 'Concluídas']
-                    # Limpa o nome do agente usando o dicionário nativo
-                    dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
-                    df_mot['Motorista'] = df_mot['Motorista'].apply(lambda x: dict_nomes_dash.get(str(x).strip().lower(), str(x).upper().split('|')[0]))
-                    
-                    st.dataframe(df_mot, hide_index=True, use_container_width=True, height=350)
-                else:
-                    st.info("Nenhuma entrega finalizada hoje ainda.")
+                # Junta Tomador + Laboratório para ver quem mais pediu
+                df_labs = df_hoje['TOMADOR'].value_counts().head(10).reset_index()
+                df_labs.columns = ['Tomador/Cliente', 'Volumes']
+                
+                # Usando um gráfico mais bonito nativo do Streamlit
+                st.bar_chart(data=df_labs, x='Tomador/Cliente', y='Volumes', color="#1E293B", height=320)
             else:
-                st.info("Aguardando início das rotas.")
+                st.info("Sem demandas registradas para hoje ainda.")
         
         st.markdown("---")
-        if st.button("🔄 Atualizar Dashboard", use_container_width=True):
+        if st.button("🔄 Atualizar Dashboard Oficial", use_container_width=True, type="primary"):
             carregar_dados_completos.clear()
             st.rerun()
