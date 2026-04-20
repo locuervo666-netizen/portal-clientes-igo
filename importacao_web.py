@@ -2651,10 +2651,10 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.3 WAR ROOM BLINDADO)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.4 AERODATABOX RADAR)
 # =============================================================================
 elif menu == "📈 Dashboard":
-    # 🔥 NOVO REFRESH NATIVO E BLINDADO (SUBSTITUI O st_autorefresh) 🔥
+    # 🔥 REFRESH NATIVO E BLINDADO (SUBSTITUI O st_autorefresh) 🔥
     import streamlit.components.v1 as components
     components.html(
         """
@@ -2751,7 +2751,7 @@ elif menu == "📈 Dashboard":
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
         # =============================================================================
-        # 🔥 CÉREBROS DE INTEGRAÇÃO EXTERNA (CLIMA UF & VOOS BLINDADOS) 🔥
+        # 🔥 CÉREBROS DE INTEGRAÇÃO EXTERNA (CLIMA UF & AERODATABOX) 🔥
         # =============================================================================
         @st.cache_data(ttl=3600)
         def buscar_alertas_climaticos(cidades_com_uf):
@@ -2775,40 +2775,48 @@ elif menu == "📈 Dashboard":
             return alertas
 
         @st.cache_data(ttl=900)
-        def buscar_status_voos(lista_voos):
+        def buscar_status_voos_aerodatabox(lista_voos, data_referencia):
             alertas_voos = []
             headers = {
                 "x-rapidapi-key": "726b5b7c75msh782bc334e03fcd1p1d415cjsn84ef052a00e7",
-                "x-rapidapi-host": "flightera-flight-data.p.rapidapi.com"
+                "x-rapidapi-host": "aerodatabox.p.rapidapi.com"
             }
+            # Formata a data para a API (YYYY-MM-DD)
+            data_str = data_referencia.strftime('%Y-%m-%d')
+            
             for voo in lista_voos:
                 v_query = str(voo).upper().replace(" ", "")
                 try:
-                    url = "https://flightera-flight-data.p.rapidapi.com/flight/info"
-                    resp = requests.get(url, headers=headers, params={"flnr": v_query}, timeout=7)
+                    # Endpoint da AeroDataBox busca pelo Número do Voo + Data
+                    url = f"https://aerodatabox.p.rapidapi.com/flights/number/{v_query}/{data_str}"
+                    resp = requests.get(url, headers=headers, timeout=7)
                     
                     if resp.status_code == 200:
                         dados = resp.json()
                         if dados and isinstance(dados, list) and len(dados) > 0:
-                            v = dados[0]
+                            v = dados[0] # Pega o trecho principal
                             status = str(v.get('status', 'UNK')).upper()
-                            partida_raw = str(v.get('scheduled_departure_time', ''))
+                            
+                            # Extrai horário local de partida se existir
+                            partida_raw = v.get('departure', {}).get('scheduledTimeLocal', '')
                             partida = partida_raw[11:16] if len(partida_raw) > 16 else "---"
                             
-                            if "SCHEDULED" in status:
+                            if "EXPECTED" in status or "SCHEDULED" in status:
                                 alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} CONFIRMADO para as {partida}. Sem atrasos reportados.")
                             elif "DELAYED" in status:
                                 alertas_voos.append(f"🚨 ALERTA AÉREO: Voo {v_query} consta como ATRASADO no radar!")
-                            elif "CANCELLED" in status:
+                            elif "CANCELED" in status or "CANCELLED" in status:
                                 alertas_voos.append(f"🚫 CRÍTICO: Voo {v_query} foi CANCELADO!")
-                            elif "EN ROUTE" in status or "LIVE" in status:
+                            elif "ACTIVE" in status or "EN ROUTE" in status:
                                 alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} está EM VOO neste momento.")
                             elif "ARRIVED" in status or "LANDED" in status:
                                 alertas_voos.append(f"✅ RADAR AÉREO: Voo {v_query} já POUSOU no destino.")
                             else:
                                 alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} informa status: {status}.")
                         else:
-                            alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} não localizado na malha aérea de hoje.")
+                            alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} não localizado na malha de hoje.")
+                    elif resp.status_code == 403:
+                        alertas_voos.append(f"⚠️ RADAR AÉREO: Assinatura do AeroDataBox não ativada. Clique em 'Subscribe to Test' no site.")
                     else:
                         alertas_voos.append(f"⚠️ RADAR AÉREO: Falha de comunicação com a torre (Erro {resp.status_code} no voo {v_query}).")
                 except: 
@@ -2845,7 +2853,7 @@ elif menu == "📈 Dashboard":
         
         # INJETA AS APIs REAIS
         if cidades_alvo: manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
-        if voos_monitorados: manchetes.extend(buscar_status_voos(voos_monitorados))
+        if voos_monitorados: manchetes.extend(buscar_status_voos_aerodatabox(voos_monitorados, hoje))
         
         # Alerta Real de Feriado Nacional
         if hoje in FERIADOS_BR:
