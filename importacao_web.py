@@ -2678,7 +2678,7 @@ elif menu == "📈 Dashboard":
         
         def calc_variacao(val_hoje, val_ontem):
             if val_ontem == 0:
-                return "+100%", "▲" if val_hoje > 0 else "0%", "-"
+                return ("+100%", "▲") if val_hoje > 0 else ("0%", "-")
             var = ((val_hoje - val_ontem) / val_ontem) * 100
             if var > 0: return f"+{var:.1f}%", "▲"
             elif var < 0: return f"{var:.1f}%", "▼"
