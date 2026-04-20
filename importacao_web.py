@@ -630,7 +630,7 @@ with st.sidebar:
     st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=160)
     st.divider()
     menu = st.radio("Navegação Operacional:", [
-        "📈 Dashboard",    # <--- ADICIONE ESTA LINHA AQUI
+        "📈 Dashboard",
         "📊 GRID",
         "💰 Faturamento", 
         "📥 Importações", 
@@ -640,7 +640,7 @@ with st.sidebar:
         "⚙️ Rotas", 
         "🔬 Triagem", 
         "📱 WhatsApp"
-    ]), index=1)
+    ], index=1)
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
