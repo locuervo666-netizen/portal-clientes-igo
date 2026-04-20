@@ -2651,7 +2651,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.0 WAR ROOM + FLIGHT RADAR)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.1 CORREÇÃO RADAR AÉREO)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
@@ -2668,7 +2668,6 @@ elif menu == "📈 Dashboard":
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         hoje = hoje_br
         
-        # Cálculo do Dia Útil Anterior
         ontem_util = hoje - timedelta(days=1)
         while ontem_util.weekday() >= 5 or ontem_util in FERIADOS_BR:
             ontem_util -= timedelta(days=1)
@@ -2709,12 +2708,11 @@ elif menu == "📈 Dashboard":
         v_frus_str, s_frus = calc_variacao(frus_h, frus_o)
         v_atra_str, s_atra = calc_variacao(atra_h, atra_o)
         v_frota_str, s_frota = calc_variacao(frota_h, frota_o)
-        
         if var_taxa > 0: v_taxa_str, s_taxa = f"+{var_taxa:.1f} pp", "▲"
         elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
         else: v_taxa_str, s_taxa = "0 pp", "-"
 
-        # --- LÓGICA DE RANKING MENSAL POR TOMADOR E MÉDIA DIÁRIA ---
+        # --- LÓGICA DE RANKING MENSAL ---
         df_mes = df_raw.copy()
         df_mes['MES_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.month
         df_mes['ANO_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.year
@@ -2761,7 +2759,7 @@ elif menu == "📈 Dashboard":
                 except: continue
             return alertas
 
-        @st.cache_data(ttl=7200) # Cache de 2h para economizar chamadas gratuitas da RapidAPI
+        @st.cache_data(ttl=900) # Reduzido para 15 min (Cache mais rápido para testes)
         def buscar_status_voos(lista_voos):
             alertas_voos = []
             headers = {
@@ -2771,27 +2769,34 @@ elif menu == "📈 Dashboard":
             for voo in lista_voos:
                 try:
                     url = "https://flightera-flight-data.p.rapidapi.com/flight/info"
-                    resp = requests.get(url, headers=headers, params={"flnr": voo}, timeout=5)
+                    # Normaliza o número do voo (sempre maiúsculo e sem espaços)
+                    v_query = str(voo).upper().replace(" ", "")
+                    resp = requests.get(url, headers=headers, params={"flnr": v_query}, timeout=7)
+                    
                     if resp.status_code == 200:
                         dados = resp.json()
-                        if dados and len(dados) > 0:
+                        if dados and isinstance(dados, list) and len(dados) > 0:
                             v = dados[0]
-                            status = str(v.get('status', '')).upper()
-                            partida = str(v.get('scheduled_departure_time', ''))[11:16]
+                            status = str(v.get('status', 'UNK')).upper()
+                            # Tenta pegar horário de partida agendado
+                            partida_raw = str(v.get('scheduled_departure_time', ''))
+                            partida = partida_raw[11:16] if len(partida_raw) > 16 else "---"
                             
-                            if status == "SCHEDULED":
-                                alertas_voos.append(f"✈️ RADAR AÉREO: Voo {voo} CONFIRMADO para {partida}. Sem atrasos na rota.")
-                            elif status in ["DELAYED", "CANCELLED"]:
-                                alertas_voos.append(f"🚨 ALERTA AÉREO: Voo {voo} consta como {status}! Acionar contingência.")
-                            elif status == "EN ROUTE":
-                                alertas_voos.append(f"✈️ RADAR AÉREO: Voo {voo} está EM VOO neste momento.")
+                            if "SCHEDULED" in status:
+                                alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} CONFIRMADO para {partida}. Sem atrasos reportados.")
+                            elif "DELAYED" in status:
+                                alertas_voos.append(f"🚨 ALERTA AÉREO: Voo {v_query} consta como ATRASADO no radar!")
+                            elif "CANCELLED" in status:
+                                alertas_voos.append(f"🚫 CRÍTICO: Voo {v_query} foi CANCELADO!")
+                            elif "EN ROUTE" in status or "LIVE" in status:
+                                alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} está EM VOO neste momento.")
                 except: continue
             return alertas_voos
 
-        # Pega as 5 maiores cidades do dia para a API de clima
+        # Pega as cidades da rota hoje
         cidades_alvo = df_hoje['CIDADE'].value_counts().head(5).index.tolist() if not df_hoje.empty else []
         
-        # NÚMEROS DOS VOOS QUE VOCÊ QUER MONITORAR (Pode adicionar mais na lista)
+        # NÚMEROS DOS VOOS MONITORADOS (ATUALIZADO PARA G31240)
         voos_monitorados = ["G31240"]
 
         # 3. BARRA DE ROLAGEM ESTILO CNN (TICKER)
