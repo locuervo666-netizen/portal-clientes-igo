@@ -2651,7 +2651,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.4 AERODATABOX RADAR)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.5 RADAR LAPIDADO)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # 🔥 REFRESH NATIVO E BLINDADO (SUBSTITUI O st_autorefresh) 🔥
@@ -2781,26 +2781,24 @@ elif menu == "📈 Dashboard":
                 "x-rapidapi-key": "726b5b7c75msh782bc334e03fcd1p1d415cjsn84ef052a00e7",
                 "x-rapidapi-host": "aerodatabox.p.rapidapi.com"
             }
-            # Formata a data para a API (YYYY-MM-DD)
             data_str = data_referencia.strftime('%Y-%m-%d')
             
             for voo in lista_voos:
                 v_query = str(voo).upper().replace(" ", "")
                 try:
-                    # Endpoint da AeroDataBox busca pelo Número do Voo + Data
                     url = f"https://aerodatabox.p.rapidapi.com/flights/number/{v_query}/{data_str}"
                     resp = requests.get(url, headers=headers, timeout=7)
                     
                     if resp.status_code == 200:
                         dados = resp.json()
                         if dados and isinstance(dados, list) and len(dados) > 0:
-                            v = dados[0] # Pega o trecho principal
+                            v = dados[0] 
                             status = str(v.get('status', 'UNK')).upper()
                             
-                            # Extrai horário local de partida se existir
                             partida_raw = v.get('departure', {}).get('scheduledTimeLocal', '')
                             partida = partida_raw[11:16] if len(partida_raw) > 16 else "---"
                             
+                            # LÓGICA DE STATUS LAPIDADA
                             if "EXPECTED" in status or "SCHEDULED" in status:
                                 alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} CONFIRMADO para as {partida}. Sem atrasos reportados.")
                             elif "DELAYED" in status:
@@ -2811,8 +2809,10 @@ elif menu == "📈 Dashboard":
                                 alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} está EM VOO neste momento.")
                             elif "ARRIVED" in status or "LANDED" in status:
                                 alertas_voos.append(f"✅ RADAR AÉREO: Voo {v_query} já POUSOU no destino.")
+                            elif "UNKNOWN" in status:
+                                alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} mapeado. Aguardando sinal do transponder para atualizar.")
                             else:
-                                alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} informa status: {status}.")
+                                alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} monitorado. Status atual: {status.title()}.")
                         else:
                             alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} não localizado na malha de hoje.")
                     elif resp.status_code == 403:
