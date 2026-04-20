@@ -2651,7 +2651,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V6.2 CORPORATIVO)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V7.0 RADAR CLIMÁTICO)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
@@ -2717,7 +2717,7 @@ elif menu == "📈 Dashboard":
         elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
         else: v_taxa_str, s_taxa = "0 pp", "-"
 
-        # --- BLOCO: LÓGICA DE RANKING MENSAL POR TOMADOR E MÉDIA DIÁRIA ---
+        # --- LÓGICA DE RANKING MENSAL ---
         df_mes = df_raw.copy()
         df_mes['MES_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.month
         df_mes['ANO_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.year
@@ -2745,6 +2745,30 @@ elif menu == "📈 Dashboard":
         
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
+        # 🔥 NOVO: RADAR CLIMÁTICO (API EXTERNA COM CACHE DE 1 HORA) 🔥
+        @st.cache_data(ttl=3600)
+        def buscar_alertas_climaticos(cidades):
+            alertas = []
+            for cidade in cidades:
+                if not cidade or str(cidade).upper() == "NAN": continue
+                try:
+                    cid_fmt = urllib.parse.quote(str(cidade).strip())
+                    # Consulta a API de clima wttr.in (formato JSON)
+                    resp = requests.get(f"https://wttr.in/{cid_fmt}?format=j1", timeout=3)
+                    if resp.status_code == 200:
+                        dados = resp.json()
+                        condicao = str(dados['current_condition'][0]['weatherDesc'][0]['value']).lower()
+                        # Palavras-chave de tempo severo em inglês que a API retorna
+                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder', 'drizzle']):
+                            alertas.append(f"⛈️ RADAR IGO: Chuva detectada na área de operação de {str(cidade).upper()}. Risco de atraso!")
+                except:
+                    continue # Ignora se a API falhar para não travar o CCO
+            return alertas
+
+        # Pega as 5 cidades com mais rotas hoje para não sobrecarregar a API
+        cidades_alvo = df_hoje['CIDADE'].value_counts().head(5).index.tolist() if not df_hoje.empty else []
+        alertas_tempo = buscar_alertas_climaticos(cidades_alvo)
+
         # 3. BARRA DE ROLAGEM ESTILO CNN
         manchetes = [
             f"🕒 ATUALIZAÇÃO AUTOMÁTICA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}",
@@ -2753,10 +2777,14 @@ elif menu == "📈 Dashboard":
             f"📊 MÉDIA DIÁRIA DO MÊS: {media_diaria_global} VOLUMES/DIA"
         ]
         
+        # Injeta os alertas climáticos na barra!
+        if alertas_tempo:
+            manchetes.extend(alertas_tempo)
+        
         if len(frota_ordenada) >= 3:
-            manchetes.append(f"🏆 RANKING DO DIA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
+            manchetes.append(f"🏆 CORRIDA DA VARREDURA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
         elif len(frota_ordenada) > 0:
-            manchetes.append(f"🏆 DESTAQUE DO DIA: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}% concluído!")
+            manchetes.append(f"🏆 LÍDER DE VARREDURA: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}% concluído!")
 
         for nome, s in frota_ordenada:
             if s['perc'] == 100 and s['total'] > 0:
@@ -2767,7 +2795,7 @@ elif menu == "📈 Dashboard":
             ult_frus = frustradas_hj.iloc[-1]
             lab_f = ult_frus.get('LABORATORIO', 'Desconhecido')
             mot_f = dict_nomes_dash.get(str(ult_frus.get('AGENTE_RAW', '')).strip().lower(), str(ult_frus.get('AGENTE_RAW', '')))
-            manchetes.append(f"🛑 ÚLTIMA OCORRÊNCIA: Visita em {lab_f} reportada com problema pelo agente {mot_f}.")
+            manchetes.append(f"🛑 ÚLTIMA OCORRÊNCIA: Visita em {lab_f} frustrada/sem material pelo agente {mot_f}.")
 
         ticker_text = " &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
 
@@ -2867,7 +2895,6 @@ elif menu == "📈 Dashboard":
                         <span style="font-weight: 900; color: #0284C7; font-size: 18px;">{media_diaria_global} 📦 /dia</span>
                     </div>
                 """
-                
                 for _, row in vol_tomadores.head(8).iterrows():
                     tom = str(row['Tomador']).upper()
                     vol = row['Volume']
