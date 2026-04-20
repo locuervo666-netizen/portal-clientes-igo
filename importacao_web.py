@@ -640,7 +640,7 @@ with st.sidebar:
         "⚙️ Rotas", 
         "🔬 Triagem", 
         "📱 WhatsApp"
-    ])
+    ]), index=1)
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
@@ -2651,7 +2651,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V6.0 WAR ROOM FINAL)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V6.1 WAR ROOM FINAL)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
@@ -2717,7 +2717,7 @@ elif menu == "📈 Dashboard":
         elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
         else: v_taxa_str, s_taxa = "0 pp", "-"
 
-        # --- BLOCO: NOVA LÓGICA DE RANKING MENSAL POR TOMADOR E MÉDIA DIÁRIA ---
+        # --- BLOCO: LÓGICA DE RANKING MENSAL POR TOMADOR E MÉDIA DIÁRIA ---
         df_mes = df_raw.copy()
         df_mes['MES_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.month
         df_mes['ANO_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.year
@@ -2867,7 +2867,8 @@ elif menu == "📈 Dashboard":
                         <span style="font-weight: 900; color: #0284C7; font-size: 18px;">{media_diaria_global} 📦 /dia</span>
                     </div>
                 """
-                # Loop para gerar as barras dos maiores clientes (Top 8 para caber bonito na tela)
+                
+                # CORREÇÃO DA INDENTAÇÃO AQUI (TIRANDO OS ESPAÇOS DO F-STRING)
                 for _, row in vol_tomadores.head(8).iterrows():
                     tom = str(row['Tomador']).upper()
                     vol = row['Volume']
@@ -2875,16 +2876,16 @@ elif menu == "📈 Dashboard":
                     perc = int((vol / max_vol_tomador) * 100)
                     
                     html_ranking += f"""
-                    <div style='margin-bottom: 16px;'>
-                        <div style='display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 4px;'>
-                            <span>{tom} <span style="color:#94A3B8; font-weight:normal; font-size:11px;">(Média: {med_tom}/dia)</span></span>
-                            <span>{vol} vols</span>
-                        </div>
-                        <div style='width: 100%; background-color: #F1F5F9; border-radius: 4px; height: 10px;'>
-                            <div style='width: {perc}%; background-color: #334155; height: 10px; border-radius: 4px;'></div>
-                        </div>
-                    </div>
-                    """
+<div style='margin-bottom: 16px;'>
+    <div style='display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 4px;'>
+        <span>{tom} <span style="color:#94A3B8; font-weight:normal; font-size:11px;">(Média: {med_tom}/dia)</span></span>
+        <span>{vol} vols</span>
+    </div>
+    <div style='width: 100%; background-color: #F1F5F9; border-radius: 4px; height: 10px;'>
+        <div style='width: {perc}%; background-color: #334155; height: 10px; border-radius: 4px;'></div>
+    </div>
+</div>
+"""
                 html_ranking += "</div>"
                 st.markdown(html_ranking, unsafe_allow_html=True)
             else:
