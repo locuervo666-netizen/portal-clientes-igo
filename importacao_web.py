@@ -2651,7 +2651,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V7.0 RADAR CLIMÁTICO)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V8.1 WAR ROOM REAL)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
@@ -2668,7 +2668,6 @@ elif menu == "📈 Dashboard":
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         hoje = hoje_br
         
-        # Cálculo do Dia Útil Anterior
         ontem_util = hoje - timedelta(days=1)
         while ontem_util.weekday() >= 5 or ontem_util in FERIADOS_BR:
             ontem_util -= timedelta(days=1)
@@ -2686,13 +2685,10 @@ elif menu == "📈 Dashboard":
 
         # 2. Cálculos dos KPIs Macro
         vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
-        
         resolvidos_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
         resolvidos_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
-        
         ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
         ent_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
-        
         pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
         pend_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
         frus_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
@@ -2712,7 +2708,6 @@ elif menu == "📈 Dashboard":
         v_frus_str, s_frus = calc_variacao(frus_h, frus_o)
         v_atra_str, s_atra = calc_variacao(atra_h, atra_o)
         v_frota_str, s_frota = calc_variacao(frota_h, frota_o)
-        
         if var_taxa > 0: v_taxa_str, s_taxa = f"+{var_taxa:.1f} pp", "▲"
         elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
         else: v_taxa_str, s_taxa = "0 pp", "-"
@@ -2745,31 +2740,29 @@ elif menu == "📈 Dashboard":
         
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
-        # 🔥 NOVO: RADAR CLIMÁTICO (API EXTERNA COM CACHE DE 1 HORA) 🔥
-        @st.cache_data(ttl=3600)
+        # =============================================================================
+        # 🔥 CÉREBROS DE INTEGRAÇÃO EXTERNA (APIs 100% REAIS E GRÁTIS) 🔥
+        # =============================================================================
+        @st.cache_data(ttl=3600) # Cache de 1h
         def buscar_alertas_climaticos(cidades):
             alertas = []
             for cidade in cidades:
                 if not cidade or str(cidade).upper() == "NAN": continue
                 try:
                     cid_fmt = urllib.parse.quote(str(cidade).strip())
-                    # Consulta a API de clima wttr.in (formato JSON)
                     resp = requests.get(f"https://wttr.in/{cid_fmt}?format=j1", timeout=3)
                     if resp.status_code == 200:
                         dados = resp.json()
                         condicao = str(dados['current_condition'][0]['weatherDesc'][0]['value']).lower()
-                        # Palavras-chave de tempo severo em inglês que a API retorna
                         if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder', 'drizzle']):
-                            alertas.append(f"⛈️ RADAR IGO: Chuva detectada na área de operação de {str(cidade).upper()}. Risco de atraso!")
-                except:
-                    continue # Ignora se a API falhar para não travar o CCO
+                            alertas.append(f"⛈️ RADAR IGO: Chuva detectada na operação de {str(cidade).upper()}. Possíveis impactos logísticos!")
+                except: continue
             return alertas
 
-        # Pega as 5 cidades com mais rotas hoje para não sobrecarregar a API
+        # Pega as 5 maiores cidades do dia para a API de clima
         cidades_alvo = df_hoje['CIDADE'].value_counts().head(5).index.tolist() if not df_hoje.empty else []
-        alertas_tempo = buscar_alertas_climaticos(cidades_alvo)
 
-        # 3. BARRA DE ROLAGEM ESTILO CNN
+        # 3. BARRA DE ROLAGEM (TICKER CNN) COM TODAS AS NOTÍCIAS
         manchetes = [
             f"🕒 ATUALIZAÇÃO AUTOMÁTICA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}",
             f"📅 COMP. ÚLTIMO DIA ÚTIL: {ontem_util.strftime('%d/%m/%Y')}",
@@ -2777,14 +2770,19 @@ elif menu == "📈 Dashboard":
             f"📊 MÉDIA DIÁRIA DO MÊS: {media_diaria_global} VOLUMES/DIA"
         ]
         
-        # Injeta os alertas climáticos na barra!
-        if alertas_tempo:
-            manchetes.extend(alertas_tempo)
+        # Injeta Clima Real
+        if cidades_alvo: manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
         
+        # Alerta Real de Feriado Nacional (Sem API Externa)
+        if hoje in FERIADOS_BR:
+            nome_feriado = FERIADOS_BR.get(hoje)
+            manchetes.append(f"📅 ATENÇÃO: Hoje é feriado nacional ({nome_feriado}). Confirme o funcionamento dos PCLs!")
+
+        # PÓDIO E ALERTAS INTERNOS
         if len(frota_ordenada) >= 3:
-            manchetes.append(f"🏆 CORRIDA DA VARREDURA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
+            manchetes.append(f"🏆 RANKING DO DIA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
         elif len(frota_ordenada) > 0:
-            manchetes.append(f"🏆 LÍDER DE VARREDURA: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}% concluído!")
+            manchetes.append(f"🏆 DESTAQUE DO DIA: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}% concluído!")
 
         for nome, s in frota_ordenada:
             if s['perc'] == 100 and s['total'] > 0:
@@ -2795,14 +2793,14 @@ elif menu == "📈 Dashboard":
             ult_frus = frustradas_hj.iloc[-1]
             lab_f = ult_frus.get('LABORATORIO', 'Desconhecido')
             mot_f = dict_nomes_dash.get(str(ult_frus.get('AGENTE_RAW', '')).strip().lower(), str(ult_frus.get('AGENTE_RAW', '')))
-            manchetes.append(f"🛑 ÚLTIMA OCORRÊNCIA: Visita em {lab_f} frustrada/sem material pelo agente {mot_f}.")
+            manchetes.append(f"🛑 ÚLTIMA OCORRÊNCIA: Visita em {lab_f} reportada com problema pelo agente {mot_f}.")
 
         ticker_text = " &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
 
         st.markdown(f"""
             <style>
             .nasdaq-container {{ background-color: #0F172A; color: #F8FAFC; padding: 12px 0; border-radius: 6px; margin-bottom: 25px; white-space: nowrap; overflow: hidden; border-left: 5px solid #10B981; position: relative; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
-            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 20s linear infinite; }}
+            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 25s linear infinite; }} /* Ajustado para 25s para leitura perfeita */
             .nasdaq-item {{ display: inline-block; font-size: 14px; font-weight: 600; font-family: 'Segoe UI', Roboto, sans-serif; letter-spacing: 0.5px; }}
             @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
             </style>
