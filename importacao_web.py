@@ -2651,7 +2651,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.1 CORREÇÃO RADAR AÉREO)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.2 CLIMA UF + RADAR ROBUSTO)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
@@ -2741,24 +2741,27 @@ elif menu == "📈 Dashboard":
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
         # =============================================================================
-        # 🔥 CÉREBROS DE INTEGRAÇÃO EXTERNA (CLIMA & VOOS) 🔥
+        # 🔥 CÉREBROS DE INTEGRAÇÃO EXTERNA (CLIMA UF & VOOS BLINDADOS) 🔥
         # =============================================================================
-        @st.cache_data(ttl=3600) 
-        def buscar_alertas_climaticos(cidades):
+        @st.cache_data(ttl=3600)
+        def buscar_alertas_climaticos(cidades_com_uf):
             alertas = []
-            for cidade in cidades:
-                if not cidade or str(cidade).upper() == "NAN": continue
+            for item in cidades_com_uf:
+                if not item or str(item).upper() == "NAN": continue
                 try:
-                    cid_fmt = urllib.parse.quote(str(cidade).strip())
+                    # Tira a UF só para pesquisar na API, mas exibe completo na tela
+                    cidade_busca = str(item).split('/')[0].strip() if '/' in str(item) else str(item).strip()
+                    cid_fmt = urllib.parse.quote(cidade_busca)
+                    
                     resp = requests.get(f"https://wttr.in/{cid_fmt}?format=j1", timeout=3)
                     if resp.status_code == 200:
                         dados = resp.json()
                         condicao = str(dados['current_condition'][0]['weatherDesc'][0]['value']).lower()
+                        
                         if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder', 'drizzle']):
-                            alertas.append(f"⛈️ RADAR IGO: Chuva detectada na operação de {str(cidade).upper()}. Risco de lentidão!")
+                            alertas.append(f"⛈️ RADAR IGO: Chuva detectada na operação de {item}. Risco de lentidão!")
                         else:
-                            # Adicionado temporariamente para você ver que está funcionando!
-                            alertas.append(f"☀️ RADAR IGO: Tempo estável detectado na operação de {str(cidade).upper()}.")
+                            alertas.append(f"☀️ RADAR IGO: Tempo estável na operação de {item}.")
                 except: continue
             return alertas
 
@@ -2770,13 +2773,14 @@ elif menu == "📈 Dashboard":
                 "x-rapidapi-host": "flightera-flight-data.p.rapidapi.com"
             }
             for voo in lista_voos:
+                v_query = str(voo).upper().replace(" ", "")
                 try:
                     url = "https://flightera-flight-data.p.rapidapi.com/flight/info"
-                    v_query = str(voo).upper().replace(" ", "")
                     resp = requests.get(url, headers=headers, params={"flnr": v_query}, timeout=7)
                     
                     if resp.status_code == 200:
                         dados = resp.json()
+                        # Se a API retornou dados e achou o voo
                         if dados and isinstance(dados, list) and len(dados) > 0:
                             v = dados[0]
                             status = str(v.get('status', 'UNK')).upper()
@@ -2792,18 +2796,39 @@ elif menu == "📈 Dashboard":
                             elif "EN ROUTE" in status or "LIVE" in status:
                                 alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} está EM VOO neste momento.")
                             elif "ARRIVED" in status or "LANDED" in status:
-                                # Adicionado para mapear voos que já chegaram
                                 alertas_voos.append(f"✅ RADAR AÉREO: Voo {v_query} já POUSOU no destino.")
                             else:
-                                # Caso a API devolva um status maluco, a gente exibe ele aqui
                                 alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} informa status: {status}.")
-                except: continue
+                        else:
+                            # SE O VOO NÃO ESTIVER NA MALHA DE HOJE
+                            alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} não localizado na malha aérea de hoje.")
+                    else:
+                        # SE A API DA FLIGHTERA NEGAR A BUSCA (Limites excedidos, etc)
+                        alertas_voos.append(f"⚠️ RADAR AÉREO: Falha de comunicação com a torre (Erro {resp.status_code} no voo {v_query}).")
+                except: 
+                    alertas_voos.append(f"⚠️ RADAR AÉREO: Sem sinal GPS para o voo {v_query} no momento.")
             return alertas_voos
 
-        # Pega as cidades da rota hoje
-        cidades_alvo = df_hoje['CIDADE'].value_counts().head(5).index.tolist() if not df_hoje.empty else []
+        # --- INTELIGÊNCIA: PEGAR CIDADE E JUNTAR COM A UF DA PLANILHA ---
+        cidades_alvo = []
+        if not df_hoje.empty:
+            top_cids = df_hoje['CIDADE'].value_counts().head(5).index.tolist()
+            # Descobre se a planilha usa a coluna 'UF' ou 'ESTADO'
+            col_uf = 'UF' if 'UF' in df_hoje.columns else ('ESTADO' if 'ESTADO' in df_hoje.columns else None)
+            
+            for cid in top_cids:
+                cid_nome = str(cid).strip().title() # Ex: "Sao Paulo" em vez de "SAO PAULO"
+                if col_uf:
+                    try:
+                        # Pega a UF predominante para essa cidade
+                        uf = str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()
+                        cidades_alvo.append(f"{cid_nome}/{uf}")
+                    except:
+                        cidades_alvo.append(cid_nome)
+                else:
+                    cidades_alvo.append(cid_nome)
         
-        # NÚMEROS DOS VOOS MONITORADOS (ATUALIZADO PARA G31240)
+        # NÚMEROS DOS VOOS MONITORADOS (G31240)
         voos_monitorados = ["G31240"]
 
         # 3. BARRA DE ROLAGEM ESTILO CNN (TICKER)
@@ -2898,7 +2923,7 @@ elif menu == "📈 Dashboard":
 
         st.markdown("---")
 
-        # 6. PÓDIO DE EFICIÊNCIA E PERFORMANCE POR TOMADOR (VISUAL TV)
+        # 6. PÓDIO DE EFICIÊNCIA E PERFORMANCE POR TOMADOR
         col_rel, col_perf = st.columns([1, 1.2])
         
         with col_rel:
