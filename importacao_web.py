@@ -2651,7 +2651,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V5.0 EFICIÊNCIA DE ROTA)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V6.0 WAR ROOM FINAL)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
@@ -2687,12 +2687,9 @@ elif menu == "📈 Dashboard":
         # 2. Cálculos dos KPIs Macro
         vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
         
-        # --- A NOVA LÓGICA DE EFICIÊNCIA DE ROTA ---
-        # Tudo o que saiu da pendência (Sucessos + Ocorrências Tratadas)
         resolvidos_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
         resolvidos_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
         
-        # Apenas os Sucessos (Para quem quer ver só o que deu bom)
         ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
         ent_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
         
@@ -2705,12 +2702,10 @@ elif menu == "📈 Dashboard":
         frota_h = df_hoje['AGENTE_RAW'].replace("", pd.NA).nunique()
         frota_o = df_ontem['AGENTE_RAW'].replace("", pd.NA).nunique()
         
-        # Taxa de Varredura (Meta Global)
         taxa_sucesso_h = (resolvidos_h / vol_total_h * 100) if vol_total_h > 0 else 0
         taxa_sucesso_o = (resolvidos_o / vol_total_o * 100) if vol_total_o > 0 else 0
         var_taxa = taxa_sucesso_h - taxa_sucesso_o
         
-        # Variações
         v_tot_str, s_tot = calc_variacao(vol_total_h, vol_total_o)
         v_ent_str, s_ent = calc_variacao(ent_h, ent_o)
         v_pend_str, s_pend = calc_variacao(pend_h, pend_o)
@@ -2722,18 +2717,18 @@ elif menu == "📈 Dashboard":
         elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
         else: v_taxa_str, s_taxa = "0 pp", "-"
 
-        # --- BLOCO: COMPARATIVO POR TOMADOR ---
-        counts_h = df_hoje['TOMADOR'].value_counts().reset_index(name='Hoje')
-        counts_o = df_ontem['TOMADOR'].value_counts().reset_index(name='Ontem')
-        df_comp = pd.merge(counts_h, counts_o, on='TOMADOR', how='left').fillna(0)
+        # --- BLOCO: NOVA LÓGICA DE RANKING MENSAL POR TOMADOR E MÉDIA DIÁRIA ---
+        df_mes = df_raw.copy()
+        df_mes['MES_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.month
+        df_mes['ANO_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.year
+        df_mes_atual = df_mes[(df_mes['MES_TEMP'] == hoje.month) & (df_mes['ANO_TEMP'] == hoje.year)]
         
-        def format_delta(row):
-            h, o = row['Hoje'], row['Ontem']
-            if o == 0: return "🆕 Novo"
-            diff = ((h - o) / o) * 100
-            return f"▲ {diff:.1f}%" if diff > 0 else (f"▼ {abs(diff):.1f}%" if diff < 0 else "-")
-
-        df_comp['Variação'] = df_comp.apply(format_delta, axis=1)
+        dias_ativos = df_mes_atual['DATA_OBJ'].nunique()
+        media_diaria_global = int(len(df_mes_atual) / dias_ativos) if dias_ativos > 0 else 0
+        
+        vol_tomadores = df_mes_atual['TOMADOR'].value_counts().reset_index()
+        vol_tomadores.columns = ['Tomador', 'Volume']
+        max_vol_tomador = vol_tomadores['Volume'].max() if not vol_tomadores.empty else 1
 
         # --- INTELIGÊNCIA DOS MOTORISTAS E PÓDIO ---
         dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
@@ -2744,33 +2739,29 @@ elif menu == "📈 Dashboard":
                 nome_amigavel = dict_nomes_dash.get(str(ag).strip().lower(), str(ag).upper().split('|')[0])
                 df_ag = df_hoje[df_hoje['AGENTE_RAW'] == ag]
                 total_ag = len(df_ag)
-                # O motorista pontua ao finalizar a visita, seja sucesso ou problema
                 concluidos_ag = len(df_ag[df_ag['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
                 perc_ag = int((concluidos_ag / total_ag) * 100) if total_ag > 0 else 0
                 frota_stats[nome_amigavel] = {"perc": perc_ag, "conc": concluidos_ag, "total": total_ag}
         
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
-        # 3. BARRA DE ROLAGEM ESTILO CNN (20s) COM NOVAS INTELIGÊNCIAS
+        # 3. BARRA DE ROLAGEM ESTILO CNN
         manchetes = [
             f"🕒 ATUALIZAÇÃO AUTOMÁTICA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}",
             f"📅 COMP. ÚLTIMO DIA ÚTIL: {ontem_util.strftime('%d/%m/%Y')}",
-            f"📦 CARGA TOTAL ROTEIRIZADA: {vol_total_h} VOLUMES ({s_tot} {v_tot_str})",
-            f"🚀 CLIENTE LÍDER HOJE: {df_hoje['TOMADOR'].mode()[0] if not df_hoje.empty else '---'}"
+            f"📦 CARGA TOTAL ROTEIRIZADA HOJE: {vol_total_h} VOLUMES ({s_tot} {v_tot_str})",
+            f"📊 MÉDIA DIÁRIA DO MÊS: {media_diaria_global} VOLUMES/DIA"
         ]
         
-        # Adiciona Pódio à CNN
         if len(frota_ordenada) >= 3:
             manchetes.append(f"🏆 CORRIDA DA VARREDURA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
         elif len(frota_ordenada) > 0:
             manchetes.append(f"🏆 LÍDER DE VARREDURA: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}% concluído!")
 
-        # Adiciona 100% e Alertas
         for nome, s in frota_ordenada:
             if s['perc'] == 100 and s['total'] > 0:
                 manchetes.append(f"🟢 MISSÃO CUMPRIDA: Motorista {nome} finalizou 100% da sua rota!")
 
-        # Última Ocorrência / Frustrada
         frustradas_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)]
         if not frustradas_hj.empty:
             ult_frus = frustradas_hj.iloc[-1]
@@ -2793,7 +2784,7 @@ elif menu == "📈 Dashboard":
             </div>
         """, unsafe_allow_html=True)
 
-        # 4. A GRANDE META DO DIA (BARRA DE PROGRESSO DE VARREDURA)
+        # 4. A GRANDE META DO DIA
         progresso_meta = int((resolvidos_h / vol_total_h) * 100) if vol_total_h > 0 else 0
         cor_meta = "#10B981" if progresso_meta >= 80 else ("#F59E0B" if progresso_meta >= 40 else "#EF4444")
         
@@ -2801,7 +2792,7 @@ elif menu == "📈 Dashboard":
         <div style="background-color: #1E293B; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 20px; border: 1px solid #334155;">
             <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
                 <div>
-                    <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin: 0; letter-spacing: 1px;">🎯 META GLOBAL DE VARREDURA (VISITAS REALIZADAS)</p>
+                    <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin: 0; letter-spacing: 1px;">🎯 META GLOBAL DE VARREDURA (VISITAS REALIZADAS HOJE)</p>
                     <h3 style="color: #F8FAFC; font-size: 26px; margin: 5px 0 0 0;">{resolvidos_h} de {vol_total_h} Visitas Concluídas</h3>
                 </div>
                 <h2 style="color: {cor_meta}; font-size: 42px; margin: 0; font-weight: 900; line-height: 1;">{progresso_meta}%</h2>
@@ -2813,7 +2804,7 @@ elif menu == "📈 Dashboard":
         """
         st.markdown(meta_html, unsafe_allow_html=True)
 
-        # 5. GRID DE 8 BLOCOS (CORES DA ABA GRID)
+        # 5. GRID DE 8 BLOCOS
         def make_card(title, value, var_str, color1, color2):
             return f"""
             <div style="background: linear-gradient(135deg, {color1} 0%, {color2} 100%); padding: 15px; border-radius: 8px; text-align: center; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 110px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;">
@@ -2837,13 +2828,11 @@ elif menu == "📈 Dashboard":
 
         st.markdown("---")
 
-        # 6. PÓDIO DE EFICIÊNCIA E PERFORMANCE POR TOMADOR
-        col_rel, col_perf = st.columns([1.2, 1])
+        # 6. PÓDIO DE EFICIÊNCIA E PERFORMANCE POR TOMADOR (VISUAL TV)
+        col_rel, col_perf = st.columns([1, 1.2])
         
         with col_rel:
             st.markdown("#### 🏆 Pódio e Status da Frota")
-            
-            # Renderiza o Pódio (Top 3)
             if len(frota_ordenada) >= 3:
                 html_podio = f"""
                 <div style='display: flex; justify-content: space-around; background: #F8FAFC; padding: 15px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 20px; text-align: center;'>
@@ -2854,7 +2843,6 @@ elif menu == "📈 Dashboard":
                 """
                 st.markdown(html_podio, unsafe_allow_html=True)
             
-            # Renderiza as barras dos motoristas
             for nome, s in frota_ordenada:
                 bar_color = "#10B981" if s['perc'] == 100 else ("#0284C7" if s['perc'] > 50 else "#F59E0B")
                 st.markdown(f"""
@@ -2870,19 +2858,34 @@ elif menu == "📈 Dashboard":
                 """, unsafe_allow_html=True)
 
         with col_perf:
-            st.markdown("#### 🏢 Injeção de Carga por Tomador (Hoje vs Ontem)")
-            if not df_comp.empty:
-                st.dataframe(
-                    df_comp.sort_values(by='Hoje', ascending=False),
-                    column_config={
-                        "TOMADOR": "Cliente",
-                        "Hoje": st.column_config.NumberColumn("Qtd Hoje", format="%d 📦"),
-                        "Ontem": st.column_config.NumberColumn("Qtd Ontem", format="%d 📦"),
-                        "Variação": "Trend"
-                    },
-                    hide_index=True,
-                    use_container_width=True,
-                    height=400
-                )
+            st.markdown("#### 🏢 Ranking de Injeção de Carga do Mês")
+            if not vol_tomadores.empty:
+                html_ranking = f"""
+                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 15px; border-bottom: 1px solid #E2E8F0; padding-bottom: 10px;">
+                        <span style="font-weight: 800; color: #475569; font-size: 13px; letter-spacing: 0.5px;">MÉDIA DIÁRIA GERAL:</span>
+                        <span style="font-weight: 900; color: #0284C7; font-size: 18px;">{media_diaria_global} 📦 /dia</span>
+                    </div>
+                """
+                # Loop para gerar as barras dos maiores clientes (Top 8 para caber bonito na tela)
+                for _, row in vol_tomadores.head(8).iterrows():
+                    tom = str(row['Tomador']).upper()
+                    vol = row['Volume']
+                    med_tom = int(vol / dias_ativos) if dias_ativos > 0 else 0
+                    perc = int((vol / max_vol_tomador) * 100)
+                    
+                    html_ranking += f"""
+                    <div style='margin-bottom: 16px;'>
+                        <div style='display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 4px;'>
+                            <span>{tom} <span style="color:#94A3B8; font-weight:normal; font-size:11px;">(Média: {med_tom}/dia)</span></span>
+                            <span>{vol} vols</span>
+                        </div>
+                        <div style='width: 100%; background-color: #F1F5F9; border-radius: 4px; height: 10px;'>
+                            <div style='width: {perc}%; background-color: #334155; height: 10px; border-radius: 4px;'></div>
+                        </div>
+                    </div>
+                    """
+                html_ranking += "</div>"
+                st.markdown(html_ranking, unsafe_allow_html=True)
             else:
-                st.info("Aguardando dados de roteirização.")
+                st.info("Aguardando dados do mês atual.")
