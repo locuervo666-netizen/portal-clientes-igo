@@ -2651,7 +2651,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V6.1 WAR ROOM FINAL)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V6.2 CORPORATIVO)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
@@ -2754,9 +2754,9 @@ elif menu == "📈 Dashboard":
         ]
         
         if len(frota_ordenada) >= 3:
-            manchetes.append(f"🏆 CORRIDA DA VARREDURA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
+            manchetes.append(f"🏆 RANKING DO DIA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
         elif len(frota_ordenada) > 0:
-            manchetes.append(f"🏆 LÍDER DE VARREDURA: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}% concluído!")
+            manchetes.append(f"🏆 DESTAQUE DO DIA: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}% concluído!")
 
         for nome, s in frota_ordenada:
             if s['perc'] == 100 and s['total'] > 0:
@@ -2767,7 +2767,7 @@ elif menu == "📈 Dashboard":
             ult_frus = frustradas_hj.iloc[-1]
             lab_f = ult_frus.get('LABORATORIO', 'Desconhecido')
             mot_f = dict_nomes_dash.get(str(ult_frus.get('AGENTE_RAW', '')).strip().lower(), str(ult_frus.get('AGENTE_RAW', '')))
-            manchetes.append(f"🛑 ÚLTIMA OCORRÊNCIA: Visita em {lab_f} frustrada/sem material pelo agente {mot_f}.")
+            manchetes.append(f"🛑 ÚLTIMA OCORRÊNCIA: Visita em {lab_f} reportada com problema pelo agente {mot_f}.")
 
         ticker_text = " &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
 
@@ -2792,7 +2792,7 @@ elif menu == "📈 Dashboard":
         <div style="background-color: #1E293B; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 20px; border: 1px solid #334155;">
             <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
                 <div>
-                    <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin: 0; letter-spacing: 1px;">🎯 META GLOBAL DE VARREDURA (VISITAS REALIZADAS HOJE)</p>
+                    <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin: 0; letter-spacing: 1px;">🎯 META DO DIA (VISITAS REALIZADAS HOJE)</p>
                     <h3 style="color: #F8FAFC; font-size: 26px; margin: 5px 0 0 0;">{resolvidos_h} de {vol_total_h} Visitas Concluídas</h3>
                 </div>
                 <h2 style="color: {cor_meta}; font-size: 42px; margin: 0; font-weight: 900; line-height: 1;">{progresso_meta}%</h2>
@@ -2868,7 +2868,6 @@ elif menu == "📈 Dashboard":
                     </div>
                 """
                 
-                # CORREÇÃO DA INDENTAÇÃO AQUI (TIRANDO OS ESPAÇOS DO F-STRING)
                 for _, row in vol_tomadores.head(8).iterrows():
                     tom = str(row['Tomador']).upper()
                     vol = row['Volume']
