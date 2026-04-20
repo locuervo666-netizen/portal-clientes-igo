@@ -630,6 +630,7 @@ with st.sidebar:
     st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=160)
     st.divider()
     menu = st.radio("Navegação Operacional:", [
+        "📈 Dashboard",    # <--- ADICIONE ESTA LINHA AQUI
         "📊 GRID",
         "💰 Faturamento", 
         "📥 Importações", 
@@ -2647,3 +2648,172 @@ elif menu == "⚙️ Rotas":
                         except Exception as e: st.error(f"Erro Crítico ao limpar o banco: {e}")
                 else:
                     if senha_reset: st.error("❌ Senha incorreta.")
+
+# =============================================================================
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL CCO / ESTILO NASDAQ)
+# =============================================================================
+elif menu == "📈 Dashboard":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📈 Painel Executivo C.C.O</h3></div>", unsafe_allow_html=True)
+    
+    df_raw = carregar_dados_completos(planilha_db)
+    
+    if df_raw.empty:
+        st.warning("⚠️ O banco de dados está vazio. Sem dados para o painel.")
+    else:
+        # 1. Preparação de Dados e Períodos
+        df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
+        
+        hoje = hoje_br
+        ontem = hoje - timedelta(days=1)
+        
+        # Filtra os DataFrames
+        df_hoje = df_raw[df_raw['DATA_OBJ'] == hoje]
+        df_ontem = df_raw[df_raw['DATA_OBJ'] == ontem]
+        
+        # Função para calcular variação percentual
+        def calc_variacao(val_hoje, val_ontem):
+            if val_ontem == 0:
+                return "+100%", "val-up" if val_hoje > 0 else "val-neu", "▲" if val_hoje > 0 else "-"
+            var = ((val_hoje - val_ontem) / val_ontem) * 100
+            if var > 0: return f"+{var:.1f}%", "val-up", "▲"
+            elif var < 0: return f"{var:.1f}%", "val-down", "▼"
+            return "0%", "val-neu", "-"
+
+        # 2. Cálculos dos KPIs (Hoje vs Ontem)
+        vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
+        ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue')])
+        ent_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue')])
+        pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota')])
+        pend_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Pendente|Rota')])
+        frus_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema')])
+        frus_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Frustrada|Problema')])
+        
+        # Puxa a variação
+        v_tot_str, c_tot, s_tot = calc_variacao(vol_total_h, vol_total_o)
+        v_ent_str, c_ent, s_ent = calc_variacao(ent_h, ent_o)
+        v_pend_str, c_pend, s_pend = calc_variacao(pend_h, pend_o)
+        v_frus_str, c_frus, s_frus = calc_variacao(frus_h, frus_o)
+
+        # 3. BARRA DE ROLAGEM ESTILO NASDAQ (CSS + HTML)
+        html_ticker = f"""
+        <style>
+        .nasdaq-container {{
+            background-color: #0F172A;
+            color: #F8FAFC;
+            padding: 12px 0;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            white-space: nowrap;
+            overflow: hidden;
+            border-left: 5px solid #0284C7;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }}
+        .nasdaq-scroller {{
+            display: inline-block;
+            animation: scroll-left 25s linear infinite;
+        }}
+        .nasdaq-item {{
+            display: inline-block;
+            margin-right: 50px;
+            font-size: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }}
+        .val-up {{ color: #10B981; font-weight: 900; }}
+        .val-down {{ color: #EF4444; font-weight: 900; }}
+        .val-neu {{ color: #94A3B8; font-weight: 900; }}
+        
+        @keyframes scroll-left {{
+            0% {{ transform: translateX(100%); }}
+            100% {{ transform: translateX(-100%); }}
+        }}
+        </style>
+        
+        <div class="nasdaq-container">
+            <div class="nasdaq-scroller">
+                <span class="nasdaq-item">📊 DATA BASE: {hoje.strftime('%d/%m/%Y')}</span>
+                <span class="nasdaq-item">📦 VOLUME TOTAL: {vol_total_h} <span class="{c_tot}">{s_tot} {v_tot_str}</span></span>
+                <span class="nasdaq-item">✅ SUCESSO (ENTREGAS): {ent_h} <span class="{c_ent}">{s_ent} {v_ent_str}</span></span>
+                <span class="nasdaq-item">⏳ PENDÊNCIAS EM ROTA: {pend_h} <span class="{c_pend}">{s_pend} {v_pend_str}</span></span>
+                <span class="nasdaq-item">🚨 OCORRÊNCIAS / FRUSTRADAS: {frus_h} <span class="{c_frus}">{s_frus} {v_frus_str}</span></span>
+                <span class="nasdaq-item">🌐 IGO LOGÍSTICA CORPORATE</span>
+            </div>
+        </div>
+        """
+        st.markdown(html_ticker, unsafe_allow_html=True)
+
+        # 4. PAINEL DE CARTÕES EXECUTIVOS
+        col_k1, col_k2, col_k3, col_k4 = st.columns(4)
+        
+        with col_k1:
+            st.markdown(f"""
+            <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 15px; border-radius: 8px; text-align: center;">
+                <p style="margin:0; font-size:12px; font-weight:bold; color:#64748B;">MÉTRICA GLOBAL</p>
+                <h2 style="margin:5px 0; color:#0F172A; font-size:32px;">{vol_total_h}</h2>
+                <p style="margin:0; font-size:12px; font-weight:bold;" class="{c_tot}">{s_tot} {v_tot_str} vs Ontem</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with col_k2:
+            st.markdown(f"""
+            <div style="background-color: #F0FDF4; border: 1px solid #A7F3D0; padding: 15px; border-radius: 8px; text-align: center;">
+                <p style="margin:0; font-size:12px; font-weight:bold; color:#065F46;">ENTREGAS CONFIRMADAS</p>
+                <h2 style="margin:5px 0; color:#059669; font-size:32px;">{ent_h}</h2>
+                <p style="margin:0; font-size:12px; font-weight:bold;" class="{c_ent}">{s_ent} {v_ent_str} vs Ontem</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with col_k3:
+            st.markdown(f"""
+            <div style="background-color: #FFFBEB; border: 1px solid #FDE68A; padding: 15px; border-radius: 8px; text-align: center;">
+                <p style="margin:0; font-size:12px; font-weight:bold; color:#92400E;">EM ROTA / PENDENTES</p>
+                <h2 style="margin:5px 0; color:#D97706; font-size:32px;">{pend_h}</h2>
+                <p style="margin:0; font-size:12px; font-weight:bold;" class="{c_pend}">{s_pend} {v_pend_str} vs Ontem</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with col_k4:
+            st.markdown(f"""
+            <div style="background-color: #FEF2F2; border: 1px solid #FECACA; padding: 15px; border-radius: 8px; text-align: center;">
+                <p style="margin:0; font-size:12px; font-weight:bold; color:#991B1B;">TAXA DE FRUSTRAÇÃO</p>
+                <h2 style="margin:5px 0; color:#DC2626; font-size:32px;">{frus_h}</h2>
+                <p style="margin:0; font-size:12px; font-weight:bold;" class="{c_frus}">{s_frus} {v_frus_str} vs Ontem</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 5. GRÁFICOS E RANKINGS (Estilo Limpo)
+        col_g1, col_g2 = st.columns([2, 1.5])
+        
+        with col_g1:
+            st.markdown("#### 🏢 Demandas por Laboratório (Top 10 Hoje)")
+            if not df_hoje.empty:
+                df_labs = df_hoje['LABORATORIO'].value_counts().head(10).reset_index()
+                df_labs.columns = ['Laboratório', 'Volumes']
+                st.bar_chart(data=df_labs, x='Laboratório', y='Volumes', color="#0284C7", height=350)
+            else:
+                st.info("Sem demandas registradas para hoje ainda.")
+                
+        with col_g2:
+            st.markdown("#### 🏃‍♂️ Engajamento da Frota (Entregas x Motorista)")
+            if not df_hoje.empty:
+                df_entregues_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue')]
+                if not df_entregues_hj.empty:
+                    df_mot = df_entregues_hj['AGENTE_RAW'].value_counts().reset_index()
+                    df_mot.columns = ['Motorista', 'Concluídas']
+                    # Limpa o nome do agente usando o dicionário nativo
+                    dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
+                    df_mot['Motorista'] = df_mot['Motorista'].apply(lambda x: dict_nomes_dash.get(str(x).strip().lower(), str(x).upper().split('|')[0]))
+                    
+                    st.dataframe(df_mot, hide_index=True, use_container_width=True, height=350)
+                else:
+                    st.info("Nenhuma entrega finalizada hoje ainda.")
+            else:
+                st.info("Aguardando início das rotas.")
+        
+        st.markdown("---")
+        if st.button("🔄 Atualizar Dashboard", use_container_width=True):
+            carregar_dados_completos.clear()
+            st.rerun()
