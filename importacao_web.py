@@ -2651,11 +2651,21 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.2 CLIMA UF + RADAR ROBUSTO)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.3 WAR ROOM BLINDADO)
 # =============================================================================
 elif menu == "📈 Dashboard":
-    # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
-    st_autorefresh(interval=300000, limit=None, key="refresh_dashboard")
+    # 🔥 NOVO REFRESH NATIVO E BLINDADO (SUBSTITUI O st_autorefresh) 🔥
+    import streamlit.components.v1 as components
+    components.html(
+        """
+        <script>
+        setTimeout(function(){
+            window.parent.location.reload();
+        }, 300000); // 300.000 ms = 5 Minutos
+        </script>
+        """,
+        height=0, width=0
+    )
     
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📈 Painel de Controle</h3></div>", unsafe_allow_html=True)
     
@@ -2749,7 +2759,6 @@ elif menu == "📈 Dashboard":
             for item in cidades_com_uf:
                 if not item or str(item).upper() == "NAN": continue
                 try:
-                    # Tira a UF só para pesquisar na API, mas exibe completo na tela
                     cidade_busca = str(item).split('/')[0].strip() if '/' in str(item) else str(item).strip()
                     cid_fmt = urllib.parse.quote(cidade_busca)
                     
@@ -2780,7 +2789,6 @@ elif menu == "📈 Dashboard":
                     
                     if resp.status_code == 200:
                         dados = resp.json()
-                        # Se a API retornou dados e achou o voo
                         if dados and isinstance(dados, list) and len(dados) > 0:
                             v = dados[0]
                             status = str(v.get('status', 'UNK')).upper()
@@ -2800,10 +2808,8 @@ elif menu == "📈 Dashboard":
                             else:
                                 alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} informa status: {status}.")
                         else:
-                            # SE O VOO NÃO ESTIVER NA MALHA DE HOJE
                             alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} não localizado na malha aérea de hoje.")
                     else:
-                        # SE A API DA FLIGHTERA NEGAR A BUSCA (Limites excedidos, etc)
                         alertas_voos.append(f"⚠️ RADAR AÉREO: Falha de comunicação com a torre (Erro {resp.status_code} no voo {v_query}).")
                 except: 
                     alertas_voos.append(f"⚠️ RADAR AÉREO: Sem sinal GPS para o voo {v_query} no momento.")
@@ -2813,14 +2819,12 @@ elif menu == "📈 Dashboard":
         cidades_alvo = []
         if not df_hoje.empty:
             top_cids = df_hoje['CIDADE'].value_counts().head(5).index.tolist()
-            # Descobre se a planilha usa a coluna 'UF' ou 'ESTADO'
             col_uf = 'UF' if 'UF' in df_hoje.columns else ('ESTADO' if 'ESTADO' in df_hoje.columns else None)
             
             for cid in top_cids:
-                cid_nome = str(cid).strip().title() # Ex: "Sao Paulo" em vez de "SAO PAULO"
+                cid_nome = str(cid).strip().title()
                 if col_uf:
                     try:
-                        # Pega a UF predominante para essa cidade
                         uf = str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()
                         cidades_alvo.append(f"{cid_nome}/{uf}")
                     except:
