@@ -2651,13 +2651,12 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO COM CORES DA GRID)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
     st_autorefresh(interval=300000, limit=None, key="refresh_dashboard")
     
-    # NOME AJUSTADO PARA GANHAR ESPAÇO
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📈 Painel de Controle</h3></div>", unsafe_allow_html=True)
     
     df_raw = carregar_dados_completos(planilha_db)
@@ -2679,24 +2678,41 @@ elif menu == "📈 Dashboard":
         
         def calc_variacao(val_hoje, val_ontem):
             if val_ontem == 0:
-                return "+100%", "val-up", "▲" if val_hoje > 0 else "0%", "val-neu", "-"
+                return "+100%", "▲" if val_hoje > 0 else "0%", "-"
             var = ((val_hoje - val_ontem) / val_ontem) * 100
-            if var > 0: return f"+{var:.1f}%", "val-up", "▲"
-            elif var < 0: return f"{var:.1f}%", "val-down", "▼"
-            return "0%", "val-neu", "-"
+            if var > 0: return f"+{var:.1f}%", "▲"
+            elif var < 0: return f"{var:.1f}%", "▼"
+            return "0%", "-"
 
         # 2. Cálculos dos KPIs Macro
         vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
         ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
         ent_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
         pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
+        pend_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
         frus_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
+        frus_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
         atra_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
+        atra_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
         frota_h = df_hoje['AGENTE_RAW'].replace("", pd.NA).nunique()
+        frota_o = df_ontem['AGENTE_RAW'].replace("", pd.NA).nunique()
+        
         taxa_sucesso_h = (ent_h / vol_total_h * 100) if vol_total_h > 0 else 0
+        taxa_sucesso_o = (ent_o / vol_total_o * 100) if vol_total_o > 0 else 0
+        var_taxa = taxa_sucesso_h - taxa_sucesso_o
         
-        v_tot_str, c_tot, s_tot = calc_variacao(vol_total_h, vol_total_o)
+        # Variações
+        v_tot_str, s_tot = calc_variacao(vol_total_h, vol_total_o)
+        v_ent_str, s_ent = calc_variacao(ent_h, ent_o)
+        v_pend_str, s_pend = calc_variacao(pend_h, pend_o)
+        v_frus_str, s_frus = calc_variacao(frus_h, frus_o)
+        v_atra_str, s_atra = calc_variacao(atra_h, atra_o)
+        v_frota_str, s_frota = calc_variacao(frota_h, frota_o)
         
+        if var_taxa > 0: v_taxa_str, s_taxa = f"+{var_taxa:.1f} pp", "▲"
+        elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
+        else: v_taxa_str, s_taxa = "0 pp", "-"
+
         # --- BLOCO: COMPARATIVO POR TOMADOR ---
         counts_h = df_hoje['TOMADOR'].value_counts().reset_index(name='Hoje')
         counts_o = df_ontem['TOMADOR'].value_counts().reset_index(name='Ontem')
@@ -2740,20 +2756,30 @@ elif menu == "📈 Dashboard":
             </div>
         """, unsafe_allow_html=True)
 
-        # 4. GRID DE 8 BLOCOS (INDICADORES VISUAIS)
+        # 4. GRID DE 8 BLOCOS (CORES DA ABA GRID)
         st.markdown("#### 🎯 Indicadores de Performance Operacional")
+        
+        def make_card(title, value, var_str, color1, color2):
+            return f"""
+            <div style="background: linear-gradient(135deg, {color1} 0%, {color2} 100%); padding: 15px; border-radius: 8px; text-align: center; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 110px; display: flex; flex-direction: column; justify-content: center;">
+                <p style="margin:0; font-size:11px; font-weight:800; letter-spacing: 0.5px; opacity: 0.9;">{title}</p>
+                <h2 style="margin:2px 0; font-size:32px; font-weight:900;">{value}</h2>
+                <div style="margin-top:auto;"><span style="font-size:11px; font-weight:bold; background: rgba(255,255,255,0.25); padding: 3px 10px; border-radius: 12px;">{var_str}</span></div>
+            </div>
+            """
+
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("VOLUME TOTAL", vol_total_h, v_tot_str)
-        c2.metric("EFICIÊNCIA (BAIXAS)", f"{taxa_sucesso_h:.1f}%")
-        c3.metric("FROTA EM CAMPO", f"{frota_h} Agentes")
-        c4.metric("ENTREGUES/COLETADOS", ent_h)
+        c1.markdown(make_card("VOLUME TOTAL", vol_total_h, f"{s_tot} {v_tot_str} vs Ontem", "#1E293B", "#334155"), unsafe_allow_html=True)
+        c2.markdown(make_card("ENTREGUES / COLETADOS", ent_h, f"{s_ent} {v_ent_str} vs Ontem", "#059669", "#10B981"), unsafe_allow_html=True)
+        c3.markdown(make_card("EFICIÊNCIA (BAIXAS)", f"{taxa_sucesso_h:.1f}%", f"{s_taxa} {v_taxa_str} vs Ontem", "#0369A1", "#0EA5E9"), unsafe_allow_html=True)
+        c4.markdown(make_card("FROTA EM CAMPO", f"{frota_h} Agts", f"{s_frota} {v_frota_str} vs Ontem", "#3730A3", "#4F46E5"), unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         c5, c6, c7, c8 = st.columns(4)
-        c5.metric("PENDENTES EM ROTA", pend_h, delta_color="inverse")
-        c6.metric("ATRASADOS (SLA)", atra_h, delta_color="inverse")
-        c7.metric("OCORRÊNCIAS", frus_h, delta_color="inverse")
-        c8.metric("ONTEM ÚTIL (TOTAL)", vol_total_o)
+        c5.markdown(make_card("PENDENTES EM ROTA", pend_h, f"{s_pend} {v_pend_str} vs Ontem", "#D97706", "#F59E0B"), unsafe_allow_html=True)
+        c6.markdown(make_card("ATRASADOS (SLA)", atra_h, f"{s_atra} {v_atra_str} vs Ontem", "#7F1D1D", "#B91C1C"), unsafe_allow_html=True)
+        c7.markdown(make_card("OCORRÊNCIAS", frus_h, f"{s_frus} {v_frus_str} vs Ontem", "#991B1B", "#EF4444"), unsafe_allow_html=True)
+        c8.markdown(make_card("ONTEM ÚTIL (TOTAL)", vol_total_o, "Base de Comparação", "#475569", "#64748B"), unsafe_allow_html=True)
 
         st.markdown("---")
 
@@ -2807,5 +2833,3 @@ elif menu == "📈 Dashboard":
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
-                
-        # (BOTÃO REMOVIDO PARA DEIXAR A TELA DA TV IMPECÁVEL E LIMPA)
