@@ -2651,7 +2651,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V4.0 WAR ROOM)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V5.0 EFICIÊNCIA DE ROTA)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
@@ -2686,8 +2686,16 @@ elif menu == "📈 Dashboard":
 
         # 2. Cálculos dos KPIs Macro
         vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
+        
+        # --- A NOVA LÓGICA DE EFICIÊNCIA DE ROTA ---
+        # Tudo o que saiu da pendência (Sucessos + Ocorrências Tratadas)
+        resolvidos_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
+        resolvidos_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
+        
+        # Apenas os Sucessos (Para quem quer ver só o que deu bom)
         ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
         ent_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
+        
         pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
         pend_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
         frus_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
@@ -2697,8 +2705,9 @@ elif menu == "📈 Dashboard":
         frota_h = df_hoje['AGENTE_RAW'].replace("", pd.NA).nunique()
         frota_o = df_ontem['AGENTE_RAW'].replace("", pd.NA).nunique()
         
-        taxa_sucesso_h = (ent_h / vol_total_h * 100) if vol_total_h > 0 else 0
-        taxa_sucesso_o = (ent_o / vol_total_o * 100) if vol_total_o > 0 else 0
+        # Taxa de Varredura (Meta Global)
+        taxa_sucesso_h = (resolvidos_h / vol_total_h * 100) if vol_total_h > 0 else 0
+        taxa_sucesso_o = (resolvidos_o / vol_total_o * 100) if vol_total_o > 0 else 0
         var_taxa = taxa_sucesso_h - taxa_sucesso_o
         
         # Variações
@@ -2735,7 +2744,8 @@ elif menu == "📈 Dashboard":
                 nome_amigavel = dict_nomes_dash.get(str(ag).strip().lower(), str(ag).upper().split('|')[0])
                 df_ag = df_hoje[df_hoje['AGENTE_RAW'] == ag]
                 total_ag = len(df_ag)
-                concluidos_ag = len(df_ag[df_ag['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema', case=False)])
+                # O motorista pontua ao finalizar a visita, seja sucesso ou problema
+                concluidos_ag = len(df_ag[df_ag['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
                 perc_ag = int((concluidos_ag / total_ag) * 100) if total_ag > 0 else 0
                 frota_stats[nome_amigavel] = {"perc": perc_ag, "conc": concluidos_ag, "total": total_ag}
         
@@ -2745,20 +2755,20 @@ elif menu == "📈 Dashboard":
         manchetes = [
             f"🕒 ATUALIZAÇÃO AUTOMÁTICA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}",
             f"📅 COMP. ÚLTIMO DIA ÚTIL: {ontem_util.strftime('%d/%m/%Y')}",
-            f"📦 CARGA TOTAL: {vol_total_h} VOLUMES ({s_tot} {v_tot_str})",
+            f"📦 CARGA TOTAL ROTEIRIZADA: {vol_total_h} VOLUMES ({s_tot} {v_tot_str})",
             f"🚀 CLIENTE LÍDER HOJE: {df_hoje['TOMADOR'].mode()[0] if not df_hoje.empty else '---'}"
         ]
         
         # Adiciona Pódio à CNN
         if len(frota_ordenada) >= 3:
-            manchetes.append(f"🏆 CORRIDA DO DIA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
+            manchetes.append(f"🏆 CORRIDA DA VARREDURA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
         elif len(frota_ordenada) > 0:
-            manchetes.append(f"🏆 LÍDER ATUAL: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}% concluído!")
+            manchetes.append(f"🏆 LÍDER DE VARREDURA: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}% concluído!")
 
         # Adiciona 100% e Alertas
         for nome, s in frota_ordenada:
             if s['perc'] == 100 and s['total'] > 0:
-                manchetes.append(f"🟢 CONCLUÍDO: Motorista {nome} finalizou 100% da rota!")
+                manchetes.append(f"🟢 MISSÃO CUMPRIDA: Motorista {nome} finalizou 100% da sua rota!")
 
         # Última Ocorrência / Frustrada
         frustradas_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)]
@@ -2766,7 +2776,7 @@ elif menu == "📈 Dashboard":
             ult_frus = frustradas_hj.iloc[-1]
             lab_f = ult_frus.get('LABORATORIO', 'Desconhecido')
             mot_f = dict_nomes_dash.get(str(ult_frus.get('AGENTE_RAW', '')).strip().lower(), str(ult_frus.get('AGENTE_RAW', '')))
-            manchetes.append(f"🛑 ÚLTIMA OCORRÊNCIA: Pacote de {lab_f} marcado como problema pelo agente {mot_f}.")
+            manchetes.append(f"🛑 ÚLTIMA OCORRÊNCIA: Visita em {lab_f} frustrada/sem material pelo agente {mot_f}.")
 
         ticker_text = " &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
 
@@ -2783,16 +2793,16 @@ elif menu == "📈 Dashboard":
             </div>
         """, unsafe_allow_html=True)
 
-        # 4. A GRANDE META DO DIA (BARRA DE PROGRESSO GLOBAL)
-        progresso_meta = int((ent_h / vol_total_h) * 100) if vol_total_h > 0 else 0
+        # 4. A GRANDE META DO DIA (BARRA DE PROGRESSO DE VARREDURA)
+        progresso_meta = int((resolvidos_h / vol_total_h) * 100) if vol_total_h > 0 else 0
         cor_meta = "#10B981" if progresso_meta >= 80 else ("#F59E0B" if progresso_meta >= 40 else "#EF4444")
         
         meta_html = f"""
         <div style="background-color: #1E293B; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 20px; border: 1px solid #334155;">
             <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
                 <div>
-                    <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin: 0; letter-spacing: 1px;">🎯 META GLOBAL DO DIA (SUCESSO DA OPERAÇÃO)</p>
-                    <h3 style="color: #F8FAFC; font-size: 26px; margin: 5px 0 0 0;">{ent_h} de {vol_total_h} Volumes Concluídos</h3>
+                    <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin: 0; letter-spacing: 1px;">🎯 META GLOBAL DE VARREDURA (VISITAS REALIZADAS)</p>
+                    <h3 style="color: #F8FAFC; font-size: 26px; margin: 5px 0 0 0;">{resolvidos_h} de {vol_total_h} Visitas Concluídas</h3>
                 </div>
                 <h2 style="color: {cor_meta}; font-size: 42px; margin: 0; font-weight: 900; line-height: 1;">{progresso_meta}%</h2>
             </div>
@@ -2815,14 +2825,14 @@ elif menu == "📈 Dashboard":
 
         c1, c2, c3, c4 = st.columns(4)
         c1.markdown(make_card("VOLUME TOTAL", vol_total_h, f"{s_tot} {v_tot_str} vs Ontem", "#1E293B", "#334155"), unsafe_allow_html=True)
-        c2.markdown(make_card("ENTREGUES / COLETADOS", ent_h, f"{s_ent} {v_ent_str} vs Ontem", "#059669", "#10B981"), unsafe_allow_html=True)
-        c3.markdown(make_card("EFICIÊNCIA (BAIXAS)", f"{taxa_sucesso_h:.1f}%", f"{s_taxa} {v_taxa_str} vs Ontem", "#0369A1", "#0EA5E9"), unsafe_allow_html=True)
-        c4.markdown(make_card("FROTA EM CAMPO", f"{frota_h} Agts", f"{s_frota} {v_frota_str} vs Ontem", "#3730A3", "#4F46E5"), unsafe_allow_html=True)
+        c2.markdown(make_card("EFICIÊNCIA DE ROTA", f"{taxa_sucesso_h:.1f}%", f"{s_taxa} {v_taxa_str} vs Ontem", "#0369A1", "#0EA5E9"), unsafe_allow_html=True)
+        c3.markdown(make_card("FROTA EM CAMPO", f"{frota_h} Agts", f"{s_frota} {v_frota_str} vs Ontem", "#3730A3", "#4F46E5"), unsafe_allow_html=True)
+        c4.markdown(make_card("SUCESSO (ENTREGUES)", ent_h, f"{s_ent} {v_ent_str} vs Ontem", "#059669", "#10B981"), unsafe_allow_html=True)
 
         c5, c6, c7, c8 = st.columns(4)
         c5.markdown(make_card("PENDENTES EM ROTA", pend_h, f"{s_pend} {v_pend_str} vs Ontem", "#D97706", "#F59E0B"), unsafe_allow_html=True)
         c6.markdown(make_card("ATRASADOS (SLA)", atra_h, f"{s_atra} {v_atra_str} vs Ontem", "#7F1D1D", "#B91C1C"), unsafe_allow_html=True)
-        c7.markdown(make_card("OCORRÊNCIAS", frus_h, f"{s_frus} {v_frus_str} vs Ontem", "#991B1B", "#EF4444"), unsafe_allow_html=True)
+        c7.markdown(make_card("FRUSTRADAS (CUSTO)", frus_h, f"{s_frus} {v_frus_str} vs Ontem", "#991B1B", "#EF4444"), unsafe_allow_html=True)
         c8.markdown(make_card("ONTEM ÚTIL (TOTAL)", vol_total_o, "Base de Comparação", "#475569", "#64748B"), unsafe_allow_html=True)
 
         st.markdown("---")
