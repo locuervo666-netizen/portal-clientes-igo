@@ -2651,7 +2651,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V8.1 WAR ROOM REAL)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.0 WAR ROOM + FLIGHT RADAR)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
@@ -2668,6 +2668,7 @@ elif menu == "📈 Dashboard":
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         hoje = hoje_br
         
+        # Cálculo do Dia Útil Anterior
         ontem_util = hoje - timedelta(days=1)
         while ontem_util.weekday() >= 5 or ontem_util in FERIADOS_BR:
             ontem_util -= timedelta(days=1)
@@ -2708,11 +2709,12 @@ elif menu == "📈 Dashboard":
         v_frus_str, s_frus = calc_variacao(frus_h, frus_o)
         v_atra_str, s_atra = calc_variacao(atra_h, atra_o)
         v_frota_str, s_frota = calc_variacao(frota_h, frota_o)
+        
         if var_taxa > 0: v_taxa_str, s_taxa = f"+{var_taxa:.1f} pp", "▲"
         elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
         else: v_taxa_str, s_taxa = "0 pp", "-"
 
-        # --- LÓGICA DE RANKING MENSAL ---
+        # --- LÓGICA DE RANKING MENSAL POR TOMADOR E MÉDIA DIÁRIA ---
         df_mes = df_raw.copy()
         df_mes['MES_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.month
         df_mes['ANO_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.year
@@ -2741,7 +2743,7 @@ elif menu == "📈 Dashboard":
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
         # =============================================================================
-        # 🔥 CÉREBROS DE INTEGRAÇÃO EXTERNA (APIs 100% REAIS E GRÁTIS) 🔥
+        # 🔥 CÉREBROS DE INTEGRAÇÃO EXTERNA (CLIMA & VOOS) 🔥
         # =============================================================================
         @st.cache_data(ttl=3600) # Cache de 1h
         def buscar_alertas_climaticos(cidades):
@@ -2759,10 +2761,40 @@ elif menu == "📈 Dashboard":
                 except: continue
             return alertas
 
+        @st.cache_data(ttl=7200) # Cache de 2h para economizar chamadas gratuitas da RapidAPI
+        def buscar_status_voos(lista_voos):
+            alertas_voos = []
+            headers = {
+                "x-rapidapi-key": "726b5b7c75msh782bc334e03fcd1p1d415cjsn84ef052a00e7",
+                "x-rapidapi-host": "flightera-flight-data.p.rapidapi.com"
+            }
+            for voo in lista_voos:
+                try:
+                    url = "https://flightera-flight-data.p.rapidapi.com/flight/info"
+                    resp = requests.get(url, headers=headers, params={"flnr": voo}, timeout=5)
+                    if resp.status_code == 200:
+                        dados = resp.json()
+                        if dados and len(dados) > 0:
+                            v = dados[0]
+                            status = str(v.get('status', '')).upper()
+                            partida = str(v.get('scheduled_departure_time', ''))[11:16]
+                            
+                            if status == "SCHEDULED":
+                                alertas_voos.append(f"✈️ RADAR AÉREO: Voo {voo} CONFIRMADO para {partida}. Sem atrasos na rota.")
+                            elif status in ["DELAYED", "CANCELLED"]:
+                                alertas_voos.append(f"🚨 ALERTA AÉREO: Voo {voo} consta como {status}! Acionar contingência.")
+                            elif status == "EN ROUTE":
+                                alertas_voos.append(f"✈️ RADAR AÉREO: Voo {voo} está EM VOO neste momento.")
+                except: continue
+            return alertas_voos
+
         # Pega as 5 maiores cidades do dia para a API de clima
         cidades_alvo = df_hoje['CIDADE'].value_counts().head(5).index.tolist() if not df_hoje.empty else []
+        
+        # NÚMEROS DOS VOOS QUE VOCÊ QUER MONITORAR (Pode adicionar mais na lista)
+        voos_monitorados = ["G31240"]
 
-        # 3. BARRA DE ROLAGEM (TICKER CNN) COM TODAS AS NOTÍCIAS
+        # 3. BARRA DE ROLAGEM ESTILO CNN (TICKER)
         manchetes = [
             f"🕒 ATUALIZAÇÃO AUTOMÁTICA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}",
             f"📅 COMP. ÚLTIMO DIA ÚTIL: {ontem_util.strftime('%d/%m/%Y')}",
@@ -2770,15 +2802,15 @@ elif menu == "📈 Dashboard":
             f"📊 MÉDIA DIÁRIA DO MÊS: {media_diaria_global} VOLUMES/DIA"
         ]
         
-        # Injeta Clima Real
+        # INJETA AS APIs REAIS
         if cidades_alvo: manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
+        if voos_monitorados: manchetes.extend(buscar_status_voos(voos_monitorados))
         
-        # Alerta Real de Feriado Nacional (Sem API Externa)
+        # Alerta Real de Feriado Nacional
         if hoje in FERIADOS_BR:
             nome_feriado = FERIADOS_BR.get(hoje)
             manchetes.append(f"📅 ATENÇÃO: Hoje é feriado nacional ({nome_feriado}). Confirme o funcionamento dos PCLs!")
 
-        # PÓDIO E ALERTAS INTERNOS
         if len(frota_ordenada) >= 3:
             manchetes.append(f"🏆 RANKING DO DIA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
         elif len(frota_ordenada) > 0:
@@ -2800,7 +2832,7 @@ elif menu == "📈 Dashboard":
         st.markdown(f"""
             <style>
             .nasdaq-container {{ background-color: #0F172A; color: #F8FAFC; padding: 12px 0; border-radius: 6px; margin-bottom: 25px; white-space: nowrap; overflow: hidden; border-left: 5px solid #10B981; position: relative; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
-            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 25s linear infinite; }} /* Ajustado para 25s para leitura perfeita */
+            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 35s linear infinite; }}
             .nasdaq-item {{ display: inline-block; font-size: 14px; font-weight: 600; font-family: 'Segoe UI', Roboto, sans-serif; letter-spacing: 0.5px; }}
             @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
             </style>
