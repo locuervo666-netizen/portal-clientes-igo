@@ -2651,7 +2651,7 @@ elif menu == "⚙️ Rotas":
                     if senha_reset: st.error("❌ Senha incorreta.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO COM CORES DA GRID)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V4.0 WAR ROOM)
 # =============================================================================
 elif menu == "📈 Dashboard":
     # ⏱️ ATUALIZAÇÃO AUTOMÁTICA DA TV: 300.000ms = 5 Minutos
@@ -2668,7 +2668,7 @@ elif menu == "📈 Dashboard":
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         hoje = hoje_br
         
-        # Cálculo do Dia Útil Anterior (Pula FDS e Feriados)
+        # Cálculo do Dia Útil Anterior
         ontem_util = hoje - timedelta(days=1)
         while ontem_util.weekday() >= 5 or ontem_util in FERIADOS_BR:
             ontem_util -= timedelta(days=1)
@@ -2726,7 +2726,22 @@ elif menu == "📈 Dashboard":
 
         df_comp['Variação'] = df_comp.apply(format_delta, axis=1)
 
-        # 3. BARRA DE ROLAGEM ESTILO CNN (20s - RÁPIDA E LIMPA)
+        # --- INTELIGÊNCIA DOS MOTORISTAS E PÓDIO ---
+        dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
+        frota_stats = {}
+        if not df_hoje.empty:
+            for ag in df_hoje['AGENTE_RAW'].dropna().unique():
+                if not str(ag).strip() or str(ag).upper() == 'NAN': continue
+                nome_amigavel = dict_nomes_dash.get(str(ag).strip().lower(), str(ag).upper().split('|')[0])
+                df_ag = df_hoje[df_hoje['AGENTE_RAW'] == ag]
+                total_ag = len(df_ag)
+                concluidos_ag = len(df_ag[df_ag['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema', case=False)])
+                perc_ag = int((concluidos_ag / total_ag) * 100) if total_ag > 0 else 0
+                frota_stats[nome_amigavel] = {"perc": perc_ag, "conc": concluidos_ag, "total": total_ag}
+        
+        frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
+
+        # 3. BARRA DE ROLAGEM ESTILO CNN (20s) COM NOVAS INTELIGÊNCIAS
         manchetes = [
             f"🕒 ATUALIZAÇÃO AUTOMÁTICA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}",
             f"📅 COMP. ÚLTIMO DIA ÚTIL: {ontem_util.strftime('%d/%m/%Y')}",
@@ -2734,12 +2749,24 @@ elif menu == "📈 Dashboard":
             f"🚀 CLIENTE LÍDER HOJE: {df_hoje['TOMADOR'].mode()[0] if not df_hoje.empty else '---'}"
         ]
         
-        for ag in df_hoje['AGENTE_RAW'].dropna().unique():
-            if not str(ag).strip(): continue
-            df_ag = df_hoje[df_hoje['AGENTE_RAW'] == ag]
-            conc = len(df_ag[df_ag['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema', case=False)])
-            if conc == len(df_ag) and len(df_ag) > 0:
-                manchetes.append(f"🟢 CONCLUÍDO: Motorista {str(ag).split('|')[0]} finalizou 100% da rota!")
+        # Adiciona Pódio à CNN
+        if len(frota_ordenada) >= 3:
+            manchetes.append(f"🏆 CORRIDA DO DIA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
+        elif len(frota_ordenada) > 0:
+            manchetes.append(f"🏆 LÍDER ATUAL: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}% concluído!")
+
+        # Adiciona 100% e Alertas
+        for nome, s in frota_ordenada:
+            if s['perc'] == 100 and s['total'] > 0:
+                manchetes.append(f"🟢 CONCLUÍDO: Motorista {nome} finalizou 100% da rota!")
+
+        # Última Ocorrência / Frustrada
+        frustradas_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)]
+        if not frustradas_hj.empty:
+            ult_frus = frustradas_hj.iloc[-1]
+            lab_f = ult_frus.get('LABORATORIO', 'Desconhecido')
+            mot_f = dict_nomes_dash.get(str(ult_frus.get('AGENTE_RAW', '')).strip().lower(), str(ult_frus.get('AGENTE_RAW', '')))
+            manchetes.append(f"🛑 ÚLTIMA OCORRÊNCIA: Pacote de {lab_f} marcado como problema pelo agente {mot_f}.")
 
         ticker_text = " &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
 
@@ -2756,12 +2783,30 @@ elif menu == "📈 Dashboard":
             </div>
         """, unsafe_allow_html=True)
 
-        # 4. GRID DE 8 BLOCOS (CORES DA ABA GRID)
-        st.markdown("#### 🎯 Indicadores de Performance Operacional")
+        # 4. A GRANDE META DO DIA (BARRA DE PROGRESSO GLOBAL)
+        progresso_meta = int((ent_h / vol_total_h) * 100) if vol_total_h > 0 else 0
+        cor_meta = "#10B981" if progresso_meta >= 80 else ("#F59E0B" if progresso_meta >= 40 else "#EF4444")
         
+        meta_html = f"""
+        <div style="background-color: #1E293B; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 20px; border: 1px solid #334155;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
+                <div>
+                    <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin: 0; letter-spacing: 1px;">🎯 META GLOBAL DO DIA (SUCESSO DA OPERAÇÃO)</p>
+                    <h3 style="color: #F8FAFC; font-size: 26px; margin: 5px 0 0 0;">{ent_h} de {vol_total_h} Volumes Concluídos</h3>
+                </div>
+                <h2 style="color: {cor_meta}; font-size: 42px; margin: 0; font-weight: 900; line-height: 1;">{progresso_meta}%</h2>
+            </div>
+            <div style="width: 100%; background-color: #0F172A; border-radius: 8px; height: 16px; overflow: hidden; border: 1px solid #334155;">
+                <div style="width: {progresso_meta}%; background: {cor_meta}; height: 16px; transition: width 1s ease-in-out;"></div>
+            </div>
+        </div>
+        """
+        st.markdown(meta_html, unsafe_allow_html=True)
+
+        # 5. GRID DE 8 BLOCOS (CORES DA ABA GRID)
         def make_card(title, value, var_str, color1, color2):
             return f"""
-            <div style="background: linear-gradient(135deg, {color1} 0%, {color2} 100%); padding: 15px; border-radius: 8px; text-align: center; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 110px; display: flex; flex-direction: column; justify-content: center;">
+            <div style="background: linear-gradient(135deg, {color1} 0%, {color2} 100%); padding: 15px; border-radius: 8px; text-align: center; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 110px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;">
                 <p style="margin:0; font-size:11px; font-weight:800; letter-spacing: 0.5px; opacity: 0.9;">{title}</p>
                 <h2 style="margin:2px 0; font-size:32px; font-weight:900;">{value}</h2>
                 <div style="margin-top:auto;"><span style="font-size:11px; font-weight:bold; background: rgba(255,255,255,0.25); padding: 3px 10px; border-radius: 12px;">{var_str}</span></div>
@@ -2774,7 +2819,6 @@ elif menu == "📈 Dashboard":
         c3.markdown(make_card("EFICIÊNCIA (BAIXAS)", f"{taxa_sucesso_h:.1f}%", f"{s_taxa} {v_taxa_str} vs Ontem", "#0369A1", "#0EA5E9"), unsafe_allow_html=True)
         c4.markdown(make_card("FROTA EM CAMPO", f"{frota_h} Agts", f"{s_frota} {v_frota_str} vs Ontem", "#3730A3", "#4F46E5"), unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
         c5, c6, c7, c8 = st.columns(4)
         c5.markdown(make_card("PENDENTES EM ROTA", pend_h, f"{s_pend} {v_pend_str} vs Ontem", "#D97706", "#F59E0B"), unsafe_allow_html=True)
         c6.markdown(make_card("ATRASADOS (SLA)", atra_h, f"{s_atra} {v_atra_str} vs Ontem", "#7F1D1D", "#B91C1C"), unsafe_allow_html=True)
@@ -2783,44 +2827,25 @@ elif menu == "📈 Dashboard":
 
         st.markdown("---")
 
-        # 5. COMPARATIVO DE CLIENTES E PERFORMANCE DA FROTA
+        # 6. PÓDIO DE EFICIÊNCIA E PERFORMANCE POR TOMADOR
         col_rel, col_perf = st.columns([1.2, 1])
         
         with col_rel:
-            st.markdown("#### 🏢 Performance por Tomador (vs Dia Útil Anterior)")
-            if not df_comp.empty:
-                st.dataframe(
-                    df_comp.sort_values(by='Hoje', ascending=False),
-                    column_config={
-                        "TOMADOR": "Cliente",
-                        "Hoje": st.column_config.NumberColumn("Qtd Hoje", format="%d 📦"),
-                        "Ontem": st.column_config.NumberColumn("Qtd Ontem", format="%d 📦"),
-                        "Variação": "Trend"
-                    },
-                    hide_index=True,
-                    use_container_width=True
-                )
-            else:
-                st.info("Aguardando dados de faturamento.")
-
-        with col_perf:
-            st.markdown("#### 🏃‍♂️ Status da Rota por Agente")
+            st.markdown("#### 🏆 Pódio e Status da Frota")
             
-            # --- INTELIGÊNCIA DOS MOTORISTAS ---
-            dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
-            frota_stats = {}
-            if not df_hoje.empty:
-                for ag in df_hoje['AGENTE_RAW'].dropna().unique():
-                    if not str(ag).strip() or str(ag).upper() == 'NAN': continue
-                    nome_amigavel = dict_nomes_dash.get(str(ag).strip().lower(), str(ag).upper().split('|')[0])
-                    df_ag = df_hoje[df_hoje['AGENTE_RAW'] == ag]
-                    total_ag = len(df_ag)
-                    concluidos_ag = len(df_ag[df_ag['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema', case=False)])
-                    perc_ag = int((concluidos_ag / total_ag) * 100) if total_ag > 0 else 0
-                    frota_stats[nome_amigavel] = {"perc": perc_ag, "conc": concluidos_ag, "total": total_ag}
+            # Renderiza o Pódio (Top 3)
+            if len(frota_ordenada) >= 3:
+                html_podio = f"""
+                <div style='display: flex; justify-content: space-around; background: #F8FAFC; padding: 15px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 20px; text-align: center;'>
+                    <div><span style='font-size: 24px;'>🥈</span><br><b style='color:#475569; font-size:14px;'>{frota_ordenada[1][0]}</b><br><span style='color:#0284C7; font-weight:bold;'>{frota_ordenada[1][1]['perc']}%</span></div>
+                    <div style='transform: scale(1.1);'><span style='font-size: 32px;'>🥇</span><br><b style='color:#0F172A; font-size:15px;'>{frota_ordenada[0][0]}</b><br><span style='color:#10B981; font-weight:bold;'>{frota_ordenada[0][1]['perc']}%</span></div>
+                    <div><span style='font-size: 24px;'>🥉</span><br><b style='color:#475569; font-size:14px;'>{frota_ordenada[2][0]}</b><br><span style='color:#D97706; font-weight:bold;'>{frota_ordenada[2][1]['perc']}%</span></div>
+                </div>
+                """
+                st.markdown(html_podio, unsafe_allow_html=True)
             
-            # Renderiza as barras
-            for nome, s in sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True):
+            # Renderiza as barras dos motoristas
+            for nome, s in frota_ordenada:
                 bar_color = "#10B981" if s['perc'] == 100 else ("#0284C7" if s['perc'] > 50 else "#F59E0B")
                 st.markdown(f"""
                     <div style='margin-bottom: 12px;'>
@@ -2833,3 +2858,21 @@ elif menu == "📈 Dashboard":
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
+
+        with col_perf:
+            st.markdown("#### 🏢 Injeção de Carga por Tomador (Hoje vs Ontem)")
+            if not df_comp.empty:
+                st.dataframe(
+                    df_comp.sort_values(by='Hoje', ascending=False),
+                    column_config={
+                        "TOMADOR": "Cliente",
+                        "Hoje": st.column_config.NumberColumn("Qtd Hoje", format="%d 📦"),
+                        "Ontem": st.column_config.NumberColumn("Qtd Ontem", format="%d 📦"),
+                        "Variação": "Trend"
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    height=400
+                )
+            else:
+                st.info("Aguardando dados de roteirização.")
