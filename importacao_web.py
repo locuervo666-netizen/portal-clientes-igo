@@ -777,9 +777,31 @@ if menu == "📊 GRID":
         # 🔥 FIM DA CAIXA DE ENTRADA 🔥
         
         def get_detalhes(row):
-            obs = str(row.get('A_OB', row.get('OBSERVACOES', ''))).strip()
-            if obs and obs.upper() != 'NAN': return obs
+            # 1. Puxa os dados com os nomes corretos das colunas
+            obs_master = str(row.get('OBSERVACOES', '')).strip()
+            obs_app = str(row.get('APP_OBS', '')).strip()
+            status_atual = str(row.get('STATUS', '')).upper()
+            
+            if obs_master.upper() == 'NAN': obs_master = ""
+            if obs_app.upper() == 'NAN': obs_app = ""
+            
+            # 2. A prioridade é sempre o que o motorista enviou do aplicativo
+            obs_final = obs_app if obs_app else obs_master
+            
+            # 3. Inteligência: Se a entrega falhou, arranca o texto de horário para destacar o erro
+            if status_atual in ['FRUSTRADA', 'PROBLEMA', 'CANCELADO']:
+                # Usa regex para apagar o "[COLETA: 08:00 - 16:00] - " invisivelmente
+                obs_limpa = re.sub(r'\[COLETA:.*?\]\s*-?\s*', '', obs_final).strip()
+                
+                if obs_limpa:
+                    return f"⚠️ Motivo: {obs_limpa}"
+                else:
+                    return "⚠️ Motivo não justificado pelo motorista"
+            
+            # Se deu tudo certo ou tá pendente, mostra a observação normal
+            if obs_final: return obs_final
             return "-"
+            
         df_raw['DETALHES'] = df_raw.apply(get_detalhes, axis=1)
         
         def tratar_link_foto(x):
