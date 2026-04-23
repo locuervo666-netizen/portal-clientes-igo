@@ -386,13 +386,14 @@ else:
                 with ck[4]: st.button(f"🔒 AGUARDANDO\n\n{n_agu_k}", key="kpi_aguardando", use_container_width=True, on_click=set_kpi, args=("Aguardando",))
                 with ck[5]: st.button(f"📅 HOJE\n\n{n_hoje_k}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
-                with st.expander("📈 Ver Gráfico de Volume Diário", expanded=False):
-                    if not df_f.empty:
-                        df_chart = df_f.groupby('DATA_OBJ').size().reset_index(name='Volume')
-                        df_chart = df_chart.set_index('DATA_OBJ')
-                        st.bar_chart(df_chart, color="#3B82F6", height=200)
-                    else:
-                        st.info("Dados insuficientes para gerar o gráfico.")
+                # 🔥 RESTAURADO: BARRA DE PROGRESSO SIMPLES 🔥
+                st.markdown("<br>🎯 **Progresso de Hoje**", unsafe_allow_html=True)
+                df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
+                if not df_h.empty:
+                    tx = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Recusada')]) / len(df_h)
+                    st.progress(tx)
+                else: 
+                    st.info("Nenhum pedido despachado para hoje.")
 
                 st.markdown("<br>", unsafe_allow_html=True)
                 busca = st.text_input("🔎 Busca Rápida:", placeholder="Buscar por pedido, laboratório, cidade...")
