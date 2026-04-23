@@ -216,10 +216,19 @@ def carregar_dados_completos(_planilha):
                     col_qr_app = next((c for c in ['QR_CODE', 'QRCODE', 'QR', 'CODIGO'] if c in df_app.columns), None)
                     if col_qr_app: cols_to_extract.append(col_qr_app)
                     
+                    # 🔥 INTELIGÊNCIA: PUXAR A COLUNA DE DETALHES/NOME DO APP 🔥
+                    col_nome = None
+                    for c in ['DETALHES', 'RECEBEDOR', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
+                        if c in df_app.columns:
+                            cols_to_extract.append(c)
+                            col_nome = c
+                            break
+                    
                     df_app_clean = df_app[[c for c in cols_to_extract if c in df_app.columns]].copy()
                     rename_map = {'STATUS': 'APP_STATUS', 'OBSERVACOES': 'APP_OBS', 'FOTO': 'APP_FOTO'}
                     if 'DATA_ENTREGA' in df_app.columns: rename_map['DATA_ENTREGA'] = 'APP_DATA_ENTREGA'
                     if col_qr_app: rename_map[col_qr_app] = 'APP_QR'
+                    if col_nome: rename_map[col_nome] = 'A_CONTATO' # <--- Renomeia para o nome que a GRID espera
                         
                     df_app_clean.rename(columns=rename_map, inplace=True)
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
@@ -234,6 +243,58 @@ def carregar_dados_completos(_planilha):
                     if 'APP_QR' in df.columns:
                         if 'QR_CODE' not in df.columns: df['QR_CODE'] = df['APP_QR']
                         else: df['QR_CODE'] = df.apply(lambda r: r['APP_QR'] if str(r.get('APP_QR','')).strip() and str(r.get('APP_QR','')).upper() != 'NAN' else r.get('QR_CODE', ''), axis=1)
+
+                    def get_true_status(row):
+                        s_db = str(row.get('STATUS', '')).strip().upper()
+                        s_app = str(row.get('APP_STATUS', '')).strip().upper()
+                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        if rom_id in rom_dict:
+                            s_rom = str(rom_dict[rom_id].get('APP_STATUS', '')).strip().upper()
+                            if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']: return s_rom
+                        if s_db in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_db
+                        if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_app
+                        if s_db in ['EM ROTA DE ENTREGA', 'CONFERIDO', 'COLETADO']: return s_db
+                        if s_app == 'COLETADO': return s_app
+                        if s_app and s_app != 'NAN': return s_app
+                        return s_db
+                    
+                    df['STATUS'] = df.apply(get_true_status, axis=1)
+                    
+                    def get_true_data_entrega(row):
+                        d_db = str(row.get('DATA_ENTREGA', '')).strip()
+                        s_final = str(row.get('STATUS', '')).strip().upper()
+                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        if rom_id in rom_dict:
+                            d_rom = str(rom_dict[rom_id].get('APP_DATA_ENTREGA', '')).strip()
+                            if d_rom and d_rom.upper() != 'NAN': return d_rom
+                        if s_final in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA'] and 'APP_DATA_ENTREGA' in row:
+                            d_app = str(row.get('APP_DATA_ENTREGA', '')).strip()
+                            if d_app and d_app.upper() != 'NAN': return d_app
+                        return d_db if d_db.upper() != 'NAN' else ""
+                        
+                    if 'DATA_ENTREGA' in df.columns or 'APP_DATA_ENTREGA' in df.columns:
+                        df['DATA_ENTREGA'] = df.apply(get_true_data_entrega, axis=1)
+
+                    def get_true_foto(row):
+                        f_db = str(row.get('FOTO', '')).strip()
+                        f_app = str(row.get('APP_FOTO', '')).strip()
+                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        if rom_id in rom_dict:
+                            f_rom = str(rom_dict[rom_id].get('APP_FOTO', '')).strip()
+                            if f_rom and f_rom.upper() != 'NAN': return f_rom
+                        if f_app and f_app.upper() != 'NAN': return f_app
+                        return f_db
+                        
+                    if 'APP_FOTO' in df.columns or len(rom_dict) > 0:
+                        df['FOTO'] = df.apply(get_true_foto, axis=1)
+            except Exception: pass
+            
+            if 'DATA' in df.columns: 
+                df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+            return df
+    except Exception as e: 
+        st.error(f"Erro Crítico ao carregar a Memoria_Sistema: {e}")
+    return pd.DataFrame()
 
                     def get_true_status(row):
                         s_db = str(row.get('STATUS', '')).strip().upper()
