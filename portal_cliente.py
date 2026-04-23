@@ -6,8 +6,8 @@ import urllib.parse
 import json
 import requests
 import re
+import streamlit.components.v1 as components
 from datetime import datetime, timedelta, timezone
-from streamlit_autorefresh import st_autorefresh
 from google.oauth2.credentials import Credentials
 
 FUSO_BR = timezone(timedelta(hours=-3))
@@ -17,8 +17,8 @@ LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
 # =======================================================
 st.set_page_config(page_title="Monitoramento IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
-st_autorefresh(interval=60000, limit=None, key="refresh_timer")
 
+# 🔥 BUG FIX: CSS ajustado para não quebrar o filtro de Cidades
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { transition: background-color 0.3s ease; font-family: 'Inter', sans-serif; }
@@ -36,14 +36,16 @@ st.markdown("""
         border-radius: 12px !important; 
         padding: 15px !important; 
     }
-    [data-testid="stSidebar"] input, [data-testid="stSidebar"] textarea {
+    
+    /* Trava para aplicar o visual apenas nos inputs de dentro do formulário de chamado */
+    [data-testid="stSidebar"] [data-testid="stForm"] input, [data-testid="stSidebar"] [data-testid="stForm"] textarea {
         background-color: #ffffff !important;
         border: 1px solid #cbd5e1 !important; 
         border-radius: 6px !important;
         color: #1e293b !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; 
     }
-    [data-testid="stSidebar"] input:focus, [data-testid="stSidebar"] textarea:focus {
+    [data-testid="stSidebar"] [data-testid="stForm"] input:focus, [data-testid="stSidebar"] [data-testid="stForm"] textarea:focus {
         border-color: #3b82f6 !important;
         box-shadow: 0 0 0 1px #3b82f6 !important;
     }
@@ -254,6 +256,18 @@ if not st.session_state.logado:
                     st.rerun()
                 else: st.error("❌ Credenciais Incorretas")
 else:
+    # 🔥 REFRESH NATIVO E BLINDADO 🔥
+    components.html(
+        """
+        <script>
+        setTimeout(function(){
+            window.parent.location.reload();
+        }, 300000); // 5 Minutos
+        </script>
+        """,
+        height=0, width=0
+    )
+
     conf = CLIENTES_CONFIG[st.session_state.cliente]
     hoje_br = datetime.now(FUSO_BR).date()
     nome_tomador_oficial = conf["filtro"] if conf["filtro"] != "TODOS" else "MATRIZ IGO"
@@ -265,7 +279,6 @@ else:
             except: st.markdown(f"<h3 style='text-align: center;'>{st.session_state.cliente}</h3>", unsafe_allow_html=True)
             
         st.divider()
-        # 🔥 MUDANÇA: Puxando 15 dias de histórico padrão 🔥
         datas_sel = st.date_input("🗓️ Período:", value=(hoje_br - timedelta(days=15), hoje_br), format="DD/MM/YYYY")
         holder_cidades = st.empty()
         
@@ -302,6 +315,9 @@ else:
 
         tab_grid, tab_solicitar = st.tabs(["📊 Meus Pedidos e Monitoramento", "➕ Solicitar Nova Coleta"])
 
+        # =======================================================
+        # ABA 1: GRID E MONITORAMENTO
+        # =======================================================
         with tab_grid:
             if df_cliente.empty:
                 st.warning(f"Nenhum pedido registrado no sistema sob a titularidade '{conf['filtro']}'.")
@@ -351,9 +367,7 @@ else:
                     (df_f['DT_LIMITE_OBJ'].notnull())
                 )
                 
-                # 🔥 MUDANÇA: Exibir o "Atrasado" na cara do cliente 🔥
                 df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] = df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] + ' ⚠️ ATRASADO'
-                
                 df_atrasados_only = df_f[mask_atrasado]
 
                 ck = st.columns(6)
@@ -372,12 +386,13 @@ else:
                 with ck[4]: st.button(f"🔒 AGUARDANDO\n\n{n_agu_k}", key="kpi_aguardando", use_container_width=True, on_click=set_kpi, args=("Aguardando",))
                 with ck[5]: st.button(f"📅 HOJE\n\n{n_hoje_k}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
 
-                st.markdown("<br>🎯 **Progresso de Hoje**", unsafe_allow_html=True)
-                df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
-                if not df_h.empty:
-                    tx = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Recusada')]) / len(df_h)
-                    st.progress(tx)
-                else: st.info("Nenhum pedido despachado para hoje.")
+                with st.expander("📈 Ver Gráfico de Volume Diário", expanded=False):
+                    if not df_f.empty:
+                        df_chart = df_f.groupby('DATA_OBJ').size().reset_index(name='Volume')
+                        df_chart = df_chart.set_index('DATA_OBJ')
+                        st.bar_chart(df_chart, color="#3B82F6", height=200)
+                    else:
+                        st.info("Dados insuficientes para gerar o gráfico.")
 
                 st.markdown("<br>", unsafe_allow_html=True)
                 busca = st.text_input("🔎 Busca Rápida:", placeholder="Buscar por pedido, laboratório, cidade...")
@@ -391,8 +406,6 @@ else:
                 if busca: df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
                 if not df_grid.empty:
-                    
-                    # 🔥 MUDANÇA: ORDENAÇÃO INTELIGENTE NA GRID 🔥
                     def definir_prioridade_portal(status_str):
                         s = str(status_str).upper()
                         if 'ATRASADO' in s: return 1
@@ -403,41 +416,8 @@ else:
                         return 6
                         
                     df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(definir_prioridade_portal)
-                    # Ordena por Prioridade -> Data mais recente -> Pedido mais recente
                     df_grid = df_grid.sort_values(by=['PRIORIDADE', 'DATA_OBJ', 'PEDIDO'], ascending=[True, False, False]).drop(columns=['PRIORIDADE'])
-                    # -------------------------------------------------------------
                     
-                    cols = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'DATA_EFETIVA', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DETALHES', 'FOTO']
-                    df_final = df_grid[[c for c in cols if c in df_grid.columns]].copy()
-                    
-                    def tratar_foto(x):
-                        xs = str(x).strip()
-                        if not xs or xs.upper() in ['NAN', 'NONE']: return ""
-                        if xs.startswith("http"): return xs
-                        return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
-                    
-                    df_final['COMPROVANTE'] = df_final['FOTO'].apply(tratar_foto)
-
-                    colunas_ordenadas = ['DATA', 'PEDIDO', 'STATUS_DISPLAY', 'LABORATORIO', 'CIDADE', 'DATA_LIMITE', 'DATA_EFETIVA', 'COMPROVANTE', 'DETALHES']
-                    
-                    for col in df_final.columns: df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
-
-                    # 🔥 MELHORIA UX 1: GRID LIMPA E RESPIRÁVEL 🔥
-                    def tratar_foto(x):
-                        xs = str(x).strip()
-                        if not xs or xs.upper() in ['NAN', 'NONE']: return ""
-                        if xs.startswith("http"): return xs
-                        return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
-                    
-                    df_final['COMPROVANTE'] = df_final['FOTO'].apply(tratar_foto)
-
-                    for col in df_final.columns: 
-                        df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
-
-                    # Selecionamos apenas as colunas essenciais para não sobrecarregar a visão
-                    colunas_visiveis = ['PEDIDO', 'DATA', 'LABORATORIO', 'STATUS_DISPLAY', 'DETALHES', 'COMPROVANTE']
-
-                    # 🔥 MELHORIA UX 1: GRID LIMPA, COMPLETA E CORRIGIDA 🔥
                     def tratar_foto(x):
                         xs = str(x).strip()
                         if not xs or xs.upper() in ['NAN', 'NONE']: return ""
@@ -447,9 +427,7 @@ else:
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO'].apply(tratar_foto)
 
-                    # Inteligência para juntar Cidade e UF na mesma coluna
-                    if 'UF' not in df_final.columns:
-                        df_final['UF'] = ""
+                    if 'UF' not in df_final.columns: df_final['UF'] = ""
                         
                     df_final['CIDADE_UF'] = df_final.apply(
                         lambda r: f"{str(r.get('CIDADE','')).strip()}/{str(r.get('UF','')).strip()}" if str(r.get('UF','')).strip() and str(r.get('UF','')).upper() != 'NAN' else str(r.get('CIDADE','')).strip(), 
@@ -459,14 +437,12 @@ else:
                     for col in df_final.columns: 
                         df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
-                    # Colunas restauradas na ordem lógica de leitura
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF', 
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY', 
                         'DETALHES', 'COMPROVANTE'
                     ]
                     
-                    # Filtro de segurança caso alguma coluna esteja vazia no BD
                     colunas_visiveis = [c for c in colunas_visiveis if c in df_final.columns]
 
                     st.dataframe(
@@ -483,7 +459,7 @@ else:
                             "COMPROVANTE": st.column_config.LinkColumn("📎 Anexo", display_text="Ver Comprovante")
                         },
                         hide_index=True, 
-                        use_container_width=True, 
+                        use_container_width=False, 
                         height=450
                     )
 
@@ -491,7 +467,9 @@ else:
                         csv = df_grid.to_csv(index=False, sep=';').encode('utf-8-sig')
                         st.download_button("📥 Exportar Relatório Completo (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
 
-            # 🔥 NOVO MÓDULO: AUTOATENDIMENTO DE COLETA 🔥
+        # =======================================================
+        # ABA 2: AUTOATENDIMENTO DE COLETA
+        # =======================================================
         with tab_solicitar:
             st.markdown("### ➕ Nova Solicitação de Coleta")
             st.markdown("<p style='color: #64748B;'>Escolha o ponto de coleta desejado abaixo. Solicitações feitas após as 10:00 são agendadas automaticamente para o próximo dia útil.</p>", unsafe_allow_html=True)
@@ -509,23 +487,26 @@ else:
                             lista_labs = sorted(df_cli_locais['LABORATORIO'].unique().tolist())
                             lab_sel = st.selectbox("📍 Selecione o Ponto de Coleta (Laboratório):", ["Selecione..."] + lista_labs)
                             
+                            if lab_sel != "Selecione...":
+                                local_data = df_cli_locais[df_cli_locais['LABORATORIO'] == lab_sel].iloc[0]
+                                endereco_fmt = f"{local_data.get('ENDERECO', '')}, {local_data.get('NUMERO', '')} - {local_data.get('BAIRRO', '')}"
+                                cidade_fmt = f"{local_data.get('CIDADE', '')}/{local_data.get('UF', '')} | CEP: {local_data.get('CEP', '')}"
+                                
+                                st.markdown(f"""
+                                <div style="background-color: #F8FAFC; border-left: 4px solid #3B82F6; padding: 12px 15px; border-radius: 4px; margin-bottom: 15px;">
+                                    <p style="margin: 0; font-size: 12px; color: #64748B; font-weight: bold;">DESTINO DA COLETA CONFIRMADO:</p>
+                                    <p style="margin: 2px 0 0 0; font-size: 14px; color: #0F172A;"><b>{endereco_fmt}</b><br>{cidade_fmt}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
                             c1, c2 = st.columns(2)
                             
-                            # =======================================================
-                            # 🕒 INTELIGÊNCIA: HORÁRIO DE CORTE E DIAS ÚTEIS
-                            # =======================================================
                             agora_sp = datetime.now(FUSO_BR)
-                            
-                            # 1. Regra das 10:00h
-                            if agora_sp.hour < 10:
-                                data_minima = agora_sp.date()
-                            else:
-                                data_minima = agora_sp.date() + timedelta(days=1)
+                            if agora_sp.hour < 10: data_minima = agora_sp.date()
+                            else: data_minima = agora_sp.date() + timedelta(days=1)
                                 
-                            # 2. Pula os finais de semana (5 = Sábado, 6 = Domingo)
                             while data_minima.weekday() >= 5:
                                 data_minima += timedelta(days=1)
-                            # =======================================================
                             
                             data_coleta = c1.date_input("📅 Data Desejada para Coleta:", min_value=data_minima, value=data_minima, format="DD/MM/YYYY")
                             obs = st.text_area("📝 Observações / Instruções (Opcional):", placeholder="Ex: Procurar por Fulano, coletar na recepção...", height=100)
@@ -534,13 +515,10 @@ else:
                                 if lab_sel == "Selecione...":
                                     st.error("⚠️ Por favor, selecione um Ponto de Coleta válido na lista.")
                                 elif data_coleta.weekday() >= 5:
-                                    # 3. Trava de segurança contra o cliente teimoso
                                     st.error("⚠️ Solicitação bloqueada: Coletas não são realizadas aos finais de semana. Por favor, escolha um dia útil no calendário.")
                                 else:
                                     with st.spinner("Registrando pedido seguro e notificando o C.C.O..."):
                                         try:
-                                            local_data = df_cli_locais[df_cli_locais['LABORATORIO'] == lab_sel].iloc[0]
-                                            
                                             gc = conectar_banco_seguro()
                                             planilha = gc.open("DB_IGO_Logistica")
                                             aba_m = planilha.worksheet("Memoria_Sistema")
