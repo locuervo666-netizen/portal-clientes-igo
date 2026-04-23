@@ -442,10 +442,10 @@ else:
                         csv = df_grid.to_csv(index=False, sep=';').encode('utf-8-sig')
                         st.download_button("📥 Exportar Planilha (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
 
-        # 🔥 NOVO MÓDULO: AUTOATENDIMENTO DE COLETA 🔥
+            # 🔥 NOVO MÓDULO: AUTOATENDIMENTO DE COLETA 🔥
         with tab_solicitar:
             st.markdown("### ➕ Nova Solicitação de Coleta")
-            st.markdown("<p style='color: #64748B;'>Escolha o ponto de coleta desejado abaixo. A data mínima para agendamento é o próximo dia útil.</p>", unsafe_allow_html=True)
+            st.markdown("<p style='color: #64748B;'>Escolha o ponto de coleta desejado abaixo. Solicitações feitas após as 10:00 são agendadas automaticamente para o próximo dia útil.</p>", unsafe_allow_html=True)
             
             df_locais = carregar_base_locais()
             if df_locais.empty:
@@ -461,13 +461,32 @@ else:
                             lab_sel = st.selectbox("📍 Selecione o Ponto de Coleta (Laboratório):", ["Selecione..."] + lista_labs)
                             
                             c1, c2 = st.columns(2)
-                            amanha = hoje_br + timedelta(days=1)
-                            data_coleta = c1.date_input("📅 Data Desejada para Coleta:", min_value=amanha, value=amanha, format="DD/MM/YYYY")
+                            
+                            # =======================================================
+                            # 🕒 INTELIGÊNCIA: HORÁRIO DE CORTE E DIAS ÚTEIS
+                            # =======================================================
+                            agora_sp = datetime.now(FUSO_BR)
+                            
+                            # 1. Regra das 10:00h
+                            if agora_sp.hour < 10:
+                                data_minima = agora_sp.date()
+                            else:
+                                data_minima = agora_sp.date() + timedelta(days=1)
+                                
+                            # 2. Pula os finais de semana (5 = Sábado, 6 = Domingo)
+                            while data_minima.weekday() >= 5:
+                                data_minima += timedelta(days=1)
+                            # =======================================================
+                            
+                            data_coleta = c1.date_input("📅 Data Desejada para Coleta:", min_value=data_minima, value=data_minima, format="DD/MM/YYYY")
                             obs = st.text_area("📝 Observações / Instruções (Opcional):", placeholder="Ex: Procurar por Fulano, coletar na recepção...", height=100)
 
                             if st.form_submit_button("🚀 Enviar Solicitação ao C.C.O.", type="primary", use_container_width=True):
                                 if lab_sel == "Selecione...":
                                     st.error("⚠️ Por favor, selecione um Ponto de Coleta válido na lista.")
+                                elif data_coleta.weekday() >= 5:
+                                    # 3. Trava de segurança contra o cliente teimoso
+                                    st.error("⚠️ Solicitação bloqueada: Coletas não são realizadas aos finais de semana. Por favor, escolha um dia útil no calendário.")
                                 else:
                                     with st.spinner("Registrando pedido seguro e notificando o C.C.O..."):
                                         try:
@@ -511,7 +530,7 @@ else:
                                             
                                             enviar_whatsapp_zapi_cliente("5511947996371", texto_zap)
                                             
-                                            st.success(f"🎉 Sucesso! Pedido #{prox_id} criado e aguardando aprovação do C.C.O.")
+                                            st.success(f"🎉 Sucesso! Pedido #{prox_id} criado para {data_coleta.strftime('%d/%m/%Y')}. Aguardando aprovação do C.C.O.")
                                             carregar_dados_nuvem.clear()
                                         except Exception as e:
                                             st.error(f"Erro ao processar solicitação: {e}")
