@@ -777,26 +777,38 @@ if menu == "📊 GRID":
         # 🔥 FIM DA CAIXA DE ENTRADA 🔥
         
         def get_detalhes(row):
-            # 1. Puxa os dados com os nomes corretos das colunas
+            # 1. Puxa os dados com os nomes corretos mapeados pelo sistema
             obs_master = str(row.get('OBSERVACOES', '')).strip()
             obs_app = str(row.get('APP_OBS', '')).strip()
+            contato_app = str(row.get('A_CONTATO', '')).strip() # <--- Puxando o nome/informante do App
             status_atual = str(row.get('STATUS', '')).upper()
             
-            if obs_master.upper() == 'NAN': obs_master = ""
-            if obs_app.upper() == 'NAN': obs_app = ""
+            # Limpeza de nulos
+            if obs_master.upper() in ['NAN', 'NONE']: obs_master = ""
+            if obs_app.upper() in ['NAN', 'NONE']: obs_app = ""
+            if contato_app.upper() in ['NAN', 'NONE']: contato_app = ""
             
-            # 2. A prioridade é sempre o que o motorista enviou do aplicativo
-            obs_final = obs_app if obs_app else obs_master
+            # 2. Concatenação Inteligente do App (Observação + Nome)
+            obs_final_app = obs_app
+            if obs_app and contato_app:
+                # Evita que fique "Ana / Ana" se ele digitar igual nos dois campos
+                if obs_app.upper() != contato_app.upper(): 
+                    obs_final_app = f"{obs_app} / {contato_app}"
+            elif contato_app:
+                obs_final_app = contato_app
+
+            # 3. A prioridade é sempre o que o motorista enviou do aplicativo
+            obs_final = obs_final_app if obs_final_app else obs_master
             
-            # 3. Inteligência: Se a entrega falhou, arranca o texto de horário para destacar o erro
+            # 4. Limpeza: Se a entrega falhou, arranca o texto de horário
             if status_atual in ['FRUSTRADA', 'PROBLEMA', 'CANCELADO']:
-                # Usa regex para apagar o "[COLETA: 08:00 - 16:00] - " invisivelmente
+                # Apaga o "[COLETA: 08:00 - 16:00] - " invisivelmente
                 obs_limpa = re.sub(r'\[COLETA:.*?\]\s*-?\s*', '', obs_final).strip()
                 
                 if obs_limpa:
-                    return f"⚠️ Motivo: {obs_limpa}"
+                    return f"⚠️ {obs_limpa}" # <--- Palavra 'Motivo' removida
                 else:
-                    return "⚠️ Motivo não justificado pelo motorista"
+                    return "⚠️ Sem justificativa"
             
             # Se deu tudo certo ou tá pendente, mostra a observação normal
             if obs_final: return obs_final
