@@ -437,12 +437,18 @@ else:
                     for col in df_final.columns: 
                         df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
+                    # Colunas restauradas na ordem lógica de leitura
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF', 
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY', 
                         'DETALHES', 'COMPROVANTE'
                     ]
                     
+                    # 🔥 INTELIGÊNCIA: INJETA O CNPJ APENAS SE FOR A LABEST 🔥
+                    if st.session_state.cliente == "LOGISTICA.LABEST":
+                        colunas_visiveis.insert(3, 'CNPJ') # Coloca o CNPJ logo depois do Laboratório
+                    
+                    # Filtro de segurança caso alguma coluna esteja vazia no BD
                     colunas_visiveis = [c for c in colunas_visiveis if c in df_final.columns]
 
                     st.dataframe(
@@ -451,6 +457,7 @@ else:
                             "PEDIDO": st.column_config.TextColumn("📦 Pedido", width="small"),
                             "DATA": st.column_config.TextColumn("📅 Emissão", width="small"),
                             "LABORATORIO": st.column_config.TextColumn("🔬 Ponto de Coleta", width="medium"),
+                            "CNPJ": st.column_config.TextColumn("🏢 CNPJ", width="medium"), # <-- Configuração da nova coluna
                             "CIDADE_UF": st.column_config.TextColumn("📍 Cidade / UF", width="medium"),
                             "DATA_LIMITE": st.column_config.TextColumn("🎯 Previsão", width="small"),
                             "DATA_EFETIVA": st.column_config.TextColumn("🏁 Entrega", width="small"),
