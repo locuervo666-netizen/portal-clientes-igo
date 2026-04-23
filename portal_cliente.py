@@ -437,12 +437,34 @@ else:
                     # Selecionamos apenas as colunas essenciais para não sobrecarregar a visão
                     colunas_visiveis = ['PEDIDO', 'DATA', 'LABORATORIO', 'STATUS_DISPLAY', 'DETALHES', 'COMPROVANTE']
 
+                    # 🔥 MELHORIA UX 1: GRID LIMPA, MAS COMPLETA 🔥
+                    def tratar_foto(x):
+                        xs = str(x).strip()
+                        if not xs or xs.upper() in ['NAN', 'NONE']: return ""
+                        if xs.startswith("http"): return xs
+                        return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
+                    
+                    df_final['COMPROVANTE'] = df_final['FOTO'].apply(tratar_foto)
+
+                    for col in df_final.columns: 
+                        df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
+
+                    # Colunas restauradas na ordem lógica de leitura
+                    colunas_visiveis = [
+                        'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE', 
+                        'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY', 
+                        'DETALHES', 'COMPROVANTE'
+                    ]
+
                     st.dataframe(
                         df_final[colunas_visiveis],
                         column_config={
                             "PEDIDO": st.column_config.TextColumn("📦 Pedido", width="small"),
-                            "DATA": st.column_config.TextColumn("📅 Data", width="small"),
+                            "DATA": st.column_config.TextColumn("📅 Emissão", width="small"),
                             "LABORATORIO": st.column_config.TextColumn("🔬 Ponto de Coleta", width="medium"),
+                            "CIDADE": st.column_config.TextColumn("📍 Destino", width="medium"),
+                            "DATA_LIMITE": st.column_config.TextColumn("🎯 Previsão", width="small"),
+                            "DATA_EFETIVA": st.column_config.TextColumn("🏁 Entrega", width="small"),
                             "STATUS_DISPLAY": st.column_config.TextColumn("🚦 Status", width="medium"),
                             "DETALHES": st.column_config.TextColumn("💬 Atualizações / Motivos", width="large"),
                             "COMPROVANTE": st.column_config.LinkColumn("📎 Anexo", display_text="Ver Comprovante")
