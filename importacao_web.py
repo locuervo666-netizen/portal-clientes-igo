@@ -1472,7 +1472,9 @@ elif menu == "📝 Pedido Manual":
 # =============================================================================
 elif menu == "📥 Importações":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes (Oficial)</h3></div>", unsafe_allow_html=True)
+    
     if "df_preview_oficial" not in st.session_state: st.session_state.df_preview_oficial = pd.DataFrame()
+    if "df_carrinho_oficial" not in st.session_state: st.session_state.df_carrinho_oficial = pd.DataFrame()
         
     with st.container(border=True):
         st.markdown("#### 1. Mapeamento de Planilha e Colagem")
@@ -1532,7 +1534,7 @@ elif menu == "📥 Importações":
                                     if obs_val and obs_val.upper() not in ['NAN', 'NONE']:
                                         nova_obs += f" - {obs_val}"
                                     df_limpo.at[idx, 'OBSERVACOES'] = nova_obs
-                                
+                        
                         df_limpo['PEDIDO'] = ""
                             
                         for idx, row in df_limpo.iterrows():
@@ -1545,14 +1547,12 @@ elif menu == "📥 Importações":
                                 if ',' in e and not n: 
                                     pts = e.split(',')
                                     df_limpo.at[idx, 'ENDERECO'], df_limpo.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
-                                    
+                                
                         df_limpo['UF'] = df_limpo['UF'].astype(str).str.upper().str.strip()
                         df_limpo['TOMADOR'] = tom
                         df_limpo['DATA'] = dt_c.strftime("%d/%m/%Y")
                         
-                        # 🔥 A MÁGICA DA CORREÇÃO ORTOGRÁFICA ACONTECE AQUI:
                         df_limpo['CIDADE'] = df_limpo['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
-                        
                         df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
                         
                         st.session_state.df_preview_oficial = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
@@ -1607,49 +1607,171 @@ elif menu == "📥 Importações":
         else:
             st.success(f"✅ Lote validado! {len(df_ok)} pedidos prontos.")
             st.dataframe(df_ok, hide_index=True)
-            if st.button("🚀 3. INJETAR LOTE OFICIAL", type="primary", key="inj_oficial"):
-                with st.spinner("🚀 Injetando lotes no banco de dados principal..."):
+            
+            # 🔥 MUDANÇA 1: ADICIONAR AO CARRINHO COM IDs OFICIAIS SEQUENCIAIS 🔥
+            if st.button("➕ Adicionar ao Carrinho Oficial (Cumulativo)", type="primary", key="add_carrinho_oficial"):
+                with st.spinner("Gerando IDs sequenciais e adicionando ao carrinho..."):
                     try:
-                        aba = planilha_db.worksheet("Memoria_Sistema")
-                        atuais = aba.get_all_values()
-                        df_up = pd.DataFrame(atuais[1:], columns=atuais[0]) if len(atuais) > 1 else pd.DataFrame()
+                        aba_m = planilha_db.worksheet("Memoria_Sistema")
+                        df_up = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
                         
-                        if 'ZAP_ENVIADO' not in df_up.columns: df_up['ZAP_ENVIADO'] = ""
-                        if 'CNPJ' not in df_up.columns: df_up['CNPJ'] = ""
+                        if 'contador_oficial_temp' not in st.session_state:
+                            st.session_state.contador_oficial_temp = obter_proximo_id(df_up)
+                            
+                        prox_id_of = st.session_state.contador_oficial_temp
                         
-                        # INTELIGÊNCIA: Ler o maior número direto da nuvem
-                        prox_id = obter_proximo_id(df_up)
                         for idx, row in df_ok.iterrows():
-                            if not str(row['PEDIDO']).strip(): 
-                                df_ok.at[idx, 'PEDIDO'] = str(prox_id); prox_id += 1
-                                
+                            df_ok.at[idx, 'PEDIDO'] = str(prox_id_of)
+                            prox_id_of += 1
+                            
+                        st.session_state.contador_oficial_temp = prox_id_of
+                        
                         df_ok['PRAZO_DIAS'] = df_ok.apply(lambda r: str(calcular_sla_dias(r['UF'], r['CIDADE'], r['TOMADOR'])), axis=1)
                         df_ok['DATA_LIMITE'] = df_ok.apply(lambda r: str(calcular_data_limite(r['DATA'], int(r['PRAZO_DIAS']))), axis=1)
-                        df_ok['STATUS'] = 'PENDENTE'; df_ok['DATA_ENTREGA'] = ''; df_ok['FOTO'] = ''; df_ok['ROMANEIO'] = ''; df_ok['ZAP_ENVIADO'] = ''
+                        df_ok['STATUS'] = 'PENDENTE'
+                        df_ok['DATA_ENTREGA'] = ''
+                        df_ok['FOTO'] = ''
+                        df_ok['ROMANEIO'] = ''
+                        df_ok['ZAP_ENVIADO'] = ''
+                        df_ok['FATURA'] = ''
                         
                         df_ok = df_ok.astype(str)
-                        df_up = pd.concat([df_up, df_ok], ignore_index=True) if not df_up.empty else df_ok
-                        aba.clear()
-                        aba.update("A1", [df_up.columns.tolist()] + df_up.fillna("").astype(str).values.tolist())
                         
-                        lista_app = []
-                        for _, r in df_ok.iterrows():
+                        if st.session_state.df_carrinho_oficial.empty:
+                            st.session_state.df_carrinho_oficial = df_ok
+                        else:
+                            st.session_state.df_carrinho_oficial = pd.concat([st.session_state.df_carrinho_oficial, df_ok], ignore_index=True)
+                            
+                        st.session_state.df_preview_oficial = pd.DataFrame()
+                        st.success("✅ Pedidos adicionados ao carrinho com sucesso!")
+                        time.sleep(1.5); st.rerun()
+                    except Exception as e: st.error(f"Erro: {e}")
+
+    # 🔥 MUDANÇA 2: O CARRINHO E A MESA DE COMANDO OFICIAL 🔥
+    if not st.session_state.df_carrinho_oficial.empty:
+        df_cart_of = st.session_state.df_carrinho_oficial
+        
+        st.markdown("---")
+        col_tit_c, col_canc_c = st.columns([4, 1], vertical_alignment="center")
+        col_tit_c.markdown("### 🛒 2. Carrinho de Expedição Oficial")
+        if col_canc_c.button("🗑️ Esvaziar Carrinho", type="secondary", use_container_width=True, key="canc_carr_of"):
+            st.session_state.df_carrinho_oficial = pd.DataFrame()
+            if 'contador_oficial_temp' in st.session_state: del st.session_state.contador_oficial_temp
+            st.rerun()
+
+        c_kpi1_of, c_kpi2_of = st.columns([1, 4])
+        c_kpi1_of.metric("TOTAL NO CARRINHO", len(df_cart_of))
+        resumo_tom_of = df_cart_of.groupby('TOMADOR').size().reset_index(name='QTD')
+        c_kpi2_of.info(f"**Detalhamento por Cliente:**\n{' | '.join([f'**{row['TOMADOR']}**: {row['QTD']}' for _, row in resumo_tom_of.iterrows()])}")
+        
+        st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
+        df_editado_oficial = st.data_editor(df_cart_of, num_rows="dynamic", use_container_width=True, key="oficial_grid_master")
+        
+        st.markdown("---")
+        st.markdown("### 🎛️ Mesa de Comando Oficial")
+        col_cmd1, col_cmd2 = st.columns([1, 1])
+        
+        with col_cmd1:
+            if st.button("🚀 1. Injetar Lote no Banco de Dados", type="primary", use_container_width=True):
+                with st.spinner("🚀 Injetando lotes no banco de dados principal e AppSheet..."):
+                    try:
+                        # 🔥 BLINDAGEM: Garantir que apenas as colunas corretas subam para não sujar a GRID 🔥
+                        colunas_bd_oficiais = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO', 'ZAP_ENVIADO', 'FATURA', 'OBSERVACOES']
+                        
+                        df_to_insert = df_editado_oficial.copy()
+                        for c in colunas_bd_oficiais:
+                            if c not in df_to_insert.columns: df_to_insert[c] = ""
+                        df_to_insert = df_to_insert[colunas_bd_oficiais].astype(str)
+
+                        aba_m = planilha_db.worksheet("Memoria_Sistema")
+                        df_up_final = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                        df_up_final = pd.concat([df_up_final, df_to_insert], ignore_index=True)
+                        
+                        aba_m.clear()
+                        aba_m.update("A1", [df_up_final.columns.tolist()] + df_up_final.fillna("").astype(str).values.tolist())
+                        
+                        lista_app_of = []
+                        for _, r in df_to_insert.iterrows():
                             if str(r.get('AGENTE_RAW','')).strip():
-                                dict_app = {
+                                lista_app_of.append({
                                     'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'], 
                                     'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'], 
                                     'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'], 
                                     'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'], 
                                     'TOMADOR': r['TOMADOR'], 'OBSERVACOES': r.get('OBSERVACOES', '')
-                                }
-                                lista_app.append(dict_app)
-                        if lista_app: despachar_para_appsheet(lista_app)
+                                })
+                        if lista_app_of: despachar_para_appsheet(lista_app_of)
                         
-                        st.success(f"🎉 SUCESSO! {len(df_ok)} pedidos importados no C.C.O.")
-                        time.sleep(3.5) 
+                        # Limpa o carrinho após injetar com sucesso
+                        st.session_state.df_carrinho_oficial = pd.DataFrame()
+                        if 'contador_oficial_temp' in st.session_state: del st.session_state.contador_oficial_temp
                         
-                        st.session_state.df_preview_oficial = pd.DataFrame(); carregar_dados_completos.clear(); st.rerun()
-                    except Exception as e: st.error(f"Erro: {e}")
+                        st.success(f"🎉 SUCESSO! {len(df_to_insert)} pedidos importados no C.C.O.")
+                        time.sleep(2.5); carregar_dados_completos.clear(); st.rerun()
+                    except Exception as e: st.error(f"Erro ao injetar: {e}")
+
+        with col_cmd2.popover("📲 2. Disparar WhatsApp", use_container_width=True):
+            st.markdown("Isso disparará as rotas de todos os clientes no carrinho para os motoristas. **Lembre-se de clicar em Injetar no Banco depois para salvar o status do disparo!**")
+            if st.button("🚀 Confirmar Disparos", use_container_width=True, key="zap_oficial"):
+                dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
+                dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
+                
+                agentes_selecionados = df_editado_oficial['AGENTE_RAW'].dropna().unique()
+                sucessos_of = 0
+                agentes_xls_of = AGENTES_XLS_AUTORIZADOS
+                
+                if len(agentes_selecionados) > 0:
+                    progress_bar = st.progress(0)
+                    status_txt = st.empty()
+                
+                    for idx_ag, ag in enumerate(agentes_selecionados):
+                        if not str(ag).strip(): continue
+                        df_ag_of = df_editado_oficial[df_editado_oficial['AGENTE_RAW'] == ag]
+                        tel = dict_tel.get(str(ag).strip().lower(), "")
+                        nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
+                        ag_login = str(ag).strip().lower()
+                        
+                        if tel:
+                            status_txt.markdown(f"**Enviando rota para:** {nom} ({idx_ag+1}/{len(agentes_selecionados)})...")
+                            dt_ref = pd.to_datetime(df_ag_of.iloc[0]['DATA'], format='%d/%m/%Y', errors='coerce').date() if not df_ag_of.empty else hoje_br
+                            data_str = dt_ref.strftime('%d/%m/%Y')
+                            
+                            msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
+                            tot_qtd = 0
+                            for cid, count in df_ag_of['CIDADE'].value_counts().items():
+                                msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}"); tot_qtd += count
+                            msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
+                            
+                            for cid, group in df_ag_of.groupby('CIDADE'):
+                                msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
+                                items = []
+                                for _, row in group.iterrows():
+                                    item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                    obs = str(row.get('OBSERVACOES', '')).strip()
+                                    if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
+                                    items.append(item_str)
+                                msg_parts.append("\n\n      . . . . .\n\n".join(items) + "\n")
+                                
+                            if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
+                                time.sleep(2.0)
+                                pdf_bytes_of = gerar_pdf_rota_whatsapp(nom, data_str, df_ag_of)
+                                enviar_pdf_zapi(tel, pdf_bytes_of, f"ROTA_IGO_{nom.replace(' ', '_')}_{dt_ref.strftime('%d%m')}.pdf")
+                                
+                                if ag_login in agentes_xls_of or ag_login.split('|')[0] in agentes_xls_of:
+                                    time.sleep(3.0)
+                                    xls_bytes_of = gerar_excel_rota_whatsapp(df_ag_of)
+                                    enviar_excel_zapi(tel, xls_bytes_of, f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{dt_ref.strftime('%d%m')}.xlsx")
+                                
+                                sucessos_of += 1
+                                st.session_state.df_carrinho_oficial.loc[st.session_state.df_carrinho_oficial['PEDIDO'].isin(df_ag_of['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
+                                
+                        progress_bar.progress((idx_ag + 1) / len(agentes_selecionados))
+                    
+                    status_txt.markdown("✅ **Processo finalizado!**")
+                    if sucessos_of > 0: 
+                        st.success(f"🎉 Disparo concluído para {sucessos_of} motorista(s)! (Clique em Injetar no Banco para salvar as informações).")
+                        time.sleep(3.5); st.rerun()
+                    else: st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
 
 # =============================================================================
 # 🔥 MÓDULO SANDBOX (PARALELO): IMPORTAÇÕES UMOVE 🔥
