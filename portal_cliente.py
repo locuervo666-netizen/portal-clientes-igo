@@ -437,24 +437,37 @@ else:
                     # Selecionamos apenas as colunas essenciais para não sobrecarregar a visão
                     colunas_visiveis = ['PEDIDO', 'DATA', 'LABORATORIO', 'STATUS_DISPLAY', 'DETALHES', 'COMPROVANTE']
 
-                    # 🔥 MELHORIA UX 1: GRID LIMPA, MAS COMPLETA 🔥
+                    # 🔥 MELHORIA UX 1: GRID LIMPA, COMPLETA E CORRIGIDA 🔥
                     def tratar_foto(x):
                         xs = str(x).strip()
                         if not xs or xs.upper() in ['NAN', 'NONE']: return ""
                         if xs.startswith("http"): return xs
                         return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
                     
+                    df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO'].apply(tratar_foto)
+
+                    # Inteligência para juntar Cidade e UF na mesma coluna
+                    if 'UF' not in df_final.columns:
+                        df_final['UF'] = ""
+                        
+                    df_final['CIDADE_UF'] = df_final.apply(
+                        lambda r: f"{str(r.get('CIDADE','')).strip()}/{str(r.get('UF','')).strip()}" if str(r.get('UF','')).strip() and str(r.get('UF','')).upper() != 'NAN' else str(r.get('CIDADE','')).strip(), 
+                        axis=1
+                    )
 
                     for col in df_final.columns: 
                         df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
                     # Colunas restauradas na ordem lógica de leitura
                     colunas_visiveis = [
-                        'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE', 
+                        'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF', 
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY', 
                         'DETALHES', 'COMPROVANTE'
                     ]
+                    
+                    # Filtro de segurança caso alguma coluna esteja vazia no BD
+                    colunas_visiveis = [c for c in colunas_visiveis if c in df_final.columns]
 
                     st.dataframe(
                         df_final[colunas_visiveis],
@@ -462,7 +475,7 @@ else:
                             "PEDIDO": st.column_config.TextColumn("📦 Pedido", width="small"),
                             "DATA": st.column_config.TextColumn("📅 Emissão", width="small"),
                             "LABORATORIO": st.column_config.TextColumn("🔬 Ponto de Coleta", width="medium"),
-                            "CIDADE": st.column_config.TextColumn("📍 Destino", width="medium"),
+                            "CIDADE_UF": st.column_config.TextColumn("📍 Cidade / UF", width="medium"),
                             "DATA_LIMITE": st.column_config.TextColumn("🎯 Previsão", width="small"),
                             "DATA_EFETIVA": st.column_config.TextColumn("🏁 Entrega", width="small"),
                             "STATUS_DISPLAY": st.column_config.TextColumn("🚦 Status", width="medium"),
