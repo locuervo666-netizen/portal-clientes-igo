@@ -422,25 +422,39 @@ else:
                     
                     for col in df_final.columns: df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
-                    st.data_editor(
-                        df_final,
+                    # 🔥 MELHORIA UX 1: GRID LIMPA E RESPIRÁVEL 🔥
+                    def tratar_foto(x):
+                        xs = str(x).strip()
+                        if not xs or xs.upper() in ['NAN', 'NONE']: return ""
+                        if xs.startswith("http"): return xs
+                        return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
+                    
+                    df_final['COMPROVANTE'] = df_final['FOTO'].apply(tratar_foto)
+
+                    for col in df_final.columns: 
+                        df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
+
+                    # Selecionamos apenas as colunas essenciais para não sobrecarregar a visão
+                    colunas_visiveis = ['PEDIDO', 'DATA', 'LABORATORIO', 'STATUS_DISPLAY', 'DETALHES', 'COMPROVANTE']
+
+                    st.dataframe(
+                        df_final[colunas_visiveis],
                         column_config={
-                            "DATA": st.column_config.TextColumn("DATA PEDIDO"),
-                            "PEDIDO": st.column_config.TextColumn("PEDIDO"),
-                            "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
-                            "DATA_EFETIVA": st.column_config.TextColumn("DATA ENTREGA"),
-                            "LABORATORIO": st.column_config.TextColumn("PCL"),
-                            "CIDADE": st.column_config.TextColumn("CIDADE"),
-                            "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
-                            "COMPROVANTE": st.column_config.LinkColumn("COMPROVANTE", display_text="🔎 Abrir Foto"),
-                            "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large")
+                            "PEDIDO": st.column_config.TextColumn("📦 Pedido", width="small"),
+                            "DATA": st.column_config.TextColumn("📅 Data", width="small"),
+                            "LABORATORIO": st.column_config.TextColumn("🔬 Ponto de Coleta", width="medium"),
+                            "STATUS_DISPLAY": st.column_config.TextColumn("🚦 Status", width="medium"),
+                            "DETALHES": st.column_config.TextColumn("💬 Atualizações / Motivos", width="large"),
+                            "COMPROVANTE": st.column_config.LinkColumn("📎 Anexo", display_text="Ver Comprovante")
                         },
-                        column_order=colunas_ordenadas, disabled=True, hide_index=True, use_container_width=True, height=500
+                        hide_index=True, 
+                        use_container_width=True, 
+                        height=450
                     )
 
                     with holder_exportar:
                         csv = df_grid.to_csv(index=False, sep=';').encode('utf-8-sig')
-                        st.download_button("📥 Exportar Planilha (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
+                        st.download_button("📥 Exportar Relatório Completo (CSV)", data=csv, file_name=f"Relatorio_{st.session_state.cliente}.csv", use_container_width=True)
 
             # 🔥 NOVO MÓDULO: AUTOATENDIMENTO DE COLETA 🔥
         with tab_solicitar:
