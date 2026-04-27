@@ -2002,20 +2002,46 @@ elif menu == "📥 Importações Umove":
             aba_fixos.update("A1", [cols_fixos])
             df_regras = pd.DataFrame(columns=cols_fixos)
 
+        # --- NOVA LÓGICA DE CEP PARA PEDIDOS FIXOS ---
+        if 'f_rua' not in st.session_state: st.session_state['f_rua'] = ""
+        if 'f_bai' not in st.session_state: st.session_state['f_bai'] = ""
+        if 'f_cid' not in st.session_state: st.session_state['f_cid'] = ""
+        if 'f_uf' not in st.session_state: st.session_state['f_uf'] = ""
+        if 'cep_input_fixo' not in st.session_state: st.session_state['cep_input_fixo'] = ""
+
+        def buscar_cep_fixo_callback():
+            cep_limpo = re.sub(r'\D', '', st.session_state.cep_input_fixo)
+            if len(cep_limpo) == 8:
+                try:
+                    resp = requests.get(f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
+                    if "erro" not in resp:
+                        st.session_state['f_rua'] = padronizar_texto(resp.get("logradouro", ""))
+                        st.session_state['f_bai'] = padronizar_texto(resp.get("bairro", ""))
+                        st.session_state['f_cid'] = padronizar_texto(resp.get("localidade", ""))
+                        st.session_state['f_uf'] = padronizar_texto(resp.get("uf", ""))
+                except Exception: pass
+
+        cc1_f, cc2_f, cc3_f = st.columns([2, 1, 3], vertical_alignment="bottom")
+        cc1_f.text_input("Digite o CEP e aperte ENTER", max_chars=9, key="cep_input_fixo", on_change=buscar_cep_fixo_callback)
+        if cc2_f.button("🔍 Buscar CEP", key="btn_busc_cep_fixo", use_container_width=True):
+            buscar_cep_fixo_callback()
+            
+        st.markdown("---")
+        # ---------------------------------------------
+
         with st.form("form_novo_fixo", clear_on_submit=True):
             col_f1, col_f2 = st.columns(2)
             f_tomador = col_f1.selectbox("Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
             f_lab = col_f2.text_input("Ponto de Coleta / Laboratório *")
             
-            c_cep, c_rua, c_num = st.columns([1, 2, 1])
-            f_cep = c_cep.text_input("CEP")
-            f_rua = c_rua.text_input("Logradouro *")
+            c_rua, c_num = st.columns([3, 1])
+            f_rua = c_rua.text_input("Logradouro *", value=st.session_state['f_rua'])
             f_num = c_num.text_input("Número *")
             
             c_bai, c_cid, c_uf = st.columns([2, 2, 1])
-            f_bai = c_bai.text_input("Bairro *")
-            f_cid = c_cid.text_input("Cidade *")
-            f_uf = c_uf.text_input("UF *")
+            f_bai = c_bai.text_input("Bairro *", value=st.session_state['f_bai'])
+            f_cid = c_cid.text_input("Cidade *", value=st.session_state['f_cid'])
+            f_uf = c_uf.text_input("UF *", value=st.session_state['f_uf'])
             
             f_obs = st.text_input("Observações Padrão (Ex: [COLETA: 08:00 - 12:00])")
             
@@ -2044,7 +2070,7 @@ elif menu == "📥 Importações Umove":
                         nova_regra = [
                             f"REG-{str(uuid.uuid4())[:6].upper()}", f_tomador, padronizar_texto(f_lab), 
                             padronizar_texto(f_rua), padronizar_texto(f_num), padronizar_texto(f_bai), 
-                            padronizar_texto(f_cid), padronizar_texto(f_uf), re.sub(r'\D', '', f_cep), 
+                            padronizar_texto(f_cid), padronizar_texto(f_uf), re.sub(r'\D', '', st.session_state.cep_input_fixo), 
                             str(f_obs), f_agente,
                             "SIM" if b_seg else "NAO", "SIM" if b_ter else "NAO", "SIM" if b_qua else "NAO",
                             "SIM" if b_qui else "NAO", "SIM" if b_sex else "NAO", "SIM" if b_sab else "NAO",
@@ -2053,6 +2079,14 @@ elif menu == "📥 Importações Umove":
                         try:
                             aba_fixos.append_row(nova_regra)
                             st.success("✅ Regra Fixa cadastrada com sucesso!")
+                            
+                            # Limpa os campos da sessão após salvar
+                            st.session_state['f_rua'] = ""
+                            st.session_state['f_bai'] = ""
+                            st.session_state['f_cid'] = ""
+                            st.session_state['f_uf'] = ""
+                            st.session_state['cep_input_fixo'] = ""
+                            
                             time.sleep(1.5); st.rerun()
                         except Exception as e: st.error(f"Erro: {e}")
 
