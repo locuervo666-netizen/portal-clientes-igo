@@ -1989,28 +1989,26 @@ elif menu == "📥 Importações Umove":
     # -------------------------------------------------------------------------
     with tab_fixos:
         st.markdown("#### 🏭 Criar Novo Agendamento Fixo")
-        st.info("Cadastre aqui os laboratórios que têm coletas programadas para dias específicos da semana.")
         
-        # Conexão com a aba de Agendamentos Fixos
+        # Conexão e criação da aba se não existir
         try:
             aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
-            dados_fixos = aba_fixos.get_all_values()
-            df_regras = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0]) if len(dados_fixos) > 1 else pd.DataFrame(columns=['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS'])
         except Exception:
             aba_fixos = planilha_db.add_worksheet("Agendamentos_Fixos", 100, 20)
-            cols_fixos = ['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
-            aba_fixos.update("A1", [cols_fixos])
-            df_regras = pd.DataFrame(columns=cols_fixos)
+            aba_fixos.update("A1", [['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']])
 
-        # --- NOVA LÓGICA DE CEP PARA PEDIDOS FIXOS ---
+        # --- LÓGICA DE RESET INTELIGENTE ---
         if 'f_rua' not in st.session_state: st.session_state['f_rua'] = ""
         if 'f_bai' not in st.session_state: st.session_state['f_bai'] = ""
         if 'f_cid' not in st.session_state: st.session_state['f_cid'] = ""
         if 'f_uf' not in st.session_state: st.session_state['f_uf'] = ""
-        if 'cep_input_fixo' not in st.session_state: st.session_state['cep_input_fixo'] = ""
+        if 'cep_version' not in st.session_state: st.session_state['cep_version'] = 0
 
         def buscar_cep_fixo_callback():
-            cep_limpo = re.sub(r'\D', '', st.session_state.cep_input_fixo)
+            # Acessamos o valor usando a chave versionada
+            chave_atual = f"cep_input_fixo_{st.session_state.cep_version}"
+            cep_digitado = st.session_state.get(chave_atual, "")
+            cep_limpo = re.sub(r'\D', '', cep_digitado)
             if len(cep_limpo) == 8:
                 try:
                     resp = requests.get(f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
@@ -2022,12 +2020,15 @@ elif menu == "📥 Importações Umove":
                 except Exception: pass
 
         cc1_f, cc2_f, cc3_f = st.columns([2, 1, 3], vertical_alignment="bottom")
-        cc1_f.text_input("Digite o CEP e aperte ENTER", max_chars=9, key="cep_input_fixo", on_change=buscar_cep_fixo_callback)
-        if cc2_f.button("🔍 Buscar CEP", key="btn_busc_cep_fixo", use_container_width=True):
+        
+        # A KEY agora é dinâmica: cep_input_fixo_0, dps cep_input_fixo_1...
+        key_dinamica = f"cep_input_fixo_{st.session_state.cep_version}"
+        cc1_f.text_input("Digite o CEP e aperte ENTER", max_chars=9, key=key_dinamica, on_change=buscar_cep_fixo_callback)
+        
+        if cc2_f.button("🔍 Buscar CEP", key="btn_busc_cep_fixo"):
             buscar_cep_fixo_callback()
             
         st.markdown("---")
-        # ---------------------------------------------
 
         with st.form("form_novo_fixo", clear_on_submit=True):
             col_f1, col_f2 = st.columns(2)
@@ -2061,7 +2062,7 @@ elif menu == "📥 Importações Umove":
                 if f_tomador == "Selecione..." or not f_lab or not f_rua or not f_num or not f_bai or not f_cid:
                     st.error("Preencha todos os campos obrigatórios (*).")
                 elif not any([b_seg, b_ter, b_qua, b_qui, b_sex, b_sab]):
-                    st.error("Selecione pelo menos um dia da semana para o agendamento.")
+                    st.error("Selecione pelo menos um dia da semana.")
                 else:
                     with st.spinner("Salvando regra..."):
                         if f_agente == "Automático (Por Rota)":
@@ -2070,7 +2071,7 @@ elif menu == "📥 Importações Umove":
                         nova_regra = [
                             f"REG-{str(uuid.uuid4())[:6].upper()}", f_tomador, padronizar_texto(f_lab), 
                             padronizar_texto(f_rua), padronizar_texto(f_num), padronizar_texto(f_bai), 
-                            padronizar_texto(f_cid), padronizar_texto(f_uf), re.sub(r'\D', '', st.session_state.cep_input_fixo), 
+                            padronizar_texto(f_cid), padronizar_texto(f_uf), st.session_state.get(key_dinamica, ""), 
                             str(f_obs), f_agente,
                             "SIM" if b_seg else "NAO", "SIM" if b_ter else "NAO", "SIM" if b_qua else "NAO",
                             "SIM" if b_qui else "NAO", "SIM" if b_sex else "NAO", "SIM" if b_sab else "NAO",
@@ -2080,12 +2081,13 @@ elif menu == "📥 Importações Umove":
                             aba_fixos.append_row(nova_regra)
                             st.success("✅ Regra Fixa cadastrada com sucesso!")
                             
-                            # Limpa os campos da sessão após salvar
+                            # LIMPANDO TUDO COM SEGURANÇA
                             st.session_state['f_rua'] = ""
                             st.session_state['f_bai'] = ""
                             st.session_state['f_cid'] = ""
                             st.session_state['f_uf'] = ""
-                            st.session_state['cep_input_fixo'] = ""
+                            # 🔥 AQUI ESTÁ O PULO DO GATO:
+                            st.session_state.cep_version += 1 
                             
                             time.sleep(1.5); st.rerun()
                         except Exception as e: st.error(f"Erro: {e}")
