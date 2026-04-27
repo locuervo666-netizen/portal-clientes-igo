@@ -2115,80 +2115,80 @@ elif menu == "📥 Importações Umove":
     # ABA 3: CARRINHO E SAÍDA
     # -------------------------------------------------------------------------
     with tab_carrinho:
-        # 🔥 O BOTÃO MÁGICO QUE GERA OS PEDIDOS FIXOS DO DIA 🔥
-        st.markdown("#### ⚙️ Automação de Carga Diária")
-        if st.button("🚀 PUXAR PEDIDOS FIXOS DE HOJE", type="primary", use_container_width=True):
-            with st.spinner("Lendo banco de regras e gerando ordens de coleta..."):
-                try:
-                    aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
-                    dados_fixos = aba_fixos.get_all_values()
-                    if len(dados_fixos) > 1:
-                        df_regras = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0])
-                        
-                        mapa_dias = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
-                        dia_atual = mapa_dias[hoje_br.weekday()]
-                        
-                        if dia_atual == 'DOM':
-                            st.warning("Hoje é Domingo. Não há coletas programadas.")
-                        else:
-                            # Filtra as regras ativas para o dia de hoje
-                            df_alvo = df_regras[(df_regras[dia_atual] == "SIM") & (df_regras['STATUS'] == "ATIVO")].copy()
-                            
-                            if df_alvo.empty:
-                                st.info(f"Nenhum pedido fixo agendado para hoje ({dia_atual}).")
-                            else:
-                                # Prepara os IDs Sequenciais
-                                try: aba_contador = planilha_sandbox.worksheet("Contador")
-                                except: aba_contador = planilha_sandbox.add_worksheet("Contador", 100, 20); aba_contador.update("A1", [["700020"]])
-                                val = aba_contador.acell('A1').value
-                                prox_id_sb = int(val) if (val and str(val).isdigit()) else 700020
-
-                                novos_pedidos = []
-                                for _, regra in df_alvo.iterrows():
-                                    novo_pedido = {
-                                        'DATA': hoje_br.strftime("%d/%m/%Y"),
-                                        'TOMADOR': regra['TOMADOR'],
-                                        'PEDIDO': str(prox_id_sb),
-                                        'LABORATORIO': regra['LABORATORIO'],
-                                        'CNPJ': "",
-                                        'ENDERECO': regra['ENDERECO'],
-                                        'NUMERO': regra['NUMERO'],
-                                        'BAIRRO': regra['BAIRRO'],
-                                        'CIDADE': regra['CIDADE'],
-                                        'UF': regra['UF'],
-                                        'CEP': regra['CEP'],
-                                        'OBSERVACOES': regra['OBSERVACOES'],
-                                        'AGENTE_RAW': regra['MOTORISTA']
-                                    }
-                                    novos_pedidos.append(novo_pedido)
-                                    prox_id_sb += 1
-                                
-                                df_novos = pd.DataFrame(novos_pedidos)
-                                
-                                # Atualiza Contador
-                                try: aba_contador.update("A1", [[str(prox_id_sb)]])
-                                except: pass
-                                
-                                # Joga no Carrinho
-                                if st.session_state.df_sandbox_mem.empty: st.session_state.df_sandbox_mem = df_novos
-                                else: st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_novos], ignore_index=True)
-                                
-                                st.success(f"🎉 Máquina rodou! {len(df_novos)} pedidos fixos injetados no carrinho!")
-                                time.sleep(2); st.rerun()
-                    else:
-                        st.warning("O banco de regras está vazio. Cadastre na aba 'Gestão de Pedidos Fixos'.")
-                except Exception as e:
-                    st.error(f"Erro ao processar fixos: {e}")
         
+        # 1. O Robô Lê os Pedidos Fixos do Dia em Memória (Caixa B)
+        df_fixos_hoje = pd.DataFrame()
+        try:
+            aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
+            dados_fixos = aba_fixos.get_all_values()
+            if len(dados_fixos) > 1:
+                df_regras = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0])
+                mapa_dias = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
+                dia_atual = mapa_dias[hoje_br.weekday()]
+                
+                if dia_atual != 'DOM':
+                    df_alvo = df_regras[(df_regras[dia_atual] == "SIM") & (df_regras['STATUS'] == "ATIVO")].copy()
+                    if not df_alvo.empty:
+                        # Puxa o contador oficial do Umove para dar os IDs 700020+
+                        try: aba_contador = planilha_sandbox.worksheet("Contador")
+                        except: aba_contador = None
+                        
+                        prox_id_sb = 700020
+                        if aba_contador:
+                            val = aba_contador.acell('A1').value
+                            if val and str(val).isdigit(): prox_id_sb = int(val)
+                        elif 'contador_temp' in st.session_state:
+                            prox_id_sb = st.session_state.contador_temp
+                            
+                        # Soma a quantidade de itens que já estão no carrinho manual para não haver IDs iguais
+                        prox_id_sb += len(st.session_state.df_sandbox_mem)
+                        
+                        novos_pedidos = []
+                        for _, regra in df_alvo.iterrows():
+                            novo_pedido = {
+                                'DATA': hoje_br.strftime("%d/%m/%Y"),
+                                'TOMADOR': regra['TOMADOR'],
+                                'PEDIDO': str(prox_id_sb),
+                                'LABORATORIO': regra['LABORATORIO'],
+                                'CNPJ': "",
+                                'ENDERECO': regra['ENDERECO'],
+                                'NUMERO': regra['NUMERO'],
+                                'BAIRRO': regra['BAIRRO'],
+                                'CIDADE': regra['CIDADE'],
+                                'UF': regra['UF'],
+                                'CEP': regra['CEP'],
+                                'OBSERVACOES': regra['OBSERVACOES'] + " [FIXO]",
+                                'AGENTE_RAW': regra['MOTORISTA']
+                            }
+                            novos_pedidos.append(novo_pedido)
+                            prox_id_sb += 1
+                        
+                        df_fixos_hoje = pd.DataFrame(novos_pedidos)
+        except Exception: pass
+
+        # 2. O Checkbox Mágico (Interruptor)
+        incluir_fixos = False
+        if not df_fixos_hoje.empty:
+            st.info(f"💡 O sistema encontrou **{len(df_fixos_hoje)} pedidos fixos** programados para hoje ({dia_atual}).")
+            incluir_fixos = st.toggle("👉 INCLUIR PEDIDOS FIXOS NA CARGA DE HOJE", value=True)
+        else:
+            st.info("Nenhum pedido fixo programado para hoje.")
+
+        # 3. A Fusão Visual (Caixa A + Caixa B)
+        df_sb = st.session_state.df_sandbox_mem.copy()
+        if incluir_fixos and not df_fixos_hoje.empty:
+            if df_sb.empty:
+                df_sb = df_fixos_hoje
+            else:
+                df_sb = pd.concat([df_sb, df_fixos_hoje], ignore_index=True)
+
         st.markdown("---")
         
-        # CARRINHO DE EXPEDIÇÃO ORIGINAL
-        if not st.session_state.df_sandbox_mem.empty:
-            df_sb = st.session_state.df_sandbox_mem
-            
+        # 4. Renderização do Carrinho Final
+        if not df_sb.empty:
             col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
             col_tit.markdown("### 🛒 Carrinho de Expedição Umove")
-            if col_canc.button("🗑️ Esvaziar Carrinho", type="secondary", use_container_width=True, key="canc_carrinho_sb"):
+            if col_canc.button("🗑️ Esvaziar Carrinho Manual", type="secondary", use_container_width=True, key="canc_carrinho_sb"):
                 st.session_state.df_sandbox_mem = pd.DataFrame()
                 try: planilha_sandbox.sheet1.clear()
                 except: pass
@@ -2239,7 +2239,7 @@ elif menu == "📥 Importações Umove":
                     agente_agd = agente_raw.split('|')[0].strip()
                     
                     schedule_type = "visita_tox"
-                    linha_agd = f";{id_loc};{schedule_type};7;1;{row.get('DATA','')};00:10;;{id_agd};{agente_agd};"
+                    linha_agd = f";{id_loc};{schedule_type};7;1;{hoje_br.strftime('%d/%m/%Y')};00:10;;{id_agd};{agente_agd};"
                     agd_lines.append(linha_agd)
                     
                 loc_lines_unique = [loc_lines[0]] + list(dict.fromkeys(loc_lines[1:]))
@@ -2302,8 +2302,15 @@ elif menu == "📥 Importações Umove":
                                     
                                     if ag_login in agentes_xls_sb or ag_login.split('|')[0] in agentes_xls_sb:
                                         time.sleep(3.0)
-                                        xls_bytes_sb = gerar_excel_rota_whatsapp(df_ag_sb)
-                                        enviar_excel_zapi(tel, xls_bytes_sb, f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx")
+                                        # 🔥 AJUSTE ESTRATÉGICO LUIZ PAULO 🔥
+                                        if ag_login == 'luiz.paulo':
+                                            df_para_xls = df_editado_sb[df_editado_sb['UF'] == 'RJ']
+                                            nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
+                                        else:
+                                            df_para_xls = df_ag_sb
+                                            nome_arq_xls = f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx"
+                                            
+                                        enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_para_xls), nome_arq_xls)
                                     
                                     sucessos_sb += 1
                                     
@@ -2311,12 +2318,19 @@ elif menu == "📥 Importações Umove":
                         
                         status_txt.markdown("✅ **Processo finalizado!**")
                         if sucessos_sb > 0: 
+                            # Atualiza o contador de pedidos no drive quando disparado para garantir a sequencia do próximo dia
+                            try:
+                                aba_contador = planilha_sandbox.worksheet("Contador")
+                                max_id_gerado = df_editado_sb['PEDIDO'].astype(int).max()
+                                aba_contador.update("A1", [[str(max_id_gerado + 1)]])
+                            except: pass
+                            
                             st.success(f"🎉 SUCESSO ABSOLUTO! Disparo concluído para {sucessos_sb} motorista(s)!")
                             time.sleep(3.5)
                             st.rerun()
                         else: st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
         else:
-            st.info("🛒 O carrinho está vazio. Cole uma matriz ou puxe os pedidos fixos do dia para começar.")
+            st.info("🛒 O carrinho está vazio. Cole uma matriz na Aba 1 para começar ou marque o interruptor dos pedidos fixos.")
 
 # =============================================================================
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO
