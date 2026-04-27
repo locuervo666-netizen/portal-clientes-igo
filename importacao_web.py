@@ -1990,12 +1990,19 @@ elif menu == "📥 Importações Umove":
     with tab_fixos:
         st.markdown("#### 🏭 Criar Novo Agendamento Fixo")
         
-        # Conexão e criação da aba se não existir
+        # Conexão, leitura e criação da aba se não existir
+        cols_fixos = ['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
         try:
             aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
+            dados_fixos = aba_fixos.get_all_values()
+            if len(dados_fixos) > 1:
+                df_regras = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0])
+            else:
+                df_regras = pd.DataFrame(columns=cols_fixos)
         except Exception:
             aba_fixos = planilha_db.add_worksheet("Agendamentos_Fixos", 100, 20)
-            aba_fixos.update("A1", [['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']])
+            aba_fixos.update("A1", [cols_fixos])
+            df_regras = pd.DataFrame(columns=cols_fixos)
 
         # --- LÓGICA DE RESET INTELIGENTE ---
         if 'f_rua' not in st.session_state: st.session_state['f_rua'] = ""
@@ -2005,7 +2012,6 @@ elif menu == "📥 Importações Umove":
         if 'cep_version' not in st.session_state: st.session_state['cep_version'] = 0
 
         def buscar_cep_fixo_callback():
-            # Acessamos o valor usando a chave versionada
             chave_atual = f"cep_input_fixo_{st.session_state.cep_version}"
             cep_digitado = st.session_state.get(chave_atual, "")
             cep_limpo = re.sub(r'\D', '', cep_digitado)
@@ -2021,11 +2027,11 @@ elif menu == "📥 Importações Umove":
 
         cc1_f, cc2_f, cc3_f = st.columns([2, 1, 3], vertical_alignment="bottom")
         
-        # A KEY agora é dinâmica: cep_input_fixo_0, dps cep_input_fixo_1...
+        # A KEY agora é dinâmica
         key_dinamica = f"cep_input_fixo_{st.session_state.cep_version}"
         cc1_f.text_input("Digite o CEP e aperte ENTER", max_chars=9, key=key_dinamica, on_change=buscar_cep_fixo_callback)
         
-        if cc2_f.button("🔍 Buscar CEP", key="btn_busc_cep_fixo"):
+        if cc2_f.button("🔍 Buscar CEP", key="btn_busc_cep_fixo", use_container_width=True):
             buscar_cep_fixo_callback()
             
         st.markdown("---")
@@ -2086,7 +2092,6 @@ elif menu == "📥 Importações Umove":
                             st.session_state['f_bai'] = ""
                             st.session_state['f_cid'] = ""
                             st.session_state['f_uf'] = ""
-                            # 🔥 AQUI ESTÁ O PULO DO GATO:
                             st.session_state.cep_version += 1 
                             
                             time.sleep(1.5); st.rerun()
