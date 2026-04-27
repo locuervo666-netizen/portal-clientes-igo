@@ -1805,337 +1805,484 @@ elif menu == "📥 Importações":
 # 🔥 MÓDULO SANDBOX (PARALELO): IMPORTAÇÕES UMOVE 🔥
 # =============================================================================
 elif menu == "📥 Importações Umove":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Zona de Importação</h3></div>", unsafe_allow_html=True)
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Zona de Importação & Pedidos Fixos</h3></div>", unsafe_allow_html=True)
     
-    if planilha_sandbox is None:
-        st.error("❌ Não foi possível conectar com a planilha 'Import_Umove' no Drive. Verifique as permissões.")
+    if planilha_sandbox is None or planilha_db is None:
+        st.error("❌ Erro de conexão com as planilhas no Drive. Verifique as permissões.")
         st.stop()
         
     if "df_sandbox_mem" not in st.session_state: 
         st.session_state.df_sandbox_mem = pd.DataFrame()
-
     if "df_preview_sb" not in st.session_state:
         st.session_state.df_preview_sb = pd.DataFrame()
 
-    with st.container(border=True):
-        st.markdown("#### 1. Colagem da Matriz do Cliente")
-        c1_sb, c2_sb, c3_sb = st.columns([1, 1, 2])
-        with c1_sb: tom_sandbox = st.selectbox("🏢 Tomador Desta Carga:", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="tom_sb")
-        with c2_sb: dt_sandbox = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br, key="dt_sb")
-            
-        txt_sb = st.text_area("📋 Cole os dados (Ctrl+V) do sistema legado:", height=150)
+    tab_matriz, tab_fixos, tab_carrinho = st.tabs(["📋 1. Colar Matriz", "🔁 2. Gestão de Pedidos Fixos", "🛒 3. Carrinho & Saída"])
 
-        if st.button("🔍 Processar Matriz", type="primary", use_container_width=True):
-            if not txt_sb or tom_sandbox == "Selecione...":
-                st.warning("⚠️ Preencha o Tomador e cole os dados!")
-            else:
-                with st.spinner("Lendo dados colados..."):
-                    try:
-                        delim = '\t' if '\t' in txt_sb else (';' if ';' in txt_sb else ',')
-                        df_raw_sb = pd.read_csv(io.StringIO(txt_sb), sep=delim, header=None, dtype=str).fillna("")
-                        
-                        idx_h, max_matches = 0, 0
-                        for i in range(min(15, len(df_raw_sb))):
-                            row_str = unicodedata.normalize('NFKD', " ".join(df_raw_sb.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
-                            matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP', 'HORARIO', 'FUNCIONAMENTO', 'OBSERVA'] if kw in row_str)
-                            if matches > max_matches: max_matches, idx_h = matches, i
-                                
-                        df_limpo_sb = df_raw_sb.iloc[idx_h+1:].copy()
-                        df_limpo_sb.columns = [str(c).strip() for c in df_raw_sb.iloc[idx_h].values]
-                        df_limpo_sb = df_limpo_sb.loc[:, ~df_limpo_sb.columns.duplicated()] 
-                        
-                        for col in df_limpo_sb.columns: df_limpo_sb[col] = df_limpo_sb[col].apply(tratar_texto_global)
-                        
-                        mapa_sb = {}
-                        for c in df_limpo_sb.columns:
-                            c_upper = str(c).upper().strip()
-                            cl = ''.join(e for e in unicodedata.normalize('NFKD', c_upper).encode('ASCII', 'ignore').decode('utf-8') if e.isalnum()) 
-                            
-                            if c_upper in ['Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in ['N', 'NO', 'NR', 'NUM', 'NUMERO']: mapa_sb[c] = 'NUMERO'
-                            elif any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': mapa_sb[c] = 'PEDIDO'
-                            elif any(x in cl for x in ['CNPJ', 'CPF', 'DOCUMENTO', 'DOC']): mapa_sb[c] = 'CNPJ' 
-                            elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): mapa_sb[c] = 'LABORATORIO'
-                            elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): mapa_sb[c] = 'ENDERECO'
-                            elif 'BAIRRO' in cl: mapa_sb[c] = 'BAIRRO'
-                            elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa_sb[c] = 'CIDADE'
-                            elif any(x in cl for x in ['ESTADO', 'UF']): mapa_sb[c] = 'UF'
-                            elif 'CEP' in cl: mapa_sb[c] = 'CEP'
-                            elif any(x in cl for x in ['HORARIO', 'HORA', 'FUNCIONAMENTO', 'PERIODO']): mapa_sb[c] = 'HORARIO'
-                            elif any(x in cl for x in ['OBSERVA', 'OBS', 'NOTA']): mapa_sb[c] = 'OBSERVACOES'
-                                
-                        df_limpo_sb.rename(columns=mapa_sb, inplace=True)
-                        
-                        for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
-                            if c not in df_limpo_sb.columns: df_limpo_sb[c] = ""
-
-                        if 'HORARIO' in df_limpo_sb.columns:
-                            for idx, row in df_limpo_sb.iterrows():
-                                horario_val = str(row['HORARIO']).strip()
-                                obs_val = str(row['OBSERVACOES']).strip()
-                                if horario_val and horario_val.upper() not in ['NAN', 'NONE']:
-                                    nova_obs = f"[COLETA: {horario_val}]"
-                                    if obs_val and obs_val.upper() not in ['NAN', 'NONE']:
-                                        nova_obs += f" - {obs_val}"
-                                    df_limpo_sb.at[idx, 'OBSERVACOES'] = nova_obs
-                        
-                        df_limpo_sb['PEDIDO'] = ""
-                        for idx, row in df_limpo_sb.iterrows():
-                            e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
-                            if e and (not n or not b):
-                                cep_m = re.search(r'(\d{5}-?\d{3})', e)
-                                if cep_m: 
-                                    df_limpo_sb.at[idx, 'CEP'] = cep_m.group(1)
-                                    e = e.replace(cep_m.group(1), '').strip(' ,-')
-                                if ',' in e and not n: 
-                                    pts = e.split(',')
-                                    df_limpo_sb.at[idx, 'ENDERECO'], df_limpo_sb.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
-                                    
-                        df_limpo_sb['UF'] = df_limpo_sb['UF'].astype(str).str.upper().str.strip()
-                        df_limpo_sb['TOMADOR'] = tom_sandbox
-                        df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
-                        
-                        # 🔥 A MÁGICA DA CORREÇÃO ORTOGRÁFICA TAMBÉM AQUI NO UMOVE:
-                        df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
-                        
-                        df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
-                        
-                        df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
-                        
-                        st.session_state.df_preview_sb = df_final_sb
-                        st.success("✅ Matriz processada! Verifique o preview abaixo.")
-                        time.sleep(1); st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao processar a matriz: {e}")
-
-    # PREVIEW DA MATRIZ ATUAL (Etapa de Segurança Rigorosa)
-    if not st.session_state.df_preview_sb.empty:
-        st.markdown("---")
-        df_preview = st.session_state.df_preview_sb
-        mask_err = (df_preview['AGENTE_RAW'].astype(str).str.strip() == "") | (df_preview['AGENTE_RAW'].astype(str).str.upper() == "NAN")
-        df_err = df_preview[mask_err]; df_ok = df_preview[~mask_err]
-
-        if not df_err.empty:
-            st.error(f"🚨 **Atenção:** {len(df_err)} pedido(s) não encontraram motorista automático. Corrija abaixo para liberar o botão.")
-            with st.form("form_correcao_agentes_sb"):
-                correcoes = {}; logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-                for idx, row in df_err.iterrows():
-                    st.markdown(f"**Local:** {row['LABORATORIO']} | **Cidade:** {row['CIDADE']}")
-                    correcoes[idx] = st.selectbox(f"Motorista:", ["Selecione..."] + logins_disp, key=f"fix_mot_sb_{idx}")
+    # -------------------------------------------------------------------------
+    # ABA 1: COLAR MATRIZ TRADICIONAL
+    # -------------------------------------------------------------------------
+    with tab_matriz:
+        with st.container(border=True):
+            st.markdown("#### Importação Avulsa (Matriz do Cliente)")
+            c1_sb, c2_sb, c3_sb = st.columns([1, 1, 2])
+            with c1_sb: tom_sandbox = st.selectbox("🏢 Tomador Desta Carga:", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="tom_sb")
+            with c2_sb: dt_sandbox = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br, key="dt_sb")
                 
-                if st.form_submit_button("💾 Validar Motoristas", type="primary"):
-                    novas_rotas = []
-                    for idx, novo_mot in correcoes.items():
-                        if novo_mot != "Selecione...":
-                            st.session_state.df_preview_sb.at[idx, 'AGENTE_RAW'] = novo_mot
-                            r_cid = str(st.session_state.df_preview_sb.at[idx, 'CIDADE'])
-                            r_bai = str(st.session_state.df_preview_sb.at[idx, 'BAIRRO'])
-                            rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai)] if p])
-                            if not DF_AGENTES.empty:
-                                dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == novo_mot].iloc[0]
-                                novas_rotas.append({"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": novo_mot, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']})
-                    
-                    if novas_rotas:
+            txt_sb = st.text_area("📋 Cole os dados (Ctrl+V) do sistema legado:", height=150)
+
+            if st.button("🔍 Processar Matriz", type="primary", use_container_width=True):
+                if not txt_sb or tom_sandbox == "Selecione...":
+                    st.warning("⚠️ Preencha o Tomador e cole os dados!")
+                else:
+                    with st.spinner("Lendo dados colados..."):
                         try:
-                            df_novas_rotas = pd.DataFrame(novas_rotas)
-                            aba_agentes = planilha_db.worksheet("Agentes")
-                            dados_atuais_ag = aba_agentes.get_all_values()
-                            df_ag_atual = pd.DataFrame(dados_atuais_ag[1:], columns=dados_atuais_ag[0]) if len(dados_atuais_ag) > 1 else pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
-                            df_novo = pd.concat([df_ag_atual, df_novas_rotas], ignore_index=True).drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
-                            aba_agentes.clear()
-                            aba_agentes.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
-                            carregar_dados_agentes.clear()
+                            delim = '\t' if '\t' in txt_sb else (';' if ';' in txt_sb else ',')
+                            df_raw_sb = pd.read_csv(io.StringIO(txt_sb), sep=delim, header=None, dtype=str).fillna("")
+                            
+                            idx_h, max_matches = 0, 0
+                            for i in range(min(15, len(df_raw_sb))):
+                                row_str = unicodedata.normalize('NFKD', " ".join(df_raw_sb.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
+                                matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP', 'HORARIO', 'FUNCIONAMENTO', 'OBSERVA'] if kw in row_str)
+                                if matches > max_matches: max_matches, idx_h = matches, i
+                                    
+                            df_limpo_sb = df_raw_sb.iloc[idx_h+1:].copy()
+                            df_limpo_sb.columns = [str(c).strip() for c in df_raw_sb.iloc[idx_h].values]
+                            df_limpo_sb = df_limpo_sb.loc[:, ~df_limpo_sb.columns.duplicated()] 
+                            
+                            for col in df_limpo_sb.columns: df_limpo_sb[col] = df_limpo_sb[col].apply(tratar_texto_global)
+                            
+                            mapa_sb = {}
+                            for c in df_limpo_sb.columns:
+                                c_upper = str(c).upper().strip()
+                                cl = ''.join(e for e in unicodedata.normalize('NFKD', c_upper).encode('ASCII', 'ignore').decode('utf-8') if e.isalnum()) 
+                                
+                                if c_upper in ['Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in ['N', 'NO', 'NR', 'NUM', 'NUMERO']: mapa_sb[c] = 'NUMERO'
+                                elif any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': mapa_sb[c] = 'PEDIDO'
+                                elif any(x in cl for x in ['CNPJ', 'CPF', 'DOCUMENTO', 'DOC']): mapa_sb[c] = 'CNPJ' 
+                                elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): mapa_sb[c] = 'LABORATORIO'
+                                elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): mapa_sb[c] = 'ENDERECO'
+                                elif 'BAIRRO' in cl: mapa_sb[c] = 'BAIRRO'
+                                elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa_sb[c] = 'CIDADE'
+                                elif any(x in cl for x in ['ESTADO', 'UF']): mapa_sb[c] = 'UF'
+                                elif 'CEP' in cl: mapa_sb[c] = 'CEP'
+                                elif any(x in cl for x in ['HORARIO', 'HORA', 'FUNCIONAMENTO', 'PERIODO']): mapa_sb[c] = 'HORARIO'
+                                elif any(x in cl for x in ['OBSERVA', 'OBS', 'NOTA']): mapa_sb[c] = 'OBSERVACOES'
+                                    
+                            df_limpo_sb.rename(columns=mapa_sb, inplace=True)
+                            
+                            for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
+                                if c not in df_limpo_sb.columns: df_limpo_sb[c] = ""
+
+                            if 'HORARIO' in df_limpo_sb.columns:
+                                for idx, row in df_limpo_sb.iterrows():
+                                    horario_val = str(row['HORARIO']).strip()
+                                    obs_val = str(row['OBSERVACOES']).strip()
+                                    if horario_val and horario_val.upper() not in ['NAN', 'NONE']:
+                                        nova_obs = f"[COLETA: {horario_val}]"
+                                        if obs_val and obs_val.upper() not in ['NAN', 'NONE']:
+                                            nova_obs += f" - {obs_val}"
+                                        df_limpo_sb.at[idx, 'OBSERVACOES'] = nova_obs
+                            
+                            df_limpo_sb['PEDIDO'] = ""
+                            for idx, row in df_limpo_sb.iterrows():
+                                e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
+                                if e and (not n or not b):
+                                    cep_m = re.search(r'(\d{5}-?\d{3})', e)
+                                    if cep_m: 
+                                        df_limpo_sb.at[idx, 'CEP'] = cep_m.group(1)
+                                        e = e.replace(cep_m.group(1), '').strip(' ,-')
+                                    if ',' in e and not n: 
+                                        pts = e.split(',')
+                                        df_limpo_sb.at[idx, 'ENDERECO'], df_limpo_sb.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
+                                        
+                            df_limpo_sb['UF'] = df_limpo_sb['UF'].astype(str).str.upper().str.strip()
+                            df_limpo_sb['TOMADOR'] = tom_sandbox
+                            df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
+                            
+                            df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
+                            df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
+                            
+                            df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
+                            
+                            st.session_state.df_preview_sb = df_final_sb
+                            st.success("✅ Matriz processada! Verifique o preview abaixo.")
+                            time.sleep(1); st.rerun()
                         except Exception as e:
-                            st.warning(f"Erro ao salvar rota inteligente: {e}")
+                            st.error(f"Erro ao processar a matriz: {e}")
+
+        # PREVIEW DA MATRIZ (Sandbox)
+        if not st.session_state.df_preview_sb.empty:
+            st.markdown("---")
+            df_preview = st.session_state.df_preview_sb
+            mask_err = (df_preview['AGENTE_RAW'].astype(str).str.strip() == "") | (df_preview['AGENTE_RAW'].astype(str).str.upper() == "NAN")
+            df_err = df_preview[mask_err]; df_ok = df_preview[~mask_err]
+
+            if not df_err.empty:
+                st.error(f"🚨 **Atenção:** {len(df_err)} pedido(s) não encontraram motorista automático.")
+                with st.form("form_correcao_agentes_sb"):
+                    correcoes = {}; logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                    for idx, row in df_err.iterrows():
+                        st.markdown(f"**Local:** {row['LABORATORIO']} | **Cidade:** {row['CIDADE']}")
+                        correcoes[idx] = st.selectbox(f"Motorista:", ["Selecione..."] + logins_disp, key=f"fix_mot_sb_{idx}")
                     
-                    st.rerun()
-        else:
-            st.success(f"✅ Preview validado! {len(df_ok)} pedidos com motoristas atrelados.")
-            st.dataframe(df_ok, hide_index=True)
-            if st.button("➕ Adicionar ao Carrinho (Cumulativo)", type="primary", key="add_carrinho_sb"):
-                with st.spinner("Gerando IDs 700020+ e adicionando ao carrinho..."):
-                    try:
-                        # CONTADOR BLINDADO (Aba Controlador na Umove)
-                        try:
-                            aba_contador = planilha_sandbox.worksheet("Contador")
-                        except Exception:
+                    if st.form_submit_button("💾 Validar Motoristas", type="primary"):
+                        novas_rotas = []
+                        for idx, novo_mot in correcoes.items():
+                            if novo_mot != "Selecione...":
+                                st.session_state.df_preview_sb.at[idx, 'AGENTE_RAW'] = novo_mot
+                                r_cid = str(st.session_state.df_preview_sb.at[idx, 'CIDADE'])
+                                r_bai = str(st.session_state.df_preview_sb.at[idx, 'BAIRRO'])
+                                rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai)] if p])
+                                if not DF_AGENTES.empty:
+                                    dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == novo_mot].iloc[0]
+                                    novas_rotas.append({"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": novo_mot, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']})
+                        
+                        if novas_rotas:
                             try:
+                                df_novas_rotas = pd.DataFrame(novas_rotas)
+                                aba_agentes = planilha_db.worksheet("Agentes")
+                                dados_atuais_ag = aba_agentes.get_all_values()
+                                df_ag_atual = pd.DataFrame(dados_atuais_ag[1:], columns=dados_atuais_ag[0]) if len(dados_atuais_ag) > 1 else pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
+                                df_novo = pd.concat([df_ag_atual, df_novas_rotas], ignore_index=True).drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+                                aba_agentes.clear()
+                                aba_agentes.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                                carregar_dados_agentes.clear()
+                            except Exception as e:
+                                st.warning(f"Erro ao salvar rota inteligente: {e}")
+                        st.rerun()
+            else:
+                st.success(f"✅ Preview validado! {len(df_ok)} pedidos com motoristas atrelados.")
+                st.dataframe(df_ok, hide_index=True)
+                if st.button("➕ Adicionar ao Carrinho (Cumulativo)", type="primary", key="add_carrinho_sb"):
+                    with st.spinner("Gerando IDs 700020+ e adicionando ao carrinho..."):
+                        try:
+                            try: aba_contador = planilha_sandbox.worksheet("Contador")
+                            except:
                                 aba_contador = planilha_sandbox.add_worksheet(title="Contador", rows=100, cols=20)
                                 aba_contador.update("A1", [["700020"]])
-                            except Exception as e:
-                                st.error(f"Erro ao criar aba Contador: {e}")
-                                aba_contador = None
 
-                        prox_id_sb = 700020
-                        if aba_contador:
-                            val = aba_contador.acell('A1').value
-                            if val and str(val).isdigit():
-                                prox_id_sb = int(val)
-                            else:
-                                aba_contador.update("A1", [["700020"]])
-                        else:
-                            if 'contador_temp' in st.session_state: prox_id_sb = st.session_state.contador_temp
+                            prox_id_sb = 700020
+                            if aba_contador:
+                                val = aba_contador.acell('A1').value
+                                if val and str(val).isdigit(): prox_id_sb = int(val)
+                                else: aba_contador.update("A1", [["700020"]])
 
-                        for idx, row in df_ok.iterrows():
-                            df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
-                            prox_id_sb += 1
+                            for idx, row in df_ok.iterrows():
+                                df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
+                                prox_id_sb += 1
+                                
+                            if aba_contador:
+                                try: aba_contador.update("A1", [[str(prox_id_sb)]])
+                                except: pass
+
+                            if st.session_state.df_sandbox_mem.empty: st.session_state.df_sandbox_mem = df_ok
+                            else: st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_ok], ignore_index=True)
+
+                            st.session_state.df_preview_sb = pd.DataFrame()
+                            st.success("✅ Pedidos adicionados ao carrinho com sucesso!")
+                            time.sleep(1.5); st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao adicionar ao carrinho: {e}")
+
+    # -------------------------------------------------------------------------
+    # ABA 2: GESTÃO DE PEDIDOS FIXOS (A FÁBRICA)
+    # -------------------------------------------------------------------------
+    with tab_fixos:
+        st.markdown("#### 🏭 Criar Novo Agendamento Fixo")
+        st.info("Cadastre aqui os laboratórios que têm coletas programadas para dias específicos da semana.")
+        
+        # Conexão com a aba de Agendamentos Fixos
+        try:
+            aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
+            dados_fixos = aba_fixos.get_all_values()
+            df_regras = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0]) if len(dados_fixos) > 1 else pd.DataFrame(columns=['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS'])
+        except Exception:
+            aba_fixos = planilha_db.add_worksheet("Agendamentos_Fixos", 100, 20)
+            cols_fixos = ['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
+            aba_fixos.update("A1", [cols_fixos])
+            df_regras = pd.DataFrame(columns=cols_fixos)
+
+        with st.form("form_novo_fixo", clear_on_submit=True):
+            col_f1, col_f2 = st.columns(2)
+            f_tomador = col_f1.selectbox("Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+            f_lab = col_f2.text_input("Ponto de Coleta / Laboratório *")
+            
+            c_cep, c_rua, c_num = st.columns([1, 2, 1])
+            f_cep = c_cep.text_input("CEP")
+            f_rua = c_rua.text_input("Logradouro *")
+            f_num = c_num.text_input("Número *")
+            
+            c_bai, c_cid, c_uf = st.columns([2, 2, 1])
+            f_bai = c_bai.text_input("Bairro *")
+            f_cid = c_cid.text_input("Cidade *")
+            f_uf = c_uf.text_input("UF *")
+            
+            f_obs = st.text_input("Observações Padrão (Ex: [COLETA: 08:00 - 12:00])")
+            
+            st.markdown("**Dias da Semana com Coleta Fixa:**")
+            d1, d2, d3, d4, d5, d6 = st.columns(6)
+            b_seg = d1.checkbox("Segunda")
+            b_ter = d2.checkbox("Terça")
+            b_qua = d3.checkbox("Quarta")
+            b_qui = d4.checkbox("Quinta")
+            b_sex = d5.checkbox("Sexta")
+            b_sab = d6.checkbox("Sábado")
+            
+            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+            f_agente = st.selectbox("Motorista Fixo:", ["Automático (Por Rota)"] + logins_disp)
+
+            if st.form_submit_button("💾 Salvar Agendamento Fixo", type="primary"):
+                if f_tomador == "Selecione..." or not f_lab or not f_rua or not f_num or not f_bai or not f_cid:
+                    st.error("Preencha todos os campos obrigatórios (*).")
+                elif not any([b_seg, b_ter, b_qua, b_qui, b_sex, b_sab]):
+                    st.error("Selecione pelo menos um dia da semana para o agendamento.")
+                else:
+                    with st.spinner("Salvando regra..."):
+                        if f_agente == "Automático (Por Rota)":
+                            f_agente = obter_login_agente(f_cid, f_bai, f_lab, f_rua, DF_AGENTES)
                             
-                        if aba_contador:
-                            try: aba_contador.update("A1", [[str(prox_id_sb)]])
-                            except: pass
-                        st.session_state.contador_temp = prox_id_sb
-
-                        if st.session_state.df_sandbox_mem.empty: st.session_state.df_sandbox_mem = df_ok
-                        else: st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_ok], ignore_index=True)
-
+                        nova_regra = [
+                            f"REG-{str(uuid.uuid4())[:6].upper()}", f_tomador, padronizar_texto(f_lab), 
+                            padronizar_texto(f_rua), padronizar_texto(f_num), padronizar_texto(f_bai), 
+                            padronizar_texto(f_cid), padronizar_texto(f_uf), re.sub(r'\D', '', f_cep), 
+                            str(f_obs), f_agente,
+                            "SIM" if b_seg else "NAO", "SIM" if b_ter else "NAO", "SIM" if b_qua else "NAO",
+                            "SIM" if b_qui else "NAO", "SIM" if b_sex else "NAO", "SIM" if b_sab else "NAO",
+                            "ATIVO"
+                        ]
                         try:
-                            aba_sb = planilha_sandbox.sheet1
-                            aba_sb.clear()
-                            aba_sb.update("A1", [st.session_state.df_sandbox_mem.columns.tolist()] + st.session_state.df_sandbox_mem.fillna("").astype(str).values.tolist())
-                        except: pass
-                        
-                        st.session_state.df_preview_sb = pd.DataFrame()
-                        st.success("✅ Pedidos adicionados ao carrinho com sucesso!")
-                        time.sleep(1.5); st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao adicionar ao carrinho: {e}")
+                            aba_fixos.append_row(nova_regra)
+                            st.success("✅ Regra Fixa cadastrada com sucesso!")
+                            time.sleep(1.5); st.rerun()
+                        except Exception as e: st.error(f"Erro: {e}")
 
-    # CARRINHO DE EXPEDIÇÃO
-    if not st.session_state.df_sandbox_mem.empty:
-        df_sb = st.session_state.df_sandbox_mem
-        
         st.markdown("---")
-        col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
-        col_tit.markdown("### 🛒 2. Carrinho de Expedição Umove")
-        if col_canc.button("🗑️ Esvaziar Carrinho", type="secondary", use_container_width=True, key="canc_carrinho_sb"):
-            st.session_state.df_sandbox_mem = pd.DataFrame()
-            try: planilha_sandbox.sheet1.clear()
-            except: pass
-            st.rerun()
-
-        c_kpi1, c_kpi2 = st.columns([1, 4])
-        total_sb = len(df_sb)
-        c_kpi1.metric("TOTAL NO CARRINHO", total_sb)
-        
-        resumo_tom = df_sb.groupby('TOMADOR').size().reset_index(name='QTD')
-        resumo_str = " | ".join([f"**{row['TOMADOR']}**: {row['QTD']}" for _, row in resumo_tom.iterrows()])
-        c_kpi2.info(f"**Detalhamento por Cliente:**\n{resumo_str}")
-        
-        st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
-        st.markdown("<p style='font-size:12px; color:#64748B;'>Esta tabela exibe todos os lotes que você adicionou até agora. Dê dois cliques para editar.</p>", unsafe_allow_html=True)
-        
-        df_editado_sb = st.data_editor(
-            df_sb,
-            num_rows="dynamic",
-            use_container_width=True,
-            key="sandbox_grid_master_fix"
-        )
-        
-        st.markdown("---")
-        st.markdown("### 🎛️ Mesa de Comando de Saída")
-        col_cmd1, col_cmd2, col_cmd3 = st.columns([1, 1, 1])
-        
-        def criar_arquivos_legados(df):
-            loc_lines = ["alternativeIdentifier;description;corporateName;state;city;cityNeighborhood;street;streetNumber;zipCode;CF_loc_responsavel_cliente;CF_loc_whats;CF_CNPJ;active"]
-            agd_lines = ["C", "command;serviceLocal;scheduleType;activitiesOrigin;active;date;hour;situation;alternativeIdentifier;agent;CF_tar_valor"]
+        st.markdown("#### 📋 Laboratórios Fixos Ativos")
+        if not df_regras.empty:
+            df_regras_show = df_regras.copy()
+            df_regras_show = df_regras_show.set_index('ID_REGRA')
+            st.dataframe(df_regras_show, use_container_width=True)
             
-            for idx, row in df.iterrows():
-                id_agd = str(row['PEDIDO'])
-                tomador = str(row.get('TOMADOR', '')).upper()
-                lab = str(row.get('LABORATORIO', '')).upper()
-                cep = str(row.get('CEP', ''))
-                
-                id_loc = f"{tomador}-{lab}-{cep}"
-                corp_name = f"{tomador}-{lab}"
-                cnpj = str(row.get('CNPJ', ''))
-                if cnpj: cnpj = f"'{cnpj}"
-                
-                # BLINDAGEM DO .LOC - Destruidor de letras na coluna número
-                numero_limpo = re.sub(r'\D', '', str(row.get('NUMERO', '')))
-                
-                linha_loc = f"{id_loc};{id_loc};{corp_name};{row.get('UF','')};{row.get('CIDADE','')};{row.get('BAIRRO','')};{row.get('ENDERECO','')};{numero_limpo};{cep};{tomador};;{cnpj};1"
-                loc_lines.append(linha_loc)
-                
-                # MÁGICA UMOVE: Corta o nome na barra "|" para o arquivo AGD
-                agente_raw = str(row.get('AGENTE_RAW',''))
-                agente_agd = agente_raw.split('|')[0].strip()
-                
-                schedule_type = "visita_tox"
-                linha_agd = f";{id_loc};{schedule_type};7;1;{row.get('DATA','')};00:10;;{id_agd};{agente_agd};"
-                agd_lines.append(linha_agd)
-                
-            loc_lines_unique = [loc_lines[0]] + list(dict.fromkeys(loc_lines[1:]))
-            return "\n".join(loc_lines_unique).encode('utf-8'), "\n".join(agd_lines).encode('utf-8')
-            
-        bytes_loc, bytes_agd = criar_arquivos_legados(df_editado_sb)
-        
-        def notify_loc(): st.toast("✅ Download do arquivo .LOC finalizado com sucesso!", icon="💾")
-        def notify_agd(): st.toast("✅ Download do arquivo .AGD finalizado com sucesso!", icon="💾")
+            with st.expander("🗑️ Excluir ou Inativar Regra"):
+                with st.form("form_excluir_regra"):
+                    id_del = st.selectbox("Selecione o ID da Regra:", df_regras['ID_REGRA'].tolist())
+                    if st.form_submit_button("Apagar Regra"):
+                        try:
+                            df_new = df_regras[df_regras['ID_REGRA'] != id_del]
+                            aba_fixos.clear()
+                            aba_fixos.update("A1", [df_new.columns.tolist()] + df_new.fillna("").astype(str).values.tolist())
+                            st.success("Regra apagada!")
+                            time.sleep(1); st.rerun()
+                        except Exception as e: st.error(f"Erro: {e}")
+        else:
+            st.info("Nenhuma regra de agendamento cadastrada ainda.")
 
-        with col_cmd1:
-            st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
-        with col_cmd2:
-            st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{dt_sandbox.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
-
-        with col_cmd3.popover("📲 3. Disparar WhatsApp", use_container_width=True):
-            st.markdown("Isso disparará as rotas de todos os clientes no carrinho para os motoristas.")
-            if st.button("🚀 Confirmar Disparos", use_container_width=True):
-                dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
-                dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
-                
-                agentes_selecionados = df_editado_sb['AGENTE_RAW'].dropna().unique()
-                sucessos_sb = 0
-                agentes_xls_sb = AGENTES_XLS_AUTORIZADOS
-                
-                if len(agentes_selecionados) > 0:
-                    progress_bar = st.progress(0)
-                    status_txt = st.empty()
-                
-                    for idx_ag, ag in enumerate(agentes_selecionados):
-                        if not str(ag).strip(): continue
-                        df_ag_sb = df_editado_sb[df_editado_sb['AGENTE_RAW'] == ag]
-                        tel = dict_tel.get(str(ag).strip().lower(), "")
-                        nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
-                        ag_login = str(ag).strip().lower()
+    # -------------------------------------------------------------------------
+    # ABA 3: CARRINHO E SAÍDA
+    # -------------------------------------------------------------------------
+    with tab_carrinho:
+        # 🔥 O BOTÃO MÁGICO QUE GERA OS PEDIDOS FIXOS DO DIA 🔥
+        st.markdown("#### ⚙️ Automação de Carga Diária")
+        if st.button("🚀 PUXAR PEDIDOS FIXOS DE HOJE", type="primary", use_container_width=True):
+            with st.spinner("Lendo banco de regras e gerando ordens de coleta..."):
+                try:
+                    aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
+                    dados_fixos = aba_fixos.get_all_values()
+                    if len(dados_fixos) > 1:
+                        df_regras = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0])
                         
-                        if tel:
-                            status_txt.markdown(f"**Enviando rota para:** {nom} ({idx_ag+1}/{len(agentes_selecionados)})...")
-                            data_str = dt_sandbox.strftime('%d/%m/%Y')
-                            msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
-                            tot_qtd = 0
-                            for cid, count in df_ag_sb['CIDADE'].value_counts().items():
-                                msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}"); tot_qtd += count
-                            msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
+                        mapa_dias = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
+                        dia_atual = mapa_dias[hoje_br.weekday()]
+                        
+                        if dia_atual == 'DOM':
+                            st.warning("Hoje é Domingo. Não há coletas programadas.")
+                        else:
+                            # Filtra as regras ativas para o dia de hoje
+                            df_alvo = df_regras[(df_regras[dia_atual] == "SIM") & (df_regras['STATUS'] == "ATIVO")].copy()
                             
-                            for cid, group in df_ag_sb.groupby('CIDADE'):
-                                msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
-                                items = []
-                                for _, row in group.iterrows():
-                                    item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
-                                    obs = str(row.get('OBSERVACOES', '')).strip()
-                                    if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
-                                    items.append(item_str)
-                                msg_parts.append("\n\n      . . . . .\n\n".join(items) + "\n")
+                            if df_alvo.empty:
+                                st.info(f"Nenhum pedido fixo agendado para hoje ({dia_atual}).")
+                            else:
+                                # Prepara os IDs Sequenciais
+                                try: aba_contador = planilha_sandbox.worksheet("Contador")
+                                except: aba_contador = planilha_sandbox.add_worksheet("Contador", 100, 20); aba_contador.update("A1", [["700020"]])
+                                val = aba_contador.acell('A1').value
+                                prox_id_sb = int(val) if (val and str(val).isdigit()) else 700020
+
+                                novos_pedidos = []
+                                for _, regra in df_alvo.iterrows():
+                                    novo_pedido = {
+                                        'DATA': hoje_br.strftime("%d/%m/%Y"),
+                                        'TOMADOR': regra['TOMADOR'],
+                                        'PEDIDO': str(prox_id_sb),
+                                        'LABORATORIO': regra['LABORATORIO'],
+                                        'CNPJ': "",
+                                        'ENDERECO': regra['ENDERECO'],
+                                        'NUMERO': regra['NUMERO'],
+                                        'BAIRRO': regra['BAIRRO'],
+                                        'CIDADE': regra['CIDADE'],
+                                        'UF': regra['UF'],
+                                        'CEP': regra['CEP'],
+                                        'OBSERVACOES': regra['OBSERVACOES'],
+                                        'AGENTE_RAW': regra['MOTORISTA']
+                                    }
+                                    novos_pedidos.append(novo_pedido)
+                                    prox_id_sb += 1
                                 
-                            if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
-                                time.sleep(2.0)
-                                pdf_bytes_sb = gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb)
-                                enviar_pdf_zapi(tel, pdf_bytes_sb, f"ROTA_IGO_{nom.replace(' ', '_')}_{dt_sandbox.strftime('%d%m')}.pdf")
+                                df_novos = pd.DataFrame(novos_pedidos)
                                 
-                                if ag_login in agentes_xls_sb or ag_login.split('|')[0] in agentes_xls_sb:
-                                    time.sleep(3.0)
-                                    xls_bytes_sb = gerar_excel_rota_whatsapp(df_ag_sb)
-                                    enviar_excel_zapi(tel, xls_bytes_sb, f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{dt_sandbox.strftime('%d%m')}.xlsx")
+                                # Atualiza Contador
+                                try: aba_contador.update("A1", [[str(prox_id_sb)]])
+                                except: pass
                                 
-                                sucessos_sb += 1
+                                # Joga no Carrinho
+                                if st.session_state.df_sandbox_mem.empty: st.session_state.df_sandbox_mem = df_novos
+                                else: st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_novos], ignore_index=True)
                                 
-                        progress_bar.progress((idx_ag + 1) / len(agentes_selecionados))
+                                st.success(f"🎉 Máquina rodou! {len(df_novos)} pedidos fixos injetados no carrinho!")
+                                time.sleep(2); st.rerun()
+                    else:
+                        st.warning("O banco de regras está vazio. Cadastre na aba 'Gestão de Pedidos Fixos'.")
+                except Exception as e:
+                    st.error(f"Erro ao processar fixos: {e}")
+        
+        st.markdown("---")
+        
+        # CARRINHO DE EXPEDIÇÃO ORIGINAL
+        if not st.session_state.df_sandbox_mem.empty:
+            df_sb = st.session_state.df_sandbox_mem
+            
+            col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
+            col_tit.markdown("### 🛒 Carrinho de Expedição Umove")
+            if col_canc.button("🗑️ Esvaziar Carrinho", type="secondary", use_container_width=True, key="canc_carrinho_sb"):
+                st.session_state.df_sandbox_mem = pd.DataFrame()
+                try: planilha_sandbox.sheet1.clear()
+                except: pass
+                st.rerun()
+
+            c_kpi1, c_kpi2 = st.columns([1, 4])
+            total_sb = len(df_sb)
+            c_kpi1.metric("TOTAL NO CARRINHO", total_sb)
+            
+            resumo_tom = df_sb.groupby('TOMADOR').size().reset_index(name='QTD')
+            resumo_str = " | ".join([f"**{row['TOMADOR']}**: {row['QTD']}" for _, row in resumo_tom.iterrows()])
+            c_kpi2.info(f"**Detalhamento por Cliente:**\n{resumo_str}")
+            
+            st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
+            st.markdown("<p style='font-size:12px; color:#64748B;'>Esta tabela exibe os lotes manuais e automáticos que você adicionou até agora. Dê dois cliques para editar.</p>", unsafe_allow_html=True)
+            
+            df_editado_sb = st.data_editor(
+                df_sb,
+                num_rows="dynamic",
+                use_container_width=True,
+                key="sandbox_grid_master_fix"
+            )
+            
+            st.markdown("---")
+            st.markdown("### 🎛️ Mesa de Comando de Saída")
+            col_cmd1, col_cmd2, col_cmd3 = st.columns([1, 1, 1])
+            
+            def criar_arquivos_legados(df):
+                loc_lines = ["alternativeIdentifier;description;corporateName;state;city;cityNeighborhood;street;streetNumber;zipCode;CF_loc_responsavel_cliente;CF_loc_whats;CF_CNPJ;active"]
+                agd_lines = ["C", "command;serviceLocal;scheduleType;activitiesOrigin;active;date;hour;situation;alternativeIdentifier;agent;CF_tar_valor"]
+                
+                for idx, row in df.iterrows():
+                    id_agd = str(row['PEDIDO'])
+                    tomador = str(row.get('TOMADOR', '')).upper()
+                    lab = str(row.get('LABORATORIO', '')).upper()
+                    cep = str(row.get('CEP', ''))
                     
-                    status_txt.markdown("✅ **Processo finalizado!**")
-                    if sucessos_sb > 0: 
-                        st.success(f"🎉 SUCESSO ABSOLUTO! Disparo concluído para {sucessos_sb} motorista(s)!")
-                        time.sleep(3.5)
-                        st.rerun()
-                    else: st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
+                    id_loc = f"{tomador}-{lab}-{cep}"
+                    corp_name = f"{tomador}-{lab}"
+                    cnpj = str(row.get('CNPJ', ''))
+                    if cnpj: cnpj = f"'{cnpj}"
+                    
+                    numero_limpo = re.sub(r'\D', '', str(row.get('NUMERO', '')))
+                    linha_loc = f"{id_loc};{id_loc};{corp_name};{row.get('UF','')};{row.get('CIDADE','')};{row.get('BAIRRO','')};{row.get('ENDERECO','')};{numero_limpo};{cep};{tomador};;{cnpj};1"
+                    loc_lines.append(linha_loc)
+                    
+                    agente_raw = str(row.get('AGENTE_RAW',''))
+                    agente_agd = agente_raw.split('|')[0].strip()
+                    
+                    schedule_type = "visita_tox"
+                    linha_agd = f";{id_loc};{schedule_type};7;1;{row.get('DATA','')};00:10;;{id_agd};{agente_agd};"
+                    agd_lines.append(linha_agd)
+                    
+                loc_lines_unique = [loc_lines[0]] + list(dict.fromkeys(loc_lines[1:]))
+                return "\n".join(loc_lines_unique).encode('utf-8'), "\n".join(agd_lines).encode('utf-8')
+                
+            bytes_loc, bytes_agd = criar_arquivos_legados(df_editado_sb)
+            
+            def notify_loc(): st.toast("✅ Download do arquivo .LOC finalizado com sucesso!", icon="💾")
+            def notify_agd(): st.toast("✅ Download do arquivo .AGD finalizado com sucesso!", icon="💾")
+
+            with col_cmd1:
+                st.download_button("💾 1. Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{hoje_br.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
+            with col_cmd2:
+                st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{hoje_br.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
+
+            with col_cmd3.popover("📲 3. Disparar WhatsApp", use_container_width=True):
+                st.markdown("Isso disparará as rotas de todos os clientes no carrinho para os motoristas.")
+                if st.button("🚀 Confirmar Disparos", use_container_width=True):
+                    dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
+                    dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
+                    
+                    agentes_selecionados = df_editado_sb['AGENTE_RAW'].dropna().unique()
+                    sucessos_sb = 0
+                    agentes_xls_sb = AGENTES_XLS_AUTORIZADOS
+                    
+                    if len(agentes_selecionados) > 0:
+                        progress_bar = st.progress(0)
+                        status_txt = st.empty()
+                    
+                        for idx_ag, ag in enumerate(agentes_selecionados):
+                            if not str(ag).strip(): continue
+                            df_ag_sb = df_editado_sb[df_editado_sb['AGENTE_RAW'] == ag]
+                            tel = dict_tel.get(str(ag).strip().lower(), "")
+                            nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
+                            ag_login = str(ag).strip().lower()
+                            
+                            if tel:
+                                status_txt.markdown(f"**Enviando rota para:** {nom} ({idx_ag+1}/{len(agentes_selecionados)})...")
+                                data_str = hoje_br.strftime('%d/%m/%Y')
+                                msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
+                                tot_qtd = 0
+                                for cid, count in df_ag_sb['CIDADE'].value_counts().items():
+                                    msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}"); tot_qtd += count
+                                msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
+                                
+                                for cid, group in df_ag_sb.groupby('CIDADE'):
+                                    msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
+                                    items = []
+                                    for _, row in group.iterrows():
+                                        item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                        obs = str(row.get('OBSERVACOES', '')).strip()
+                                        if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
+                                        items.append(item_str)
+                                    msg_parts.append("\n\n      . . . . .\n\n".join(items) + "\n")
+                                    
+                                if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
+                                    time.sleep(2.0)
+                                    pdf_bytes_sb = gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb)
+                                    enviar_pdf_zapi(tel, pdf_bytes_sb, f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
+                                    
+                                    if ag_login in agentes_xls_sb or ag_login.split('|')[0] in agentes_xls_sb:
+                                        time.sleep(3.0)
+                                        xls_bytes_sb = gerar_excel_rota_whatsapp(df_ag_sb)
+                                        enviar_excel_zapi(tel, xls_bytes_sb, f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx")
+                                    
+                                    sucessos_sb += 1
+                                    
+                            progress_bar.progress((idx_ag + 1) / len(agentes_selecionados))
+                        
+                        status_txt.markdown("✅ **Processo finalizado!**")
+                        if sucessos_sb > 0: 
+                            st.success(f"🎉 SUCESSO ABSOLUTO! Disparo concluído para {sucessos_sb} motorista(s)!")
+                            time.sleep(3.5)
+                            st.rerun()
+                        else: st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
+        else:
+            st.info("🛒 O carrinho está vazio. Cole uma matriz ou puxe os pedidos fixos do dia para começar.")
 
 # =============================================================================
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO
