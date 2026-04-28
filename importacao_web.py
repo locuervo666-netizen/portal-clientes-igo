@@ -1156,18 +1156,14 @@ if menu == "📊 GRID":
 
             col_b7.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
 # =============================================================================
-# 💰 MÓDULO 2: FATURAMENTO MASTER (ESPELHO DA GRID - INFALÍVEL)
+# 💰 MÓDULO 2: FATURAMENTO MASTER (LENTE DE RAIO-X E ANTI-ERROS)
 # =============================================================================
 elif menu == "💰 Faturamento":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>💰 Gestão Financeira Master</h3></div>", unsafe_allow_html=True)
     
     tab_faturar, tab_historico = st.tabs(["📈 Novo Lote de Faturamento", "📜 Livro Caixa e Histórico"])
     
-    # 1. Puxa a mesma inteligência que alimenta a GRID
     df_raw = carregar_dados_completos(planilha_db)
-    if not df_raw.empty:
-        df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
-        
     if 'fatura_sucesso' not in st.session_state: st.session_state.fatura_sucesso = False
 
     @st.cache_data(ttl=60)
@@ -1194,7 +1190,7 @@ elif menu == "💰 Faturamento":
             return pd.DataFrame()
         except Exception: return pd.DataFrame()
 
-    def calcular_valor_fatura(cid, bai, end, status_display, df_p):
+    def calcular_valor_fatura(cid, bai, end, status, df_p):
         if df_p.empty: return 0.0
         c, b, e = padronizar_texto(cid), padronizar_texto(bai), padronizar_texto(end)
         match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == b) & (df_p['ENDERECO'] == e)]
@@ -1203,8 +1199,7 @@ elif menu == "💰 Faturamento":
         if not match.empty:
             v_base = float(match.iloc[0]['VALOR_CHEIO'])
             mult = float(match.iloc[0]['MULT_FRUSTRADA'])
-            # Lê o status com segurança
-            return v_base if "ENTREGUE" in str(status_display).upper() else (v_base * mult)
+            return v_base if "ENTREGUE" in str(status).upper() else (v_base * mult)
         return 0.0
 
     def gerar_pdf_fatura(id_fat, tomador, df_cobrados, total, obs_texto=""):
@@ -1237,7 +1232,6 @@ elif menu == "💰 Faturamento":
             d_ent = str(row.get('DATA_ENTREGA', '')).split(' ')[0]
             val_str = f"R$ {row.get('VALOR (R$)', 0):.2f}"
             
-            # Limpa emoji para não dar erro na hora de gerar o PDF
             st_pdf = "ENTREGUE" if "ENTREGUE" in str(row.get('STATUS','')).upper() else "FRUSTRADA"
             
             pdf.cell(18, 5, str(row.get('PEDIDO','')), 1, 0, "C", True)
@@ -1278,7 +1272,6 @@ elif menu == "💰 Faturamento":
         
         else:
             with st.container(border=True):
-                st.info("💡 **Sistema Espelhado Ativado:** Se o pedido aparece como Entregue ou Frustrada na GRID, ele estará garantido nesta tela.")
                 c1, c2 = st.columns([1, 1])
                 f_tom = c1.selectbox("🏢 Selecionar Tomador:", CLIENTES_AUTORIZADOS, key="fat_tom_sel")
                 f_per = c2.date_input("📅 Período de Entrega:", value=(hoje_br - timedelta(days=30), hoje_br), format="DD/MM/YYYY", key="fat_per_sel")
@@ -1286,109 +1279,122 @@ elif menu == "💰 Faturamento":
                 if df_raw.empty:
                     st.warning("O banco de dados está vazio.")
                 else:
-                    # 2. O FILTRO MATADOR: Usa a mesma coluna que a GRID usa!
+                    # 1. Garante que os status estão computados (mesma lógica da GRID)
+                    if 'STATUS_DISPLAY' not in df_raw.columns:
+                        df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
+
+                    # 2. O FILTRO MATADOR: Busca TUDO do cliente que já terminou, não importa a data!
                     df_raw['TOMADOR_CLEAN'] = df_raw['TOMADOR'].astype(str).str.strip().str.upper()
-                    
-                    mask_status = df_raw['STATUS_DISPLAY'].str.contains('Entregue|Frustrada', case=False, na=False)
+                    mask_status = df_raw['STATUS_DISPLAY'].str.contains('Entregue|Frustrada', case=False, na=False) | df_raw['STATUS'].str.upper().str.contains('ENTREGUE|FRUSTRADA', na=False)
                     mask_tomador = (df_raw['TOMADOR_CLEAN'] == f_tom.upper()) | (df_raw['TOMADOR_CLEAN'].str.contains(f_tom.upper(), na=False))
                     
                     if 'FATURA' not in df_raw.columns: df_raw['FATURA'] = ""
-                    mask_fatura = df_raw['FATURA'].astype(str).str.strip().str.upper().isin(["", "NAN", "NONE", "<NA>"])
+                    # Blindagem contra espaços vazios: Só filtra se tiver "FAT-" escrito.
+                    mask_fatura = ~df_raw['FATURA'].astype(str).str.upper().str.contains('FAT-', na=False)
                     
-                    df_fin = df_raw[mask_tomador & mask_status & mask_fatura].copy()
-                    
-                    # 3. Tratamento de Datas à Prova de Balas
-                    def extrair_data_real(row):
-                        d_ent = str(row.get('DATA_ENTREGA', '')).split(' ')[0]
-                        try: return pd.to_datetime(d_ent, format='%d/%m/%Y').date()
-                        except:
-                            try: return pd.to_datetime(d_ent).date()
-                            except: return row.get('DATA_OBJ', hoje_br)
-                                
-                    if not df_fin.empty:
-                        df_fin['DT_FILTRO'] = df_fin.apply(extrair_data_real, axis=1)
-                        if isinstance(f_per, (tuple, list)) and len(f_per) == 2:
-                            df_fin = df_fin[(df_fin['DT_FILTRO'] >= f_per[0]) & (df_fin['DT_FILTRO'] <= f_per[1])]
+                    df_todas_pendentes = df_raw[mask_tomador & mask_status & mask_fatura].copy()
 
-                    if df_fin.empty: 
-                        st.success(f"✅ Nenhum pedido pendente para {f_tom} no período selecionado.")
+                    if df_todas_pendentes.empty: 
+                        st.success(f"✅ O sistema vasculhou todo o banco de dados e não achou NENHUM pedido 'Entregue' para {f_tom} que já não tenha sido faturado.")
                     else:
-                        df_p = carregar_tabela_precos(f_tom)
-                        if df_p.empty: 
-                            st.error(f"⚠️ Aba de preços '{f_tom}' vazia ou não encontrada na planilha do financeiro.")
+                        # 3. Tratamento de Datas à Prova de Falhas (Se não entender a data, não esconde, joga pra hoje)
+                        def extrair_data_real(row):
+                            d_ent = str(row.get('DATA_ENTREGA', '')).split(' ')[0]
+                            try: return pd.to_datetime(d_ent, format='%d/%m/%Y').date()
+                            except:
+                                try: return pd.to_datetime(d_ent).date()
+                                except: return pd.to_datetime(row.get('DATA', hoje_br.strftime('%d/%m/%Y')), format='%d/%m/%Y', errors='coerce').date()
+                                    
+                        df_todas_pendentes['DT_FILTRO'] = df_todas_pendentes.apply(extrair_data_real, axis=1)
+                        df_todas_pendentes['DT_FILTRO'] = df_todas_pendentes['DT_FILTRO'].fillna(hoje_br) # Se tudo falhar, assume hoje
+                        
+                        # 4. Agora sim aplica a Data que você selecionou no calendário
+                        if isinstance(f_per, (tuple, list)) and len(f_per) == 2:
+                            mask_data = (df_todas_pendentes['DT_FILTRO'] >= f_per[0]) & (df_todas_pendentes['DT_FILTRO'] <= f_per[1])
+                            df_fin = df_todas_pendentes[mask_data].copy()
                         else:
-                            df_fin['VALOR (R$)'] = df_fin.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS_DISPLAY'], df_p), axis=1)
-                            df_show = df_fin[['DT_FILTRO', 'DATA', 'DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'VALOR (R$)']].copy()
-                            # Renomeia para STATUS para a tabela ficar limpa
-                            df_show.rename(columns={'STATUS_DISPLAY': 'STATUS'}, inplace=True)
-                            df_show['DATA_ENTREGA'] = df_show['DATA_ENTREGA'].apply(lambda x: str(x).split(' ')[0])
-                            
-                            sel_all_fat = st.checkbox("✅ Selecionar / Deselecionar Todos", value=True, key="sel_all_faturamento")
-                            df_show.insert(0, "SELECIONAR", sel_all_fat)
-                            
-                            edit = st.data_editor(df_show, column_config={"DT_FILTRO": None, "DATA": "COLETA", "DATA_ENTREGA": "ENTREGA"}, hide_index=True, use_container_width=True, disabled=[c for c in df_show.columns if c != "SELECIONAR"])
-                            sel_f = edit[edit["SELECIONAR"]]
-                            total_f = sel_f['VALOR (R$)'].sum()
-                            qtd_f = len(sel_f)
-                            
-                            st.markdown("---")
-                            
-                            html_kpis = f"""
-                            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                                <div style="flex: 1; background: linear-gradient(135deg, #1E293B 0%, #334155 100%); border-radius: 8px; height: 75px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                                    <p style="color: white; font-weight: 800; font-size: 13px; margin: 0; line-height: 1.3;">📦 VOLUMES SELECIONADOS</p>
-                                    <p style="color: white; font-weight: 900; font-size: 22px; margin: 0; line-height: 1.3;">{qtd_f}</p>
-                                </div>
-                                <div style="flex: 1; background: linear-gradient(135deg, #059669 0%, #10B981 100%); border-radius: 8px; height: 75px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                                    <p style="color: white; font-weight: 800; font-size: 13px; margin: 0; line-height: 1.3;">💰 TOTAL PROJETADO</p>
-                                    <p style="color: white; font-weight: 900; font-size: 22px; margin: 0; line-height: 1.3;">R$ {total_f:,.2f}</p>
-                                </div>
-                            </div>
-                            """
-                            st.markdown(html_kpis, unsafe_allow_html=True)
-                            
-                            obs_fat = st.text_area("📝 Observação Customizada (Opcional - Sai no rodapé do PDF):", placeholder="Ex: Dados bancários para depósito...")
-                            
-                            if st.button("⚙️ GERAR FATURA AGORA", type="primary", use_container_width=True):
-                                if sel_f.empty: st.warning("Selecione os pedidos para faturar!")
-                                else:
-                                    with st.spinner("Registrando fatura no Livro Caixa e limpando memória..."):
-                                        id_fat = f"FAT-{f_tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
-                                        
-                                        # 4. Gravação Definitiva no Banco na hora de Faturar
-                                        aba_m = planilha_db.worksheet("Memoria_Sistema")
-                                        df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-                                        
-                                        pedidos_faturados = sel_f['PEDIDO'].astype(str).tolist()
-                                        for pid in pedidos_faturados:
-                                            mask = df_nuvem['PEDIDO'] == pid
-                                            if mask.any():
-                                                df_nuvem.loc[mask, 'FATURA'] = id_fat
-                                                # Pega o status da GRID, tira os emojis, e crava no banco para atualizar o "Em Rota"
-                                                st_grid = sel_f[sel_f['PEDIDO'] == pid].iloc[0]['STATUS']
-                                                df_nuvem.loc[mask, 'STATUS'] = "ENTREGUE" if "ENTREGUE" in st_grid.upper() else "FRUSTRADA"
+                            df_fin = df_todas_pendentes.copy()
 
-                                        aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                        
-                                        try: aba_h = planilha_financeiro.worksheet("Historico_Faturas")
-                                        except: 
-                                            aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 7)
-                                            aba_h.update("A1", [["ID_FATURA", "DATA_EMISSAO", "TOMADOR", "TOTAL_PEDIDOS", "VALOR_TOTAL_R$", "PERIODO", "STATUS_PAGAMENTO"]])
-                                        
-                                        d_sel = pd.to_datetime(sel_f['DATA'], format='%d/%m/%Y', errors='coerce').dropna()
-                                        periodo_f = f"{d_sel.min().strftime('%d/%m/%Y')} a {d_sel.max().strftime('%d/%m/%Y')}" if not d_sel.empty else "Data Única"
-                                        
-                                        aba_h.append_row([id_fat, hoje_br.strftime("%d/%m/%Y"), f_tom, len(sel_f), round(total_f, 2), periodo_f, "⏳ AGUARDANDO"])
-                                        
-                                        st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f, obs_fat)
-                                        st.session_state.fatura_xls = gerar_excel_memoria(sel_f.drop(columns=['DT_FILTRO', 'SELECIONAR']))
-                                        st.session_state.fatura_id = id_fat
-                                        st.session_state.fatura_tomador = f_tom
-                                        st.session_state.fatura_qtd = len(sel_f)
-                                        st.session_state.fatura_total = total_f
-                                        
-                                        carregar_dados_completos.clear()
-                                        st.session_state.fatura_sucesso = True; st.rerun()
+                        # 5. AVISO DE RAIO-X: Se sumiu pela data, ele avisa!
+                        if df_fin.empty:
+                            datas_escondidas = sorted([d.strftime('%d/%m/%Y') for d in df_todas_pendentes['DT_FILTRO'].unique()])
+                            st.warning(f"⚠️ Achei {len(df_todas_pendentes)} pedido(s) Entregues da {f_tom}! MAS eles não estão aparecendo porque a data de entrega deles foi em: {', '.join(datas_escondidas)}. Ajuste o calendário acima para cobrir essas datas.")
+                        else:
+                            df_p = carregar_tabela_precos(f_tom)
+                            if df_p.empty: 
+                                st.error(f"⚠️ Aba de preços '{f_tom}' vazia ou não encontrada na planilha do financeiro.")
+                            else:
+                                df_fin['VALOR (R$)'] = df_fin.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS_DISPLAY'], df_p), axis=1)
+                                df_show = df_fin[['DT_FILTRO', 'DATA', 'DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'VALOR (R$)']].copy()
+                                df_show.rename(columns={'STATUS_DISPLAY': 'STATUS'}, inplace=True)
+                                df_show['DATA_ENTREGA'] = df_show['DATA_ENTREGA'].apply(lambda x: str(x).split(' ')[0])
+                                
+                                sel_all_fat = st.checkbox("✅ Selecionar / Deselecionar Todos", value=True, key="sel_all_faturamento")
+                                df_show.insert(0, "SELECIONAR", sel_all_fat)
+                                
+                                edit = st.data_editor(df_show, column_config={"DT_FILTRO": None, "DATA": "COLETA", "DATA_ENTREGA": "ENTREGA"}, hide_index=True, use_container_width=True, disabled=[c for c in df_show.columns if c != "SELECIONAR"])
+                                sel_f = edit[edit["SELECIONAR"]]
+                                total_f = sel_f['VALOR (R$)'].sum()
+                                qtd_f = len(sel_f)
+                                
+                                st.markdown("---")
+                                
+                                html_kpis = f"""
+                                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                                    <div style="flex: 1; background: linear-gradient(135deg, #1E293B 0%, #334155 100%); border-radius: 8px; height: 75px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                        <p style="color: white; font-weight: 800; font-size: 13px; margin: 0; line-height: 1.3;">📦 VOLUMES SELECIONADOS</p>
+                                        <p style="color: white; font-weight: 900; font-size: 22px; margin: 0; line-height: 1.3;">{qtd_f}</p>
+                                    </div>
+                                    <div style="flex: 1; background: linear-gradient(135deg, #059669 0%, #10B981 100%); border-radius: 8px; height: 75px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                        <p style="color: white; font-weight: 800; font-size: 13px; margin: 0; line-height: 1.3;">💰 TOTAL PROJETADO</p>
+                                        <p style="color: white; font-weight: 900; font-size: 22px; margin: 0; line-height: 1.3;">R$ {total_f:,.2f}</p>
+                                    </div>
+                                </div>
+                                """
+                                st.markdown(html_kpis, unsafe_allow_html=True)
+                                
+                                obs_fat = st.text_area("📝 Observação Customizada (Opcional - Sai no rodapé do PDF):", placeholder="Ex: Dados bancários para depósito...")
+                                
+                                if st.button("⚙️ GERAR FATURA AGORA", type="primary", use_container_width=True):
+                                    if sel_f.empty: st.warning("Selecione os pedidos para faturar!")
+                                    else:
+                                        with st.spinner("Registrando fatura no Livro Caixa e consolidando baixas..."):
+                                            id_fat = f"FAT-{f_tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
+                                            
+                                            # 6. Gravação Definitiva no Banco na hora de Faturar
+                                            aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                            df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                                            
+                                            pedidos_faturados = sel_f['PEDIDO'].astype(str).tolist()
+                                            for pid in pedidos_faturados:
+                                                mask = df_nuvem['PEDIDO'] == pid
+                                                if mask.any():
+                                                    df_nuvem.loc[mask, 'FATURA'] = id_fat
+                                                    # Pega o status da GRID, tira os emojis, e crava no banco para atualizar a Memória de fato
+                                                    st_grid = sel_f[sel_f['PEDIDO'] == pid].iloc[0]['STATUS']
+                                                    df_nuvem.loc[mask, 'STATUS'] = "ENTREGUE" if "ENTREGUE" in st_grid.upper() else "FRUSTRADA"
+
+                                            aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                            
+                                            try: aba_h = planilha_financeiro.worksheet("Historico_Faturas")
+                                            except: 
+                                                aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 7)
+                                                aba_h.update("A1", [["ID_FATURA", "DATA_EMISSAO", "TOMADOR", "TOTAL_PEDIDOS", "VALOR_TOTAL_R$", "PERIODO", "STATUS_PAGAMENTO"]])
+                                            
+                                            d_sel = pd.to_datetime(sel_f['DATA'], format='%d/%m/%Y', errors='coerce').dropna()
+                                            periodo_f = f"{d_sel.min().strftime('%d/%m/%Y')} a {d_sel.max().strftime('%d/%m/%Y')}" if not d_sel.empty else "Data Única"
+                                            
+                                            aba_h.append_row([id_fat, hoje_br.strftime("%d/%m/%Y"), f_tom, len(sel_f), round(total_f, 2), periodo_f, "⏳ AGUARDANDO"])
+                                            
+                                            st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f, obs_fat)
+                                            st.session_state.fatura_xls = gerar_excel_memoria(sel_f.drop(columns=['DT_FILTRO', 'SELECIONAR']))
+                                            st.session_state.fatura_id = id_fat
+                                            st.session_state.fatura_tomador = f_tom
+                                            st.session_state.fatura_qtd = len(sel_f)
+                                            st.session_state.fatura_total = total_f
+                                            
+                                            carregar_dados_completos.clear()
+                                            st.session_state.fatura_sucesso = True; st.rerun()
 
     with tab_historico:
         st.markdown("#### 📖 Livro Caixa Eletrônico")
