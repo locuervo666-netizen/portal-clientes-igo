@@ -1260,26 +1260,37 @@ elif menu == "💰 Faturamento":
                 df_raw['TOMADOR'] = df_raw['TOMADOR'].apply(lambda x: str(x).replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB'))
                 if 'FATURA' not in df_raw.columns: df_raw['FATURA'] = ""
                 
-                df_fin = df_raw[(df_raw['TOMADOR'] == f_tom) & (df_raw['STATUS'].isin(['ENTREGUE', 'FRUSTRADA'])) & (df_raw['FATURA'].astype(str).str.strip() == "")].copy()
+                # 🔥 BLINDAGEM 1: FORÇA A LIMPEZA E PADRONIZAÇÃO DO STATUS 🔥
+                mask_status = df_raw['STATUS'].astype(str).str.strip().str.upper().isin(['ENTREGUE', 'FRUSTRADA'])
+                mask_tomador = df_raw['TOMADOR'] == f_tom
+                mask_fatura = df_raw['FATURA'].astype(str).str.strip() == ""
+                
+                df_fin = df_raw[mask_tomador & mask_status & mask_fatura].copy()
+                
+                # 🔥 BLINDAGEM 2: FILTRO DE DATAS BASEADO NA ENTREGA REAL 🔥
+                df_fin['DATA_ENTREGA_CLEAN'] = df_fin['DATA_ENTREGA'].astype(str).str.split(' ').str[0]
+                df_fin['DT_ENTREGA_OBJ'] = pd.to_datetime(df_fin['DATA_ENTREGA_CLEAN'], format='%d/%m/%Y', errors='coerce').dt.date
+                # Se for frustrada ou não tiver data de entrega limpa, cai pro dia da emissão como fallback
+                df_fin['DT_FILTRO'] = df_fin['DT_ENTREGA_OBJ'].fillna(df_fin['DATA_OBJ'])
+                
                 if isinstance(f_per, (tuple, list)) and len(f_per) == 2:
-                    df_fin = df_fin[(df_fin['DATA_OBJ'] >= f_per[0]) & (df_fin['DATA_OBJ'] <= f_per[1])]
+                    df_fin = df_fin[(df_fin['DT_FILTRO'] >= f_per[0]) & (df_fin['DT_FILTRO'] <= f_per[1])]
 
                 if df_fin.empty: 
-                    st.info(f"✅ Nenhum pedido pendente para {f_tom} neste período.")
+                    st.info(f"✅ Nenhum pedido finalizado pendente de faturamento para a {f_tom} no período selecionado.")
                 else:
                     df_p = carregar_tabela_precos(f_tom)
                     if df_p.empty: 
-                        st.error(f"⚠️ Aba de preços '{f_tom}' vazia ou não encontrada no financeiro.")
+                        st.error(f"⚠️ Aba de preços '{f_tom}' vazia ou não encontrada na planilha do financeiro.")
                     else:
-                        df_fin['VALOR (R$)'] = df_fin.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS'], df_p), axis=1)
-                        df_show = df_fin[['DATA_OBJ', 'DATA', 'DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)']].copy()
+                        df_fin['VALOR (R$)'] = df_fin.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS'].strip().upper(), df_p), axis=1)
+                        df_show = df_fin[['DT_FILTRO', 'DATA', 'DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)']].copy()
                         df_show['DATA_ENTREGA'] = df_show['DATA_ENTREGA'].apply(lambda x: str(x).split(' ')[0])
                         
-                        # Botão Marcar/Desmarcar todos acima da tabela
                         sel_all_fat = st.checkbox("✅ Selecionar / Deselecionar Todos", value=True, key="sel_all_faturamento")
                         df_show.insert(0, "SELECIONAR", sel_all_fat)
                         
-                        edit = st.data_editor(df_show, column_config={"DATA_OBJ": None, "DATA": "COLETA", "DATA_ENTREGA": "ENTREGA"}, hide_index=True, use_container_width=True, disabled=[c for c in df_show.columns if c != "SELECIONAR"])
+                        edit = st.data_editor(df_show, column_config={"DT_FILTRO": None, "DATA": "COLETA", "DATA_ENTREGA": "ENTREGA"}, hide_index=True, use_container_width=True, disabled=[c for c in df_show.columns if c != "SELECIONAR"])
                         sel_f = edit[edit["SELECIONAR"]]
                         total_f = sel_f['VALOR (R$)'].sum()
                         qtd_f = len(sel_f)
@@ -1324,7 +1335,7 @@ elif menu == "💰 Faturamento":
                                     aba_h.append_row([id_fat, hoje_br.strftime("%d/%m/%Y"), f_tom, len(sel_f), round(total_f, 2), periodo_f, "⏳ AGUARDANDO"])
                                     
                                     st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f, obs_fat)
-                                    st.session_state.fatura_xls = gerar_excel_memoria(sel_f.drop(columns=['DATA_OBJ', 'SELECIONAR']))
+                                    st.session_state.fatura_xls = gerar_excel_memoria(sel_f.drop(columns=['DT_FILTRO', 'SELECIONAR']))
                                     st.session_state.fatura_id = id_fat
                                     st.session_state.fatura_tomador = f_tom
                                     st.session_state.fatura_qtd = len(sel_f)
@@ -1362,7 +1373,7 @@ elif menu == "💰 Faturamento":
                         df_rec = df_raw[df_raw['FATURA'] == fat_sel].copy()
                         if not df_rec.empty:
                             df_p_rec = carregar_tabela_precos(df_rec.iloc[0]['TOMADOR'])
-                            df_rec['VALOR (R$)'] = df_rec.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS'], df_p_rec), axis=1)
+                            df_rec['VALOR (R$)'] = df_rec.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS'].strip().upper(), df_p_rec), axis=1)
                             total_rec = df_rec['VALOR (R$)'].sum()
                             st.download_button("📥 Reemitir PDF", data=gerar_pdf_fatura(fat_sel, df_rec.iloc[0]['TOMADOR'], df_rec, total_rec), file_name=f"{fat_sel}_2via.pdf", use_container_width=True)
                         
