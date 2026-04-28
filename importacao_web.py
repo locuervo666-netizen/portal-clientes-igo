@@ -963,12 +963,15 @@ if menu == "📊 GRID":
                         if tem_entregue:
                             st.warning("⚠️ Desfazendo pedido já **ENTREGUES**.")
                             senha_reversao = st.text_input("🔑 Senha:", type="password")
+                        
                         if st.form_submit_button("Confirmar Nova Baixa", type="primary", use_container_width=True):
-                            with st.spinner("Atualizando status no banco de dados..."):
+                            with st.spinner("Atualizando C.C.O. e limpando o App do Motorista..."):
                                 status_limpo = status_baixa.split(" ")[0].upper()
-                                if tem_entregue and status_limpo != 'ENTREGUE' and senha_reversao != '123': st.error("❌ Senha incorreta!")
+                                if tem_entregue and status_limpo != 'ENTREGUE' and senha_reversao != '123': 
+                                    st.error("❌ Senha incorreta!")
                                 else:
                                     try:
+                                        # 1. ATUALIZA A MEMÓRIA OFICIAL (C.C.O)
                                         aba = planilha_db.worksheet("Memoria_Sistema")
                                         df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
                                         for pid in p_ids:
@@ -982,9 +985,35 @@ if menu == "📊 GRID":
                                                 
                                         aba.clear()
                                         aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                        st.success("🎉 Atualizado!")
+                                        
+                                        # 2. ESPELHA NO APP DO MOTORISTA E FAXINA DUPLICATAS
+                                        try:
+                                            aba_app = planilha_db.worksheet("App_Tarefas")
+                                            dados_app = aba_app.get_all_values()
+                                            if len(dados_app) > 1:
+                                                df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
+                                                
+                                                for pid in p_ids:
+                                                    mask_app = df_app['PEDIDO'] == pid
+                                                    if mask_app.any():
+                                                        df_app.loc[mask_app, 'STATUS'] = status_limpo
+                                                        if status_limpo == "ENTREGUE" and 'DATA_ENTREGA' in df_app.columns:
+                                                            df_app.loc[mask_app, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y %H:%M:%S")
+                                                
+                                                # Remove o "lixo" duplicado que confunde o AppSheet
+                                                if 'PEDIDO' in df_app.columns:
+                                                    df_app = df_app.drop_duplicates(subset=['PEDIDO'], keep='last')
+                                                    
+                                                aba_app.clear()
+                                                aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
+                                        except Exception as e_app:
+                                            # Se der erro no app, ignora silenciosamente para não travar a baixa do CCO
+                                            pass
+                                            
+                                        st.success("🎉 Atualizado no CCO e App sincronizado!")
                                         time.sleep(1); carregar_dados_completos.clear(); st.rerun()
-                                    except Exception as e: st.error(f"Erro: {e}")
+                                    except Exception as e: 
+                                        st.error(f"Erro: {e}")
 
             with col_b3.popover("🔄 Trocar Agente", use_container_width=True):
                 if not tem_sel: st.warning("Selecione um pedido!")
