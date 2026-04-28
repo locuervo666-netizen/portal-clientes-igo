@@ -294,14 +294,16 @@ def carregar_dados_nuvem():
                     if 'FOTO'        in df_app.columns: cols_to_extract.append('FOTO')
                     if 'DATA'        in df_app.columns: cols_to_extract.append('DATA')
                     if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
+                    if 'RECEBEDOR'   in df_app.columns: cols_to_extract.append('RECEBEDOR') # ADICIONADO
 
                     col_nome = None
-                    for c in ['DETALHES', 'RECEBEDOR', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
+                    for c in ['DETALHES', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
                         if c in df_app.columns:
                             cols_to_extract.append(c)
                             col_nome = c
                             break
-
+                    
+                    cols_to_extract = list(set(cols_to_extract))
                     df_app_clean = df_app[cols_to_extract].copy()
 
                     rename_dict = {
@@ -309,7 +311,8 @@ def carregar_dados_nuvem():
                         'OBSERVACOES': 'A_OB',
                         'FOTO': 'A_FO',
                         'DATA': 'A_DT',
-                        'DATA_ENTREGA': 'A_DT_ENTREGA'
+                        'DATA_ENTREGA': 'A_DT_ENTREGA',
+                        'RECEBEDOR': 'A_REC' # MAPEMENTO
                     }
                     if col_nome:
                         rename_dict[col_nome] = 'A_CONTATO'
@@ -324,11 +327,23 @@ def carregar_dados_nuvem():
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
 
+                    # Função de cruzamento robusto para Romaneios
+                    def get_app_val(row, col_app):
+                        val = str(row.get(col_app, '')).strip()
+                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        if rom_id in rom_dict:
+                            rom_val = str(rom_dict[rom_id].get(col_app, '')).strip()
+                            if rom_val and rom_val.upper() != 'NAN':
+                                return rom_val
+                        return val if val.upper() != 'NAN' else ""
+
+                    df['RECEBEDOR_FINAL'] = df.apply(lambda r: get_app_val(r, 'A_REC'), axis=1)
+                    df['OBS_APP_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_OB'), axis=1)
+                    df['CONTATO_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_CONTATO'), axis=1)
+
                     if 'A_FO' in df.columns:
                         df['FOTO'] = df.apply(
-                            lambda r: r['A_FO']
-                            if str(r.get('A_FO', '')).strip() and str(r.get('A_FO', '')).upper() != 'NAN'
-                            else r.get('FOTO', ''),
+                            lambda r: get_app_val(r, 'A_FO') if get_app_val(r, 'A_FO') else r.get('FOTO', ''),
                             axis=1
                         )
 
@@ -482,17 +497,33 @@ KPI_META = [
     ("HOJE",       "📅 Hoje",         "kpi_hoje"),
 ]
 
+# 🔥 NOVA FUNÇÃO DE DETALHES INTELIGENTE 🔥
 def get_detalhes(row):
     obs_master = str(row.get('OBSERVACOES', '')).strip()
-    obs_app    = str(row.get('A_OB', '')).strip()
-    contato    = str(row.get('A_CONTATO', '')).strip()
-    obs_final  = obs_app if (obs_app and obs_app.upper() != 'NAN') else obs_master
+    obs_app    = str(row.get('OBS_APP_FINAL', '')).strip()
+    contato    = str(row.get('CONTATO_FINAL', '')).strip()
+    recebedor  = str(row.get('RECEBEDOR_FINAL', '')).strip()
+    
+    status     = str(row.get('STATUS_DISPLAY', '')).upper()
+
+    # REGRA 1: Se Entregue, foca em mostrar QUEM recebeu (se essa informação existir)
+    if 'ENTREGUE' in status:
+        if recebedor:
+            return f"Recebedor(a): {recebedor}"
+        elif contato:
+            return f"Recebedor(a): {contato}"
+        else:
+            return "-"
+
+    # REGRA 2: Se não for Entregue (Frustrada, Problema, etc), mostra a Observação (Motivo)
+    obs_final = obs_app if obs_app else obs_master
     if obs_final.upper() == 'NAN': obs_final = ""
-    if contato.upper()   == 'NAN': contato   = ""
+
     if not obs_final and not contato: return "-"
     if obs_final and contato and obs_final.upper() != contato.upper():
         return f"{obs_final} (Informante: {contato})"
     return obs_final if obs_final else f"Informante: {contato}"
+
 
 def definir_prioridade_portal(status_str):
     s = str(status_str).upper()
