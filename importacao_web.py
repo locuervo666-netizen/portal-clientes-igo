@@ -1156,7 +1156,7 @@ if menu == "📊 GRID":
 
             col_b7.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
 # =============================================================================
-# 💰 MÓDULO 2: FATURAMENTO MASTER (AUTO-SYNC E CORREÇÃO DE DATAS)
+# 💰 MÓDULO 2: FATURAMENTO MASTER (COM SINCRONIZAÇÃO FORÇADA)
 # =============================================================================
 elif menu == "💰 Faturamento":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>💰 Gestão Financeira Master</h3></div>", unsafe_allow_html=True)
@@ -1269,6 +1269,59 @@ elif menu == "💰 Faturamento":
                 st.session_state.fatura_sucesso = False; st.rerun()
         
         else:
+            # 🔥 BOTÃO DE FORÇA BRUTA (REAGATE DE BAIXAS DO APP) 🔥
+            st.markdown("#### 🚨 Resgate de Baixas do Aplicativo")
+            st.info("Se os pedidos estão 'Em Rota' na Memória mas foram entregues no App, clique abaixo para forçar a gravação definitiva no banco e liberar para faturamento.")
+            if st.button("🔄 FORÇAR SINCRONIZAÇÃO COM O APP", type="primary", use_container_width=True):
+                with st.spinner("Lendo Aplicativo e forçando atualização no banco de dados oficial..."):
+                    try:
+                        aba_m = planilha_db.worksheet("Memoria_Sistema")
+                        aba_app = planilha_db.worksheet("App_Tarefas")
+                        df_m = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                        df_app = pd.DataFrame(aba_app.get_all_values()[1:], columns=aba_app.get_all_values()[0])
+                        
+                        cols_app = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
+                        df_app.columns = cols_app
+                        
+                        df_app_finalizados = df_app[df_app['STATUS'].astype(str).str.upper().isin(['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO'])]
+                        
+                        pedidos_dict = df_app_finalizados.set_index('PEDIDO')['STATUS'].to_dict()
+                        datas_dict = df_app_finalizados.set_index('PEDIDO')['DATA_ENTREGA'].to_dict() if 'DATA_ENTREGA' in df_app.columns else {}
+                            
+                        atualizados = 0
+                        for idx, row in df_m.iterrows():
+                            pid = str(row.get('PEDIDO', '')).strip()
+                            rom = str(row.get('ROMANEIO', '')).strip()
+                            
+                            novo_st = None
+                            nova_dt = None
+                            
+                            if rom and rom in pedidos_dict:
+                                novo_st = pedidos_dict[rom]
+                                nova_dt = datas_dict.get(rom, "")
+                            elif pid in pedidos_dict:
+                                novo_st = pedidos_dict[pid]
+                                nova_dt = datas_dict.get(pid, "")
+                                
+                            if novo_st and str(row.get('STATUS', '')).strip().upper() != str(novo_st).upper():
+                                df_m.at[idx, 'STATUS'] = str(novo_st).upper()
+                                if nova_dt: df_m.at[idx, 'DATA_ENTREGA'] = str(nova_dt)
+                                atualizados += 1
+                                
+                        if atualizados > 0:
+                            aba_m.clear()
+                            aba_m.update("A1", [df_m.columns.tolist()] + df_m.fillna("").astype(str).values.tolist())
+                            st.success(f"✅ SUCESSO! {atualizados} pedidos que estavam presos na memória foram atualizados e liberados.")
+                        else:
+                            st.info("Nenhum pedido divergente encontrado no momento.")
+                        
+                        carregar_dados_completos.clear()
+                        time.sleep(2)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao forçar atualização: {e}")
+            st.markdown("---")
+
             with st.container(border=True):
                 c1, c2 = st.columns([1, 1])
                 f_tom = c1.selectbox("🏢 Selecionar Tomador:", CLIENTES_AUTORIZADOS, key="fat_tom_sel")
@@ -1283,8 +1336,6 @@ elif menu == "💰 Faturamento":
                 
                 df_fin = df_raw[mask_tomador & mask_status & mask_fatura].copy()
                 
-                # 🔥 LÓGICA DE DATA CORRIGIDA (INTELIGENTE) 🔥
-                # Tenta ler a data de entrega forçando o formato Brasileiro (dia primeiro)
                 df_fin['DT_FILTRO'] = pd.to_datetime(df_fin['DATA_ENTREGA'].astype(str).str.split(' ').str[0], dayfirst=True, errors='coerce').dt.date
                 df_fin['DT_FILTRO'] = df_fin['DT_FILTRO'].fillna(df_fin['DATA_OBJ'])
                 
@@ -1292,7 +1343,7 @@ elif menu == "💰 Faturamento":
                     df_fin = df_fin[(df_fin['DT_FILTRO'] >= f_per[0]) & (df_fin['DT_FILTRO'] <= f_per[1])]
 
                 if df_fin.empty: 
-                    st.info(f"✅ Nenhum pedido pendente para {f_tom}. (Verifique se não há notas pendentes fora da data selecionada).")
+                    st.info(f"✅ Nenhum pedido pendente para {f_tom}. (Se você acabou de sincronizar, verifique as datas no filtro acima).")
                 else:
                     df_p = carregar_tabela_precos(f_tom)
                     if df_p.empty: 
@@ -1336,7 +1387,6 @@ elif menu == "💰 Faturamento":
                                     aba_m = planilha_db.worksheet("Memoria_Sistema")
                                     df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
                                     
-                                    # 🔥 AUTO-SYNC INVISÍVEL: Salva o status do App direto na Memoria Oficial
                                     pedidos_faturados = sel_f['PEDIDO'].astype(str).tolist()
                                     for pid in pedidos_faturados:
                                         mask = df_nuvem['PEDIDO'] == pid
