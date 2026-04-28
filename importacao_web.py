@@ -1139,7 +1139,7 @@ if menu == "📊 GRID":
             col_b7.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
 
 # =============================================================================
-# 💰 MÓDULO 2: FATURAMENTO MASTER (ERP LOGÍSTICO COMPLETO)
+# 💰 MÓDULO 2: FATURAMENTO MASTER (AUTO-SYNC E CORREÇÃO DE DATAS)
 # =============================================================================
 elif menu == "💰 Faturamento":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>💰 Gestão Financeira Master</h3></div>", unsafe_allow_html=True)
@@ -1182,7 +1182,6 @@ elif menu == "💰 Faturamento":
         if not match.empty:
             v_base = float(match.iloc[0]['VALOR_CHEIO'])
             mult = float(match.iloc[0]['MULT_FRUSTRADA'])
-            # Aceita qualquer variação limpa de 'ENTREGUE'
             return v_base if "ENTREGUE" in str(status).upper() else (v_base * mult)
         return 0.0
 
@@ -1258,34 +1257,30 @@ elif menu == "💰 Faturamento":
                 f_tom = c1.selectbox("🏢 Selecionar Tomador:", CLIENTES_AUTORIZADOS, key="fat_tom_sel")
                 f_per = c2.date_input("📅 Período de Entrega:", value=(hoje_br - timedelta(days=30), hoje_br), format="DD/MM/YYYY", key="fat_per_sel")
                 
-                # 🔥 AJUSTE DE LIMPEZA INTELIGENTE PARA SOUZA CRUZ E OUTROS 🔥
                 df_raw['TOMADOR_CLEAN'] = df_raw['TOMADOR'].astype(str).str.strip().str.upper()
                 df_raw['STATUS_CLEAN'] = df_raw['STATUS'].astype(str).str.strip().str.upper()
                 
-                # Filtro inteligente: Aceita se CONTÉM a palavra 'ENTREGUE' ou 'FRUSTRADA' (ignorando emojis e espaços extras)
                 mask_status = df_raw['STATUS_CLEAN'].str.contains('ENTREGUE|FRUSTRADA', na=False)
                 mask_tomador = (df_raw['TOMADOR_CLEAN'] == f_tom.upper()) | (df_raw['TOMADOR_CLEAN'].str.contains(f_tom.upper(), na=False))
-                
-                # Só passa quem NÃO foi faturado
                 mask_fatura = (df_raw['FATURA'].astype(str).str.strip() == "") | (df_raw['FATURA'].isna())
                 
                 df_fin = df_raw[mask_tomador & mask_status & mask_fatura].copy()
                 
-                # Filtro de Datas baseado na Entrega Real ou Emissão
-                df_fin['DT_FILTRO'] = pd.to_datetime(df_fin['DATA_ENTREGA'].astype(str).str.split(' ').str[0], format='%d/%m/%Y', errors='coerce').dt.date
+                # 🔥 LÓGICA DE DATA CORRIGIDA (INTELIGENTE) 🔥
+                # Tenta ler a data de entrega forçando o formato Brasileiro (dia primeiro)
+                df_fin['DT_FILTRO'] = pd.to_datetime(df_fin['DATA_ENTREGA'].astype(str).str.split(' ').str[0], dayfirst=True, errors='coerce').dt.date
                 df_fin['DT_FILTRO'] = df_fin['DT_FILTRO'].fillna(df_fin['DATA_OBJ'])
                 
                 if isinstance(f_per, (tuple, list)) and len(f_per) == 2:
                     df_fin = df_fin[(df_fin['DT_FILTRO'] >= f_per[0]) & (df_fin['DT_FILTRO'] <= f_per[1])]
 
                 if df_fin.empty: 
-                    st.info(f"✅ Nenhum pedido pendente para {f_tom}. (Certifique-se de que a coluna FATURA no Google Sheets está totalmente em branco).")
+                    st.info(f"✅ Nenhum pedido pendente para {f_tom}. (Verifique se não há notas pendentes fora da data selecionada).")
                 else:
                     df_p = carregar_tabela_precos(f_tom)
                     if df_p.empty: 
                         st.error(f"⚠️ Aba de preços '{f_tom}' vazia ou não encontrada na planilha do financeiro.")
                     else:
-                        # Passa o STATUS_CLEAN para o calculador
                         df_fin['VALOR (R$)'] = df_fin.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), r['STATUS_CLEAN'], df_p), axis=1)
                         df_show = df_fin[['DT_FILTRO', 'DATA', 'DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS', 'VALOR (R$)']].copy()
                         df_show['DATA_ENTREGA'] = df_show['DATA_ENTREGA'].apply(lambda x: str(x).split(' ')[0])
@@ -1300,7 +1295,6 @@ elif menu == "💰 Faturamento":
                         
                         st.markdown("---")
                         
-                        # 🔥 BLOCOS DE KPI ESTILO GRID 🔥
                         html_kpis = f"""
                         <div style="display: flex; gap: 15px; margin-bottom: 20px;">
                             <div style="flex: 1; background: linear-gradient(135deg, #1E293B 0%, #334155 100%); border-radius: 8px; height: 75px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
@@ -1320,11 +1314,22 @@ elif menu == "💰 Faturamento":
                         if st.button("⚙️ GERAR FATURA AGORA", type="primary", use_container_width=True):
                             if sel_f.empty: st.warning("Selecione os pedidos para faturar!")
                             else:
-                                with st.spinner("Registrando fatura no Livro Caixa..."):
+                                with st.spinner("Registrando fatura no Livro Caixa e consolidando baixas..."):
                                     id_fat = f"FAT-{f_tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
                                     aba_m = planilha_db.worksheet("Memoria_Sistema")
                                     df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-                                    df_nuvem.loc[df_nuvem['PEDIDO'].isin(sel_f['PEDIDO'].astype(str)), 'FATURA'] = id_fat
+                                    
+                                    # 🔥 AUTO-SYNC INVISÍVEL: Salva o status do App direto na Memoria Oficial
+                                    pedidos_faturados = sel_f['PEDIDO'].astype(str).tolist()
+                                    for pid in pedidos_faturados:
+                                        mask = df_nuvem['PEDIDO'] == pid
+                                        if mask.any():
+                                            status_app = sel_f[sel_f['PEDIDO'] == pid].iloc[0]['STATUS']
+                                            data_app = sel_f[sel_f['PEDIDO'] == pid].iloc[0]['DATA_ENTREGA']
+                                            df_nuvem.loc[mask, 'FATURA'] = id_fat
+                                            df_nuvem.loc[mask, 'STATUS'] = status_app
+                                            df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_app
+
                                     aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     
                                     try: aba_h = planilha_financeiro.worksheet("Historico_Faturas")
@@ -1376,7 +1381,6 @@ elif menu == "💰 Faturamento":
                         df_rec = df_raw[df_raw['FATURA'] == fat_sel].copy()
                         if not df_rec.empty:
                             df_p_rec = carregar_tabela_precos(df_rec.iloc[0]['TOMADOR'])
-                            # Usa o STATUS limpo para a reemissão também
                             df_rec['VALOR (R$)'] = df_rec.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), str(r['STATUS']).strip().upper(), df_p_rec), axis=1)
                             total_rec = df_rec['VALOR (R$)'].sum()
                             st.download_button("📥 Reemitir PDF", data=gerar_pdf_fatura(fat_sel, df_rec.iloc[0]['TOMADOR'], df_rec, total_rec), file_name=f"{fat_sel}_2via.pdf", use_container_width=True)
