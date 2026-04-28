@@ -77,8 +77,6 @@ st.markdown("""
 
     /* ── KPI CARDS ── */
     .kpi-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
         border-radius: 12px;
         padding: 14px 12px 12px;
         text-align: center;
@@ -88,13 +86,11 @@ st.markdown("""
         overflow: hidden;
     }
     .kpi-card:hover {
-        border-color: #94a3b8;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        transform: translateY(-2px);
     }
     .kpi-card.active {
-        border-color: #3b82f6;
-        background: #eff6ff;
+        box-shadow: 0 0 0 2px #3b82f6;
     }
     .kpi-dot {
         width: 8px;
@@ -111,7 +107,7 @@ st.markdown("""
     .kpi-label {
         font-size: 10px;
         font-weight: 600;
-        color: #94a3b8;
+        color: #64748b;
         text-transform: uppercase;
         letter-spacing: 0.06em;
         margin-top: 5px;
@@ -458,22 +454,32 @@ def get_st(row):
     if 'PROBLEMA'   in s: return '🚨 Problema'
     return '⏳ Pendente'
 
+# 🔥 CORES DOS BLOCOS (Mais sutis em tons pastéis) 🔥
 KPI_DOT_COLOR = {
     "TODOS":      "#3b82f6",
-    "ENTREGUE":  "#22c55e",
-    "FRUSTRADA": "#f59e0b",
-    "ATRASADO":  "#ef4444",
-    "Aguardando":"#94a3b8",
-    "HOJE":      "#8b5cf6",
+    "ENTREGUE":   "#22c55e",
+    "FRUSTRADA":  "#ef4444", 
+    "PENDENTE":   "#f59e0b",
+    "Aguardando": "#64748b",
+    "HOJE":       "#8b5cf6",
+}
+
+KPI_BG_COLOR = {
+    "TODOS":      "#eff6ff", # Azul bem claro
+    "ENTREGUE":   "#f0fdf4", # Verde bem claro
+    "FRUSTRADA":  "#fef2f2", # Vermelho bem claro
+    "PENDENTE":   "#fffbeb", # Amarelo/Laranja bem claro
+    "Aguardando": "#f8fafc", # Cinza bem claro
+    "HOJE":       "#f5f3ff", # Roxo bem claro
 }
 
 KPI_META = [
-    ("TODOS",      "📦 Total",       "kpi_total"),
-    ("ENTREGUE",  "✅ Entregues",  "kpi_entregue"),
-    ("FRUSTRADA", "❌ Frustradas", "kpi_frus"),
-    ("ATRASADO",  "🚨 Atrasados",  "kpi_atra"),
-    ("Aguardando","🔒 Aguardando", "kpi_aguardando"),
-    ("HOJE",      "📅 Hoje",        "kpi_hoje"),
+    ("TODOS",      "📦 Total",        "kpi_total"),
+    ("ENTREGUE",   "✅ Entregues",    "kpi_entregue"),
+    ("FRUSTRADA",  "❌ Frustradas",   "kpi_frus"),
+    ("PENDENTE",   "⏳ Pendentes",    "kpi_pend"),
+    ("Aguardando", "⏱️ Aguard. CCO",  "kpi_aguardando"),
+    ("HOJE",       "📅 Hoje",         "kpi_hoje"),
 ]
 
 def get_detalhes(row):
@@ -678,7 +684,7 @@ else:
                 if cidades_sel:
                     df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
-                # Detecta atrasados
+                # Detecta atrasados (Mantemos para alertar na tabela)
                 df_f['DT_LIMITE_OBJ'] = pd.to_datetime(
                     df_f['DATA_LIMITE'], format='%d/%m/%Y', errors='coerce'
                 ).dt.date
@@ -691,18 +697,16 @@ else:
                     (df_f['DT_LIMITE_OBJ'] < hoje_br) &
                     (df_f['DT_LIMITE_OBJ'].notnull())
                 )
-                # 🔥 ADICIONA EMOJI E TEXTO PARA ATRASADOS 🔥
                 df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] = (
                     df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] + ' 🚨 ATRASADO'
                 )
-                df_atrasados_only = df_f[mask_atrasado]
 
                 # ── KPI CARDS ────────────────────────────
                 n_vals = {
                     "TODOS":      len(df_f),
                     "ENTREGUE":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', case=False)]),
                     "FRUSTRADA":  len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', case=False)]),
-                    "ATRASADO":   len(df_atrasados_only),
+                    "PENDENTE":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Pendente|Rota|Coletado', case=False, na=False)]),
                     "Aguardando": len(df_f[df_f['STATUS_DISPLAY'].str.contains('Aguardando', case=False)]),
                     "HOJE":       len(df_f[df_f['DATA_OBJ'] == hoje_br]),
                 }
@@ -711,11 +715,14 @@ else:
                 for col, (filtro, label, key) in zip(cols_kpi, KPI_META):
                     is_active = st.session_state.filtro_kpi == filtro
                     dot_color = KPI_DOT_COLOR[filtro]
+                    bg_color  = KPI_BG_COLOR[filtro]
                     active_cls = "active" if is_active else ""
                     valor = n_vals[filtro]
                     with col:
+                        # Agora os cards recebem a cor de fundo pastel dinamicamente
                         st.markdown(f"""
                             <div class="kpi-card {active_cls}"
+                                 style="background-color: {bg_color}; border: 1px solid {dot_color}30;"
                                  onclick="window.location.reload()">
                                 <div class="kpi-dot" style="background:{dot_color};"></div>
                                 <div class="kpi-val">{valor}</div>
@@ -737,7 +744,7 @@ else:
                     div.st-key-kpi_total button,
                     div.st-key-kpi_entregue button,
                     div.st-key-kpi_frus button,
-                    div.st-key-kpi_atra button,
+                    div.st-key-kpi_pend button,
                     div.st-key-kpi_hoje button,
                     div.st-key-kpi_aguardando button {
                         visibility: hidden;
@@ -793,8 +800,8 @@ else:
                 if st.session_state.filtro_kpi != "TODOS":
                     if st.session_state.filtro_kpi == "HOJE":
                         df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
-                    elif st.session_state.filtro_kpi == "ATRASADO":
-                        df_grid = df_atrasados_only.copy()
+                    elif st.session_state.filtro_kpi == "PENDENTE":
+                        df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Pendente|Rota|Coletado', case=False, na=False)]
                     else:
                         df_grid = df_grid[
                             df_grid['STATUS_DISPLAY'].str.contains(
