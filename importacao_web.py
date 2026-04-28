@@ -1918,7 +1918,7 @@ elif menu == "📥 Importações Umove":
             df_err = df_preview[mask_err]; df_ok = df_preview[~mask_err]
 
             if not df_err.empty:
-                st.error(f"🚨 **Atenção:** {len(df_err)} pedido(s) não encontraram motorista automático.")
+                st.error(f"🚨 **Atenção:** {len(df_err)} pedido(s) não encontraram motorista automático. Corrija abaixo para liberar o botão.")
                 with st.form("form_correcao_agentes_sb"):
                     correcoes = {}; logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                     for idx, row in df_err.iterrows():
@@ -1990,19 +1990,20 @@ elif menu == "📥 Importações Umove":
     with tab_fixos:
         st.markdown("#### 🏭 Criar Novo Agendamento Fixo")
         
-        # Conexão, leitura e criação da aba se não existir
+        # 🔥 PROTEÇÃO MÁXIMA CONTRA NAME ERROR 🔥
         cols_fixos = ['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
+        df_regras = pd.DataFrame(columns=cols_fixos) 
+        
         try:
             aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
             dados_fixos = aba_fixos.get_all_values()
             if len(dados_fixos) > 1:
                 df_regras = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0])
-            else:
-                df_regras = pd.DataFrame(columns=cols_fixos)
         except Exception:
-            aba_fixos = planilha_db.add_worksheet("Agendamentos_Fixos", 100, 20)
-            aba_fixos.update("A1", [cols_fixos])
-            df_regras = pd.DataFrame(columns=cols_fixos)
+            try:
+                aba_fixos = planilha_db.add_worksheet("Agendamentos_Fixos", 100, 20)
+                aba_fixos.update("A1", [cols_fixos])
+            except Exception: pass
 
         # --- LÓGICA DE RESET INTELIGENTE ---
         if 'f_rua' not in st.session_state: st.session_state['f_rua'] = ""
@@ -2027,7 +2028,6 @@ elif menu == "📥 Importações Umove":
 
         cc1_f, cc2_f, cc3_f = st.columns([2, 1, 3], vertical_alignment="bottom")
         
-        # A KEY agora é dinâmica
         key_dinamica = f"cep_input_fixo_{st.session_state.cep_version}"
         cc1_f.text_input("Digite o CEP e aperte ENTER", max_chars=9, key=key_dinamica, on_change=buscar_cep_fixo_callback)
         
@@ -2087,7 +2087,6 @@ elif menu == "📥 Importações Umove":
                             aba_fixos.append_row(nova_regra)
                             st.success("✅ Regra Fixa cadastrada com sucesso!")
                             
-                            # LIMPANDO TUDO COM SEGURANÇA
                             st.session_state['f_rua'] = ""
                             st.session_state['f_bai'] = ""
                             st.session_state['f_cid'] = ""
@@ -2099,12 +2098,12 @@ elif menu == "📥 Importações Umove":
 
         st.markdown("---")
         st.markdown("#### 📋 Gerenciar Laboratórios Fixos")
-        st.info("💡 **Edite diretamente na tabela!** Mude o Status (ATIVO/INATIVO), ajuste os dias da semana (SIM/NAO) ou troque o Motorista. Para deletar, selecione a linha no canto esquerdo e aperte a tecla 'Delete'.")
+        st.info("💡 **Edite diretamente na tabela!** Mude o Status (ATIVO/INATIVO), ajuste os dias da semana ou troque o Motorista. Para deletar, selecione a linha no canto esquerdo e aperte a tecla 'Delete' ou 'Backspace'.")
         
+        # 🔥 A TABELA DE EDIÇÃO QUE HAVIA SUMIDO COM O ERRO 🔥
         if not df_regras.empty:
             logins_p_tabela = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
             
-            # 🔥 GRID INTERATIVA DE EDIÇÃO 🔥
             df_regras_edit = st.data_editor(
                 df_regras,
                 num_rows="dynamic",
@@ -2127,7 +2126,11 @@ elif menu == "📥 Importações Umove":
                 with st.spinner("Atualizando banco de dados..."):
                     try:
                         aba_fixos.clear()
-                        aba_fixos.update("A1", [df_regras_edit.columns.tolist()] + df_regras_edit.fillna("").astype(str).values.tolist())
+                        # Se apagou tudo com a tecla Delete, não quebra a planilha:
+                        if df_regras_edit.empty:
+                            aba_fixos.update("A1", [cols_fixos])
+                        else:
+                            aba_fixos.update("A1", [df_regras_edit.columns.tolist()] + df_regras_edit.fillna("").astype(str).values.tolist())
                         st.success("✅ Regras atualizadas com sucesso!")
                         time.sleep(1.5); st.rerun()
                     except Exception as e: st.error(f"Erro ao salvar regras: {e}")
@@ -2145,12 +2148,12 @@ elif menu == "📥 Importações Umove":
             aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
             dados_fixos = aba_fixos.get_all_values()
             if len(dados_fixos) > 1:
-                df_regras = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0])
+                df_regras_temp = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0])
                 mapa_dias = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
                 dia_atual = mapa_dias[hoje_br.weekday()]
                 
                 if dia_atual != 'DOM':
-                    df_alvo = df_regras[(df_regras[dia_atual] == "SIM") & (df_regras['STATUS'] == "ATIVO")].copy()
+                    df_alvo = df_regras_temp[(df_regras_temp[dia_atual] == "SIM") & (df_regras_temp['STATUS'] == "ATIVO")].copy()
                     if not df_alvo.empty:
                         try: aba_contador = planilha_sandbox.worksheet("Contador")
                         except: aba_contador = None
@@ -2162,7 +2165,6 @@ elif menu == "📥 Importações Umove":
                         elif 'contador_temp' in st.session_state:
                             prox_id_sb = st.session_state.contador_temp
                             
-                        # Soma a quantidade de itens que já estão no carrinho manual para não haver IDs iguais
                         prox_id_sb += len(st.session_state.df_sandbox_mem)
                         
                         novos_pedidos = []
@@ -2188,11 +2190,11 @@ elif menu == "📥 Importações Umove":
                         df_fixos_hoje = pd.DataFrame(novos_pedidos)
         except Exception: pass
 
-        # 2. O Checkbox Mágico (Interruptor)
+        # 2. O Checkbox Mágico (Interruptor) - DESLIGADO POR PADRÃO 🔥
         incluir_fixos = False
         if not df_fixos_hoje.empty:
             st.info(f"💡 O sistema encontrou **{len(df_fixos_hoje)} pedidos fixos** programados para hoje ({dia_atual}).")
-            incluir_fixos = st.toggle("👉 INCLUIR PEDIDOS FIXOS NA CARGA DE HOJE", value=True)
+            incluir_fixos = st.toggle("👉 INCLUIR PEDIDOS FIXOS NA CARGA DE HOJE", value=False, key="toggle_fixos_umove")
         else:
             st.info("Nenhum pedido fixo programado para hoje.")
 
@@ -2227,12 +2229,12 @@ elif menu == "📥 Importações Umove":
             st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
             st.markdown("<p style='font-size:12px; color:#64748B;'>Esta tabela exibe os lotes manuais e automáticos que você adicionou até agora. Dê dois cliques para editar.</p>", unsafe_allow_html=True)
             
-            # 🔥 KEY DINÂMICA: Isso destrava a memória fantasma do Streamlit 🔥
+            # 🔥 KEY FIXA E SEGURA PARA NÃO PERDER EDIÇÕES 🔥
             df_editado_sb = st.data_editor(
                 df_sb,
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"sandbox_grid_master_fix_{incluir_fixos}_{len(df_sb)}"
+                key="sandbox_grid_master_umove"
             )
             
             st.markdown("---")
