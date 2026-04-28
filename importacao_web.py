@@ -1040,7 +1040,10 @@ if menu == "📊 GRID":
                                             l_orig = df_nuvem[df_nuvem['PEDIDO'] == pid].iloc[0].copy()
                                             novo_id = str(prox_id); prox_id += 1
                                             l_orig['PEDIDO'] = novo_id; l_orig['DATA'] = clone_data.strftime("%d/%m/%Y")
-                                            l_orig['STATUS'] = "PENDENTE"; l_orig['DATA_ENTREGA'] = ""; l_orig['FOTO'] = ""; l_orig['ROMANEIO'] = ""; l_orig['ZAP_ENVIADO'] = ""
+                                            
+                                            # 🔥 CORREÇÃO AQUI: Agora o clone nasce sem fatura! 🔥
+                                            l_orig['STATUS'] = "PENDENTE"; l_orig['DATA_ENTREGA'] = ""; l_orig['FOTO'] = ""; l_orig['ROMANEIO'] = ""; l_orig['ZAP_ENVIADO'] = ""; l_orig['FATURA'] = ""
+                                            
                                             if clone_mot != "Manter Original": l_orig['AGENTE_RAW'] = clone_mot
                                             prazo = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')), str(l_orig.get('TOMADOR', '')))
                                             l_orig['PRAZO_DIAS'] = str(prazo); l_orig['DATA_LIMITE'] = str(calcular_data_limite(l_orig['DATA'], prazo))
