@@ -1156,11 +1156,66 @@ if menu == "📊 GRID":
 
             col_b7.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
 # =============================================================================
-# 💰 MÓDULO 2: FATURAMENTO MASTER (COM SINCRONIZAÇÃO FORÇADA)
+# 💰 MÓDULO 2: FATURAMENTO MASTER (AUTO-SYNC BLINDADO)
 # =============================================================================
 elif menu == "💰 Faturamento":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>💰 Gestão Financeira Master</h3></div>", unsafe_allow_html=True)
     
+    # -------------------------------------------------------------------------
+    # 🔥 MOTOR DE SINCRONIZAÇÃO INVISÍVEL (CORRIGIDO PARA DUPLICATAS) 🔥
+    # -------------------------------------------------------------------------
+    with st.spinner("Sincronizando baixas do aplicativo de forma definitiva..."):
+        try:
+            aba_m_sync = planilha_db.worksheet("Memoria_Sistema")
+            aba_app_sync = planilha_db.worksheet("App_Tarefas")
+            
+            dados_m = aba_m_sync.get_all_values()
+            df_m_sync = pd.DataFrame(dados_m[1:], columns=dados_m[0])
+            
+            dados_app = aba_app_sync.get_all_values()
+            df_app_sync = pd.DataFrame(dados_app[1:], columns=dados_app[0])
+            df_app_sync.columns = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app_sync.columns]
+            
+            df_app_sync['STATUS'] = df_app_sync['STATUS'].astype(str).str.strip().str.upper()
+            df_app_final = df_app_sync[df_app_sync['STATUS'].isin(['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO'])]
+            
+            # O PULO DO GATO: Remove duplicatas do AppSheet para o código não crashar
+            df_app_final = df_app_final.drop_duplicates(subset=['PEDIDO'], keep='last')
+            
+            dict_status = dict(zip(df_app_final['PEDIDO'], df_app_final['STATUS']))
+            dict_data = dict(zip(df_app_final['PEDIDO'], df_app_final['DATA_ENTREGA'])) if 'DATA_ENTREGA' in df_app_sync.columns else {}
+            
+            atualizou = False
+            for idx, row in df_m_sync.iterrows():
+                pid = str(row.get('PEDIDO', '')).strip()
+                rom = str(row.get('ROMANEIO', '')).strip()
+                status_atual = str(row.get('STATUS', '')).strip().upper()
+                
+                novo_status = None
+                nova_dt = None
+                
+                if rom and rom in dict_status:
+                    novo_status = dict_status[rom]
+                    nova_dt = dict_data.get(rom, "")
+                elif pid in dict_status:
+                    novo_status = dict_status[pid]
+                    nova_dt = dict_data.get(pid, "")
+                    
+                if novo_status and status_atual != novo_status:
+                    df_m_sync.at[idx, 'STATUS'] = novo_status
+                    if nova_dt: df_m_sync.at[idx, 'DATA_ENTREGA'] = nova_dt
+                    atualizou = True
+                    
+            if atualizou:
+                aba_m_sync.clear()
+                aba_m_sync.update("A1", [df_m_sync.columns.tolist()] + df_m_sync.fillna("").astype(str).values.tolist())
+                carregar_dados_completos.clear() # Força o cache a limpar para a tela de faturamento
+        except Exception as e:
+            pass # Se falhar a internet, ignora em silêncio
+
+    # -------------------------------------------------------------------------
+    # TELA DE FATURAMENTO
+    # -------------------------------------------------------------------------
     tab_faturar, tab_historico = st.tabs(["📈 Novo Lote de Faturamento", "📜 Livro Caixa e Histórico"])
     
     df_raw = carregar_dados_completos(planilha_db)
@@ -1269,59 +1324,6 @@ elif menu == "💰 Faturamento":
                 st.session_state.fatura_sucesso = False; st.rerun()
         
         else:
-            # 🔥 BOTÃO DE FORÇA BRUTA (REAGATE DE BAIXAS DO APP) 🔥
-            st.markdown("#### 🚨 Resgate de Baixas do Aplicativo")
-            st.info("Se os pedidos estão 'Em Rota' na Memória mas foram entregues no App, clique abaixo para forçar a gravação definitiva no banco e liberar para faturamento.")
-            if st.button("🔄 FORÇAR SINCRONIZAÇÃO COM O APP", type="primary", use_container_width=True):
-                with st.spinner("Lendo Aplicativo e forçando atualização no banco de dados oficial..."):
-                    try:
-                        aba_m = planilha_db.worksheet("Memoria_Sistema")
-                        aba_app = planilha_db.worksheet("App_Tarefas")
-                        df_m = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-                        df_app = pd.DataFrame(aba_app.get_all_values()[1:], columns=aba_app.get_all_values()[0])
-                        
-                        cols_app = [str(c).upper().strip().replace('?', '').replace(' ', '') for c in df_app.columns]
-                        df_app.columns = cols_app
-                        
-                        df_app_finalizados = df_app[df_app['STATUS'].astype(str).str.upper().isin(['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO'])]
-                        
-                        pedidos_dict = df_app_finalizados.set_index('PEDIDO')['STATUS'].to_dict()
-                        datas_dict = df_app_finalizados.set_index('PEDIDO')['DATA_ENTREGA'].to_dict() if 'DATA_ENTREGA' in df_app.columns else {}
-                            
-                        atualizados = 0
-                        for idx, row in df_m.iterrows():
-                            pid = str(row.get('PEDIDO', '')).strip()
-                            rom = str(row.get('ROMANEIO', '')).strip()
-                            
-                            novo_st = None
-                            nova_dt = None
-                            
-                            if rom and rom in pedidos_dict:
-                                novo_st = pedidos_dict[rom]
-                                nova_dt = datas_dict.get(rom, "")
-                            elif pid in pedidos_dict:
-                                novo_st = pedidos_dict[pid]
-                                nova_dt = datas_dict.get(pid, "")
-                                
-                            if novo_st and str(row.get('STATUS', '')).strip().upper() != str(novo_st).upper():
-                                df_m.at[idx, 'STATUS'] = str(novo_st).upper()
-                                if nova_dt: df_m.at[idx, 'DATA_ENTREGA'] = str(nova_dt)
-                                atualizados += 1
-                                
-                        if atualizados > 0:
-                            aba_m.clear()
-                            aba_m.update("A1", [df_m.columns.tolist()] + df_m.fillna("").astype(str).values.tolist())
-                            st.success(f"✅ SUCESSO! {atualizados} pedidos que estavam presos na memória foram atualizados e liberados.")
-                        else:
-                            st.info("Nenhum pedido divergente encontrado no momento.")
-                        
-                        carregar_dados_completos.clear()
-                        time.sleep(2)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao forçar atualização: {e}")
-            st.markdown("---")
-
             with st.container(border=True):
                 c1, c2 = st.columns([1, 1])
                 f_tom = c1.selectbox("🏢 Selecionar Tomador:", CLIENTES_AUTORIZADOS, key="fat_tom_sel")
@@ -1343,7 +1345,7 @@ elif menu == "💰 Faturamento":
                     df_fin = df_fin[(df_fin['DT_FILTRO'] >= f_per[0]) & (df_fin['DT_FILTRO'] <= f_per[1])]
 
                 if df_fin.empty: 
-                    st.info(f"✅ Nenhum pedido pendente para {f_tom}. (Se você acabou de sincronizar, verifique as datas no filtro acima).")
+                    st.info(f"✅ Nenhum pedido finalizado para {f_tom} neste período.")
                 else:
                     df_p = carregar_tabela_precos(f_tom)
                     if df_p.empty: 
@@ -1468,7 +1470,6 @@ elif menu == "💰 Faturamento":
                                     st.success("Estorno concluído!"); time.sleep(2); carregar_dados_completos.clear(); st.rerun()
                             else: st.error("Senha incorreta!")
         except Exception: st.warning("Histórico pronto para o próximo faturamento. (Aba sendo criada)")
-
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
