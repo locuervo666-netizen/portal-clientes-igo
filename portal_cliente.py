@@ -30,7 +30,7 @@ st.markdown("""
     [data-testid="stAppViewContainer"] {
         transition: background-color 0.3s ease;
         font-family: 'Inter', sans-serif;
-        background-color: #f8fafc !important;
+        background-color: #FFFFFF !important;
     }
 
     /* ── SIDEBAR ── */
@@ -514,7 +514,7 @@ def tratar_foto(x):
 if not st.session_state.logado:
     st.markdown("""
         <style>
-        [data-testid="stAppViewContainer"] { background-color: #f8fafc !important; }
+        [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
         </style>
     """, unsafe_allow_html=True)
 
