@@ -258,6 +258,7 @@ def carregar_dados_completos(_planilha):
                         if s_app and s_app != 'NAN': return s_app
                         return s_db
                     
+                    df['STATUS_DB_ORIGINAL'] = df['STATUS'].copy() # 🔥 GUARDA O ORIGINAL PARA O AUTO-SYNC
                     df['STATUS'] = df.apply(get_true_status, axis=1)
                     
                     def get_true_data_entrega(row):
@@ -666,6 +667,32 @@ if menu != "📈 Dashboard":
 # =============================================================================
 if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
+    
+    # 🔥 AUTO-SYNC SILENCIOSO (A MÁGICA INVISÍVEL) 🔥
+    # Se o App marcou entregue mas a Memória ainda tá velha, ele escreve na planilha sozinho!
+    if not df_raw.empty and 'STATUS_DB_ORIGINAL' in df_raw.columns:
+        mask_sync = (df_raw['STATUS_DB_ORIGINAL'] != df_raw['STATUS']) & (df_raw['STATUS'].isin(['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO', 'CONFERIDO']))
+        df_to_sync = df_raw[mask_sync]
+        
+        if not df_to_sync.empty:
+            try:
+                aba_m = planilha_db.worksheet("Memoria_Sistema")
+                df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                
+                for pid in df_to_sync['PEDIDO'].tolist():
+                    idx_nuvem = df_nuvem.index[df_nuvem['PEDIDO'] == str(pid)]
+                    if not idx_nuvem.empty:
+                        novo_st = df_to_sync.loc[df_to_sync['PEDIDO'] == pid, 'STATUS'].values[0]
+                        novo_dt = df_to_sync.loc[df_to_sync['PEDIDO'] == pid, 'DATA_ENTREGA'].values[0]
+                        df_nuvem.loc[idx_nuvem, 'STATUS'] = novo_st
+                        if str(novo_dt).strip(): df_nuvem.loc[idx_nuvem, 'DATA_ENTREGA'] = str(novo_dt)
+                        
+                aba_m.clear()
+                aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                carregar_dados_completos.clear()
+                df_raw = carregar_dados_completos(planilha_db) # Recarrega os dados já atualizados
+            except Exception: pass # Se der erro de internet, ele fica quieto e tenta de novo depois
+
     if not df_raw.empty:
         
         # 🔥 CAIXA DE ENTRADA (INBOX) DO PORTAL DO CLIENTE 🔥
@@ -674,7 +701,6 @@ if menu == "📊 GRID":
             st.error(f"🚨 **Atenção:** Existem {len(df_aprovacao)} solicitação(ões) de coleta do Portal do Cliente aguardando aprovação!")
             with st.expander("🔔 INBOX: Analisar e Aprovar Coletas", expanded=True):
                 
-                # --- BLINDAGEM CONTRA O ERRO (TELA VERMELHA) ---
                 if 'OBSERVACOES' not in df_aprovacao.columns:
                     df_aprovacao['OBSERVACOES'] = ""
                 
@@ -683,7 +709,6 @@ if menu == "📊 GRID":
                 
                 df_aprovacao_show = df_aprovacao[colunas_reais].copy()
                 df_aprovacao_show.insert(0, "SELECIONAR", False)
-                # -----------------------------------------------
                 
                 tabela_aprov = st.data_editor(
                     df_aprovacao_show, 
@@ -714,30 +739,24 @@ if menu == "📊 GRID":
                                     if mask.any():
                                         l_orig = df_nuvem[mask].iloc[0].copy()
                                         
-                                        # Inteligência de Roteirização Automática ou Manual
                                         if mot_aprov == "Automático (Por Rota)":
                                             mot_final = obter_login_agente(l_orig.get('CIDADE',''), l_orig.get('BAIRRO',''), l_orig.get('LABORATORIO',''), l_orig.get('ENDERECO',''), DF_AGENTES)
                                         else:
                                             mot_final = mot_aprov
 
-                                        # 🔥 NOVO: INTELIGÊNCIA DE PRAZO (SLA) 🔥
                                         prazo_calc = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')), str(l_orig.get('TOMADOR', '')))
                                         data_limite_calc = calcular_data_limite(str(l_orig.get('DATA', hoje_br.strftime("%d/%m/%Y"))), prazo_calc)
                                         
                                         df_nuvem.loc[mask, 'PRAZO_DIAS'] = str(prazo_calc)
                                         df_nuvem.loc[mask, 'DATA_LIMITE'] = str(data_limite_calc)
-                                        # ----------------------------------------
                                             
-                                        # Muda o status destrancando o pedido
                                         df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
                                         df_nuvem.loc[mask, 'AGENTE_RAW'] = mot_final
                                         
-                                        # Prepara pacote para o AppSheet do motorista
                                         d_app = l_orig.to_dict()
                                         d_app['MOTORISTA'] = mot_final
                                         lista_para_app.append(d_app)
 
-                                        # --- NOTIFICAÇÃO VIA WHATSAPP ---
                                         if mot_final:
                                             tel_row = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == mot_final]
                                             if not tel_row.empty:
@@ -753,7 +772,6 @@ if menu == "📊 GRID":
                                                 msg_zap += "Por favor, verifique o seu aplicativo para mais detalhes."
                                                 
                                                 enviar_whatsapp_zapi(tel_motorista, msg_zap)
-                                        # ---------------------------------------------------------------
                                         
                                 aba_m.clear()
                                 aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
@@ -1127,7 +1145,7 @@ if menu == "📊 GRID":
                                                     aba.clear()
                                                     aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                                 except Exception as e: st.error(f"Erro ao carimbar envio: {e}")
-                                        
+                                                
                                         progress_bar.progress((idx_ag + 1) / len(agentes_selecionados))
                                     
                                     status_text.markdown("✅ **Processo finalizado!**")
@@ -1137,7 +1155,6 @@ if menu == "📊 GRID":
                                     else: st.error("🚨 Nenhum envio realizado. Verifique os contatos.")
 
             col_b7.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
-
 # =============================================================================
 # 💰 MÓDULO 2: FATURAMENTO MASTER (AUTO-SYNC E CORREÇÃO DE DATAS)
 # =============================================================================
