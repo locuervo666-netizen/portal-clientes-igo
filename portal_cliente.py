@@ -793,7 +793,7 @@ else:
                 df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
                 if not df_h.empty:
                     n_fim  = len(df_h[df_h['STATUS_DISPLAY'].str.contains(
-                        'Entregue|Frustrada|Cancelado|Recusada', case=False
+                        'Entregue|Frustrada|Cancelado|Recusada|Coletado', case=False
                     )])
                     n_tot  = len(df_h)
                     pct    = round((n_fim / n_tot) * 100) if n_tot else 0
