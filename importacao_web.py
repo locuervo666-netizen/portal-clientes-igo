@@ -2098,23 +2098,39 @@ elif menu == "📥 Importações Umove":
                         except Exception as e: st.error(f"Erro: {e}")
 
         st.markdown("---")
-        st.markdown("#### 📋 Laboratórios Fixos Ativos")
+        st.markdown("#### 📋 Gerenciar Laboratórios Fixos")
+        st.info("💡 **Edite diretamente na tabela!** Mude o Status (ATIVO/INATIVO), ajuste os dias da semana (SIM/NAO) ou troque o Motorista. Para deletar, selecione a linha no canto esquerdo e aperte a tecla 'Delete'.")
+        
         if not df_regras.empty:
-            df_regras_show = df_regras.copy()
-            df_regras_show = df_regras_show.set_index('ID_REGRA')
-            st.dataframe(df_regras_show, use_container_width=True)
+            logins_p_tabela = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
             
-            with st.expander("🗑️ Excluir ou Inativar Regra"):
-                with st.form("form_excluir_regra"):
-                    id_del = st.selectbox("Selecione o ID da Regra:", df_regras['ID_REGRA'].tolist())
-                    if st.form_submit_button("Apagar Regra"):
-                        try:
-                            df_new = df_regras[df_regras['ID_REGRA'] != id_del]
-                            aba_fixos.clear()
-                            aba_fixos.update("A1", [df_new.columns.tolist()] + df_new.fillna("").astype(str).values.tolist())
-                            st.success("Regra apagada!")
-                            time.sleep(1); st.rerun()
-                        except Exception as e: st.error(f"Erro: {e}")
+            # 🔥 GRID INTERATIVA DE EDIÇÃO 🔥
+            df_regras_edit = st.data_editor(
+                df_regras,
+                num_rows="dynamic",
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "STATUS": st.column_config.SelectboxColumn("STATUS", options=["ATIVO", "INATIVO"]),
+                    "SEG": st.column_config.SelectboxColumn("SEG", options=["SIM", "NAO"]),
+                    "TER": st.column_config.SelectboxColumn("TER", options=["SIM", "NAO"]),
+                    "QUA": st.column_config.SelectboxColumn("QUA", options=["SIM", "NAO"]),
+                    "QUI": st.column_config.SelectboxColumn("QUI", options=["SIM", "NAO"]),
+                    "SEX": st.column_config.SelectboxColumn("SEX", options=["SIM", "NAO"]),
+                    "SAB": st.column_config.SelectboxColumn("SAB", options=["SIM", "NAO"]),
+                    "MOTORISTA": st.column_config.SelectboxColumn("MOTORISTA", options=logins_p_tabela)
+                },
+                key="editor_regras_fixas"
+            )
+            
+            if st.button("💾 Salvar Alterações na Base de Regras", type="primary", use_container_width=True):
+                with st.spinner("Atualizando banco de dados..."):
+                    try:
+                        aba_fixos.clear()
+                        aba_fixos.update("A1", [df_regras_edit.columns.tolist()] + df_regras_edit.fillna("").astype(str).values.tolist())
+                        st.success("✅ Regras atualizadas com sucesso!")
+                        time.sleep(1.5); st.rerun()
+                    except Exception as e: st.error(f"Erro ao salvar regras: {e}")
         else:
             st.info("Nenhuma regra de agendamento cadastrada ainda.")
 
@@ -2136,7 +2152,6 @@ elif menu == "📥 Importações Umove":
                 if dia_atual != 'DOM':
                     df_alvo = df_regras[(df_regras[dia_atual] == "SIM") & (df_regras['STATUS'] == "ATIVO")].copy()
                     if not df_alvo.empty:
-                        # Puxa o contador oficial do Umove para dar os IDs 700020+
                         try: aba_contador = planilha_sandbox.worksheet("Contador")
                         except: aba_contador = None
                         
@@ -2164,7 +2179,7 @@ elif menu == "📥 Importações Umove":
                                 'CIDADE': regra['CIDADE'],
                                 'UF': regra['UF'],
                                 'CEP': regra['CEP'],
-                                'OBSERVACOES': regra['OBSERVACOES'] + " [FIXO]",
+                                'OBSERVACOES': str(regra['OBSERVACOES']) + " [FIXO]",
                                 'AGENTE_RAW': regra['MOTORISTA']
                             }
                             novos_pedidos.append(novo_pedido)
@@ -2212,11 +2227,12 @@ elif menu == "📥 Importações Umove":
             st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
             st.markdown("<p style='font-size:12px; color:#64748B;'>Esta tabela exibe os lotes manuais e automáticos que você adicionou até agora. Dê dois cliques para editar.</p>", unsafe_allow_html=True)
             
+            # 🔥 KEY DINÂMICA: Isso destrava a memória fantasma do Streamlit 🔥
             df_editado_sb = st.data_editor(
                 df_sb,
                 num_rows="dynamic",
                 use_container_width=True,
-                key="sandbox_grid_master_fix"
+                key=f"sandbox_grid_master_fix_{incluir_fixos}_{len(df_sb)}"
             )
             
             st.markdown("---")
@@ -2325,7 +2341,6 @@ elif menu == "📥 Importações Umove":
                         
                         status_txt.markdown("✅ **Processo finalizado!**")
                         if sucessos_sb > 0: 
-                            # Atualiza o contador de pedidos no drive quando disparado para garantir a sequencia do próximo dia
                             try:
                                 aba_contador = planilha_sandbox.worksheet("Contador")
                                 max_id_gerado = df_editado_sb['PEDIDO'].astype(int).max()
@@ -2338,7 +2353,6 @@ elif menu == "📥 Importações Umove":
                         else: st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
         else:
             st.info("🛒 O carrinho está vazio. Cole uma matriz na Aba 1 para começar ou marque o interruptor dos pedidos fixos.")
-
 # =============================================================================
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO
 # =============================================================================
