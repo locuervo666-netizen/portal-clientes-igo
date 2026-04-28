@@ -2380,7 +2380,8 @@ elif menu == "📥 Importações Umove":
                                     msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
                                     items = []
                                     for _, row in group.iterrows():
-                                        item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                        # 🔥 CEP ADICIONADO AQUI NA LINHA ABAIXO 🔥
+                                        item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                         obs = str(row.get('OBSERVACOES', '')).strip()
                                         if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                         items.append(item_str)
@@ -2393,7 +2394,7 @@ elif menu == "📥 Importações Umove":
                                     
                                     if ag_login in agentes_xls_sb or ag_login.split('|')[0] in agentes_xls_sb:
                                         time.sleep(3.0)
-                                        # 🔥 AJUSTE ESTRATÉGICO LUIZ PAULO 🔥
+                                        # Lógica exclusiva para luiz.paulo já mantida
                                         if ag_login == 'luiz.paulo':
                                             df_para_xls = df_editado_sb[df_editado_sb['UF'] == 'RJ']
                                             nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
