@@ -117,25 +117,6 @@ st.markdown("""
         margin-top: 5px;
     }
 
-    /* ── STATUS PILLS ── */
-    .pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 3px 10px;
-        border-radius: 99px;
-        font-size: 11px;
-        font-weight: 600;
-        white-space: nowrap;
-    }
-    .pill-green  { background: #dcfce7; color: #166534; }
-    .pill-blue   { background: #dbeafe; color: #1d4ed8; }
-    .pill-amber  { background: #fef3c7; color: #92400e; }
-    .pill-red    { background: #fee2e2; color: #991b1b; }
-    .pill-gray   { background: #f1f5f9; color: #475569; }
-    .pill-purple { background: #ede9fe; color: #6d28d9; }
-    .pill-orange { background: #ffedd5; color: #9a3412; }
-
     /* ── HEADER ── */
     .header-container {
         display: flex;
@@ -286,7 +267,6 @@ def conectar_banco_seguro():
         st.warning(f"Erro ao conectar ao banco: {e}")
         return None
 
-
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
     try:
@@ -412,7 +392,6 @@ def carregar_dados_nuvem():
         st.error(f"Erro ao carregar dados: {e}")
         return pd.DataFrame()
 
-
 @st.cache_data(ttl=60)
 def carregar_base_locais():
     try:
@@ -430,7 +409,6 @@ def carregar_base_locais():
         st.warning(f"Erro ao carregar locais: {e}")
         return pd.DataFrame()
 
-
 def obter_proximo_id(df):
     if df is None or df.empty or 'PEDIDO' not in df.columns:
         return 1
@@ -439,7 +417,6 @@ def obter_proximo_id(df):
         return int(nums.max() + 1) if not nums.empty else 1
     except Exception:
         return 1
-
 
 def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
     INSTANCIA    = "3F14E62A63D2B28DC385B20DE66F3711"
@@ -461,43 +438,28 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
     except Exception:
         return False
 
-
 # ── Session State ──────────────────────────────────────
 if 'logado'     not in st.session_state: st.session_state.logado     = False
 if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 
 # ── Helpers de status ──────────────────────────────────
+# 🔥 STATUS AGORA INCLUEM EMOJIS NATIVOS 🔥
 def get_st(row):
     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
-    if 'AGUARDANDO' in s: return 'Aguardando Aprovação'
-    if 'RECUSA'     in s: return 'Solicitação Recusada'
-    if 'ENTREGUE'   in s: return 'Entregue'
-    if 'COLETADO'   in s: return 'Coletado'
-    if 'ROTA DE COLETA' in s: return 'Rota de Coleta'
-    if 'ROTA'       in s: return 'Em Rota de Entrega'
-    if 'CONFERIDO'  in s: return 'Conferido'
-    if 'FRUSTRADA'  in s: return 'Frustrada'
-    if 'CANCELADO'  in s: return 'Cancelado'
-    if 'PROBLEMA'   in s: return 'Problema'
-    return 'Pendente'
-
-
-STATUS_PILL = {
-    'Entregue':            '<span class="pill pill-green">✓ Entregue</span>',
-    'Em Rota de Entrega':  '<span class="pill pill-blue">↗ Em Rota</span>',
-    'Rota de Coleta':      '<span class="pill pill-blue">↗ Rota Coleta</span>',
-    'Coletado':            '<span class="pill pill-blue">📦 Coletado</span>',
-    'Conferido':           '<span class="pill pill-purple">☑ Conferido</span>',
-    'Frustrada':           '<span class="pill pill-amber">⚠ Frustrada</span>',
-    'Cancelado':           '<span class="pill pill-gray">✕ Cancelado</span>',
-    'Problema':            '<span class="pill pill-red">! Problema</span>',
-    'Aguardando Aprovação':'<span class="pill pill-gray">🔒 Aguardando</span>',
-    'Solicitação Recusada':'<span class="pill pill-red">✕ Recusada</span>',
-    'Pendente':            '<span class="pill pill-orange">⏳ Pendente</span>',
-}
+    if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação'
+    if 'RECUSA'     in s: return '❌ Solicitação Recusada'
+    if 'ENTREGUE'   in s: return '✅ Entregue'
+    if 'COLETADO'   in s: return '📦 Coletado'
+    if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
+    if 'ROTA'       in s: return '🚚 Em Rota de Entrega'
+    if 'CONFERIDO'  in s: return '☑️ Conferido'
+    if 'FRUSTRADA'  in s: return '⚠️ Frustrada'
+    if 'CANCELADO'  in s: return '🚫 Cancelado'
+    if 'PROBLEMA'   in s: return '🚨 Problema'
+    return '⏳ Pendente'
 
 KPI_DOT_COLOR = {
-    "TODOS":     "#3b82f6",
+    "TODOS":      "#3b82f6",
     "ENTREGUE":  "#22c55e",
     "FRUSTRADA": "#f59e0b",
     "ATRASADO":  "#ef4444",
@@ -506,14 +468,13 @@ KPI_DOT_COLOR = {
 }
 
 KPI_META = [
-    ("TODOS",     "📦 Total",      "kpi_total"),
+    ("TODOS",      "📦 Total",       "kpi_total"),
     ("ENTREGUE",  "✅ Entregues",  "kpi_entregue"),
     ("FRUSTRADA", "❌ Frustradas", "kpi_frus"),
     ("ATRASADO",  "🚨 Atrasados",  "kpi_atra"),
     ("Aguardando","🔒 Aguardando", "kpi_aguardando"),
-    ("HOJE",      "📅 Hoje",       "kpi_hoje"),
+    ("HOJE",      "📅 Hoje",        "kpi_hoje"),
 ]
-
 
 def get_detalhes(row):
     obs_master = str(row.get('OBSERVACOES', '')).strip()
@@ -527,7 +488,6 @@ def get_detalhes(row):
         return f"{obs_final} (Informante: {contato})"
     return obs_final if obs_final else f"Informante: {contato}"
 
-
 def definir_prioridade_portal(status_str):
     s = str(status_str).upper()
     if 'ATRASADO'  in s: return 1
@@ -536,7 +496,6 @@ def definir_prioridade_portal(status_str):
     if 'ROTA'      in s: return 4
     if 'ENTREGUE'  in s: return 5
     return 6
-
 
 def tratar_foto(x):
     xs = str(x).strip()
@@ -548,7 +507,6 @@ def tratar_foto(x):
         f"https://www.appsheet.com/template/gettablefileurl"
         f"?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
     )
-
 
 # =======================================================
 # 🔐 3. LOGIN
@@ -733,18 +691,19 @@ else:
                     (df_f['DT_LIMITE_OBJ'] < hoje_br) &
                     (df_f['DT_LIMITE_OBJ'].notnull())
                 )
+                # 🔥 ADICIONA EMOJI E TEXTO PARA ATRASADOS 🔥
                 df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] = (
-                    df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] + ' ⚠️ ATRASADO'
+                    df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] + ' 🚨 ATRASADO'
                 )
                 df_atrasados_only = df_f[mask_atrasado]
 
                 # ── KPI CARDS ────────────────────────────
                 n_vals = {
                     "TODOS":      len(df_f),
-                    "ENTREGUE":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')]),
-                    "FRUSTRADA":  len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')]),
+                    "ENTREGUE":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', case=False)]),
+                    "FRUSTRADA":  len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', case=False)]),
                     "ATRASADO":   len(df_atrasados_only),
-                    "Aguardando": len(df_f[df_f['STATUS_DISPLAY'].str.contains('Aguardando')]),
+                    "Aguardando": len(df_f[df_f['STATUS_DISPLAY'].str.contains('Aguardando', case=False)]),
                     "HOJE":       len(df_f[df_f['DATA_OBJ'] == hoje_br]),
                 }
 
@@ -896,20 +855,34 @@ else:
                         c for c in colunas_visiveis if c in df_final.columns
                     ]
 
+                    # 🔥 PANDAS STYLER: PINTANDO O FUNDO E O TEXTO DOS STATUS 🔥
+                    def colorir_status(val):
+                        val_str = str(val).upper()
+                        if 'ENTREGUE' in val_str: return 'background-color: #dcfce7; color: #166534; font-weight: 700;'
+                        if 'ROTA' in val_str or 'COLETADO' in val_str: return 'background-color: #dbeafe; color: #1d4ed8; font-weight: 700;'
+                        if 'CONFERIDO' in val_str: return 'background-color: #ede9fe; color: #6d28d9; font-weight: 700;'
+                        if 'FRUSTRADA' in val_str: return 'background-color: #fef3c7; color: #92400e; font-weight: 700;'
+                        if 'ATRASADO' in val_str or 'PROBLEMA' in val_str or 'CANCELADO' in val_str or 'RECUSA' in val_str: return 'background-color: #fee2e2; color: #991b1b; font-weight: 700;'
+                        if 'AGUARDANDO' in val_str: return 'background-color: #f1f5f9; color: #475569; font-weight: 700;'
+                        if 'PENDENTE' in val_str: return 'background-color: #ffedd5; color: #9a3412; font-weight: 700;'
+                        return ''
+
+                    df_estilizado = df_final[colunas_visiveis].style.map(colorir_status, subset=['STATUS_DISPLAY'])
+
                     st.dataframe(
-                        df_final[colunas_visiveis],
+                        df_estilizado,
                         column_config={
-                            "PEDIDO":       st.column_config.TextColumn("📦 Pedido",          width="small"),
-                            "DATA":         st.column_config.TextColumn("📅 Emissão",          width="small"),
+                            "PEDIDO":       st.column_config.TextColumn("📦 Pedido",         width="small"),
+                            "DATA":         st.column_config.TextColumn("📅 Emissão",         width="small"),
                             "LABORATORIO":  st.column_config.TextColumn("🔬 Ponto de Coleta",  width="medium"),
                             "CNPJ":         st.column_config.TextColumn("🏢 CNPJ",             width="medium"),
                             "CIDADE_UF":    st.column_config.TextColumn("📍 Cidade / UF",      width="medium"),
-                            "DATA_LIMITE":  st.column_config.TextColumn("🎯 Previsão",          width="small"),
-                            "DATA_EFETIVA": st.column_config.TextColumn("🏁 Entrega",           width="small"),
-                            "STATUS_DISPLAY":st.column_config.TextColumn("🚦 Status",           width="medium"),
+                            "DATA_LIMITE":  st.column_config.TextColumn("🎯 Previsão",         width="small"),
+                            "DATA_EFETIVA": st.column_config.TextColumn("🏁 Entrega",          width="small"),
+                            "STATUS_DISPLAY":st.column_config.TextColumn("🚦 Status",          width="medium"),
                             "DETALHES":     st.column_config.TextColumn("💬 Atualizações",      width="large"),
                             "COMPROVANTE":  st.column_config.LinkColumn("📎 Anexo",
-                                                display_text="Ver Comprovante"),
+                                                                        display_text="Ver Comprovante"),
                         },
                         hide_index=True,
                         use_container_width=True,
