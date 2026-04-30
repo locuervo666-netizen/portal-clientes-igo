@@ -1482,7 +1482,7 @@ elif menu == "💰 Faturamento":
                             else: st.error("Senha incorreta!")
         except Exception: st.warning("Histórico pronto para o próximo faturamento. (Aba sendo criada)")
 
-    # 🔥 NOVA LÓGICA DA ABA 3 (PEDIDOS FATURADOS) 🔥
+    # 🔥 NOVA LÓGICA DA ABA 3 (PEDIDOS FATURADOS COM FILTROS AVANÇADOS) 🔥
     with tab_faturados:
         st.markdown("#### ✅ Detalhamento de Pedidos Já Faturados")
         st.info("Aqui você visualiza individualmente todos os pedidos que já foram atrelados a uma fatura, funcionando como uma lupa para o Livro Caixa.")
@@ -1494,14 +1494,31 @@ elif menu == "💰 Faturamento":
         if df_faturados.empty:
             st.warning("Nenhum pedido individual foi faturado ainda.")
         else:
-            c_f1, c_f2 = st.columns(2)
+            # 🔥 NOVO BLOCO DE FILTROS APRIMORADO 🔥
+            c_f1, c_f2, c_f3, c_f4 = st.columns(4)
+            
             filtro_tomador = c_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + sorted(df_faturados['TOMADOR'].astype(str).unique().tolist()), key="fat_tomador_filtro_aba3")
+            filtro_fatura = c_f2.selectbox("🧾 Nº da Fatura:", ["Todas"] + sorted(df_faturados['FATURA'].astype(str).unique().tolist(), reverse=True), key="fat_fatura_filtro_aba3")
+            filtro_pedido = c_f3.text_input("📦 Busca Rápida (Pedido, Local...):", placeholder="Ex: 62 ou Manaus", key="fat_pedido_filtro_aba3")
+            filtro_data = c_f4.date_input("📅 Período (Data da Coleta):", value=(), format="DD/MM/YYYY", key="fat_data_filtro_aba3")
+
+            # Aplicação dos Filtros
+            df_filtrado_final = df_faturados.copy()
+
             if filtro_tomador != "Todos":
-                df_faturados = df_faturados[df_faturados['TOMADOR'] == filtro_tomador]
+                df_filtrado_final = df_filtrado_final[df_filtrado_final['TOMADOR'] == filtro_tomador]
                 
-            filtro_fatura = c_f2.selectbox("🧾 Filtrar por Nº da Fatura:", ["Todas"] + sorted(df_faturados['FATURA'].astype(str).unique().tolist(), reverse=True), key="fat_fatura_filtro_aba3")
             if filtro_fatura != "Todas":
-                df_faturados = df_faturados[df_faturados['FATURA'] == filtro_fatura]
+                df_filtrado_final = df_filtrado_final[df_filtrado_final['FATURA'] == filtro_fatura]
+                
+            if filtro_pedido.strip():
+                # Busca universal inteligente: procura em qualquer coluna da linha
+                mask_busca = df_filtrado_final.apply(lambda row: row.astype(str).str.contains(filtro_pedido.strip(), case=False).any(), axis=1)
+                df_filtrado_final = df_filtrado_final[mask_busca]
+                
+            if isinstance(filtro_data, (tuple, list)) and len(filtro_data) == 2:
+                # Usa a DATA_OBJ para filtrar o intervalo com precisão
+                df_filtrado_final = df_filtrado_final[(df_filtrado_final['DATA_OBJ'] >= filtro_data[0]) & (df_filtrado_final['DATA_OBJ'] <= filtro_data[1])]
                 
             # Busca as datas no histórico do financeiro para exibir na tabela
             dict_datas_faturas = {}
@@ -1514,22 +1531,23 @@ elif menu == "💰 Faturamento":
                         dict_datas_faturas = dict(zip(df_hist['ID_FATURA'], df_hist['DATA_EMISSAO']))
                 except: pass
                 
-            df_faturados['DATA_FATURAMENTO'] = df_faturados['FATURA'].map(dict_datas_faturas).fillna("Desconhecida")
+            df_filtrado_final['DATA_FATURAMENTO'] = df_filtrado_final['FATURA'].map(dict_datas_faturas).fillna("Desconhecida")
             
             # Organiza as colunas de forma limpa e direta
             cols_show = ['FATURA', 'DATA_FATURAMENTO', 'DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'DATA_ENTREGA']
-            df_show = df_faturados[[c for c in cols_show if c in df_faturados.columns]].copy()
+            df_show = df_filtrado_final[[c for c in cols_show if c in df_filtrado_final.columns]].copy()
             
             st.markdown(f"**Total de Pedidos listados na tela:** {len(df_show)}")
             st.dataframe(df_show, hide_index=True, use_container_width=True)
             
-            st.download_button(
-                "📥 Baixar Relatório Detalhado (Excel)", 
-                data=gerar_excel_memoria(df_show), 
-                file_name=f"Relatorio_Pedidos_Faturados_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", 
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary"
-            )
+            if not df_show.empty:
+                st.download_button(
+                    "📥 Baixar Relatório Desta Seleção (Excel)", 
+                    data=gerar_excel_memoria(df_show), 
+                    file_name=f"Relatorio_Pedidos_Faturados_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", 
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary"
+                )
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
