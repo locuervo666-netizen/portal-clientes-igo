@@ -1204,7 +1204,7 @@ elif menu == "💰 Faturamento":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>💰 Gestão Financeira Master</h3></div>", unsafe_allow_html=True)
     
     # 🔥 NOVA ABA ADICIONADA: Pedidos Faturados 🔥
-    tab_faturar, tab_historico, tab_faturados = st.tabs(["📈 Novo Lote de Faturamento", "📜 Livro Caixa e Histórico", "✅ Pedidos Faturados"])
+    tab_faturar, tab_historico, tab_faturados, tab_tarifas = st.tabs(["📈 Novo Lote de Faturamento", "📜 Livro Caixa e Histórico", "✅ Pedidos Faturados", "💲 Tabela de Tarifas"])
     
     df_raw = carregar_dados_completos(planilha_db)
     if 'fatura_sucesso' not in st.session_state: st.session_state.fatura_sucesso = False
@@ -1482,72 +1482,82 @@ elif menu == "💰 Faturamento":
                             else: st.error("Senha incorreta!")
         except Exception: st.warning("Histórico pronto para o próximo faturamento. (Aba sendo criada)")
 
-    # 🔥 NOVA LÓGICA DA ABA 3 (PEDIDOS FATURADOS COM FILTROS AVANÇADOS) 🔥
-    with tab_faturados:
-        st.markdown("#### ✅ Detalhamento de Pedidos Já Faturados")
-        st.info("Aqui você visualiza individualmente todos os pedidos que já foram atrelados a uma fatura, funcionando como uma lupa para o Livro Caixa.")
-        
-        # Filtra na Memória Oficial os que têm número de fatura
-        if 'FATURA' not in df_raw.columns: df_raw['FATURA'] = ""
-        df_faturados = df_raw[df_raw['FATURA'].astype(str).str.upper().str.contains('FAT-', na=False)].copy()
-        
-        if df_faturados.empty:
-            st.warning("Nenhum pedido individual foi faturado ainda.")
-        else:
-            # 🔥 NOVO BLOCO DE FILTROS APRIMORADO 🔥
-            c_f1, c_f2, c_f3, c_f4 = st.columns(4)
-            
-            filtro_tomador = c_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + sorted(df_faturados['TOMADOR'].astype(str).unique().tolist()), key="fat_tomador_filtro_aba3")
-            filtro_fatura = c_f2.selectbox("🧾 Nº da Fatura:", ["Todas"] + sorted(df_faturados['FATURA'].astype(str).unique().tolist(), reverse=True), key="fat_fatura_filtro_aba3")
-            filtro_pedido = c_f3.text_input("📦 Busca Rápida (Pedido, Local...):", placeholder="Ex: 62 ou Manaus", key="fat_pedido_filtro_aba3")
-            filtro_data = c_f4.date_input("📅 Período (Data da Coleta):", value=(), format="DD/MM/YYYY", key="fat_data_filtro_aba3")
+    # 🔥 NOVA ABA 4: GESTÃO DE TARIFAS (CADASTRO DIRETO NO CCO) 🔥
+    with tab_tarifas:
+        st.markdown("#### 💲 Gestão de Tarifas e Preços")
+        st.info("Cadastre ou atualize os valores cobrados por rota para cada cliente. Os dados são salvos e aplicados diretamente no banco financeiro.")
 
-            # Aplicação dos Filtros
-            df_filtrado_final = df_faturados.copy()
+        # Seleção do Tomador para ver/editar tarifas
+        t_cliente = st.selectbox("Selecione o Cliente (Tomador) para gerenciar:", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="sel_tomador_tarifa")
 
-            if filtro_tomador != "Todos":
-                df_filtrado_final = df_filtrado_final[df_filtrado_final['TOMADOR'] == filtro_tomador]
-                
-            if filtro_fatura != "Todas":
-                df_filtrado_final = df_filtrado_final[df_filtrado_final['FATURA'] == filtro_fatura]
-                
-            if filtro_pedido.strip():
-                # Busca universal inteligente: procura em qualquer coluna da linha
-                mask_busca = df_filtrado_final.apply(lambda row: row.astype(str).str.contains(filtro_pedido.strip(), case=False).any(), axis=1)
-                df_filtrado_final = df_filtrado_final[mask_busca]
-                
-            if isinstance(filtro_data, (tuple, list)) and len(filtro_data) == 2:
-                # Usa a DATA_OBJ para filtrar o intervalo com precisão
-                df_filtrado_final = df_filtrado_final[(df_filtrado_final['DATA_OBJ'] >= filtro_data[0]) & (df_filtrado_final['DATA_OBJ'] <= filtro_data[1])]
-                
-            # Busca as datas no histórico do financeiro para exibir na tabela
-            dict_datas_faturas = {}
-            if planilha_financeiro is not None:
-                try:
-                    aba_h = planilha_financeiro.worksheet("Historico_Faturas")
-                    dados_h = aba_h.get_all_values()
-                    if len(dados_h) > 1:
-                        df_hist = pd.DataFrame(dados_h[1:], columns=dados_h[0])
-                        dict_datas_faturas = dict(zip(df_hist['ID_FATURA'], df_hist['DATA_EMISSAO']))
-                except: pass
-                
-            df_filtrado_final['DATA_FATURAMENTO'] = df_filtrado_final['FATURA'].map(dict_datas_faturas).fillna("Desconhecida")
+        if t_cliente != "Selecione...":
+            # Puxa a tabela atual do cliente para exibir
+            df_precos_atuais = carregar_tabela_precos(t_cliente)
+
+            with st.container(border=True):
+                with st.form("form_nova_tarifa", clear_on_submit=True):
+                    st.markdown(f"**➕ Cadastrar Nova Tarifa para {t_cliente}**")
+                    col_t1, col_t2 = st.columns(2)
+                    t_cid = col_t1.text_input("Cidade *", placeholder="Ex: SAO PAULO")
+                    t_bai = col_t2.text_input("Bairro (Opcional)", placeholder="Deixe em branco para tarifa geral da cidade")
+
+                    col_t3, col_t4 = st.columns(2)
+                    t_rua = col_t3.text_input("Endereço/Rua (Opcional)", placeholder="Ex: AV PAULISTA")
+                    t_cep = col_t4.text_input("CEP (Opcional)", placeholder="Apenas números")
+
+                    col_t5, col_t6 = st.columns(2)
+                    t_valor = col_t5.number_input("Valor da Entrega (R$) *", min_value=0.0, step=0.5, format="%.2f")
+                    t_multa = col_t6.number_input("Multiplicador p/ Frustrada *", min_value=0.0, max_value=1.0, value=0.5, step=0.1, help="Ex: 0.5 cobra 50% do valor caso seja frustrada.")
+
+                    submit_tarifa = st.form_submit_button("💾 Salvar Tarifa no Banco", type="primary", use_container_width=True)
+
+                    if submit_tarifa:
+                        if not t_cid:
+                            st.error("⚠️ O preenchimento da Cidade é obrigatório!")
+                        elif t_valor <= 0:
+                            st.error("⚠️ O Valor da entrega deve ser maior que zero!")
+                        else:
+                            with st.spinner("Registrando tarifa no banco financeiro..."):
+                                try:
+                                    # Corrige as nomenclaturas mescladas igual ao faturamento
+                                    buscado = t_cliente.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if t_cliente in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else t_cliente
+                                    buscado = buscado.strip().upper()
+
+                                    # Checa se a aba do cliente existe no Sheets, se não existir, cria o esqueleto na hora!
+                                    try:
+                                        aba_cli = planilha_financeiro.worksheet(buscado)
+                                    except:
+                                        aba_cli = planilha_financeiro.add_worksheet(title=buscado, rows="100", cols="10")
+                                        aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA"]])
+
+                                    # Prepara os dados limpos
+                                    nova_linha = [
+                                        padronizar_texto(t_cid),
+                                        padronizar_texto(t_bai),
+                                        padronizar_texto(t_rua),
+                                        re.sub(r'\D', '', t_cep),
+                                        f"{t_valor:.2f}".replace(".", ","),
+                                        f"{t_multa:.2f}".replace(".", ",")
+                                    ]
+
+                                    # Injeta a linha na planilha e limpa o cache para a tela atualizar
+                                    aba_cli.append_row(nova_linha)
+                                    carregar_tabela_precos.clear()
+                                    
+                                    st.success(f"✅ Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid)} cadastrada com sucesso!")
+                                    time.sleep(1.5)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro Crítico ao salvar tarifa: {e}")
+
+            # Mostra o raio-X da tabela do cliente logo abaixo do form
+            st.markdown("---")
+            st.markdown(f"#### 🔎 Tabela de Preços Atual ({t_cliente})")
             
-            # Organiza as colunas de forma limpa e direta
-            cols_show = ['FATURA', 'DATA_FATURAMENTO', 'DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'DATA_ENTREGA']
-            df_show = df_filtrado_final[[c for c in cols_show if c in df_filtrado_final.columns]].copy()
-            
-            st.markdown(f"**Total de Pedidos listados na tela:** {len(df_show)}")
-            st.dataframe(df_show, hide_index=True, use_container_width=True)
-            
-            if not df_show.empty:
-                st.download_button(
-                    "📥 Baixar Relatório Desta Seleção (Excel)", 
-                    data=gerar_excel_memoria(df_show), 
-                    file_name=f"Relatorio_Pedidos_Faturados_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", 
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    type="primary"
-                )
+            if not df_precos_atuais.empty:
+                st.dataframe(df_precos_atuais, hide_index=True, use_container_width=True)
+            else:
+                st.warning("Nenhuma tarifa cadastrada no banco de dados para este cliente ainda.")
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
