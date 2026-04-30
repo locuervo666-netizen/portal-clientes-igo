@@ -1203,7 +1203,8 @@ if menu == "📊 GRID":
 elif menu == "💰 Faturamento":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>💰 Gestão Financeira Master</h3></div>", unsafe_allow_html=True)
     
-    tab_faturar, tab_historico = st.tabs(["📈 Novo Lote de Faturamento", "📜 Livro Caixa e Histórico"])
+    # 🔥 NOVA ABA ADICIONADA: Pedidos Faturados 🔥
+    tab_faturar, tab_historico, tab_faturados = st.tabs(["📈 Novo Lote de Faturamento", "📜 Livro Caixa e Histórico", "✅ Pedidos Faturados"])
     
     df_raw = carregar_dados_completos(planilha_db)
     if 'fatura_sucesso' not in st.session_state: st.session_state.fatura_sucesso = False
@@ -1321,17 +1322,14 @@ elif menu == "💰 Faturamento":
                 if df_raw.empty:
                     st.warning("O banco de dados está vazio.")
                 else:
-                    # 1. Garante que os status estão computados (mesma lógica da GRID)
                     if 'STATUS_DISPLAY' not in df_raw.columns:
                         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
 
-                    # 2. O FILTRO MATADOR: Busca TUDO do cliente que já terminou, não importa a data!
                     df_raw['TOMADOR_CLEAN'] = df_raw['TOMADOR'].astype(str).str.strip().str.upper()
                     mask_status = df_raw['STATUS_DISPLAY'].str.contains('Entregue|Frustrada', case=False, na=False) | df_raw['STATUS'].str.upper().str.contains('ENTREGUE|FRUSTRADA', na=False)
                     mask_tomador = (df_raw['TOMADOR_CLEAN'] == f_tom.upper()) | (df_raw['TOMADOR_CLEAN'].str.contains(f_tom.upper(), na=False))
                     
                     if 'FATURA' not in df_raw.columns: df_raw['FATURA'] = ""
-                    # Blindagem contra espaços vazios: Só filtra se tiver "FAT-" escrito.
                     mask_fatura = ~df_raw['FATURA'].astype(str).str.upper().str.contains('FAT-', na=False)
                     
                     df_todas_pendentes = df_raw[mask_tomador & mask_status & mask_fatura].copy()
@@ -1339,7 +1337,6 @@ elif menu == "💰 Faturamento":
                     if df_todas_pendentes.empty: 
                         st.success(f"✅ O sistema vasculhou todo o banco de dados e não achou NENHUM pedido 'Entregue' para {f_tom} que já não tenha sido faturado.")
                     else:
-                        # 3. Tratamento de Datas à Prova de Falhas (Se não entender a data, não esconde, joga pra hoje)
                         def extrair_data_real(row):
                             d_ent = str(row.get('DATA_ENTREGA', '')).split(' ')[0]
                             try: return pd.to_datetime(d_ent, format='%d/%m/%Y').date()
@@ -1348,16 +1345,14 @@ elif menu == "💰 Faturamento":
                                 except: return pd.to_datetime(row.get('DATA', hoje_br.strftime('%d/%m/%Y')), format='%d/%m/%Y', errors='coerce').date()
                                     
                         df_todas_pendentes['DT_FILTRO'] = df_todas_pendentes.apply(extrair_data_real, axis=1)
-                        df_todas_pendentes['DT_FILTRO'] = df_todas_pendentes['DT_FILTRO'].fillna(hoje_br) # Se tudo falhar, assume hoje
+                        df_todas_pendentes['DT_FILTRO'] = df_todas_pendentes['DT_FILTRO'].fillna(hoje_br)
                         
-                        # 4. Agora sim aplica a Data que você selecionou no calendário
                         if isinstance(f_per, (tuple, list)) and len(f_per) == 2:
                             mask_data = (df_todas_pendentes['DT_FILTRO'] >= f_per[0]) & (df_todas_pendentes['DT_FILTRO'] <= f_per[1])
                             df_fin = df_todas_pendentes[mask_data].copy()
                         else:
                             df_fin = df_todas_pendentes.copy()
 
-                        # 5. AVISO DE RAIO-X: Se sumiu pela data, ele avisa!
                         if df_fin.empty:
                             datas_escondidas = sorted([d.strftime('%d/%m/%Y') for d in df_todas_pendentes['DT_FILTRO'].unique()])
                             st.warning(f"⚠️ Achei {len(df_todas_pendentes)} pedido(s) Entregues da {f_tom}! MAS eles não estão aparecendo porque a data de entrega deles foi em: {', '.join(datas_escondidas)}. Ajuste o calendário acima para cobrir essas datas.")
@@ -1403,7 +1398,6 @@ elif menu == "💰 Faturamento":
                                         with st.spinner("Registrando fatura no Livro Caixa e consolidando baixas..."):
                                             id_fat = f"FAT-{f_tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
                                             
-                                            # 6. Gravação Definitiva no Banco na hora de Faturar
                                             aba_m = planilha_db.worksheet("Memoria_Sistema")
                                             df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
                                             
@@ -1412,7 +1406,6 @@ elif menu == "💰 Faturamento":
                                                 mask = df_nuvem['PEDIDO'] == pid
                                                 if mask.any():
                                                     df_nuvem.loc[mask, 'FATURA'] = id_fat
-                                                    # Pega o status da GRID, tira os emojis, e crava no banco para atualizar a Memória de fato
                                                     st_grid = sel_f[sel_f['PEDIDO'] == pid].iloc[0]['STATUS']
                                                     df_nuvem.loc[mask, 'STATUS'] = "ENTREGUE" if "ENTREGUE" in st_grid.upper() else "FRUSTRADA"
 
@@ -1488,6 +1481,55 @@ elif menu == "💰 Faturamento":
                                     st.success("Estorno concluído!"); time.sleep(2); carregar_dados_completos.clear(); st.rerun()
                             else: st.error("Senha incorreta!")
         except Exception: st.warning("Histórico pronto para o próximo faturamento. (Aba sendo criada)")
+
+    # 🔥 NOVA LÓGICA DA ABA 3 (PEDIDOS FATURADOS) 🔥
+    with tab_faturados:
+        st.markdown("#### ✅ Detalhamento de Pedidos Já Faturados")
+        st.info("Aqui você visualiza individualmente todos os pedidos que já foram atrelados a uma fatura, funcionando como uma lupa para o Livro Caixa.")
+        
+        # Filtra na Memória Oficial os que têm número de fatura
+        if 'FATURA' not in df_raw.columns: df_raw['FATURA'] = ""
+        df_faturados = df_raw[df_raw['FATURA'].astype(str).str.upper().str.contains('FAT-', na=False)].copy()
+        
+        if df_faturados.empty:
+            st.warning("Nenhum pedido individual foi faturado ainda.")
+        else:
+            c_f1, c_f2 = st.columns(2)
+            filtro_tomador = c_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + sorted(df_faturados['TOMADOR'].astype(str).unique().tolist()), key="fat_tomador_filtro_aba3")
+            if filtro_tomador != "Todos":
+                df_faturados = df_faturados[df_faturados['TOMADOR'] == filtro_tomador]
+                
+            filtro_fatura = c_f2.selectbox("🧾 Filtrar por Nº da Fatura:", ["Todas"] + sorted(df_faturados['FATURA'].astype(str).unique().tolist(), reverse=True), key="fat_fatura_filtro_aba3")
+            if filtro_fatura != "Todas":
+                df_faturados = df_faturados[df_faturados['FATURA'] == filtro_fatura]
+                
+            # Busca as datas no histórico do financeiro para exibir na tabela
+            dict_datas_faturas = {}
+            if planilha_financeiro is not None:
+                try:
+                    aba_h = planilha_financeiro.worksheet("Historico_Faturas")
+                    dados_h = aba_h.get_all_values()
+                    if len(dados_h) > 1:
+                        df_hist = pd.DataFrame(dados_h[1:], columns=dados_h[0])
+                        dict_datas_faturas = dict(zip(df_hist['ID_FATURA'], df_hist['DATA_EMISSAO']))
+                except: pass
+                
+            df_faturados['DATA_FATURAMENTO'] = df_faturados['FATURA'].map(dict_datas_faturas).fillna("Desconhecida")
+            
+            # Organiza as colunas de forma limpa e direta
+            cols_show = ['FATURA', 'DATA_FATURAMENTO', 'DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'DATA_ENTREGA']
+            df_show = df_faturados[[c for c in cols_show if c in df_faturados.columns]].copy()
+            
+            st.markdown(f"**Total de Pedidos listados na tela:** {len(df_show)}")
+            st.dataframe(df_show, hide_index=True, use_container_width=True)
+            
+            st.download_button(
+                "📥 Baixar Relatório Detalhado (Excel)", 
+                data=gerar_excel_memoria(df_show), 
+                file_name=f"Relatorio_Pedidos_Faturados_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx", 
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary"
+            )
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
