@@ -1574,12 +1574,43 @@ elif menu == "💰 Faturamento":
                                 except Exception as e:
                                     st.error(f"Erro Crítico ao salvar tarifa: {e}")
 
-            # Mostra o raio-X da tabela do cliente logo abaixo do form
+            # --- SUBSTITUA DAQUI PARA BAIXO NO FINAL DA ABA 4 ---
             st.markdown("---")
-            st.markdown(f"#### 🔎 Tabela de Preços Atual ({t_cliente})")
+            st.markdown(f"#### 🔎 Gerenciar Tabela de Preços Atual ({t_cliente})")
+            st.info("💡 Para **EXCLUIR** uma tarifa, clique na caixa à esquerda da linha e aperte 'Delete' ou 'Backspace'. Para **EDITAR**, dê dois cliques na célula.")
             
             if not df_precos_atuais.empty:
-                st.dataframe(df_precos_atuais, hide_index=True, use_container_width=True)
+                # Transforma o DataFrame estático em uma Grid editável
+                df_precos_edit = st.data_editor(
+                    df_precos_atuais, 
+                    num_rows="dynamic", # Permite adicionar/deletar linhas
+                    use_container_width=True, 
+                    hide_index=True,
+                    key=f"editor_tarifas_{t_cliente}"
+                )
+                
+                if st.button("💾 Salvar Alterações na Tabela", type="primary", use_container_width=True):
+                    with st.spinner("Atualizando tabela de preços no Google Sheets..."):
+                        try:
+                            buscado = t_cliente.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if t_cliente in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else t_cliente
+                            buscado = buscado.strip().upper()
+                            aba_cli = planilha_financeiro.worksheet(buscado)
+                            
+                            # Limpa a aba e reescreve com a tabela editada
+                            aba_cli.clear()
+                            
+                            if not df_precos_edit.empty:
+                                aba_cli.update("A1", [df_precos_edit.columns.tolist()] + df_precos_edit.fillna("").astype(str).values.tolist())
+                            else:
+                                # Se o usuário apagou todas as linhas, preserva o cabeçalho para não quebrar a planilha
+                                aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]])
+                                
+                            carregar_tabela_precos.clear()
+                            st.success("✅ Tabela atualizada e salva com sucesso!")
+                            time.sleep(1.5); st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Erro ao atualizar tabela: {e}")
             else:
                 st.warning("Nenhuma tarifa cadastrada no banco de dados para este cliente ainda.")
 # =============================================================================
