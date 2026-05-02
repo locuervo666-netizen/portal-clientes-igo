@@ -1482,7 +1482,7 @@ elif menu == "💰 Faturamento":
                             else: st.error("Senha incorreta!")
         except Exception: st.warning("Histórico pronto para o próximo faturamento. (Aba sendo criada)")
 
-    # 🔥 NOVA ABA 4: GESTÃO DE TARIFAS (CADASTRO DIRETO NO CCO) 🔥
+    # 🔥 NOVA ABA 4: GESTÃO DE TARIFAS (AGORA COM DROPDOWN DE UF) 🔥
     with tab_tarifas:
         st.markdown("#### 💲 Gestão de Tarifas e Preços")
         st.info("Cadastre ou atualize os valores cobrados por rota para cada cliente. Os dados são salvos e aplicados diretamente no banco financeiro.")
@@ -1497,8 +1497,14 @@ elif menu == "💰 Faturamento":
             with st.container(border=True):
                 with st.form("form_nova_tarifa", clear_on_submit=True):
                     st.markdown(f"**➕ Cadastrar Nova Tarifa para {t_cliente}**")
-                    col_t1, col_t2 = st.columns(2)
+                    
+                    # 🔥 MUDANÇA: Coluna de UF com Dropdown Nativo 🔥
+                    col_t1, col_t_uf, col_t2 = st.columns([3, 1, 3])
                     t_cid = col_t1.text_input("Cidade *", placeholder="Ex: SAO PAULO")
+                    
+                    lista_ufs = ["", "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
+                    t_uf = col_t_uf.selectbox("UF *", lista_ufs)
+                    
                     t_bai = col_t2.text_input("Bairro (Opcional)", placeholder="Deixe em branco para tarifa geral da cidade")
 
                     col_t3, col_t4 = st.columns(2)
@@ -1512,8 +1518,8 @@ elif menu == "💰 Faturamento":
                     submit_tarifa = st.form_submit_button("💾 Salvar Tarifa no Banco", type="primary", use_container_width=True)
 
                     if submit_tarifa:
-                        if not t_cid:
-                            st.error("⚠️ O preenchimento da Cidade é obrigatório!")
+                        if not t_cid or not t_uf:
+                            st.error("⚠️ O preenchimento da Cidade e da UF são obrigatórios!")
                         elif t_valor <= 0:
                             st.error("⚠️ O Valor da entrega deve ser maior que zero!")
                         else:
@@ -1523,28 +1529,29 @@ elif menu == "💰 Faturamento":
                                     buscado = t_cliente.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if t_cliente in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else t_cliente
                                     buscado = buscado.strip().upper()
 
-                                    # Checa se a aba do cliente existe no Sheets, se não existir, cria o esqueleto na hora!
+                                    # Checa se a aba do cliente existe no Sheets. Adicionado a UF no final do cabeçalho!
                                     try:
                                         aba_cli = planilha_financeiro.worksheet(buscado)
                                     except:
                                         aba_cli = planilha_financeiro.add_worksheet(title=buscado, rows="100", cols="10")
-                                        aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA"]])
+                                        aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]])
 
-                                    # Prepara os dados limpos
+                                    # Prepara os dados limpos com a UF salva na 7ª coluna
                                     nova_linha = [
                                         padronizar_texto(t_cid),
                                         padronizar_texto(t_bai),
                                         padronizar_texto(t_rua),
                                         re.sub(r'\D', '', t_cep),
                                         f"{t_valor:.2f}".replace(".", ","),
-                                        f"{t_multa:.2f}".replace(".", ",")
+                                        f"{t_multa:.2f}".replace(".", ","),
+                                        t_uf
                                     ]
 
                                     # Injeta a linha na planilha e limpa o cache para a tela atualizar
                                     aba_cli.append_row(nova_linha)
                                     carregar_tabela_precos.clear()
                                     
-                                    st.success(f"✅ Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid)} cadastrada com sucesso!")
+                                    st.success(f"✅ Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid)} - {t_uf} cadastrada com sucesso!")
                                     time.sleep(1.5)
                                     st.rerun()
                                 except Exception as e:
