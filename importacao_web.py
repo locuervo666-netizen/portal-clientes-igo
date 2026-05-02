@@ -1482,7 +1482,22 @@ elif menu == "💰 Faturamento":
                             else: st.error("Senha incorreta!")
         except Exception: st.warning("Histórico pronto para o próximo faturamento. (Aba sendo criada)")
 
-    # 🔥 NOVA ABA 4: GESTÃO DE TARIFAS (BLINDADA CONTRA DESALINHAMENTO DE COLUNAS) 🔥
+    # =========================================================================
+    # FUNÇÃO IBGE (Fica dentro do módulo de Faturamento)
+    # =========================================================================
+    @st.cache_data(ttl=86400) # Guarda na memória por 24h para ficar super rápido
+    def obter_cidades_por_uf(uf):
+        if not uf: return []
+        try:
+            url = f"https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf}/municipios"
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                cidades = [padronizar_texto(c['nome']) for c in resp.json()]
+                return sorted(cidades)
+        except: pass
+        return []
+
+    # 🔥 NOVA ABA 4: GESTÃO DE TARIFAS (COM API DO IBGE E CASCATA) 🔥
     with tab_tarifas:
         st.markdown("#### 💲 Gestão de Tarifas e Preços")
         st.info("Cadastre ou atualize os valores cobrados por rota para cada cliente. Os dados são salvos e aplicados diretamente no banco financeiro.")
@@ -1491,19 +1506,33 @@ elif menu == "💰 Faturamento":
         t_cliente = st.selectbox("Selecione o Cliente (Tomador) para gerenciar:", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="sel_tomador_tarifa")
 
         if t_cliente != "Selecione...":
-            # Puxa a tabela atual do cliente para exibir
             df_precos_atuais = carregar_tabela_precos(t_cliente)
 
             with st.container(border=True):
+                st.markdown(f"**➕ Cadastrar Nova Tarifa para {t_cliente}**")
+                
+                # 1. A UF FICA DE FORA DO FORMULÁRIO PARA ATUALIZAR A TELA NA HORA
+                lista_ufs = ["", "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
+                col_uf, col_espaco = st.columns([1, 3])
+                t_uf = col_uf.selectbox("1º Passo: Selecione a UF *", lista_ufs, key="tarifa_uf_dinamica")
+                
+                # 2. O FORMULÁRIO COMEÇA AQUI EMBAIXO
                 with st.form("form_nova_tarifa", clear_on_submit=True):
-                    st.markdown(f"**➕ Cadastrar Nova Tarifa para {t_cliente}**")
+                    col_t1, col_t2 = st.columns([2, 2])
                     
-                    col_t1, col_t_uf, col_t2 = st.columns([3, 1, 3])
-                    t_cid = col_t1.text_input("Cidade *", placeholder="Ex: SAO PAULO")
-                    
-                    lista_ufs = ["", "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
-                    t_uf = col_t_uf.selectbox("UF *", lista_ufs)
-                    
+                    # Carrega as cidades baseado na UF que ele escolheu lá em cima
+                    if t_uf:
+                        lista_cidades = obter_cidades_por_uf(t_uf)
+                        opcoes_cid = ["Selecione..."] + lista_cidades + ["✍️ OUTRA (DIGITAR MANUALMENTE)"]
+                        t_cid_box = col_t1.selectbox("2º Passo: Cidade *", opcoes_cid)
+                        
+                        # Campo de emergência caso o IBGE não tenha a cidade ou a pessoa queira digitar
+                        t_cid_manual = col_t1.text_input("Se escolheu 'Outra', digite a cidade aqui:") if t_cid_box == "✍️ OUTRA (DIGITAR MANUALMENTE)" else ""
+                    else:
+                        col_t1.info("👆 Selecione a UF acima para carregar as cidades.")
+                        t_cid_box = "Selecione..."
+                        t_cid_manual = ""
+                        
                     t_bai = col_t2.text_input("Bairro (Opcional)", placeholder="Deixe em branco para tarifa geral da cidade")
 
                     col_t3, col_t4 = st.columns(2)
@@ -1517,8 +1546,11 @@ elif menu == "💰 Faturamento":
                     submit_tarifa = st.form_submit_button("💾 Salvar Tarifa no Banco", type="primary", use_container_width=True)
 
                     if submit_tarifa:
-                        if not t_cid or not t_uf:
-                            st.error("⚠️ O preenchimento da Cidade e da UF são obrigatórios!")
+                        # Define qual campo de cidade vai ser salvo
+                        t_cid_final = t_cid_manual if t_cid_box == "✍️ OUTRA (DIGITAR MANUALMENTE)" else t_cid_box
+                        
+                        if not t_uf or t_cid_final in ["Selecione...", ""]:
+                            st.error("⚠️ O preenchimento da UF e da Cidade são obrigatórios!")
                         elif t_valor <= 0:
                             st.error("⚠️ O Valor da entrega deve ser maior que zero!")
                         else:
@@ -1527,22 +1559,19 @@ elif menu == "💰 Faturamento":
                                     buscado = t_cliente.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if t_cliente in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else t_cliente
                                     buscado = buscado.strip().upper()
 
-                                    # Checa se a aba existe. Se não, cria.
                                     try:
                                         aba_cli = planilha_financeiro.worksheet(buscado)
                                     except:
                                         aba_cli = planilha_financeiro.add_worksheet(title=buscado, rows="100", cols="10")
                                         aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]])
 
-                                    # 1. Puxa os cabeçalhos que já existem lá no Sheets
                                     cabecalhos_atuais = aba_cli.row_values(1)
                                     if not cabecalhos_atuais:
                                         cabecalhos_atuais = ["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]
                                         aba_cli.update("A1", [cabecalhos_atuais])
 
-                                    # 2. Prepara os dados num dicionário inteligente (Nome da Coluna -> Valor)
                                     dicionario_nova_tarifa = {
-                                        "CIDADE": padronizar_texto(t_cid),
+                                        "CIDADE": padronizar_texto(t_cid_final),
                                         "BAIRRO": padronizar_texto(t_bai),
                                         "ENDERECO": padronizar_texto(t_rua),
                                         "CEP": re.sub(r'\D', '', t_cep),
@@ -1551,7 +1580,6 @@ elif menu == "💰 Faturamento":
                                         "UF": t_uf
                                     }
 
-                                    # 3. Se a aba antiga não tiver CEP ou UF, adiciona no cabeçalho
                                     precisa_atualizar_cab = False
                                     for chave in dicionario_nova_tarifa.keys():
                                         if chave not in cabecalhos_atuais:
@@ -1561,29 +1589,26 @@ elif menu == "💰 Faturamento":
                                     if precisa_atualizar_cab:
                                         aba_cli.update("A1", [cabecalhos_atuais])
 
-                                    # 4. Monta a linha EXATAMENTE na ordem que as colunas estão na sua planilha
                                     nova_linha_ordenada = [dicionario_nova_tarifa.get(col, "") for col in cabecalhos_atuais]
 
-                                    # Injeta a linha certa e atualiza a tela
                                     aba_cli.append_row(nova_linha_ordenada)
                                     carregar_tabela_precos.clear()
                                     
-                                    st.success(f"✅ Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid)} - {t_uf} cadastrada na coluna certa!")
+                                    st.success(f"✅ Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid_final)} - {t_uf} cadastrada na coluna certa!")
                                     time.sleep(1.5)
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Erro Crítico ao salvar tarifa: {e}")
 
-            # --- SUBSTITUA DAQUI PARA BAIXO NO FINAL DA ABA 4 ---
+            # --- TABELA INTERATIVA (PERMITE DELETAR E EDITAR DIRETO NA TELA) ---
             st.markdown("---")
             st.markdown(f"#### 🔎 Gerenciar Tabela de Preços Atual ({t_cliente})")
-            st.info("💡 Para **EXCLUIR** uma tarifa, clique na caixa à esquerda da linha e aperte 'Delete' ou 'Backspace'. Para **EDITAR**, dê dois cliques na célula.")
+            st.info("💡 Para **EXCLUIR** uma tarifa, selecione a caixa à esquerda da linha e aperte 'Delete' ou 'Backspace'. Para **EDITAR**, dê dois cliques na célula.")
             
             if not df_precos_atuais.empty:
-                # Transforma o DataFrame estático em uma Grid editável
                 df_precos_edit = st.data_editor(
                     df_precos_atuais, 
-                    num_rows="dynamic", # Permite adicionar/deletar linhas
+                    num_rows="dynamic", 
                     use_container_width=True, 
                     hide_index=True,
                     key=f"editor_tarifas_{t_cliente}"
@@ -1596,13 +1621,11 @@ elif menu == "💰 Faturamento":
                             buscado = buscado.strip().upper()
                             aba_cli = planilha_financeiro.worksheet(buscado)
                             
-                            # Limpa a aba e reescreve com a tabela editada
                             aba_cli.clear()
                             
                             if not df_precos_edit.empty:
                                 aba_cli.update("A1", [df_precos_edit.columns.tolist()] + df_precos_edit.fillna("").astype(str).values.tolist())
                             else:
-                                # Se o usuário apagou todas as linhas, preserva o cabeçalho para não quebrar a planilha
                                 aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]])
                                 
                             carregar_tabela_precos.clear()
