@@ -1482,7 +1482,7 @@ elif menu == "💰 Faturamento":
                             else: st.error("Senha incorreta!")
         except Exception: st.warning("Histórico pronto para o próximo faturamento. (Aba sendo criada)")
 
-    # 🔥 NOVA ABA 4: GESTÃO DE TARIFAS (AGORA COM DROPDOWN DE UF) 🔥
+    # 🔥 NOVA ABA 4: GESTÃO DE TARIFAS (BLINDADA CONTRA DESALINHAMENTO DE COLUNAS) 🔥
     with tab_tarifas:
         st.markdown("#### 💲 Gestão de Tarifas e Preços")
         st.info("Cadastre ou atualize os valores cobrados por rota para cada cliente. Os dados são salvos e aplicados diretamente no banco financeiro.")
@@ -1498,7 +1498,6 @@ elif menu == "💰 Faturamento":
                 with st.form("form_nova_tarifa", clear_on_submit=True):
                     st.markdown(f"**➕ Cadastrar Nova Tarifa para {t_cliente}**")
                     
-                    # 🔥 MUDANÇA: Coluna de UF com Dropdown Nativo 🔥
                     col_t1, col_t_uf, col_t2 = st.columns([3, 1, 3])
                     t_cid = col_t1.text_input("Cidade *", placeholder="Ex: SAO PAULO")
                     
@@ -1523,35 +1522,53 @@ elif menu == "💰 Faturamento":
                         elif t_valor <= 0:
                             st.error("⚠️ O Valor da entrega deve ser maior que zero!")
                         else:
-                            with st.spinner("Registrando tarifa no banco financeiro..."):
+                            with st.spinner("Registrando tarifa e alinhando colunas no banco financeiro..."):
                                 try:
-                                    # Corrige as nomenclaturas mescladas igual ao faturamento
                                     buscado = t_cliente.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if t_cliente in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else t_cliente
                                     buscado = buscado.strip().upper()
 
-                                    # Checa se a aba do cliente existe no Sheets. Adicionado a UF no final do cabeçalho!
+                                    # Checa se a aba existe. Se não, cria.
                                     try:
                                         aba_cli = planilha_financeiro.worksheet(buscado)
                                     except:
                                         aba_cli = planilha_financeiro.add_worksheet(title=buscado, rows="100", cols="10")
                                         aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]])
 
-                                    # Prepara os dados limpos com a UF salva na 7ª coluna
-                                    nova_linha = [
-                                        padronizar_texto(t_cid),
-                                        padronizar_texto(t_bai),
-                                        padronizar_texto(t_rua),
-                                        re.sub(r'\D', '', t_cep),
-                                        f"{t_valor:.2f}".replace(".", ","),
-                                        f"{t_multa:.2f}".replace(".", ","),
-                                        t_uf
-                                    ]
+                                    # 1. Puxa os cabeçalhos que já existem lá no Sheets
+                                    cabecalhos_atuais = aba_cli.row_values(1)
+                                    if not cabecalhos_atuais:
+                                        cabecalhos_atuais = ["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]
+                                        aba_cli.update("A1", [cabecalhos_atuais])
 
-                                    # Injeta a linha na planilha e limpa o cache para a tela atualizar
-                                    aba_cli.append_row(nova_linha)
+                                    # 2. Prepara os dados num dicionário inteligente (Nome da Coluna -> Valor)
+                                    dicionario_nova_tarifa = {
+                                        "CIDADE": padronizar_texto(t_cid),
+                                        "BAIRRO": padronizar_texto(t_bai),
+                                        "ENDERECO": padronizar_texto(t_rua),
+                                        "CEP": re.sub(r'\D', '', t_cep),
+                                        "VALOR_CHEIO": f"{t_valor:.2f}".replace(".", ","),
+                                        "MULT_FRUSTRADA": f"{t_multa:.2f}".replace(".", ","),
+                                        "UF": t_uf
+                                    }
+
+                                    # 3. Se a aba antiga não tiver CEP ou UF, adiciona no cabeçalho
+                                    precisa_atualizar_cab = False
+                                    for chave in dicionario_nova_tarifa.keys():
+                                        if chave not in cabecalhos_atuais:
+                                            cabecalhos_atuais.append(chave)
+                                            precisa_atualizar_cab = True
+                                            
+                                    if precisa_atualizar_cab:
+                                        aba_cli.update("A1", [cabecalhos_atuais])
+
+                                    # 4. Monta a linha EXATAMENTE na ordem que as colunas estão na sua planilha
+                                    nova_linha_ordenada = [dicionario_nova_tarifa.get(col, "") for col in cabecalhos_atuais]
+
+                                    # Injeta a linha certa e atualiza a tela
+                                    aba_cli.append_row(nova_linha_ordenada)
                                     carregar_tabela_precos.clear()
                                     
-                                    st.success(f"✅ Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid)} - {t_uf} cadastrada com sucesso!")
+                                    st.success(f"✅ Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid)} - {t_uf} cadastrada na coluna certa!")
                                     time.sleep(1.5)
                                     st.rerun()
                                 except Exception as e:
