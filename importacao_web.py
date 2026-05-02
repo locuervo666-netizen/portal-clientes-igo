@@ -3693,21 +3693,22 @@ elif menu == "📈 Dashboard":
             </div>
         """, unsafe_allow_html=True)
 
-        # 4. A GRANDE META DO DIA
+        # 4. A GRANDE META DO DIA (VERSÃO COMPACTA)
         progresso_meta = int((resolvidos_h / vol_total_h) * 100) if vol_total_h > 0 else 0
         cor_meta = "#10B981" if progresso_meta >= 80 else ("#F59E0B" if progresso_meta >= 40 else "#EF4444")
         
         meta_html = f"""
-        <div style="background-color: #1E293B; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 20px; border: 1px solid #334155;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
-                <div>
-                    <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin: 0; letter-spacing: 1px;">🎯 META DO DIA (VISITAS REALIZADAS HOJE)</p>
-                    <h3 style="color: #F8FAFC; font-size: 26px; margin: 5px 0 0 0;">{resolvidos_h} de {vol_total_h} Visitas Concluídas</h3>
+        <div style="background-color: #1E293B; padding: 12px 18px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); margin-bottom: 15px; border: 1px solid #334155;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 16px;">🎯</span>
+                    <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin: 0; letter-spacing: 0.5px;">META DO DIA:</p>
+                    <h3 style="color: #F8FAFC; font-size: 16px; margin: 0; font-weight: 600;">{resolvidos_h} de {vol_total_h} Visitas Concluídas</h3>
                 </div>
-                <h2 style="color: {cor_meta}; font-size: 42px; margin: 0; font-weight: 900; line-height: 1;">{progresso_meta}%</h2>
+                <h2 style="color: {cor_meta}; font-size: 22px; margin: 0; font-weight: 900; line-height: 1;">{progresso_meta}%</h2>
             </div>
-            <div style="width: 100%; background-color: #0F172A; border-radius: 8px; height: 16px; overflow: hidden; border: 1px solid #334155;">
-                <div style="width: {progresso_meta}%; background: {cor_meta}; height: 16px; transition: width 1s ease-in-out;"></div>
+            <div style="width: 100%; background-color: #0F172A; border-radius: 6px; height: 8px; overflow: hidden; border: 1px solid #334155;">
+                <div style="width: {progresso_meta}%; background: {cor_meta}; height: 8px; transition: width 1s ease-in-out;"></div>
             </div>
         </div>
         """
