@@ -3693,26 +3693,8 @@ elif menu == "📈 Dashboard":
             </div>
         """, unsafe_allow_html=True)
 
-        # 4. A GRANDE META DO DIA (VERSÃO COMPACTA)
+        # 4. CÁLCULO DA META DO DIA
         progresso_meta = int((resolvidos_h / vol_total_h) * 100) if vol_total_h > 0 else 0
-        cor_meta = "#10B981" if progresso_meta >= 80 else ("#F59E0B" if progresso_meta >= 40 else "#EF4444")
-        
-        meta_html = f"""
-        <div style="background-color: #1E293B; padding: 12px 18px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); margin-bottom: 15px; border: 1px solid #334155;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 16px;">🎯</span>
-                    <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin: 0; letter-spacing: 0.5px;">META DO DIA:</p>
-                    <h3 style="color: #F8FAFC; font-size: 16px; margin: 0; font-weight: 600;">{resolvidos_h} de {vol_total_h} Visitas Concluídas</h3>
-                </div>
-                <h2 style="color: {cor_meta}; font-size: 22px; margin: 0; font-weight: 900; line-height: 1;">{progresso_meta}%</h2>
-            </div>
-            <div style="width: 100%; background-color: #0F172A; border-radius: 6px; height: 8px; overflow: hidden; border: 1px solid #334155;">
-                <div style="width: {progresso_meta}%; background: {cor_meta}; height: 8px; transition: width 1s ease-in-out;"></div>
-            </div>
-        </div>
-        """
-        st.markdown(meta_html, unsafe_allow_html=True)
 
         # 5. GRID DE 8 BLOCOS
         def make_card(title, value, var_str, color1, color2):
@@ -3728,7 +3710,7 @@ elif menu == "📈 Dashboard":
         c1.markdown(make_card("VOLUME TOTAL", vol_total_h, f"{s_tot} {v_tot_str} vs Ontem", "#1E293B", "#334155"), unsafe_allow_html=True)
         c2.markdown(make_card("EFICIÊNCIA DE ROTA", f"{taxa_sucesso_h:.1f}%", f"{s_taxa} {v_taxa_str} vs Ontem", "#0369A1", "#0EA5E9"), unsafe_allow_html=True)
         c3.markdown(make_card("FROTA EM CAMPO", f"{frota_h} Agts", f"{s_frota} {v_frota_str} vs Ontem", "#3730A3", "#4F46E5"), unsafe_allow_html=True)
-        c4.markdown(make_card("SUCESSO (ENTREGUES)", ent_h, f"{s_ent} {v_ent_str} vs Ontem", "#059669", "#10B981"), unsafe_allow_html=True)
+        c4.markdown(make_card("META DO DIA (CONCLUÍDAS)", f"{progresso_meta}%", f"{resolvidos_h} de {vol_total_h} Visitas", "#059669", "#10B981"), unsafe_allow_html=True)
 
         c5, c6, c7, c8 = st.columns(4)
         c5.markdown(make_card("PENDENTES EM ROTA", pend_h, f"{s_pend} {v_pend_str} vs Ontem", "#D97706", "#F59E0B"), unsafe_allow_html=True)
