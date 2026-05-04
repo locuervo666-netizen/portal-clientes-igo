@@ -595,9 +595,10 @@ else:
     hoje_br           = datetime.now(FUSO_BR).date()
     nome_tomador_oficial = conf["filtro"] if conf["filtro"] != "TODOS" else "MATRIZ IGO"
 
-    # ── SIDEBAR ────────────────────────────────────────
+    # ── SIDEBAR (ORGANIZAÇÃO SAAS PREMIUM) ────────────────────────────────────────
     with st.sidebar:
-        col1, col2, col3 = st.columns([1, 3, 1])
+        st.markdown("<br>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1, 4, 1])
         with col2:
             try:
                 st.image(conf["logo"], use_container_width=True)
@@ -606,30 +607,39 @@ else:
                     f"<h3 style='text-align:center;'>{st.session_state.cliente}</h3>",
                     unsafe_allow_html=True
                 )
+        
+        st.markdown("<br>", unsafe_allow_html=True)
 
-        st.divider()
-        datas_sel = st.date_input(
-            "🗓️ Período:",
-            value=(hoje_br - timedelta(days=15), hoje_br),
-            format="DD/MM/YYYY"
-        )
-        holder_cidades = st.empty()
+        # 🗂️ AGRUPAMENTO 1: FILTROS DE VISÃO
+        st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Filtros de Visão</p>", unsafe_allow_html=True)
+        with st.container(border=True):
+            datas_sel = st.date_input(
+                "🗓️ Período:",
+                value=(hoje_br - timedelta(days=15), hoje_br),
+                format="DD/MM/YYYY"
+            )
+            # Placeholder preservado para receber as cidades depois
+            holder_cidades = st.empty()
 
-        st.divider()
+        st.markdown("<br>", unsafe_allow_html=True)
 
-        # Chamado como expander para liberar espaço
-        with st.expander("🎧 Abrir Chamado C.C.O.", expanded=False):
+        # 🗂️ AGRUPAMENTO 2: AÇÕES E SUPORTE
+        st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Suporte e Relatórios</p>", unsafe_allow_html=True)
+        
+        # Popover: Botão moderno que abre um mini-menu flutuante por cima da tela
+        with st.popover("🎧 Abrir Chamado C.C.O.", use_container_width=True):
+            st.markdown("📄 **Novo Chamado de Atendimento**")
             with st.form("form_chamado_zap"):
                 pedido_chamado = st.text_input("Número do Pedido (Opcional):")
                 msg_chamado    = st.text_area(
                     "Sua Mensagem:",
                     placeholder="Ex: Preciso de urgência neste pedido..."
                 )
-                if st.form_submit_button("Enviar Solicitação", use_container_width=True):
+                if st.form_submit_button("🚀 Enviar Solicitação ao C.C.O.", type="primary", use_container_width=True):
                     if not msg_chamado.strip():
                         st.error("Digite uma mensagem!")
                     else:
-                        with st.spinner("Enviando..."):
+                        with st.spinner("Enviando via satélite..."):
                             texto_final = (
                                 f"🚨 *CHAMADO PRIORITÁRIO - PORTAL* 🚨\n\n"
                                 f"🏢 *Cliente:* {nome_tomador_oficial}\n"
@@ -641,15 +651,18 @@ else:
                                 f"⏳ _Enviado via Portal Corporativo_"
                             )
                             if enviar_whatsapp_zapi_cliente("5511947996371", texto_final):
-                                st.success("✅ Chamado enviado!")
+                                st.success("✅ Chamado recebido com sucesso pela base!")
                             else:
-                                st.error("❌ Erro de comunicação.")
+                                st.error("❌ Erro de comunicação com o servidor.")
 
-        st.divider()
+        # Placeholder reservado para o botão de exportar
         holder_exportar = st.empty()
-        st.markdown("<br>", unsafe_allow_html=True)
 
-        if st.button("🚪 Sair do Sistema", use_container_width=True):
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 🗂️ AGRUPAMENTO 3: SAÍDA DO SISTEMA
+        st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Sistema</p>", unsafe_allow_html=True)
+        if st.button("🚪 Sair com Segurança", use_container_width=True, type="secondary"):
             st.session_state.logado = False
             st.rerun()
 
