@@ -909,19 +909,31 @@ else:
                         c for c in colunas_visiveis if c in df_final.columns
                     ]
 
-                    # 🔥 PANDAS STYLER: PINTANDO O STATUS EM FORMATO DE PÍLULA (BADGE) 🔥
+                    # 🔥 PANDAS STYLER: PALETA PREMIUM PARA AS PÍLULAS DE STATUS 🔥
                     def colorir_status_badge(val):
                         val_str = str(val).upper()
-                        # Base do CSS para criar o efeito arredondado
                         base = "font-weight: 700; font-size: 12px; border-radius: 99px; padding: 4px 12px; text-align: center; border-width: 1px; border-style: solid; "
                         
-                        if 'ENTREGUE' in val_str: return base + 'background-color: #f0fdf4; color: #166534; border-color: #bbf7d0;'
-                        if 'ROTA' in val_str or 'COLETADO' in val_str: return base + 'background-color: #eff6ff; color: #1d4ed8; border-color: #bfdbfe;'
-                        if 'CONFERIDO' in val_str: return base + 'background-color: #faf5ff; color: #6d28d9; border-color: #e9d5ff;'
-                        if 'FRUSTRADA' in val_str: return base + 'background-color: #fffbeb; color: #92400e; border-color: #fde68a;'
-                        if 'ATRASADO' in val_str or 'PROBLEMA' in val_str or 'CANCELADO' in val_str or 'RECUSA' in val_str: return base + 'background-color: #fef2f2; color: #991b1b; border-color: #fecaca;'
-                        if 'AGUARDANDO' in val_str: return base + 'background-color: #f8fafc; color: #475569; border-color: #cbd5e1;'
-                        if 'PENDENTE' in val_str: return base + 'background-color: #fff7ed; color: #9a3412; border-color: #fed7aa;'
+                        if 'ENTREGUE' in val_str: 
+                            return base + 'background-color: #F0FDF4; color: #166534; border-color: #BBF7D0;'
+                        if 'ROTA' in val_str: 
+                            # Teal/Verde-Água: Moderno, indica movimento sem ser o azul bebê
+                            return base + 'background-color: #F0FDFA; color: #0F766E; border-color: #99F6E4;'
+                        if 'COLETADO' in val_str: 
+                            # Roxo/Violeta suave: Indica posse/etapa interna
+                            return base + 'background-color: #F5F3FF; color: #6D28D9; border-color: #DDD6FE;'
+                        if 'CONFERIDO' in val_str: 
+                            # Indigo/Azul Marinho: Sóbrio, etapa de auditoria
+                            return base + 'background-color: #EEF2FF; color: #3730A3; border-color: #C7D2FE;'
+                        if 'FRUSTRADA' in val_str: 
+                            return base + 'background-color: #FFFBEB; color: #B45309; border-color: #FDE68A;'
+                        if 'ATRASADO' in val_str or 'PROBLEMA' in val_str or 'CANCELADO' in val_str or 'RECUSA' in val_str: 
+                            return base + 'background-color: #FEF2F2; color: #991B1B; border-color: #FECACA;'
+                        if 'AGUARDANDO' in val_str: 
+                            return base + 'background-color: #F8FAFC; color: #475569; border-color: #CBD5E1;'
+                        if 'PENDENTE' in val_str: 
+                            return base + 'background-color: #FFF7ED; color: #9A3412; border-color: #FED7AA;'
+                        
                         return ''
 
                     df_estilizado = df_final[colunas_visiveis].style.map(colorir_status_badge, subset=['STATUS_DISPLAY'])
