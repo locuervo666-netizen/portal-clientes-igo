@@ -3696,8 +3696,22 @@ elif menu == "📈 Dashboard":
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
         # =========================================================
-        # 🧠 FUNÇÕES CÉREBRO PARA O TICKER
+        # 🧠 FUNÇÕES CÉREBRO PARA O TICKER (INCLUINDO DÓLAR)
         # =========================================================
+        @st.cache_data(ttl=1800) # Atualiza a cada 30 minutos
+        def buscar_cotacao_dolar():
+            try:
+                resp = requests.get("https://economia.awesomeapi.com.br/last/USD-BRL", timeout=3)
+                if resp.status_code == 200:
+                    dados = resp.json()
+                    dolar = float(dados['USDBRL']['bid'])
+                    variacao = float(dados['USDBRL']['pctChange'])
+                    sinal = "▲" if variacao > 0 else "▼" if variacao < 0 else "-"
+                    return f"💵 DÓLAR: R$ {dolar:.2f} ({sinal} {variacao}%)".replace('.', ',')
+            except:
+                pass
+            return ""
+
         @st.cache_data(ttl=3600)
         def buscar_alertas_climaticos(cidades_com_uf):
             alertas = []
@@ -3745,8 +3759,12 @@ elif menu == "📈 Dashboard":
         # ---------------------------------------------------------
         # ANDAR 1: TICKER CYBER COMPLETO COM TODAS AS INTEGRAÇÕES
         # ---------------------------------------------------------
-        manchetes = [f"🟢 SISTEMA ONLINE", f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}", f"📅 COMPARAÇÃO: {ontem_util.strftime('%d/%m/%Y')}"]
+        manchetes = [f"🟢 SISTEMA ONLINE", f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}"]
         
+        # 🚀 INJETA A COTAÇÃO DO DÓLAR
+        cotacao_dolar = buscar_cotacao_dolar()
+        if cotacao_dolar: manchetes.append(cotacao_dolar)
+
         # Alertas Operacionais
         if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) aguardando resposta do C.C.O!")
         if atra_h > 0: manchetes.append(f"⚠️ SLA CRÍTICO: {atra_h} visita(s) em atraso na operação agora!")
