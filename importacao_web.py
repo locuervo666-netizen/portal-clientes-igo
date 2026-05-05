@@ -3589,10 +3589,14 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - V9.5 RADAR LAPIDADO)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - VISUAL CLEAN & GRÁFICOS)
 # =============================================================================
 elif menu == "📈 Dashboard":
-    # 🔥 REFRESH NATIVO E BLINDADO (SUBSTITUI O st_autorefresh) 🔥
+    # Importa a biblioteca gráfica de alta performance
+    import plotly.express as px
+    import plotly.graph_objects as go
+    
+    # 🔥 REFRESH NATIVO E BLINDADO 🔥
     import streamlit.components.v1 as components
     components.html(
         """
@@ -3605,14 +3609,14 @@ elif menu == "📈 Dashboard":
         height=0, width=0
     )
     
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📈 Painel de Controle</h3></div>", unsafe_allow_html=True)
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📈 Painel de Controle Executivo</h3></div>", unsafe_allow_html=True)
     
     df_raw = carregar_dados_completos(planilha_db)
     
     if df_raw.empty:
         st.warning("⚠️ O banco de dados está vazio. Sem dados para o painel.")
     else:
-        # 1. Lógica de Datas (Dia Atual vs Último Dia Útil)
+        # 1. Lógica de Datas
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         hoje = hoje_br
         
@@ -3631,7 +3635,7 @@ elif menu == "📈 Dashboard":
             elif var < 0: return f"{var:.1f}%", "▼"
             return "0%", "-"
 
-        # 2. Cálculos dos KPIs Macro
+        # 2. Cálculos dos KPIs
         vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
         resolvidos_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
         resolvidos_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
@@ -3643,37 +3647,25 @@ elif menu == "📈 Dashboard":
         frus_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
         atra_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
         atra_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
-        frota_h = df_hoje['AGENTE_RAW'].replace("", pd.NA).nunique()
-        frota_o = df_ontem['AGENTE_RAW'].replace("", pd.NA).nunique()
         
         taxa_sucesso_h = (resolvidos_h / vol_total_h * 100) if vol_total_h > 0 else 0
         taxa_sucesso_o = (resolvidos_o / vol_total_o * 100) if vol_total_o > 0 else 0
         var_taxa = taxa_sucesso_h - taxa_sucesso_o
         
         v_tot_str, s_tot = calc_variacao(vol_total_h, vol_total_o)
-        v_ent_str, s_ent = calc_variacao(ent_h, ent_o)
-        v_pend_str, s_pend = calc_variacao(pend_h, pend_o)
-        v_frus_str, s_frus = calc_variacao(frus_h, frus_o)
-        v_atra_str, s_atra = calc_variacao(atra_h, atra_o)
-        v_frota_str, s_frota = calc_variacao(frota_h, frota_o)
         if var_taxa > 0: v_taxa_str, s_taxa = f"+{var_taxa:.1f} pp", "▲"
         elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
         else: v_taxa_str, s_taxa = "0 pp", "-"
 
-        # --- LÓGICA DE RANKING MENSAL ---
         df_mes = df_raw.copy()
         df_mes['MES_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.month
         df_mes['ANO_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.year
         df_mes_atual = df_mes[(df_mes['MES_TEMP'] == hoje.month) & (df_mes['ANO_TEMP'] == hoje.year)]
         
-        dias_ativos = df_mes_atual['DATA_OBJ'].nunique()
-        media_diaria_global = int(len(df_mes_atual) / dias_ativos) if dias_ativos > 0 else 0
-        
         vol_tomadores = df_mes_atual['TOMADOR'].value_counts().reset_index()
         vol_tomadores.columns = ['Tomador', 'Volume']
-        max_vol_tomador = vol_tomadores['Volume'].max() if not vol_tomadores.empty else 1
 
-        # --- INTELIGÊNCIA DOS MOTORISTAS E PÓDIO ---
+        # Inteligência da Frota
         dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         frota_stats = {}
         if not df_hoje.empty:
@@ -3688,9 +3680,7 @@ elif menu == "📈 Dashboard":
         
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
-        # =============================================================================
-        # 🔥 CÉREBROS DE INTEGRAÇÃO EXTERNA (CLIMA UF & AERODATABOX) 🔥
-        # =============================================================================
+        # CÉREBROS DE INTEGRAÇÃO EXTERNA (CLIMA & AERODATABOX)
         @st.cache_data(ttl=3600)
         def buscar_alertas_climaticos(cidades_com_uf):
             alertas = []
@@ -3699,122 +3689,38 @@ elif menu == "📈 Dashboard":
                 try:
                     cidade_busca = str(item).split('/')[0].strip() if '/' in str(item) else str(item).strip()
                     cid_fmt = urllib.parse.quote(cidade_busca)
-                    
                     resp = requests.get(f"https://wttr.in/{cid_fmt}?format=j1", timeout=3)
                     if resp.status_code == 200:
                         dados = resp.json()
                         condicao = str(dados['current_condition'][0]['weatherDesc'][0]['value']).lower()
-                        
                         if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder', 'drizzle']):
-                            alertas.append(f"⛈️ RADAR IGO: Chuva detectada na operação de {item}. Risco de lentidão!")
+                            alertas.append(f"⛈️ CHUVA DETECTADA em {item}. Risco de lentidão!")
                         else:
-                            alertas.append(f"☀️ RADAR IGO: Tempo estável na operação de {item}.")
+                            alertas.append(f"☀️ TEMPO ESTÁVEL na rota de {item}.")
                 except: continue
             return alertas
 
-        @st.cache_data(ttl=900)
-        def buscar_status_voos_aerodatabox(lista_voos, data_referencia):
-            alertas_voos = []
-            headers = {
-                "x-rapidapi-key": "726b5b7c75msh782bc334e03fcd1p1d415cjsn84ef052a00e7",
-                "x-rapidapi-host": "aerodatabox.p.rapidapi.com"
-            }
-            data_str = data_referencia.strftime('%Y-%m-%d')
-            
-            for voo in lista_voos:
-                v_query = str(voo).upper().replace(" ", "")
-                try:
-                    url = f"https://aerodatabox.p.rapidapi.com/flights/number/{v_query}/{data_str}"
-                    resp = requests.get(url, headers=headers, timeout=7)
-                    
-                    if resp.status_code == 200:
-                        dados = resp.json()
-                        if dados and isinstance(dados, list) and len(dados) > 0:
-                            v = dados[0] 
-                            status = str(v.get('status', 'UNK')).upper()
-                            
-                            partida_raw = v.get('departure', {}).get('scheduledTimeLocal', '')
-                            partida = partida_raw[11:16] if len(partida_raw) > 16 else "---"
-                            
-                            if "EXPECTED" in status or "SCHEDULED" in status:
-                                alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} CONFIRMADO para as {partida}. Sem atrasos reportados.")
-                            elif "DELAYED" in status:
-                                alertas_voos.append(f"🚨 ALERTA AÉREO: Voo {v_query} consta como ATRASADO no radar!")
-                            elif "CANCELED" in status or "CANCELLED" in status:
-                                alertas_voos.append(f"🚫 CRÍTICO: Voo {v_query} foi CANCELADO!")
-                            elif "ACTIVE" in status or "EN ROUTE" in status:
-                                alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} está EM VOO neste momento.")
-                            elif "ARRIVED" in status or "LANDED" in status:
-                                alertas_voos.append(f"✅ RADAR AÉREO: Voo {v_query} já POUSOU no destino.")
-                            elif "UNKNOWN" in status:
-                                alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} mapeado. Aguardando sinal do transponder para atualizar.")
-                            else:
-                                alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} monitorado. Status atual: {status.title()}.")
-                        else:
-                            alertas_voos.append(f"📡 RADAR AÉREO: Voo {v_query} não localizado na malha de hoje.")
-                    elif resp.status_code == 403:
-                        alertas_voos.append(f"⚠️ RADAR AÉREO: Assinatura do AeroDataBox não ativada. Clique em 'Subscribe to Test' no site.")
-                    else:
-                        alertas_voos.append(f"⚠️ RADAR AÉREO: Falha de comunicação com a torre (Erro {resp.status_code} no voo {v_query}).")
-                except: 
-                    alertas_voos.append(f"⚠️ RADAR AÉREO: Sem sinal GPS para o voo {v_query} no momento.")
-            return alertas_voos
-
-        # --- INTELIGÊNCIA: PEGAR CIDADE E JUNTAR COM A UF DA PLANILHA ---
         cidades_alvo = []
         if not df_hoje.empty:
             top_cids = df_hoje['CIDADE'].value_counts().head(5).index.tolist()
             col_uf = 'UF' if 'UF' in df_hoje.columns else ('ESTADO' if 'ESTADO' in df_hoje.columns else None)
-            
             for cid in top_cids:
                 cid_nome = str(cid).strip().title()
                 if col_uf:
                     try:
                         uf = str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()
                         cidades_alvo.append(f"{cid_nome}/{uf}")
-                    except:
-                        cidades_alvo.append(cid_nome)
-                else:
-                    cidades_alvo.append(cid_nome)
-        
-        # NÚMEROS DOS VOOS MONITORADOS (G31240)
-        voos_monitorados = ["G31240"]
+                    except: cidades_alvo.append(cid_nome)
+                else: cidades_alvo.append(cid_nome)
 
-        # 3. BARRA DE ROLAGEM ESTILO CNN (TICKER)
-        manchetes = [
-            f"🕒 ATUALIZAÇÃO AUTOMÁTICA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}",
-            f"📅 COMP. ÚLTIMO DIA ÚTIL: {ontem_util.strftime('%d/%m/%Y')}",
-            f"📦 CARGA TOTAL ROTEIRIZADA HOJE: {vol_total_h} VOLUMES ({s_tot} {v_tot_str})",
-            f"📊 MÉDIA DIÁRIA DO MÊS: {media_diaria_global} VOLUMES/DIA"
-        ]
-        
-        # INJETA AS APIs REAIS
+        # ---------------------------------------------------------
+        # ANDAR 1: O TICKER DE NOTÍCIAS (Mantido)
+        # ---------------------------------------------------------
+        manchetes = [f"🕒 ATUALIZAÇÃO AUTOMÁTICA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}"]
         if cidades_alvo: manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
-        if voos_monitorados: manchetes.extend(buscar_status_voos_aerodatabox(voos_monitorados, hoje))
-        
-        # Alerta Real de Feriado Nacional
-        if hoje in FERIADOS_BR:
-            nome_feriado = FERIADOS_BR.get(hoje)
-            manchetes.append(f"📅 ATENÇÃO: Hoje é feriado nacional ({nome_feriado}). Confirme o funcionamento dos PCLs!")
-
-        if len(frota_ordenada) >= 3:
-            manchetes.append(f"🏆 RANKING DO DIA: 1º {frota_ordenada[0][0]} ({frota_ordenada[0][1]['perc']}%) | 2º {frota_ordenada[1][0]} ({frota_ordenada[1][1]['perc']}%) | 3º {frota_ordenada[2][0]} ({frota_ordenada[2][1]['perc']}%)")
-        elif len(frota_ordenada) > 0:
-            manchetes.append(f"🏆 DESTAQUE DO DIA: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}% concluído!")
-
-        for nome, s in frota_ordenada:
-            if s['perc'] == 100 and s['total'] > 0:
-                manchetes.append(f"🟢 MISSÃO CUMPRIDA: Motorista {nome} finalizou 100% da sua rota!")
-
-        frustradas_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)]
-        if not frustradas_hj.empty:
-            ult_frus = frustradas_hj.iloc[-1]
-            lab_f = ult_frus.get('LABORATORIO', 'Desconhecido')
-            mot_f = dict_nomes_dash.get(str(ult_frus.get('AGENTE_RAW', '')).strip().lower(), str(ult_frus.get('AGENTE_RAW', '')))
-            manchetes.append(f"🛑 ÚLTIMA OCORRÊNCIA: Visita em {lab_f} reportada com problema pelo agente {mot_f}.")
+        if hoje in FERIADOS_BR: manchetes.append(f"📅 ATENÇÃO: Hoje é feriado nacional ({FERIADOS_BR.get(hoje)}).")
 
         ticker_text = " &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
-
         st.markdown(f"""
             <style>
             .nasdaq-container {{ background-color: #0F172A; color: #F8FAFC; padding: 12px 0; border-radius: 6px; margin-bottom: 25px; white-space: nowrap; overflow: hidden; border-left: 5px solid #10B981; position: relative; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
@@ -3828,99 +3734,124 @@ elif menu == "📈 Dashboard":
             </div>
         """, unsafe_allow_html=True)
 
-        # 4. CÁLCULO DA META DO DIA
-        progresso_meta = int((resolvidos_h / vol_total_h) * 100) if vol_total_h > 0 else 0
-
-        # 5. GRID DE 8 BLOCOS
-        def make_card(title, value, var_str, color1, color2):
+        # ---------------------------------------------------------
+        # ANDAR 2: NOVA PALETA CLEAN (CARDS BRANCOS)
+        # ---------------------------------------------------------
+        def make_clean_card(title, value, var_str, color_hex, icon):
+            # Se for alerta vermelho, damos um destaque na var_str
+            bg_var = f"{color_hex}1A" if color_hex != "#64748B" else "#F1F5F9"
             return f"""
-            <div style="background: linear-gradient(135deg, {color1} 0%, {color2} 100%); padding: 15px; border-radius: 8px; text-align: center; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 110px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;">
-                <p style="margin:0; font-size:11px; font-weight:800; letter-spacing: 0.5px; opacity: 0.9;">{title}</p>
-                <h2 style="margin:2px 0; font-size:32px; font-weight:900;">{value}</h2>
-                <div style="margin-top:auto;"><span style="font-size:11px; font-weight:bold; background: rgba(255,255,255,0.25); padding: 3px 10px; border-radius: 12px;">{var_str}</span></div>
+            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-left: 4px solid {color_hex}; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 110px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <p style="margin:0; font-size:11px; font-weight:800; color: #64748B; letter-spacing: 0.5px;">{title}</p>
+                    <span style="font-size:18px;">{icon}</span>
+                </div>
+                <h2 style="margin:0; font-size:28px; font-weight:900; color: #0F172A; line-height: 1;">{value}</h2>
+                <div><span style="font-size:11px; font-weight:700; color: {color_hex}; background: {bg_var}; padding: 3px 8px; border-radius: 12px;">{var_str}</span></div>
             </div>
             """
 
-        # 🔥 CALCULA OS CHAMADOS E DEFINE A COR DO CARD NO DASHBOARD 🔥
         qtd_chamados = checar_chamados_pendentes(planilha_db)
-        cor1_tkt = "#DC2626" if qtd_chamados > 0 else "#64748B"
-        cor2_tkt = "#991B1B" if qtd_chamados > 0 else "#475569"
+        cor_tkt = "#DC2626" if qtd_chamados > 0 else "#64748B"
         sub_tkt = "🚨 Requer Atenção!" if qtd_chamados > 0 else "✅ Tudo Limpo"
 
         c1, c2, c3, c4 = st.columns(4)
-        c1.markdown(make_card("VOLUME TOTAL", vol_total_h, f"{s_tot} {v_tot_str} vs Ontem", "#1E293B", "#334155"), unsafe_allow_html=True)
-        c2.markdown(make_card("EFICIÊNCIA DE ROTA", f"{taxa_sucesso_h:.1f}%", f"{s_taxa} {v_taxa_str} vs Ontem", "#0369A1", "#0EA5E9"), unsafe_allow_html=True)
+        c1.markdown(make_clean_card("VOLUME TOTAL", vol_total_h, f"{s_tot} {v_tot_str} vs Ontem", "#3B82F6", "📦"), unsafe_allow_html=True)
+        c2.markdown(make_clean_card("EFICIÊNCIA", f"{taxa_sucesso_h:.1f}%", f"{s_taxa} {v_taxa_str} vs Ontem", "#10B981", "🎯"), unsafe_allow_html=True)
+        c3.markdown(make_clean_card("CHAMADOS HELPDESK", f"{qtd_chamados}", sub_tkt, cor_tkt, "🎧"), unsafe_allow_html=True)
         
-        # O Card c3 agora é o de Chamados!
-        c3.markdown(make_card("CHAMADOS EM ABERTO", f"{qtd_chamados}", sub_tkt, cor1_tkt, cor2_tkt), unsafe_allow_html=True)
-        
-        c4.markdown(make_card("META DO DIA (CONCLUÍDAS)", f"{progresso_meta}%", f"{resolvidos_h} de {vol_total_h} Visitas", "#059669", "#10B981"), unsafe_allow_html=True)
-
-        c5, c6, c7, c8 = st.columns(4)
-        c5.markdown(make_card("PENDENTES EM ROTA", pend_h, f"{s_pend} {v_pend_str} vs Ontem", "#D97706", "#F59E0B"), unsafe_allow_html=True)
-        c6.markdown(make_card("ATRASADOS (SLA)", atra_h, f"{s_atra} {v_atra_str} vs Ontem", "#7F1D1D", "#B91C1C"), unsafe_allow_html=True)
-        c7.markdown(make_card("FRUSTRADAS (CUSTO)", frus_h, f"{s_frus} {v_frus_str} vs Ontem", "#991B1B", "#EF4444"), unsafe_allow_html=True)
-        c8.markdown(make_card("ONTEM ÚTIL (TOTAL)", vol_total_o, "Base de Comparação", "#475569", "#64748B"), unsafe_allow_html=True)
+        # Só alerta em vermelho se tiver atrasado de verdade
+        cor_atra = "#DC2626" if atra_h > 0 else "#64748B"
+        c4.markdown(make_clean_card("ATRASADOS (SLA)", atra_h, "Ruptura de Prazo", cor_atra, "⏳"), unsafe_allow_html=True)
 
         st.markdown("---")
 
-        # 6. PÓDIO DE EFICIÊNCIA E PERFORMANCE POR TOMADOR
-        col_rel, col_perf = st.columns([1, 1.2])
+        # ---------------------------------------------------------
+        # ANDAR 3: GRÁFICOS VISUAIS E INTERATIVOS (PLOTLY)
+        # ---------------------------------------------------------
+        col_graf1, col_graf2 = st.columns([1, 1.5])
         
-        with col_rel:
-            st.markdown("#### 🏆 Pódio e Status da Frota")
-            if len(frota_ordenada) >= 3:
-                html_podio = f"""
-                <div style='display: flex; justify-content: space-around; background: #F8FAFC; padding: 15px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 20px; text-align: center;'>
-                    <div><span style='font-size: 24px;'>🥈</span><br><b style='color:#475569; font-size:14px;'>{frota_ordenada[1][0]}</b><br><span style='color:#0284C7; font-weight:bold;'>{frota_ordenada[1][1]['perc']}%</span></div>
-                    <div style='transform: scale(1.1);'><span style='font-size: 32px;'>🥇</span><br><b style='color:#0F172A; font-size:15px;'>{frota_ordenada[0][0]}</b><br><span style='color:#10B981; font-weight:bold;'>{frota_ordenada[0][1]['perc']}%</span></div>
-                    <div><span style='font-size: 24px;'>🥉</span><br><b style='color:#475569; font-size:14px;'>{frota_ordenada[2][0]}</b><br><span style='color:#D97706; font-weight:bold;'>{frota_ordenada[2][1]['perc']}%</span></div>
-                </div>
-                """
-                st.markdown(html_podio, unsafe_allow_html=True)
+        with col_graf1:
+            st.markdown("#### 🎯 Status da Operação Diária")
+            # Preparando dados para o Gráfico de Rosca
+            status_labels = ['Entregue/Coletado', 'Pendente/Rota', 'Frustrada/Problema', 'Atrasado']
+            status_vals = [ent_h, pend_h, frus_h, atra_h]
+            df_donut = pd.DataFrame({'Status': status_labels, 'Volumes': status_vals})
+            df_donut = df_donut[df_donut['Volumes'] > 0] # Remove os que estão zerados para não sujar o gráfico
             
-            for nome, s in frota_ordenada:
-                bar_color = "#10B981" if s['perc'] == 100 else ("#0284C7" if s['perc'] > 50 else "#F59E0B")
-                st.markdown(f"""
-                    <div style='margin-bottom: 12px;'>
-                        <div style='display: flex; justify-content: space-between; font-size: 13px; font-weight: bold; color: #334155; margin-bottom: 4px;'>
-                            <span>{nome}</span>
-                            <span>{s['conc']}/{s['total']} ({s['perc']}%)</span>
-                        </div>
-                        <div style='width: 100%; background-color: #E2E8F0; border-radius: 4px; height: 8px;'>
-                            <div style='width: {s['perc']}%; background-color: {bar_color}; height: 8px; border-radius: 4px; transition: width 1s ease-in-out;'></div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
+            if not df_donut.empty:
+                cores_map = {'Entregue/Coletado': '#10B981', 'Pendente/Rota': '#F59E0B', 'Frustrada/Problema': '#EF4444', 'Atrasado': '#991B1B'}
+                fig_donut = px.pie(df_donut, values='Volumes', names='Status', hole=0.6, color='Status', color_discrete_map=cores_map)
+                fig_donut.update_traces(textinfo='percent+value', textfont_size=12, textfont_color='white')
+                fig_donut.update_layout(
+                    margin=dict(t=20, b=20, l=10, r=10),
+                    showlegend=True, 
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                    height=300
+                )
+                st.plotly_chart(fig_donut, use_container_width=True)
+            else:
+                st.info("Aguardando os primeiros despachos do dia.")
 
-        with col_perf:
-            st.markdown("#### 🏢 Ranking de Injeção de Carga do Mês")
+        with col_graf2:
+            st.markdown("#### 🏢 Top Clientes (Volume Mensal)")
             if not vol_tomadores.empty:
-                html_ranking = f"""
-                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                    <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 15px; border-bottom: 1px solid #E2E8F0; padding-bottom: 10px;">
-                        <span style="font-weight: 800; color: #475569; font-size: 13px; letter-spacing: 0.5px;">MÉDIA DIÁRIA GERAL:</span>
-                        <span style="font-weight: 900; color: #0284C7; font-size: 18px;">{media_diaria_global} 📦 /dia</span>
-                    </div>
-                """
-                for _, row in vol_tomadores.head(8).iterrows():
-                    tom = str(row['Tomador']).upper()
-                    vol = row['Volume']
-                    med_tom = int(vol / dias_ativos) if dias_ativos > 0 else 0
-                    perc = int((vol / max_vol_tomador) * 100)
-                    
-                    html_ranking += f"""
-<div style='margin-bottom: 16px;'>
-    <div style='display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 4px;'>
-        <span>{tom} <span style="color:#94A3B8; font-weight:normal; font-size:11px;">(Média: {med_tom}/dia)</span></span>
-        <span>{vol} vols</span>
-    </div>
-    <div style='width: 100%; background-color: #F1F5F9; border-radius: 4px; height: 10px;'>
-        <div style='width: {perc}%; background-color: #334155; height: 10px; border-radius: 4px;'></div>
-    </div>
-</div>
-"""
-                html_ranking += "</div>"
-                st.markdown(html_ranking, unsafe_allow_html=True)
+                # Prepara os Top 6 clientes para o Gráfico de Barras Horizontais
+                df_bar = vol_tomadores.head(6).sort_values(by='Volume', ascending=True) # Ascending para os maiores ficarem no topo do gráfico
+                fig_bar = px.bar(df_bar, x='Volume', y='Tomador', orientation='h', text='Volume')
+                fig_bar.update_traces(marker_color='#334155', textposition='outside', textfont_size=13, textfont_weight='bold')
+                fig_bar.update_layout(
+                    margin=dict(t=20, b=20, l=10, r=30),
+                    xaxis_title="", yaxis_title="", 
+                    xaxis_showticklabels=False, 
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    height=300
+                )
+                st.plotly_chart(fig_bar, use_container_width=True)
+            else:
+                st.info("Aguardando dados do mês atual.")
+
+        st.markdown("---")
+
+        # ---------------------------------------------------------
+        # ANDAR 4: PÓDIO E EFICIÊNCIA DA FROTA
+        # ---------------------------------------------------------
+        st.markdown("#### 🏆 Eficiência da Frota Hoje")
+        
+        if len(frota_ordenada) > 0:
+            c_f1, c_f2, c_f3 = st.columns(3)
+            
+            # Pódio 1º Lugar
+            if len(frota_ordenada) >= 1:
+                c_f1.markdown(f"""
+                <div style="background:#F0FDF4; border:1px solid #BBF7D0; padding:15px; border-radius:8px; text-align:center;">
+                    <h1 style="margin:0; font-size:40px;">🥇</h1>
+                    <p style="margin:5px 0 0; color:#065F46; font-weight:800; font-size:14px;">{frota_ordenada[0][0]}</p>
+                    <h3 style="margin:0; color:#10B981; font-weight:900;">{frota_ordenada[0][1]['perc']}%</h3>
+                    <p style="margin:0; color:#64748B; font-size:11px;">{frota_ordenada[0][1]['conc']} de {frota_ordenada[0][1]['total']} vis.</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            # Pódio 2º Lugar
+            if len(frota_ordenada) >= 2:
+                c_f2.markdown(f"""
+                <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:15px; border-radius:8px; text-align:center;">
+                    <h1 style="margin:0; font-size:30px;">🥈</h1>
+                    <p style="margin:5px 0 0; color:#334155; font-weight:800; font-size:13px;">{frota_ordenada[1][0]}</p>
+                    <h3 style="margin:0; color:#475569; font-weight:900;">{frota_ordenada[1][1]['perc']}%</h3>
+                    <p style="margin:0; color:#94A3B8; font-size:11px;">{frota_ordenada[1][1]['conc']} de {frota_ordenada[1][1]['total']} vis.</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            # Pódio 3º Lugar
+            if len(frota_ordenada) >= 3:
+                c_f3.markdown(f"""
+                <div style="background:#FFFBEB; border:1px solid #FDE68A; padding:15px; border-radius:8px; text-align:center;">
+                    <h1 style="margin:0; font-size:30px;">🥉</h1>
+                    <p style="margin:5px 0 0; color:#92400E; font-weight:800; font-size:13px;">{frota_ordenada[2][0]}</p>
+                    <h3 style="margin:0; color:#D97706; font-weight:900;">{frota_ordenada[2][1]['perc']}%</h3>
+                    <p style="margin:0; color:#94A3B8; font-size:11px;">{frota_ordenada[2][1]['conc']} de {frota_ordenada[2][1]['total']} vis.</p>
+                </div>
+                """, unsafe_allow_html=True)
             else:
                 st.info("Aguardando dados do mês atual.")
