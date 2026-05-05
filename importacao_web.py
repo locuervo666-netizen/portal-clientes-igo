@@ -3651,7 +3651,12 @@ elif menu == "📈 Dashboard":
         taxa_sucesso_o = (resolvidos_o / vol_total_o * 100) if vol_total_o > 0 else 0
         var_taxa = taxa_sucesso_h - taxa_sucesso_o
         
+        # AS VARIÁVEIS QUE FALTAVAM ESTÃO AQUI AGORA 🔥
         v_tot_str, s_tot = calc_variacao(vol_total_h, vol_total_o)
+        v_ent_str, s_ent = calc_variacao(ent_h, ent_o)
+        v_pend_str, s_pend = calc_variacao(pend_h, pend_o)
+        v_frus_str, s_frus = calc_variacao(frus_h, frus_o)
+        
         if var_taxa > 0: v_taxa_str, s_taxa = f"+{var_taxa:.1f} pp", "▲"
         elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
         else: v_taxa_str, s_taxa = "0 pp", "-"
@@ -3778,48 +3783,5 @@ elif menu == "📈 Dashboard":
             if len(frota_ordenada) >= 1: c_f1.markdown(min_podio("1º", "🥇", "#10B981", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}"), unsafe_allow_html=True)
             if len(frota_ordenada) >= 2: c_f2.markdown(min_podio("2º", "🥈", "#64748B", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}"), unsafe_allow_html=True)
             if len(frota_ordenada) >= 3: c_f3.markdown(min_podio("3º", "🥉", "#D97706", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}"), unsafe_allow_html=True)
-
-        st.markdown("---")
-
-        # ---------------------------------------------------------
-        # ANDAR 4: PÓDIO E EFICIÊNCIA DA FROTA
-        # ---------------------------------------------------------
-        st.markdown("#### 🏆 Eficiência da Frota Hoje")
-        
-        if len(frota_ordenada) > 0:
-            c_f1, c_f2, c_f3 = st.columns(3)
-            
-            # Pódio 1º Lugar
-            if len(frota_ordenada) >= 1:
-                c_f1.markdown(f"""
-                <div style="background:#F0FDF4; border:1px solid #BBF7D0; padding:15px; border-radius:8px; text-align:center;">
-                    <h1 style="margin:0; font-size:40px;">🥇</h1>
-                    <p style="margin:5px 0 0; color:#065F46; font-weight:800; font-size:14px;">{frota_ordenada[0][0]}</p>
-                    <h3 style="margin:0; color:#10B981; font-weight:900;">{frota_ordenada[0][1]['perc']}%</h3>
-                    <p style="margin:0; color:#64748B; font-size:11px;">{frota_ordenada[0][1]['conc']} de {frota_ordenada[0][1]['total']} vis.</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-            # Pódio 2º Lugar
-            if len(frota_ordenada) >= 2:
-                c_f2.markdown(f"""
-                <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:15px; border-radius:8px; text-align:center;">
-                    <h1 style="margin:0; font-size:30px;">🥈</h1>
-                    <p style="margin:5px 0 0; color:#334155; font-weight:800; font-size:13px;">{frota_ordenada[1][0]}</p>
-                    <h3 style="margin:0; color:#475569; font-weight:900;">{frota_ordenada[1][1]['perc']}%</h3>
-                    <p style="margin:0; color:#94A3B8; font-size:11px;">{frota_ordenada[1][1]['conc']} de {frota_ordenada[1][1]['total']} vis.</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-            # Pódio 3º Lugar
-            if len(frota_ordenada) >= 3:
-                c_f3.markdown(f"""
-                <div style="background:#FFFBEB; border:1px solid #FDE68A; padding:15px; border-radius:8px; text-align:center;">
-                    <h1 style="margin:0; font-size:30px;">🥉</h1>
-                    <p style="margin:5px 0 0; color:#92400E; font-weight:800; font-size:13px;">{frota_ordenada[2][0]}</p>
-                    <h3 style="margin:0; color:#D97706; font-weight:900;">{frota_ordenada[2][1]['perc']}%</h3>
-                    <p style="margin:0; color:#94A3B8; font-size:11px;">{frota_ordenada[2][1]['conc']} de {frota_ordenada[2][1]['total']} vis.</p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.info("Aguardando dados do mês atual.")
+        else:
+            st.info("Aguardando dados do mês atual.")
