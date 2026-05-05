@@ -3736,7 +3736,6 @@ elif menu == "📈 Dashboard":
                             partida_raw = v.get('departure', {}).get('scheduledTimeLocal', '')
                             partida = partida_raw[11:16] if len(partida_raw) > 16 else "---"
                             
-                            # LÓGICA DE STATUS LAPIDADA
                             if "EXPECTED" in status or "SCHEDULED" in status:
                                 alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} CONFIRMADO para as {partida}. Sem atrasos reportados.")
                             elif "DELAYED" in status:
@@ -3842,10 +3841,19 @@ elif menu == "📈 Dashboard":
             </div>
             """
 
+        # 🔥 CALCULA OS CHAMADOS E DEFINE A COR DO CARD NO DASHBOARD 🔥
+        qtd_chamados = checar_chamados_pendentes(planilha_db)
+        cor1_tkt = "#DC2626" if qtd_chamados > 0 else "#64748B"
+        cor2_tkt = "#991B1B" if qtd_chamados > 0 else "#475569"
+        sub_tkt = "🚨 Requer Atenção!" if qtd_chamados > 0 else "✅ Tudo Limpo"
+
         c1, c2, c3, c4 = st.columns(4)
         c1.markdown(make_card("VOLUME TOTAL", vol_total_h, f"{s_tot} {v_tot_str} vs Ontem", "#1E293B", "#334155"), unsafe_allow_html=True)
         c2.markdown(make_card("EFICIÊNCIA DE ROTA", f"{taxa_sucesso_h:.1f}%", f"{s_taxa} {v_taxa_str} vs Ontem", "#0369A1", "#0EA5E9"), unsafe_allow_html=True)
-        c3.markdown(make_card("FROTA EM CAMPO", f"{frota_h} Agts", f"{s_frota} {v_frota_str} vs Ontem", "#3730A3", "#4F46E5"), unsafe_allow_html=True)
+        
+        # O Card c3 agora é o de Chamados!
+        c3.markdown(make_card("CHAMADOS EM ABERTO", f"{qtd_chamados}", sub_tkt, cor1_tkt, cor2_tkt), unsafe_allow_html=True)
+        
         c4.markdown(make_card("META DO DIA (CONCLUÍDAS)", f"{progresso_meta}%", f"{resolvidos_h} de {vol_total_h} Visitas", "#059669", "#10B981"), unsafe_allow_html=True)
 
         c5, c6, c7, c8 = st.columns(4)
