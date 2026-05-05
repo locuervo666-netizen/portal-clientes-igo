@@ -6,6 +6,7 @@ import urllib.parse
 import json
 import requests
 import re
+import random
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta, timezone
 from google.oauth2.credentials import Credentials
@@ -524,7 +525,6 @@ def get_detalhes(row):
         return f"{obs_final} (Informante: {contato})"
     return obs_final if obs_final else f"Informante: {contato}"
 
-
 def definir_prioridade_portal(status_str):
     s = str(status_str).upper()
     if 'ATRASADO'  in s: return 1
@@ -629,31 +629,45 @@ else:
         # Popover: Botão moderno que abre um mini-menu flutuante por cima da tela
         with st.popover("🎧 Abrir Chamado C.C.O.", use_container_width=True):
             st.markdown("📄 **Novo Chamado de Atendimento**")
-            with st.form("form_chamado_zap"):
+            with st.form("form_chamado_zap", clear_on_submit=True):
                 pedido_chamado = st.text_input("Número do Pedido (Opcional):")
-                msg_chamado    = st.text_area(
-                    "Sua Mensagem:",
-                    placeholder="Ex: Preciso de urgência neste pedido..."
-                )
-                if st.form_submit_button("🚀 Enviar Solicitação ao C.C.O.", type="primary", use_container_width=True):
+                msg_chamado    = st.text_area("Sua Mensagem *:", placeholder="Ex: Preciso de urgência neste pedido...")
+                
+                if st.form_submit_button("🚀 Enviar Solicitação", type="primary", use_container_width=True):
                     if not msg_chamado.strip():
                         st.error("Digite uma mensagem!")
                     else:
-                        with st.spinner("Enviando via satélite..."):
-                            texto_final = (
-                                f"🚨 *CHAMADO PRIORITÁRIO - PORTAL* 🚨\n\n"
-                                f"🏢 *Cliente:* {nome_tomador_oficial}\n"
-                            )
-                            if pedido_chamado:
-                                texto_final += f"📦 *Pedido:* {pedido_chamado}\n"
-                            texto_final += (
-                                f"💬 *Mensagem:* {msg_chamado}\n\n"
-                                f"⏳ _Enviado via Portal Corporativo_"
-                            )
-                            if enviar_whatsapp_zapi_cliente("5511947996371", texto_final):
-                                st.success("✅ Chamado recebido com sucesso pela base!")
-                            else:
-                                st.error("❌ Erro de comunicação com o servidor.")
+                        with st.spinner("Gerando ticket e notificando a base..."):
+                            tkt_id = f"TKT-{random.randint(10000, 99999)}"
+                            data_tkt = datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M')
+                            
+                            try:
+                                # 1. SALVA NO BANCO DE DADOS
+                                gc = conectar_banco_seguro()
+                                planilha = gc.open("DB_IGO_Logistica")
+                                try:
+                                    aba_chamados = planilha.worksheet("Base_Chamados")
+                                except:
+                                    aba_chamados = planilha.add_worksheet(title="Base_Chamados", rows="100", cols="7")
+                                    aba_chamados.update("A1", [["TICKET", "DATA", "TOMADOR", "PEDIDO", "MENSAGEM", "STATUS", "RESPOSTA"]])
+                                
+                                linha_ticket = [tkt_id, data_tkt, nome_tomador_oficial, pedido_chamado, msg_chamado, "🟡 EM ANÁLISE", ""]
+                                aba_chamados.append_row(linha_ticket)
+                                
+                                # 2. MANDA O ZAP PARA A SUA BASE
+                                texto_final = (
+                                    f"🚨 *NOVO TICKET DE SUPORTE* [{tkt_id}]\n\n"
+                                    f"🏢 *Cliente:* {nome_tomador_oficial}\n"
+                                )
+                                if pedido_chamado:
+                                    texto_final += f"📦 *Pedido:* {pedido_chamado}\n"
+                                texto_final += f"💬 *Mensagem:* {msg_chamado}\n\n⏳ _Acesse o C.C.O. para responder._"
+                                
+                                enviar_whatsapp_zapi_cliente("5511947996371", texto_final)
+                                
+                                st.success(f"✅ Ticket {tkt_id} aberto com sucesso! Acompanhe na aba 'Meus Chamados'.")
+                            except Exception as e:
+                                st.error(f"Erro ao criar ticket: {e}")
 
         # Placeholder reservado para o botão de exportar
         holder_exportar = st.empty()
@@ -1147,3 +1161,49 @@ else:
 
                                         except Exception as e:
                                             st.error(f"Erro ao processar solicitação: {e}")
+
+        # ===================================================
+        # ABA 3 · ACOMPANHAMENTO DOS CHAMADOS
+        # ===================================================
+        with tab_chamados:
+            st.markdown("### 🎧 Histórico de Atendimento")
+            st.markdown("<p style='color:#64748b;font-size:13px;margin-top:-8px;'>Acompanhe a resolução das suas solicitações junto ao nosso C.C.O.</p>", unsafe_allow_html=True)
+            
+            try:
+                gc = conectar_banco_seguro()
+                planilha = gc.open("DB_IGO_Logistica")
+                aba_chamados = planilha.worksheet("Base_Chamados")
+                dados_tkt = aba_chamados.get_all_values()
+                
+                if len(dados_tkt) > 1:
+                    df_tkt = pd.DataFrame(dados_tkt[1:], columns=dados_tkt[0])
+                    # Filtra só os chamados deste cliente
+                    df_cli_tkt = df_tkt[df_tkt['TOMADOR'] == nome_tomador_oficial]
+                    
+                    if df_cli_tkt.empty:
+                        st.info("Você ainda não possui nenhum chamado de suporte aberto.")
+                    else:
+                        # Inverte para mostrar o mais recente primeiro
+                        df_cli_tkt = df_cli_tkt.iloc[::-1]
+                        
+                        for idx, row in df_cli_tkt.iterrows():
+                            cor_borda = "#3b82f6" if "ANÁLISE" in row['STATUS'] else "#22c55e"
+                            fundo_resp = "#f8fafc" if "ANÁLISE" in row['STATUS'] else "#f0fdf4"
+                            
+                            st.markdown(f"""
+                            <div style="border: 1px solid #e2e8f0; border-left: 4px solid {cor_borda}; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: white;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                    <span style="font-weight: 800; color: #0f172a;">🎫 Ticket {row['TICKET']}</span>
+                                    <span style="font-size: 12px; font-weight: 700; background: #f1f5f9; padding: 4px 10px; border-radius: 99px;">{row['STATUS']}</span>
+                                </div>
+                                <p style="font-size: 12px; color: #64748b; margin-bottom: 5px;"><b>Data:</b> {row['DATA']} | <b>Pedido Ref:</b> {row['PEDIDO']}</p>
+                                <p style="font-size: 14px; color: #334155;"><b>Sua Mensagem:</b> {row['MENSAGEM']}</p>
+                                <div style="background: {fundo_resp}; padding: 12px; border-radius: 6px; margin-top: 10px; border: 1px solid #e2e8f0;">
+                                    <p style="margin: 0; font-size: 13px; color: #0f172a;"><b>Resposta do C.C.O:</b> {row['RESPOSTA'] if row.get('RESPOSTA', '') else '<i>Aguardando análise de um de nossos agentes...</i>'}</p>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                else:
+                    st.info("Nenhum chamado registrado no banco de dados.")
+            except Exception:
+                st.info("A base de chamados será inicializada na sua primeira solicitação.")
