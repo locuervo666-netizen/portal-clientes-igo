@@ -649,6 +649,7 @@ with st.sidebar:
         "📁 Relatórios", 
         "⚙️ Rotas", 
         "🔬 Triagem", 
+        "🎧 Atendimento",  # <-- ADICIONE ESTA LINHA AQUI
         "📱 WhatsApp"
     ], index=1)
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
@@ -3250,7 +3251,74 @@ elif menu == "⚙️ Rotas":
                         except Exception as e: st.error(f"Erro Crítico ao limpar o banco: {e}")
                 else:
                     if senha_reset: st.error("❌ Senha incorreta.")
+# =============================================================================
+# 🎧 MÓDULO NOVO: ATENDIMENTO / HELPDESK
+# =============================================================================
+elif menu == "🎧 Atendimento":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🎧 Central de Atendimento (Helpdesk)</h3></div>", unsafe_allow_html=True)
+    st.info("Gerencie as solicitações e chamados abertos pelos clientes no Portal.")
+    
+    try:
+        aba_chamados = planilha_db.worksheet("Base_Chamados")
+        dados_tkt = aba_chamados.get_all_values()
+        
+        if len(dados_tkt) > 1:
+            df_tkt = pd.DataFrame(dados_tkt[1:], columns=dados_tkt[0])
+            
+            # Filtra apenas os chamados que estão "Em Análise"
+            df_abertos = df_tkt[df_tkt['STATUS'].str.contains('ANÁLISE', case=False, na=False)]
+            
+            if df_abertos.empty:
+                st.success("🎉 Excelente! Não há nenhum chamado pendente de resposta no momento.")
+            else:
+                st.warning(f"⚠️ Você possui {len(df_abertos)} chamado(s) aguardando resposta.")
+                
+                for idx, row in df_abertos.iterrows():
+                    with st.container(border=True):
+                        c1, c2 = st.columns([3, 1])
+                        c1.markdown(f"#### 🏢 {row['TOMADOR']}")
+                        c2.markdown(f"<div style='text-align:right;'><span style='background:#fef3c7; color:#92400e; padding:4px 12px; border-radius:99px; font-weight:bold; font-size:12px;'>🎫 {row['TICKET']}</span></div>", unsafe_allow_html=True)
+                        
+                        st.markdown(f"**Data:** {row['DATA']} | **Pedido Ref:** {row['PEDIDO'] if row['PEDIDO'] else 'N/A'}")
+                        st.info(f"💬 **Mensagem do Cliente:**\n\n{row['MENSAGEM']}")
+                        
+                        with st.form(f"form_resp_{row['TICKET']}", clear_on_submit=True):
+                            resp_texto = st.text_area("Sua Resposta Oficial:", placeholder="Digite aqui a solução ou retorno para o cliente...")
+                            
+                            if st.form_submit_button("✅ Enviar Resposta e Encerrar Ticket", type="primary"):
+                                if not resp_texto.strip():
+                                    st.error("A resposta não pode estar vazia.")
+                                else:
+                                    with st.spinner("Atualizando banco de dados e notificando o cliente..."):
+                                        coluna_tickets = aba_chamados.col_values(1) # Pega a coluna A (TICKETS)
+                                        try:
+                                            linha_idx = coluna_tickets.index(row['TICKET']) + 1 # +1 porque o sheets começa no índice 1
+                                            
+                                            # Atualiza Status (Coluna 6 = F) e Resposta (Coluna 7 = G)
+                                            aba_chamados.update_cell(linha_idx, 6, "🟢 RESOLVIDO")
+                                            aba_chamados.update_cell(linha_idx, 7, resp_texto)
+                                            
+                                            # Notificar por WhatsApp (Usando o celular de testes da diretoria)
+                                            texto_aviso = (
+                                                f"🔔 *ATUALIZAÇÃO DE CHAMADO* [{row['TICKET']}]\n\n"
+                                                f"Olá, equipe *{row['TOMADOR']}*! O C.C.O da IGO Logística acabou de responder à sua solicitação.\n\n"
+                                                f"👨‍💻 *Resposta:* {resp_texto}\n\n"
+                                                f"Acesse o seu Portal do Cliente para visualizar o histórico completo."
+                                            )
+                                            enviar_whatsapp_zapi("5511947996371", texto_aviso)
+                                            
+                                            st.success(f"Ticket {row['TICKET']} encerrado com sucesso!")
+                                            time.sleep(1.5)
+                                            st.rerun()
+                                            
+                                        except Exception as erro_sheets:
+                                            st.error(f"Erro ao salvar no banco: {erro_sheets}")
 
+        else:
+            st.info("O banco de chamados ainda está vazio.")
+            
+    except Exception as e:
+        st.error(f"Erro ao conectar com a base de chamados: {e}")
 # =============================================================================
 # 📱 MÓDULO EXTRA: DISPARO WHATSAPP
 # =============================================================================
