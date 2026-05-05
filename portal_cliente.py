@@ -693,9 +693,13 @@ else:
                 df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]
             ].copy()
 
-        tab_grid, tab_solicitar = st.tabs([
+        # ===================================================
+        # DECLARAÇÃO DAS 3 ABAS DO SISTEMA
+        # ===================================================
+        tab_grid, tab_solicitar, tab_chamados = st.tabs([
             "📊 Meus Pedidos e Monitoramento",
-            "➕ Solicitar Nova Coleta"
+            "➕ Solicitar Nova Coleta",
+            "🎧 Meus Chamados"
         ])
 
         # ===================================================
