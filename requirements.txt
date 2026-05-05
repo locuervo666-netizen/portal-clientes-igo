@@ -8,3 +8,4 @@ holidays
 xlsxwriter
 requests
 google-auth
+plotly
