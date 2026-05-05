@@ -3589,20 +3589,29 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO TV ULTRA-CLEAN / ZERO MARGEM)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO TV C.C.O DARK / SALA DE GUERRA)
 # =============================================================================
 elif menu == "📈 Dashboard":
     import plotly.express as px
     import plotly.graph_objects as go
     import streamlit.components.v1 as components
     
-    # 🔥 OTIMIZAÇÃO DE ESPAÇO PARA TV E REFRESH 🔥
+    # 🔥 OTIMIZAÇÃO DE ESPAÇO, MODO ESCURO FORÇADO E ANIMAÇÕES 🔥
     st.markdown("""
         <style>
-        /* Puxa o dashboard para o topo absoluto e estica nas laterais */
+        /* Força o fundo escuro do C.C.O e esconde as margens */
+        [data-testid="stAppViewContainer"] { background-color: #020617; color: #F8FAFC; }
+        [data-testid="stHeader"] { background-color: rgba(2, 6, 23, 0); }
         .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
-        /* Esconde separadores nativos do Streamlit que gastam espaço */
-        hr { margin: 0.5em 0 !important; }
+        hr { margin: 0.5em 0 !important; border-color: #1E293B !important; }
+        
+        /* Efeito de Sirene (Pulse) para alertas críticos */
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+        .alerta-ativo { animation: pulse-red 2s infinite; border-color: #EF4444 !important; }
         </style>
     """, unsafe_allow_html=True)
     
@@ -3685,57 +3694,77 @@ elif menu == "📈 Dashboard":
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
         # ---------------------------------------------------------
-        # ANDAR 1: TICKER 2.0 (CABECALHO DO SISTEMA)
+        # ANDAR 1: TICKER CYBER COM AS ÚLTIMAS BAIXAS DA OPERAÇÃO
         # ---------------------------------------------------------
-        # 🔥 ADICIONADO INDICADOR "SISTEMA ONLINE" NO MENU 🔥
         manchetes = [f"🟢 SISTEMA ONLINE", f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}", f"📅 COMPARAÇÃO: {ontem_util.strftime('%d/%m/%Y')}"]
         if hoje in FERIADOS_BR: manchetes.append(f"📅 FERIADO: {FERIADOS_BR.get(hoje)}.")
+        
+        # 🚀 CÉREBRO NOVO: Captura as últimas operações finalizadas
+        finalizados_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)]
+        if not finalizados_hj.empty:
+            for _, row in finalizados_hj.tail(3).iterrows(): # Pega as últimas 3 baixas
+                pcl = str(row.get('LABORATORIO', row.get('TOMADOR', 'PCL'))).title()
+                cidade = str(row.get('CIDADE', '')).title()
+                
+                # Procura a coluna de hora (pode ser HORA ou HORA_BAIXA dependendo da sua planilha)
+                hora = str(row.get('HORA', ''))
+                if hora == 'nan' or not hora.strip():
+                    hora = str(row.get('HORA_BAIXA', ''))
+                
+                hora_str = f" às {hora}" if hora and hora.lower() != 'nan' and hora.strip() else ""
+                cidade_str = f" em {cidade}" if cidade and cidade.lower() != 'nan' and cidade.strip() else ""
+                
+                tipo = "Atendimento"
+                status = str(row.get('STATUS_DISPLAY', '')).upper()
+                if 'COLETADO' in status: tipo = "Coleta"
+                elif 'ENTREGUE' in status: tipo = "Entrega"
+                
+                manchetes.append(f"✅ ÚLTIMA BAIXA: {tipo} no {pcl}{cidade_str} finalizada{hora_str}!")
 
         ticker_text = " &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
         st.markdown(f"""
             <style>
-            .nasdaq-container {{ background-color: #0F172A; color: #F8FAFC; padding: 6px 0; border-radius: 4px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-            /* 🔥 TICKER MAIS RÁPIDO: de 30s para 18s 🔥 */
+            .nasdaq-container {{ background-color: #0B1120; color: #10B981; padding: 6px 0; border-radius: 4px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; position: relative; border-bottom: 1px solid #1E293B; }}
             .nasdaq-scroller {{ display: inline-block; animation: scroll-left 18s linear infinite; }}
-            .nasdaq-item {{ display: inline-block; font-size: 12px; font-weight: 600; font-family: 'Segoe UI', sans-serif; }}
+            .nasdaq-item {{ display: inline-block; font-size: 13px; font-weight: 700; font-family: 'Segoe UI', sans-serif; text-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }}
             @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
             </style>
             <div class="nasdaq-container">
-                <div style="position: absolute; left: 0; top: 0; bottom: 0; background: #0F172A; padding: 6px 15px; font-weight: 900; z-index: 10; display: flex; align-items: center; border-right: 3px solid #10B981; font-size: 14px; letter-spacing: 1px;">
-                    🎯 IGO C.C.O
+                <div style="position: absolute; left: 0; top: 0; bottom: 0; background: #020617; color: #F8FAFC; padding: 6px 15px; font-weight: 900; z-index: 10; display: flex; align-items: center; border-right: 2px solid #3B82F6; font-size: 14px; letter-spacing: 2px;">
+                    🛰️ IGO C.C.O
                 </div>
-                <div class="nasdaq-scroller" style="padding-left: 120px;">{ticker_text}</div>
+                <div class="nasdaq-scroller" style="padding-left: 140px;">{ticker_text}</div>
             </div>
         """, unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # ANDAR 2: CARDS ULTRA-COMPACTOS (85px de altura)
+        # ANDAR 2: CARDS DARK GLASS (VIDRO ESCURO + NEON)
         # ---------------------------------------------------------
-        def make_tv_card(title, value, var_str, color_hex, icon):
-            bg_var = f"{color_hex}1A" if color_hex != "#64748B" else "#F1F5F9"
+        def make_tv_card(title, value, var_str, color_hex, icon, is_alert=False):
+            alert_class = "alerta-ativo" if is_alert else ""
             return f"""
-            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-left: 4px solid {color_hex}; padding: 10px 15px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); height: 85px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 8px;">
+            <div class="{alert_class}" style="background: #0F172A; border: 1px solid #1E293B; border-left: 4px solid {color_hex}; padding: 10px 15px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); height: 85px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <p style="margin:0; font-size:10px; font-weight:800; color: #64748B; text-transform: uppercase;">{title}</p>
-                    <span style="font-size:14px; opacity: 0.7;">{icon}</span>
+                    <p style="margin:0; font-size:10px; font-weight:800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">{title}</p>
+                    <span style="font-size:14px; opacity: 0.9;">{icon}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-                    <h2 style="margin:0; font-size:24px; font-weight:900; color: #0F172A; line-height: 1;">{value}</h2>
-                    <span style="font-size:10px; font-weight:700; color: {color_hex}; background: {bg_var}; padding: 2px 6px; border-radius: 8px;">{var_str}</span>
+                    <h2 style="margin:0; font-size:26px; font-weight:900; color: #F8FAFC; text-shadow: 0 0 10px {color_hex}50; line-height: 1;">{value}</h2>
+                    <span style="font-size:10px; font-weight:700; color: {color_hex}; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; border: 1px solid {color_hex}40;">{var_str}</span>
                 </div>
             </div>
             """
 
         qtd_chamados = checar_chamados_pendentes(planilha_db)
-        cor_tkt = "#DC2626" if qtd_chamados > 0 else "#64748B"
+        cor_tkt = "#EF4444" if qtd_chamados > 0 else "#475569"
         sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
-        cor_atra = "#DC2626" if atra_h > 0 else "#64748B"
+        cor_atra = "#F43F5E" if atra_h > 0 else "#475569"
 
         c1, c2, c3, c4 = st.columns(4)
         c1.markdown(make_tv_card("VOL. TOTAL", vol_total_h, f"{s_tot}{v_tot_str}", "#3B82F6", "📦"), unsafe_allow_html=True)
         c2.markdown(make_tv_card("EFICIÊNCIA", f"{taxa_sucesso_h:.1f}%", f"{s_taxa}{v_taxa_str}", "#10B981", "🎯"), unsafe_allow_html=True)
-        c3.markdown(make_tv_card("CHAMADOS", f"{qtd_chamados}", sub_tkt, cor_tkt, "🎧"), unsafe_allow_html=True)
-        c4.markdown(make_tv_card("ATRASADOS", atra_h, "Ruptura SLA", cor_atra, "⏳"), unsafe_allow_html=True)
+        c3.markdown(make_tv_card("CHAMADOS", f"{qtd_chamados}", sub_tkt, cor_tkt, "🎧", is_alert=(qtd_chamados > 0)), unsafe_allow_html=True)
+        c4.markdown(make_tv_card("ATRASADOS", atra_h, "SLA CRÍTICO", cor_atra, "⏳", is_alert=(atra_h > 0)), unsafe_allow_html=True)
 
         c5, c6, c7, c8 = st.columns(4)
         c5.markdown(make_tv_card("ROTA/PENDENTES", pend_h, f"{s_pend}{v_pend_str}", "#F59E0B", "🚚"), unsafe_allow_html=True)
@@ -3744,7 +3773,7 @@ elif menu == "📈 Dashboard":
         c8.markdown(make_tv_card("BASE ONTEM", vol_total_o, "Ref. Cálculo", "#475569", "📊"), unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # ANDAR 3: GRÁFICOS REDIMENSIONADOS PARA TV (220px)
+        # ANDAR 3: GRÁFICOS REDIMENSIONADOS (TEMA PLOTLY DARK)
         # ---------------------------------------------------------
         col_graf1, col_graf2 = st.columns([1, 1.5])
         
@@ -3756,9 +3785,9 @@ elif menu == "📈 Dashboard":
             
             if not df_donut.empty:
                 cores_map = {'Entregue': '#10B981', 'Pendente': '#F59E0B', 'Frustrada': '#EF4444', 'Atrasado': '#991B1B'}
-                fig_donut = px.pie(df_donut, values='Volumes', names='Status', hole=0.65, color='Status', color_discrete_map=cores_map)
-                fig_donut.update_traces(textinfo='percent', textfont_size=11, textfont_color='white')
-                fig_donut.update_layout(margin=dict(t=5, b=5, l=5, r=5), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=10)), height=220)
+                fig_donut = px.pie(df_donut, values='Volumes', names='Status', hole=0.7, color='Status', color_discrete_map=cores_map)
+                fig_donut.update_traces(textinfo='percent', textfont_size=12, textfont_color='white', marker=dict(line=dict(color='#0F172A', width=2)))
+                fig_donut.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=5, b=5, l=5, r=5), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=11, color="#94A3B8")), height=220)
                 st.plotly_chart(fig_donut, use_container_width=True)
             else: st.info("Sem dados.")
 
@@ -3766,24 +3795,24 @@ elif menu == "📈 Dashboard":
             if not vol_tomadores.empty:
                 df_bar = vol_tomadores.head(5).sort_values(by='Volume', ascending=True)
                 fig_bar = px.bar(df_bar, x='Volume', y='Tomador', orientation='h', text='Volume')
-                fig_bar.update_traces(marker_color='#334155', textposition='outside', textfont_size=11, textfont_weight='bold')
-                fig_bar.update_layout(margin=dict(t=5, b=5, l=5, r=5), xaxis_showticklabels=False, xaxis_title="", yaxis_title="", plot_bgcolor='rgba(0,0,0,0)', height=220)
+                fig_bar.update_traces(marker_color='#3B82F6', textposition='outside', textfont_size=12, textfont_color='#F8FAFC', textfont_weight='bold')
+                fig_bar.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=5, b=5, l=5, r=5), xaxis_showticklabels=False, xaxis_title="", yaxis_title="", height=220)
                 st.plotly_chart(fig_bar, use_container_width=True)
             else: st.info("Sem dados.")
 
         # ---------------------------------------------------------
-        # ANDAR 4: PÓDIO HORIZONTAL ESTREITO
+        # ANDAR 4: PÓDIO CYBER
         # ---------------------------------------------------------
         if len(frota_ordenada) > 0:
             c_f1, c_f2, c_f3 = st.columns(3)
             def min_podio(pos, ic, color, ag, pct, vols):
-                return f"""<div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:8px; border-radius:6px; display:flex; align-items:center; justify-content:space-between;">
-                    <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:20px;">{ic}</span>
-                    <div><p style="margin:0; font-size:11px; font-weight:800; color:#334155;">{ag}</p><p style="margin:0; font-size:9px; color:#94A3B8;">{vols}</p></div></div>
-                    <h3 style="margin:0; font-size:18px; color:{color};">{pct}%</h3></div>"""
+                return f"""<div style="background:#0F172A; border:1px solid #1E293B; border-bottom: 2px solid {color}; padding:8px 12px; border-radius:6px; display:flex; align-items:center; justify-content:space-between; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                    <div style="display:flex; align-items:center; gap:12px;"><span style="font-size:22px; filter: drop-shadow(0px 0px 5px {color}80);">{ic}</span>
+                    <div><p style="margin:0; font-size:12px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">{ag}</p><p style="margin:0; font-size:10px; color:#64748B;">{vols}</p></div></div>
+                    <h3 style="margin:0; font-size:20px; font-weight:900; color:{color}; text-shadow: 0 0 10px {color}50;">{pct}%</h3></div>"""
             
             if len(frota_ordenada) >= 1: c_f1.markdown(min_podio("1º", "🥇", "#10B981", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}"), unsafe_allow_html=True)
-            if len(frota_ordenada) >= 2: c_f2.markdown(min_podio("2º", "🥈", "#64748B", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}"), unsafe_allow_html=True)
+            if len(frota_ordenada) >= 2: c_f2.markdown(min_podio("2º", "🥈", "#94A3B8", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}"), unsafe_allow_html=True)
             if len(frota_ordenada) >= 3: c_f3.markdown(min_podio("3º", "🥉", "#D97706", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}"), unsafe_allow_html=True)
         else:
             st.info("Aguardando dados do mês atual.")
