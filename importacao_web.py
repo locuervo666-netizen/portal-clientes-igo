@@ -877,7 +877,7 @@ if menu == "📊 GRID":
         if f_cli != "Todos": df_f = df_f[df_f['TOMADOR'] == f_cli]
         if isinstance(f_data, tuple) and len(f_data) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= f_data[0]) & (df_f['DATA_OBJ'] <= f_data[1])]
 
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
         def set_kpi(v): st.session_state.filtro_kpi_admin = v
         c1.button(f"📦 TOTAL\n{len(df_f)}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
         c2.button(f"✅ ENTREGUES\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
@@ -885,7 +885,29 @@ if menu == "📊 GRID":
         c4.button(f"❌ FRUSTRADAS\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
         c5.button(f"🚨 ATRASADOS\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO')])}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
         c6.button(f"📅 HOJE\n{len(df_f[df_f['DATA_OBJ'] == hoje_br])}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
-
+        
+        # 🔥 NOVO BLOCO: KPI DE CHAMADOS (INTELIGENTE) 🔥
+        qtd_chamados = checar_chamados_pendentes(planilha_db)
+        
+        # Muda a cor sozinho: Vermelho (Alerta) ou Cinza (Tranquilo)
+        cor_fundo_tkt = "linear-gradient(135deg, #DC2626 0%, #991B1B 100%)" if qtd_chamados > 0 else "linear-gradient(135deg, #94A3B8 0%, #64748B 100%)"
+        
+        st.markdown(f"""
+        <style>
+        div.st-key-kpi_chamados button {{ 
+            border-radius: 8px !important; border: none !important; height: 70px !important; 
+            display: flex !important; flex-direction: column !important; justify-content: center !important; 
+            align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+            background: {cor_fundo_tkt} !important; 
+        }}
+        div.st-key-kpi_chamados button p {{ 
+            color: white !important; font-weight: 800 !important; font-size: 13px !important; 
+            margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+        
+        c7.button(f"🎧 CHAMADOS\n{qtd_chamados}", key="kpi_chamados", use_container_width=True)
         st.markdown("<br>", unsafe_allow_html=True)
         busca = st.text_input("🔎 Busca Rápida:", placeholder="Filtrar dados...")
         
