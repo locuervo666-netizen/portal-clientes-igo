@@ -3589,32 +3589,32 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (PAINEL DE TV CCO - VISUAL CLEAN & GRÁFICOS)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO TV ULTRA-CLEAN / ZERO MARGEM)
 # =============================================================================
 elif menu == "📈 Dashboard":
-    # Importa a biblioteca gráfica de alta performance
     import plotly.express as px
     import plotly.graph_objects as go
-    
-    # 🔥 REFRESH NATIVO E BLINDADO 🔥
     import streamlit.components.v1 as components
+    
+    # 🔥 OTIMIZAÇÃO DE ESPAÇO PARA TV E REFRESH 🔥
+    st.markdown("""
+        <style>
+        /* Puxa o dashboard para o topo absoluto e estica nas laterais */
+        .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
+        /* Esconde separadores nativos do Streamlit que gastam espaço */
+        hr { margin: 0.5em 0 !important; }
+        </style>
+    """, unsafe_allow_html=True)
+    
     components.html(
-        """
-        <script>
-        setTimeout(function(){
-            window.parent.location.reload();
-        }, 300000); // 300.000 ms = 5 Minutos
-        </script>
-        """,
+        """<script>setTimeout(function(){ window.parent.location.reload(); }, 300000);</script>""",
         height=0, width=0
     )
-    
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📈 Painel de Controle Executivo</h3></div>", unsafe_allow_html=True)
     
     df_raw = carregar_dados_completos(planilha_db)
     
     if df_raw.empty:
-        st.warning("⚠️ O banco de dados está vazio. Sem dados para o painel.")
+        st.warning("⚠️ Banco de dados vazio.")
     else:
         # 1. Lógica de Datas
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
@@ -3628,8 +3628,7 @@ elif menu == "📈 Dashboard":
         df_ontem = df_raw[df_raw['DATA_OBJ'] == ontem_util].copy()
         
         def calc_variacao(val_hoje, val_ontem):
-            if val_ontem == 0:
-                return ("+100%", "▲") if val_hoje > 0 else ("0%", "-")
+            if val_ontem == 0: return ("+100%", "▲") if val_hoje > 0 else ("0%", "-")
             var = ((val_hoje - val_ontem) / val_ontem) * 100
             if var > 0: return f"+{var:.1f}%", "▲"
             elif var < 0: return f"{var:.1f}%", "▼"
@@ -3680,136 +3679,105 @@ elif menu == "📈 Dashboard":
         
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
-        # CÉREBROS DE INTEGRAÇÃO EXTERNA (CLIMA & AERODATABOX)
-        @st.cache_data(ttl=3600)
-        def buscar_alertas_climaticos(cidades_com_uf):
-            alertas = []
-            for item in cidades_com_uf:
-                if not item or str(item).upper() == "NAN": continue
-                try:
-                    cidade_busca = str(item).split('/')[0].strip() if '/' in str(item) else str(item).strip()
-                    cid_fmt = urllib.parse.quote(cidade_busca)
-                    resp = requests.get(f"https://wttr.in/{cid_fmt}?format=j1", timeout=3)
-                    if resp.status_code == 200:
-                        dados = resp.json()
-                        condicao = str(dados['current_condition'][0]['weatherDesc'][0]['value']).lower()
-                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder', 'drizzle']):
-                            alertas.append(f"⛈️ CHUVA DETECTADA em {item}. Risco de lentidão!")
-                        else:
-                            alertas.append(f"☀️ TEMPO ESTÁVEL na rota de {item}.")
-                except: continue
-            return alertas
-
-        cidades_alvo = []
-        if not df_hoje.empty:
-            top_cids = df_hoje['CIDADE'].value_counts().head(5).index.tolist()
-            col_uf = 'UF' if 'UF' in df_hoje.columns else ('ESTADO' if 'ESTADO' in df_hoje.columns else None)
-            for cid in top_cids:
-                cid_nome = str(cid).strip().title()
-                if col_uf:
-                    try:
-                        uf = str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()
-                        cidades_alvo.append(f"{cid_nome}/{uf}")
-                    except: cidades_alvo.append(cid_nome)
-                else: cidades_alvo.append(cid_nome)
-
         # ---------------------------------------------------------
-        # ANDAR 1: O TICKER DE NOTÍCIAS (Mantido)
+        # ANDAR 1: TICKER 2.0 (AGORA ELE É O PRÓPRIO CABEÇALHO DO SISTEMA)
         # ---------------------------------------------------------
-        manchetes = [f"🕒 ATUALIZAÇÃO AUTOMÁTICA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}"]
-        if cidades_alvo: manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
-        if hoje in FERIADOS_BR: manchetes.append(f"📅 ATENÇÃO: Hoje é feriado nacional ({FERIADOS_BR.get(hoje)}).")
+        manchetes = [f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}", f"📅 COMPARAÇÃO: {ontem_util.strftime('%d/%m/%Y')}"]
+        if hoje in FERIADOS_BR: manchetes.append(f"📅 FERIADO: {FERIADOS_BR.get(hoje)}.")
 
-        ticker_text = " &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
+        ticker_text = " &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
         st.markdown(f"""
             <style>
-            .nasdaq-container {{ background-color: #0F172A; color: #F8FAFC; padding: 12px 0; border-radius: 6px; margin-bottom: 25px; white-space: nowrap; overflow: hidden; border-left: 5px solid #10B981; position: relative; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
-            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 35s linear infinite; }}
-            .nasdaq-item {{ display: inline-block; font-size: 14px; font-weight: 600; font-family: 'Segoe UI', Roboto, sans-serif; letter-spacing: 0.5px; }}
+            .nasdaq-container {{ background-color: #0F172A; color: #F8FAFC; padding: 6px 0; border-radius: 4px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 30s linear infinite; }}
+            .nasdaq-item {{ display: inline-block; font-size: 12px; font-weight: 600; font-family: 'Segoe UI', sans-serif; }}
             @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
             </style>
             <div class="nasdaq-container">
-                <div style="position: absolute; left: 0; top: 0; bottom: 0; background: #DC2626; padding: 12px 15px; font-weight: 900; z-index: 10; display: flex; align-items: center; box-shadow: 2px 0 5px rgba(0,0,0,0.3);">PLANTÃO IGO</div>
-                <div class="nasdaq-scroller" style="padding-left: 140px;">{ticker_text}</div>
+                <div style="position: absolute; left: 0; top: 0; bottom: 0; background: #0F172A; padding: 6px 15px; font-weight: 900; z-index: 10; display: flex; align-items: center; border-right: 3px solid #10B981; font-size: 14px; letter-spacing: 1px;">
+                    🎯 IGO C.C.O
+                </div>
+                <div class="nasdaq-scroller" style="padding-left: 120px;">{ticker_text}</div>
             </div>
         """, unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # ANDAR 2: NOVA PALETA CLEAN (CARDS BRANCOS)
+        # ANDAR 2: CARDS ULTRA-COMPACTOS (85px de altura)
         # ---------------------------------------------------------
-        def make_clean_card(title, value, var_str, color_hex, icon):
-            # Se for alerta vermelho, damos um destaque na var_str
+        def make_tv_card(title, value, var_str, color_hex, icon):
             bg_var = f"{color_hex}1A" if color_hex != "#64748B" else "#F1F5F9"
             return f"""
-            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-left: 4px solid {color_hex}; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 110px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 15px;">
+            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-left: 4px solid {color_hex}; padding: 10px 15px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); height: 85px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <p style="margin:0; font-size:11px; font-weight:800; color: #64748B; letter-spacing: 0.5px;">{title}</p>
-                    <span style="font-size:18px;">{icon}</span>
+                    <p style="margin:0; font-size:10px; font-weight:800; color: #64748B; text-transform: uppercase;">{title}</p>
+                    <span style="font-size:14px; opacity: 0.7;">{icon}</span>
                 </div>
-                <h2 style="margin:0; font-size:28px; font-weight:900; color: #0F172A; line-height: 1;">{value}</h2>
-                <div><span style="font-size:11px; font-weight:700; color: {color_hex}; background: {bg_var}; padding: 3px 8px; border-radius: 12px;">{var_str}</span></div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                    <h2 style="margin:0; font-size:24px; font-weight:900; color: #0F172A; line-height: 1;">{value}</h2>
+                    <span style="font-size:10px; font-weight:700; color: {color_hex}; background: {bg_var}; padding: 2px 6px; border-radius: 8px;">{var_str}</span>
+                </div>
             </div>
             """
 
         qtd_chamados = checar_chamados_pendentes(planilha_db)
         cor_tkt = "#DC2626" if qtd_chamados > 0 else "#64748B"
-        sub_tkt = "🚨 Requer Atenção!" if qtd_chamados > 0 else "✅ Tudo Limpo"
+        sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
+        cor_atra = "#DC2626" if atra_h > 0 else "#64748B"
 
         c1, c2, c3, c4 = st.columns(4)
-        c1.markdown(make_clean_card("VOLUME TOTAL", vol_total_h, f"{s_tot} {v_tot_str} vs Ontem", "#3B82F6", "📦"), unsafe_allow_html=True)
-        c2.markdown(make_clean_card("EFICIÊNCIA", f"{taxa_sucesso_h:.1f}%", f"{s_taxa} {v_taxa_str} vs Ontem", "#10B981", "🎯"), unsafe_allow_html=True)
-        c3.markdown(make_clean_card("CHAMADOS HELPDESK", f"{qtd_chamados}", sub_tkt, cor_tkt, "🎧"), unsafe_allow_html=True)
-        
-        # Só alerta em vermelho se tiver atrasado de verdade
-        cor_atra = "#DC2626" if atra_h > 0 else "#64748B"
-        c4.markdown(make_clean_card("ATRASADOS (SLA)", atra_h, "Ruptura de Prazo", cor_atra, "⏳"), unsafe_allow_html=True)
+        c1.markdown(make_tv_card("VOL. TOTAL", vol_total_h, f"{s_tot}{v_tot_str}", "#3B82F6", "📦"), unsafe_allow_html=True)
+        c2.markdown(make_tv_card("EFICIÊNCIA", f"{taxa_sucesso_h:.1f}%", f"{s_taxa}{v_taxa_str}", "#10B981", "🎯"), unsafe_allow_html=True)
+        c3.markdown(make_tv_card("CHAMADOS", f"{qtd_chamados}", sub_tkt, cor_tkt, "🎧"), unsafe_allow_html=True)
+        c4.markdown(make_tv_card("ATRASADOS", atra_h, "Ruptura SLA", cor_atra, "⏳"), unsafe_allow_html=True)
 
-        st.markdown("---")
+        c5, c6, c7, c8 = st.columns(4)
+        c5.markdown(make_tv_card("ROTA/PENDENTES", pend_h, f"{s_pend}{v_pend_str}", "#F59E0B", "🚚"), unsafe_allow_html=True)
+        c6.markdown(make_tv_card("ENTREGUES", ent_h, f"{s_ent}{v_ent_str}", "#059669", "✅"), unsafe_allow_html=True)
+        c7.markdown(make_tv_card("FRUSTRADAS", frus_h, f"{s_frus}{v_frus_str}", "#EF4444", "🛑"), unsafe_allow_html=True)
+        c8.markdown(make_tv_card("BASE ONTEM", vol_total_o, "Ref. Cálculo", "#475569", "📊"), unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # ANDAR 3: GRÁFICOS VISUAIS E INTERATIVOS (PLOTLY)
+        # ANDAR 3: GRÁFICOS REDIMENSIONADOS PARA TV (220px)
         # ---------------------------------------------------------
         col_graf1, col_graf2 = st.columns([1, 1.5])
         
         with col_graf1:
-            st.markdown("#### 🎯 Status da Operação Diária")
-            # Preparando dados para o Gráfico de Rosca
-            status_labels = ['Entregue/Coletado', 'Pendente/Rota', 'Frustrada/Problema', 'Atrasado']
+            status_labels = ['Entregue', 'Pendente', 'Frustrada', 'Atrasado']
             status_vals = [ent_h, pend_h, frus_h, atra_h]
             df_donut = pd.DataFrame({'Status': status_labels, 'Volumes': status_vals})
-            df_donut = df_donut[df_donut['Volumes'] > 0] # Remove os que estão zerados para não sujar o gráfico
+            df_donut = df_donut[df_donut['Volumes'] > 0]
             
             if not df_donut.empty:
-                cores_map = {'Entregue/Coletado': '#10B981', 'Pendente/Rota': '#F59E0B', 'Frustrada/Problema': '#EF4444', 'Atrasado': '#991B1B'}
-                fig_donut = px.pie(df_donut, values='Volumes', names='Status', hole=0.6, color='Status', color_discrete_map=cores_map)
-                fig_donut.update_traces(textinfo='percent+value', textfont_size=12, textfont_color='white')
-                fig_donut.update_layout(
-                    margin=dict(t=20, b=20, l=10, r=10),
-                    showlegend=True, 
-                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
-                    height=300
-                )
+                cores_map = {'Entregue': '#10B981', 'Pendente': '#F59E0B', 'Frustrada': '#EF4444', 'Atrasado': '#991B1B'}
+                fig_donut = px.pie(df_donut, values='Volumes', names='Status', hole=0.65, color='Status', color_discrete_map=cores_map)
+                fig_donut.update_traces(textinfo='percent', textfont_size=11, textfont_color='white')
+                fig_donut.update_layout(margin=dict(t=5, b=5, l=5, r=5), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=10)), height=220)
                 st.plotly_chart(fig_donut, use_container_width=True)
-            else:
-                st.info("Aguardando os primeiros despachos do dia.")
+            else: st.info("Sem dados.")
 
         with col_graf2:
-            st.markdown("#### 🏢 Top Clientes (Volume Mensal)")
             if not vol_tomadores.empty:
-                # Prepara os Top 6 clientes para o Gráfico de Barras Horizontais
-                df_bar = vol_tomadores.head(6).sort_values(by='Volume', ascending=True) # Ascending para os maiores ficarem no topo do gráfico
+                df_bar = vol_tomadores.head(5).sort_values(by='Volume', ascending=True)
                 fig_bar = px.bar(df_bar, x='Volume', y='Tomador', orientation='h', text='Volume')
-                fig_bar.update_traces(marker_color='#334155', textposition='outside', textfont_size=13, textfont_weight='bold')
-                fig_bar.update_layout(
-                    margin=dict(t=20, b=20, l=10, r=30),
-                    xaxis_title="", yaxis_title="", 
-                    xaxis_showticklabels=False, 
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    height=300
-                )
+                fig_bar.update_traces(marker_color='#334155', textposition='outside', textfont_size=11, textfont_weight='bold')
+                fig_bar.update_layout(margin=dict(t=5, b=5, l=5, r=5), xaxis_showticklabels=False, xaxis_title="", yaxis_title="", plot_bgcolor='rgba(0,0,0,0)', height=220)
                 st.plotly_chart(fig_bar, use_container_width=True)
-            else:
-                st.info("Aguardando dados do mês atual.")
+            else: st.info("Sem dados.")
+
+        # ---------------------------------------------------------
+        # ANDAR 4: PÓDIO HORIZONTAL ESTREITO
+        # ---------------------------------------------------------
+        if len(frota_ordenada) > 0:
+            c_f1, c_f2, c_f3 = st.columns(3)
+            def min_podio(pos, ic, color, ag, pct, vols):
+                return f"""<div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:8px; border-radius:6px; display:flex; align-items:center; justify-content:space-between;">
+                    <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:20px;">{ic}</span>
+                    <div><p style="margin:0; font-size:11px; font-weight:800; color:#334155;">{ag}</p><p style="margin:0; font-size:9px; color:#94A3B8;">{vols}</p></div></div>
+                    <h3 style="margin:0; font-size:18px; color:{color};">{pct}%</h3></div>"""
+            
+            if len(frota_ordenada) >= 1: c_f1.markdown(min_podio("1º", "🥇", "#10B981", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}"), unsafe_allow_html=True)
+            if len(frota_ordenada) >= 2: c_f2.markdown(min_podio("2º", "🥈", "#64748B", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}"), unsafe_allow_html=True)
+            if len(frota_ordenada) >= 3: c_f3.markdown(min_podio("3º", "🥉", "#D97706", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}"), unsafe_allow_html=True)
 
         st.markdown("---")
 
