@@ -3291,54 +3291,74 @@ elif menu == "🎧 Atendimento":
         if len(dados_tkt) > 1:
             df_tkt = pd.DataFrame(dados_tkt[1:], columns=dados_tkt[0])
             
-            # Filtra apenas os chamados que estão "Em Análise"
-            df_abertos = df_tkt[df_tkt['STATUS'].str.contains('ANÁLISE', case=False, na=False)]
+            # 🔥 CRIANDO AS ABAS DE TRABALHO E HISTÓRICO 🔥
+            tab_abertos, tab_historico_tkt = st.tabs(["🟡 Fila de Chamados", "🟢 Histórico Resolvidos"])
             
-            if df_abertos.empty:
-                st.success("🎉 Excelente! Não há nenhum chamado pendente de resposta no momento.")
-            else:
-                st.warning(f"⚠️ Você possui {len(df_abertos)} chamado(s) aguardando resposta.")
+            with tab_abertos:
+                # Filtra apenas os chamados que estão "Em Análise"
+                df_abertos = df_tkt[df_tkt['STATUS'].str.contains('ANÁLISE', case=False, na=False)]
                 
-                for idx, row in df_abertos.iterrows():
-                    with st.container(border=True):
-                        c1, c2 = st.columns([3, 1])
-                        c1.markdown(f"#### 🏢 {row['TOMADOR']}")
-                        c2.markdown(f"<div style='text-align:right;'><span style='background:#fef3c7; color:#92400e; padding:4px 12px; border-radius:99px; font-weight:bold; font-size:12px;'>🎫 {row['TICKET']}</span></div>", unsafe_allow_html=True)
-                        
-                        st.markdown(f"**Data:** {row['DATA']} | **Pedido Ref:** {row['PEDIDO'] if row['PEDIDO'] else 'N/A'}")
-                        st.info(f"💬 **Mensagem do Cliente:**\n\n{row['MENSAGEM']}")
-                        
-                        with st.form(f"form_resp_{row['TICKET']}", clear_on_submit=True):
-                            resp_texto = st.text_area("Sua Resposta Oficial:", placeholder="Digite aqui a solução ou retorno para o cliente...")
+                if df_abertos.empty:
+                    st.success("🎉 Excelente! Não há nenhum chamado pendente de resposta no momento.")
+                else:
+                    st.warning(f"⚠️ Você possui {len(df_abertos)} chamado(s) aguardando resposta.")
+                    
+                    for idx, row in df_abertos.iterrows():
+                        with st.container(border=True):
+                            c1, c2 = st.columns([3, 1])
+                            c1.markdown(f"#### 🏢 {row['TOMADOR']}")
+                            c2.markdown(f"<div style='text-align:right;'><span style='background:#fef3c7; color:#92400e; padding:4px 12px; border-radius:99px; font-weight:bold; font-size:12px;'>🎫 {row['TICKET']}</span></div>", unsafe_allow_html=True)
                             
-                            if st.form_submit_button("✅ Enviar Resposta e Encerrar Ticket", type="primary"):
-                                if not resp_texto.strip():
-                                    st.error("A resposta não pode estar vazia.")
-                                else:
-                                    with st.spinner("Atualizando banco de dados e notificando o cliente..."):
-                                        coluna_tickets = aba_chamados.col_values(1) # Pega a coluna A (TICKETS)
-                                        try:
-                                            linha_idx = coluna_tickets.index(row['TICKET']) + 1 # +1 porque o sheets começa no índice 1
-                                            
-                                            # Atualiza Status (Coluna 6 = F) e Resposta (Coluna 7 = G)
-                                            aba_chamados.update_cell(linha_idx, 6, "🟢 RESOLVIDO")
-                                            aba_chamados.update_cell(linha_idx, 7, resp_texto)
-                                            
-                                            # Notificar por WhatsApp (Usando o celular de testes da diretoria)
-                                            texto_aviso = (
-                                                f"🔔 *ATUALIZAÇÃO DE CHAMADO* [{row['TICKET']}]\n\n"
-                                                f"Olá, equipe *{row['TOMADOR']}*! O C.C.O da IGO Logística acabou de responder à sua solicitação.\n\n"
-                                                f"👨‍💻 *Resposta:* {resp_texto}\n\n"
-                                                f"Acesse o seu Portal do Cliente para visualizar o histórico completo."
-                                            )
-                                            enviar_whatsapp_zapi("5511947996371", texto_aviso)
-                                            
-                                            st.success(f"Ticket {row['TICKET']} encerrado com sucesso!")
-                                            time.sleep(1.5)
-                                            st.rerun()
-                                            
-                                        except Exception as erro_sheets:
-                                            st.error(f"Erro ao salvar no banco: {erro_sheets}")
+                            st.markdown(f"**Data:** {row['DATA']} | **Pedido Ref:** {row['PEDIDO'] if row['PEDIDO'] else 'N/A'}")
+                            st.info(f"💬 **Mensagem do Cliente:**\n\n{row['MENSAGEM']}")
+                            
+                            with st.form(f"form_resp_{row['TICKET']}", clear_on_submit=True):
+                                resp_texto = st.text_area("Sua Resposta Oficial:", placeholder="Digite aqui a solução ou retorno para o cliente...")
+                                
+                                if st.form_submit_button("✅ Enviar Resposta e Encerrar Ticket", type="primary"):
+                                    if not resp_texto.strip():
+                                        st.error("A resposta não pode estar vazia.")
+                                    else:
+                                        with st.spinner("Atualizando banco de dados e notificando o cliente..."):
+                                            coluna_tickets = aba_chamados.col_values(1) # Pega a coluna A (TICKETS)
+                                            try:
+                                                linha_idx = coluna_tickets.index(row['TICKET']) + 1 # +1 porque o sheets começa no índice 1
+                                                
+                                                # Atualiza Status (Coluna 6 = F) e Resposta (Coluna 7 = G)
+                                                aba_chamados.update_cell(linha_idx, 6, "🟢 RESOLVIDO")
+                                                aba_chamados.update_cell(linha_idx, 7, resp_texto)
+                                                
+                                                # Notificar por WhatsApp (usando seu número de retorno)
+                                                texto_aviso = (
+                                                    f"🔔 *ATUALIZAÇÃO DE CHAMADO* [{row['TICKET']}]\n\n"
+                                                    f"Olá, equipe *{row['TOMADOR']}*! O C.C.O da IGO Logística acabou de responder à sua solicitação.\n\n"
+                                                    f"👨‍💻 *Resposta:* {resp_texto}\n\n"
+                                                    f"Acesse o seu Portal do Cliente para visualizar o histórico completo."
+                                                )
+                                                enviar_whatsapp_zapi("5511947996371", texto_aviso)
+                                                
+                                                st.success(f"Ticket {row['TICKET']} encerrado com sucesso!")
+                                                time.sleep(1.5)
+                                                st.rerun()
+                                                
+                                            except Exception as erro_sheets:
+                                                st.error(f"Erro ao salvar no banco: {erro_sheets}")
+            
+            with tab_historico_tkt:
+                # Pega tudo que NÃO está em análise (já foi resolvido)
+                df_fechados = df_tkt[~df_tkt['STATUS'].str.contains('ANÁLISE', case=False, na=False)]
+                
+                if df_fechados.empty:
+                    st.info("Nenhum chamado foi resolvido ainda.")
+                else:
+                    # Inverte para o mais recente aparecer no topo
+                    df_fechados = df_fechados.iloc[::-1]
+                    st.markdown("#### 🗄️ Arquivo de Chamados Encerrados")
+                    st.dataframe(
+                        df_fechados[['TICKET', 'DATA', 'TOMADOR', 'PEDIDO', 'STATUS', 'MENSAGEM', 'RESPOSTA']], 
+                        hide_index=True, 
+                        use_container_width=True
+                    )
 
         else:
             st.info("O banco de chamados ainda está vazio.")
