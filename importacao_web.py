@@ -3589,12 +3589,14 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO TV C.C.O DARK / SALA DE GUERRA)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO TV C.C.O DARK - MEGAZORD)
 # =============================================================================
 elif menu == "📈 Dashboard":
     import plotly.express as px
     import plotly.graph_objects as go
     import streamlit.components.v1 as components
+    import requests
+    import urllib.parse
     
     # 🔥 OTIMIZAÇÃO DE ESPAÇO, MODO ESCURO FORÇADO E ANIMAÇÕES 🔥
     st.markdown("""
@@ -3693,40 +3695,104 @@ elif menu == "📈 Dashboard":
         
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
+        # =========================================================
+        # 🧠 FUNÇÕES CÉREBRO PARA O TICKER
+        # =========================================================
+        @st.cache_data(ttl=3600)
+        def buscar_alertas_climaticos(cidades_com_uf):
+            alertas = []
+            for item in cidades_com_uf:
+                if not item or str(item).upper() == "NAN": continue
+                try:
+                    cidade_busca = str(item).split('/')[0].strip() if '/' in str(item) else str(item).strip()
+                    cid_fmt = urllib.parse.quote(cidade_busca)
+                    resp = requests.get(f"https://wttr.in/{cid_fmt}?format=j1", timeout=3)
+                    if resp.status_code == 200:
+                        dados = resp.json()
+                        condicao = str(dados['current_condition'][0]['weatherDesc'][0]['value']).lower()
+                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder', 'drizzle']):
+                            alertas.append(f"⛈️ RADAR CLIMA: Chuva na rota de {item}!")
+                        else:
+                            alertas.append(f"☀️ RADAR CLIMA: Tempo estável em {item}.")
+                except: continue
+            return alertas
+
+        @st.cache_data(ttl=900)
+        def buscar_status_voos_aerodatabox(lista_voos, data_referencia):
+            alertas_voos = []
+            headers = {"x-rapidapi-key": "726b5b7c75msh782bc334e03fcd1p1d415cjsn84ef052a00e7", "x-rapidapi-host": "aerodatabox.p.rapidapi.com"}
+            data_str = data_referencia.strftime('%Y-%m-%d')
+            for voo in lista_voos:
+                v_query = str(voo).upper().replace(" ", "")
+                try:
+                    url = f"https://aerodatabox.p.rapidapi.com/flights/number/{v_query}/{data_str}"
+                    resp = requests.get(url, headers=headers, timeout=5)
+                    if resp.status_code == 200:
+                        dados = resp.json()
+                        if dados and isinstance(dados, list) and len(dados) > 0:
+                            v = dados[0] 
+                            status = str(v.get('status', 'UNK')).upper()
+                            if "EXPECTED" in status or "SCHEDULED" in status: alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} confirmado. Sem atrasos.")
+                            elif "DELAYED" in status: alertas_voos.append(f"🚨 ALERTA AÉREO: Voo {v_query} consta como ATRASADO!")
+                            elif "CANCELED" in status or "CANCELLED" in status: alertas_voos.append(f"🚫 CRÍTICO: Voo {v_query} foi CANCELADO!")
+                            elif "ACTIVE" in status or "EN ROUTE" in status: alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} está EM VOO.")
+                            elif "ARRIVED" in status or "LANDED" in status: alertas_voos.append(f"✅ RADAR AÉREO: Voo {v_query} já POUSOU.")
+                except: continue
+            return alertas_voos
+
+        qtd_chamados = checar_chamados_pendentes(planilha_db)
+
         # ---------------------------------------------------------
-        # ANDAR 1: TICKER CYBER COM AS ÚLTIMAS BAIXAS DA OPERAÇÃO
+        # ANDAR 1: TICKER CYBER COMPLETO COM TODAS AS INTEGRAÇÕES
         # ---------------------------------------------------------
         manchetes = [f"🟢 SISTEMA ONLINE", f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}", f"📅 COMPARAÇÃO: {ontem_util.strftime('%d/%m/%Y')}"]
-        if hoje in FERIADOS_BR: manchetes.append(f"📅 FERIADO: {FERIADOS_BR.get(hoje)}.")
         
-        # 🚀 CÉREBRO NOVO: Captura as últimas operações finalizadas
+        # Alertas Operacionais
+        if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) aguardando resposta do C.C.O!")
+        if atra_h > 0: manchetes.append(f"⚠️ SLA CRÍTICO: {atra_h} visita(s) em atraso na operação agora!")
+        
+        if vol_total_h > 0:
+            progresso = int((resolvidos_h / vol_total_h) * 100)
+            manchetes.append(f"🎯 META DIÁRIA: {progresso}% das operações concluídas.")
+
+        # Últimas Baixas
         finalizados_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)]
         if not finalizados_hj.empty:
-            for _, row in finalizados_hj.tail(3).iterrows(): # Pega as últimas 3 baixas
+            for _, row in finalizados_hj.tail(3).iterrows():
                 pcl = str(row.get('LABORATORIO', row.get('TOMADOR', 'PCL'))).title()
                 cidade = str(row.get('CIDADE', '')).title()
-                
-                # Procura a coluna de hora (pode ser HORA ou HORA_BAIXA dependendo da sua planilha)
                 hora = str(row.get('HORA', ''))
-                if hora == 'nan' or not hora.strip():
-                    hora = str(row.get('HORA_BAIXA', ''))
-                
+                if hora == 'nan' or not hora.strip(): hora = str(row.get('HORA_BAIXA', ''))
                 hora_str = f" às {hora}" if hora and hora.lower() != 'nan' and hora.strip() else ""
                 cidade_str = f" em {cidade}" if cidade and cidade.lower() != 'nan' and cidade.strip() else ""
-                
-                tipo = "Atendimento"
-                status = str(row.get('STATUS_DISPLAY', '')).upper()
-                if 'COLETADO' in status: tipo = "Coleta"
-                elif 'ENTREGUE' in status: tipo = "Entrega"
-                
+                tipo = "Coleta" if 'COLETADO' in str(row.get('STATUS_DISPLAY', '')).upper() else "Entrega"
                 manchetes.append(f"✅ ÚLTIMA BAIXA: {tipo} no {pcl}{cidade_str} finalizada{hora_str}!")
+
+        # Clima e Voos
+        cidades_alvo = []
+        if not df_hoje.empty:
+            top_cids = df_hoje['CIDADE'].value_counts().head(3).index.tolist()
+            col_uf = 'UF' if 'UF' in df_hoje.columns else ('ESTADO' if 'ESTADO' in df_hoje.columns else None)
+            for cid in top_cids:
+                cid_nome = str(cid).strip().title()
+                if col_uf:
+                    try:
+                        uf = str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()
+                        cidades_alvo.append(f"{cid_nome}/{uf}")
+                    except: cidades_alvo.append(cid_nome)
+                else: cidades_alvo.append(cid_nome)
+        
+        if cidades_alvo: manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
+        voos_monitorados = ["G31240"]
+        if voos_monitorados: manchetes.extend(buscar_status_voos_aerodatabox(voos_monitorados, hoje))
 
         ticker_text = " &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
         st.markdown(f"""
             <style>
-            .nasdaq-container {{ background-color: #0B1120; color: #10B981; padding: 6px 0; border-radius: 4px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; position: relative; border-bottom: 1px solid #1E293B; }}
-            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 18s linear infinite; }}
-            .nasdaq-item {{ display: inline-block; font-size: 13px; font-weight: 700; font-family: 'Segoe UI', sans-serif; text-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }}
+            .nasdaq-container {{ background-color: #0B1120; color: #F8FAFC; padding: 6px 0; border-radius: 4px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; position: relative; border-bottom: 1px solid #1E293B; }}
+            /* Tempo ajustado para 35s porque a fila de notícias está grande */
+            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 35s linear infinite; }}
+            .nasdaq-item {{ display: inline-block; font-size: 13px; font-weight: 600; font-family: 'Segoe UI', sans-serif; color: #F8FAFC; letter-spacing: 0.5px; }}
             @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
             </style>
             <div class="nasdaq-container">
@@ -3755,7 +3821,6 @@ elif menu == "📈 Dashboard":
             </div>
             """
 
-        qtd_chamados = checar_chamados_pendentes(planilha_db)
         cor_tkt = "#EF4444" if qtd_chamados > 0 else "#475569"
         sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
         cor_atra = "#F43F5E" if atra_h > 0 else "#475569"
