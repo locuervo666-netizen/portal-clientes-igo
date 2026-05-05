@@ -3606,8 +3606,9 @@ elif menu == "📈 Dashboard":
         </style>
     """, unsafe_allow_html=True)
     
+    # ⏱️ REFRESH AJUSTADO PARA 2 MINUTOS (120.000 ms)
     components.html(
-        """<script>setTimeout(function(){ window.parent.location.reload(); }, 300000);</script>""",
+        """<script>setTimeout(function(){ window.parent.location.reload(); }, 120000);</script>""",
         height=0, width=0
     )
     
@@ -3651,7 +3652,6 @@ elif menu == "📈 Dashboard":
         taxa_sucesso_o = (resolvidos_o / vol_total_o * 100) if vol_total_o > 0 else 0
         var_taxa = taxa_sucesso_h - taxa_sucesso_o
         
-        # AS VARIÁVEIS QUE FALTAVAM ESTÃO AQUI AGORA 🔥
         v_tot_str, s_tot = calc_variacao(vol_total_h, vol_total_o)
         v_ent_str, s_ent = calc_variacao(ent_h, ent_o)
         v_pend_str, s_pend = calc_variacao(pend_h, pend_o)
@@ -3685,16 +3685,18 @@ elif menu == "📈 Dashboard":
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
         # ---------------------------------------------------------
-        # ANDAR 1: TICKER 2.0 (AGORA ELE É O PRÓPRIO CABEÇALHO DO SISTEMA)
+        # ANDAR 1: TICKER 2.0 (CABECALHO DO SISTEMA)
         # ---------------------------------------------------------
-        manchetes = [f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}", f"📅 COMPARAÇÃO: {ontem_util.strftime('%d/%m/%Y')}"]
+        # 🔥 ADICIONADO INDICADOR "SISTEMA ONLINE" NO MENU 🔥
+        manchetes = [f"🟢 SISTEMA ONLINE", f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}", f"📅 COMPARAÇÃO: {ontem_util.strftime('%d/%m/%Y')}"]
         if hoje in FERIADOS_BR: manchetes.append(f"📅 FERIADO: {FERIADOS_BR.get(hoje)}.")
 
         ticker_text = " &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
         st.markdown(f"""
             <style>
             .nasdaq-container {{ background-color: #0F172A; color: #F8FAFC; padding: 6px 0; border-radius: 4px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 30s linear infinite; }}
+            /* 🔥 TICKER MAIS RÁPIDO: de 30s para 18s 🔥 */
+            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 18s linear infinite; }}
             .nasdaq-item {{ display: inline-block; font-size: 12px; font-weight: 600; font-family: 'Segoe UI', sans-serif; }}
             @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
             </style>
