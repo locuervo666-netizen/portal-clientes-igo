@@ -176,7 +176,18 @@ def corrigir_nomes_relatorio(texto):
     t = re.sub(r'\bCAEP\b', 'SYNVIA', t, flags=re.IGNORECASE)
     t = re.sub(r'\bCUNHA\b', 'GRALAB', t, flags=re.IGNORECASE)
     return t
-
+@st.cache_data(ttl=60)
+def checar_chamados_pendentes(_planilha):
+    if not _planilha: return 0
+    try:
+        aba = _planilha.worksheet("Base_Chamados")
+        dados = aba.get_all_values()
+        if len(dados) > 1:
+            df = pd.DataFrame(dados[1:], columns=dados[0])
+            # Conta apenas os que estão EM ANÁLISE
+            return len(df[df['STATUS'].str.contains('ANÁLISE', case=False, na=False)])
+    except: pass
+    return 0
 @st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
     if not _planilha: return pd.DataFrame()
@@ -638,7 +649,18 @@ if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin
 
 with st.sidebar:
     st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=160)
-    st.divider()
+    
+    # 🔥 ALERTA GLOBAL DE CHAMADOS 🔥
+    qtd_chamados_abertos = checar_chamados_pendentes(planilha_db)
+    if qtd_chamados_abertos > 0:
+        st.markdown(f"""
+            <div style="background-color: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px; border-radius: 4px; margin-top: 15px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);">
+                <p style="color: #991B1B; font-weight: 800; font-size: 13px; margin: 0;">🚨 {qtd_chamados_abertos} Chamado(s) Aberto(s)</p>
+                <p style="color: #7F1D1D; font-size: 11px; margin: 0;">Acesse o menu Atendimento.</p>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.divider()
     menu = st.radio("Navegação Operacional:", [
         "📈 Dashboard",
         "📊 GRID",
@@ -696,12 +718,16 @@ if menu == "📊 GRID":
 
     if not df_raw.empty:
         
+        # 🔥 ALERTA GIGANTE DE CHAMADOS DO HELPDESK 🔥
+        qtd_chamados_abertos = checar_chamados_pendentes(planilha_db)
+        if qtd_chamados_abertos > 0:
+            st.error(f"🎧 **HELPDESK:** Existem **{qtd_chamados_abertos} chamado(s)** de clientes aguardando sua resposta na aba de Atendimento!")
+
         # 🔥 CAIXA DE ENTRADA (INBOX) DO PORTAL DO CLIENTE 🔥
         df_aprovacao = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'AGUARDANDO APROVAÇÃO'].copy()
         if not df_aprovacao.empty:
             st.error(f"🚨 **Atenção:** Existem {len(df_aprovacao)} solicitação(ões) de coleta do Portal do Cliente aguardando aprovação!")
-            with st.expander("🔔 INBOX: Analisar e Aprovar Coletas", expanded=True):
-                
+            with st.expander("🔔 INBOX: Analisar e Aprovar Coletas", expanded=True):                
                 if 'OBSERVACOES' not in df_aprovacao.columns:
                     df_aprovacao['OBSERVACOES'] = ""
                 
