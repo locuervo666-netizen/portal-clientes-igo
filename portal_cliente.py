@@ -755,7 +755,7 @@ else:
                     "HOJE":       len(df_f[df_f['DATA_OBJ'] == hoje_br]),
                 }
 
-                # ── KPI CARDS (COM FILTRO ATIVO E CLIQUE CORRIGIDO) ────────────────
+                # ── KPI CARDS (BLINDADOS: EFEITO GHOST BUTTON NATIVO) ────────────────
                 cols_kpi = st.columns(6)
                 for col, (filtro, label, key) in zip(cols_kpi, KPI_META):
                     is_active = st.session_state.filtro_kpi == filtro
@@ -766,22 +766,19 @@ else:
                     borda = f"2px solid {dot_color}" if is_active else f"1px solid {dot_color}40"
                     valor = n_vals[filtro]
 
-                    # Separa o emoji do texto (ex: "📦 Total" vira emoji="📦" e texto="Total")
+                    # Separa o emoji do texto
                     partes = label.split(' ', 1)
                     emoji_card = partes[0]
                     texto_card = partes[1] if len(partes) > 1 else label
 
                     with col:
-                        # O HTML do Card. Adicionado 'cursor: pointer' e JS blindado para o clique.
+                        # 1. Desenha o Card Visual (HTML/CSS) sem eventos bloqueáveis
                         st.markdown(f"""
                             <div class="kpi-card"
-                                 style="background-color: {bg_color}; border: {borda}; text-align: left; padding: 16px; border-radius: 16px; height: 95px; cursor: pointer;"
-                                 onclick="var btn = window.document.querySelector('.st-key-{key} button'); if(btn) btn.click();">
-                                <!-- Ícone de Fundo (Marca d'água) -->
+                                 style="background-color: {bg_color}; border: {borda}; text-align: left; padding: 16px; border-radius: 16px; height: 95px;">
                                 <div style="position: absolute; right: -5px; bottom: -15px; font-size: 65px; opacity: 0.12; z-index: 0; line-height: 1;">
                                     {emoji_card}
                                 </div>
-                                <!-- Conteúdo (Fica por cima do ícone) -->
                                 <div style="position: relative; z-index: 1;">
                                     <div style="font-size: 11px; font-weight: 800; color: {dot_color}; text-transform: uppercase; letter-spacing: 0.5px;">
                                         {texto_card}
@@ -793,28 +790,27 @@ else:
                             </div>
                         """, unsafe_allow_html=True)
 
-                        # Botão nativo recebe a ação
+                        # 2. Cria o botão invisível gigante por cima (A lógica fica 100% no Python)
                         if st.button(label, key=key, use_container_width=True, help=f"Filtrar por: {texto_card}"):
                             st.session_state.filtro_kpi = filtro
                             st.rerun()
 
-                # 🔥 CORREÇÃO DO BUG: Ocultando os botões sem quebrar a interatividade 🔥
+                # 🔥 CSS MÁGICO: Transforma os botões em painéis transparentes sobre os cards 🔥
                 st.markdown("""
                     <style>
-                    div.st-key-kpi_total button,
-                    div.st-key-kpi_entregue button,
-                    div.st-key-kpi_frus button,
-                    div.st-key-kpi_pend button,
-                    div.st-key-kpi_hoje button,
-                    div.st-key-kpi_aguardando button {
-                        opacity: 0 !important;
-                        position: absolute !important;
-                        z-index: -100 !important;
-                        height: 0px !important;
-                        min-height: 0px !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        border: none !important;
+                    /* Puxa o botão para cima, exatamente em cima do card desenhado */
+                    div.st-key-kpi_total, div.st-key-kpi_entregue, div.st-key-kpi_frus, 
+                    div.st-key-kpi_pend, div.st-key-kpi_aguardando, div.st-key-kpi_hoje {
+                        margin-top: -110px !important;
+                        position: relative;
+                        z-index: 999;
+                        opacity: 0 !important; /* Fica 100% invisível */
+                    }
+                    /* Estica o botão fantasma para cobrir toda a área clicável */
+                    div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, 
+                    div.st-key-kpi_pend button, div.st-key-kpi_aguardando button, div.st-key-kpi_hoje button {
+                        height: 105px !important;
+                        cursor: pointer !important;
                     }
                     </style>
                 """, unsafe_allow_html=True)
