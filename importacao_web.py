@@ -3696,9 +3696,9 @@ elif menu == "📈 Dashboard":
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
         # =========================================================
-        # 🧠 FUNÇÕES CÉREBRO PARA O TICKER (INCLUINDO DÓLAR)
+        # 🧠 FUNÇÕES CÉREBRO PARA O TICKER
         # =========================================================
-        @st.cache_data(ttl=1800) # Atualiza a cada 30 minutos
+        @st.cache_data(ttl=1800)
         def buscar_cotacao_dolar():
             try:
                 resp = requests.get("https://economia.awesomeapi.com.br/last/USD-BRL", timeout=3)
@@ -3761,11 +3761,9 @@ elif menu == "📈 Dashboard":
         # ---------------------------------------------------------
         manchetes = [f"🟢 SISTEMA ONLINE", f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}"]
         
-        # 🚀 INJETA A COTAÇÃO DO DÓLAR
         cotacao_dolar = buscar_cotacao_dolar()
         if cotacao_dolar: manchetes.append(cotacao_dolar)
 
-        # Alertas Operacionais
         if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) aguardando resposta do C.C.O!")
         if atra_h > 0: manchetes.append(f"⚠️ SLA CRÍTICO: {atra_h} visita(s) em atraso na operação agora!")
         
@@ -3773,7 +3771,6 @@ elif menu == "📈 Dashboard":
             progresso = int((resolvidos_h / vol_total_h) * 100)
             manchetes.append(f"🎯 META DIÁRIA: {progresso}% das operações concluídas.")
 
-        # Últimas Baixas
         finalizados_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)]
         if not finalizados_hj.empty:
             for _, row in finalizados_hj.tail(3).iterrows():
@@ -3786,7 +3783,6 @@ elif menu == "📈 Dashboard":
                 tipo = "Coleta" if 'COLETADO' in str(row.get('STATUS_DISPLAY', '')).upper() else "Entrega"
                 manchetes.append(f"✅ ÚLTIMA BAIXA: {tipo} no {pcl}{cidade_str} finalizada{hora_str}!")
 
-        # Clima e Voos
         cidades_alvo = []
         if not df_hoje.empty:
             top_cids = df_hoje['CIDADE'].value_counts().head(3).index.tolist()
@@ -3808,7 +3804,6 @@ elif menu == "📈 Dashboard":
         st.markdown(f"""
             <style>
             .nasdaq-container {{ background-color: #0B1120; color: #F8FAFC; padding: 6px 0; border-radius: 4px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; position: relative; border-bottom: 1px solid #1E293B; }}
-            /* Tempo ajustado para 35s porque a fila de notícias está grande */
             .nasdaq-scroller {{ display: inline-block; animation: scroll-left 35s linear infinite; }}
             .nasdaq-item {{ display: inline-block; font-size: 13px; font-weight: 600; font-family: 'Segoe UI', sans-serif; color: #F8FAFC; letter-spacing: 0.5px; }}
             @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
@@ -3822,26 +3817,27 @@ elif menu == "📈 Dashboard":
         """, unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # ANDAR 2: CARDS DARK GLASS (VIDRO ESCURO + NEON)
+        # ANDAR 2: CARDS DARK GLASS COM SELOS DESTACADOS
         # ---------------------------------------------------------
         def make_tv_card(title, value, var_str, color_hex, icon, is_alert=False):
             alert_class = "alerta-ativo" if is_alert else ""
             return f"""
             <div class="{alert_class}" style="background: #0F172A; border: 1px solid #1E293B; border-left: 4px solid {color_hex}; padding: 10px 15px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); height: 85px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <p style="margin:0; font-size:10px; font-weight:800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">{title}</p>
-                    <span style="font-size:14px; opacity: 0.9;">{icon}</span>
+                    <p style="margin:0; font-size:11px; font-weight:800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">{title}</p>
+                    <span style="font-size:16px; opacity: 0.9;">{icon}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-                    <h2 style="margin:0; font-size:26px; font-weight:900; color: #F8FAFC; text-shadow: 0 0 10px {color_hex}50; line-height: 1;">{value}</h2>
-                    <span style="font-size:10px; font-weight:700; color: {color_hex}; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; border: 1px solid {color_hex}40;">{var_str}</span>
+                    <h2 style="margin:0; font-size:28px; font-weight:900; color: #F8FAFC; text-shadow: 0 0 10px {color_hex}50; line-height: 1;">{value}</h2>
+                    <span style="font-size:13px; font-weight:800; color: #FFFFFF; background: {color_hex}; padding: 3px 8px; border-radius: 4px; box-shadow: 0 0 8px {color_hex}60;">{var_str}</span>
                 </div>
             </div>
             """
 
-        cor_tkt = "#EF4444" if qtd_chamados > 0 else "#475569"
+        # ✨ AJUSTE DE CORES PARA MAIOR DESTAQUE NO FUNDO ESCURO ✨
+        cor_tkt = "#EF4444" if qtd_chamados > 0 else "#94A3B8" # Cinza Prata em vez de chumbo
         sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
-        cor_atra = "#F43F5E" if atra_h > 0 else "#475569"
+        cor_atra = "#F43F5E" if atra_h > 0 else "#94A3B8"
 
         c1, c2, c3, c4 = st.columns(4)
         c1.markdown(make_tv_card("VOL. TOTAL", vol_total_h, f"{s_tot}{v_tot_str}", "#3B82F6", "📦"), unsafe_allow_html=True)
@@ -3851,9 +3847,9 @@ elif menu == "📈 Dashboard":
 
         c5, c6, c7, c8 = st.columns(4)
         c5.markdown(make_tv_card("ROTA/PENDENTES", pend_h, f"{s_pend}{v_pend_str}", "#F59E0B", "🚚"), unsafe_allow_html=True)
-        c6.markdown(make_tv_card("ENTREGUES", ent_h, f"{s_ent}{v_ent_str}", "#059669", "✅"), unsafe_allow_html=True)
+        c6.markdown(make_tv_card("ENTREGUES", ent_h, f"{s_ent}{v_ent_str}", "#10B981", "✅"), unsafe_allow_html=True) # Padronizado para o verde mais claro
         c7.markdown(make_tv_card("FRUSTRADAS", frus_h, f"{s_frus}{v_frus_str}", "#EF4444", "🛑"), unsafe_allow_html=True)
-        c8.markdown(make_tv_card("BASE ONTEM", vol_total_o, "Ref. Cálculo", "#475569", "📊"), unsafe_allow_html=True)
+        c8.markdown(make_tv_card("BASE ONTEM", vol_total_o, "Ref. Cálculo", "#94A3B8", "📊"), unsafe_allow_html=True) # Cinza Prata para dar leitura
 
         # ---------------------------------------------------------
         # ANDAR 3: GRÁFICOS REDIMENSIONADOS (TEMA PLOTLY DARK)
