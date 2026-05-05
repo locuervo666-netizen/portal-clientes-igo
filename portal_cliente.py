@@ -755,28 +755,28 @@ else:
                     "HOJE":       len(df_f[df_f['DATA_OBJ'] == hoje_br]),
                 }
 
-                # ── KPI CARDS (MODERNIZADOS COM EFEITO E ÍCONES) ─────────
+                # ── KPI CARDS (COM FILTRO ATIVO E CLIQUE CORRIGIDO) ────────────────
                 cols_kpi = st.columns(6)
                 for col, (filtro, label, key) in zip(cols_kpi, KPI_META):
                     is_active = st.session_state.filtro_kpi == filtro
                     dot_color = KPI_DOT_COLOR[filtro]
                     bg_color  = KPI_BG_COLOR[filtro]
-                    
+
                     # Borda mais grossa e colorida se estiver selecionado
                     borda = f"2px solid {dot_color}" if is_active else f"1px solid {dot_color}40"
                     valor = n_vals[filtro]
-                    
+
                     # Separa o emoji do texto (ex: "📦 Total" vira emoji="📦" e texto="Total")
                     partes = label.split(' ', 1)
                     emoji_card = partes[0]
                     texto_card = partes[1] if len(partes) > 1 else label
 
                     with col:
-                        # O HTML do Card moderno: alinhamento à esquerda, emoji como marca d'água gigante
+                        # O HTML do Card. Adicionado 'cursor: pointer' e JS blindado para o clique.
                         st.markdown(f"""
-                            <div class="kpi-card" 
-                                 style="background-color: {bg_color}; border: {borda}; text-align: left; padding: 16px; border-radius: 16px; height: 95px;"
-                                 onclick="window.parent.document.querySelector('.st-key-{key} button').click()">
+                            <div class="kpi-card"
+                                 style="background-color: {bg_color}; border: {borda}; text-align: left; padding: 16px; border-radius: 16px; height: 95px; cursor: pointer;"
+                                 onclick="var btn = window.document.querySelector('.st-key-{key} button'); if(btn) btn.click();">
                                 <!-- Ícone de Fundo (Marca d'água) -->
                                 <div style="position: absolute; right: -5px; bottom: -15px; font-size: 65px; opacity: 0.12; z-index: 0; line-height: 1;">
                                     {emoji_card}
@@ -792,13 +792,13 @@ else:
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
-                        
-                        # Botão invisível mantém a lógica de filtro do Streamlit
+
+                        # Botão nativo recebe a ação
                         if st.button(label, key=key, use_container_width=True, help=f"Filtrar por: {texto_card}"):
                             st.session_state.filtro_kpi = filtro
                             st.rerun()
 
-                # Oculta os botões nativos do Streamlit (visuais ficam nos cards HTML)
+                # 🔥 CORREÇÃO DO BUG: Ocultando os botões sem quebrar a interatividade 🔥
                 st.markdown("""
                     <style>
                     div.st-key-kpi_total button,
@@ -807,13 +807,14 @@ else:
                     div.st-key-kpi_pend button,
                     div.st-key-kpi_hoje button,
                     div.st-key-kpi_aguardando button {
-                        visibility: hidden;
-                        height: 0 !important;
+                        opacity: 0 !important;
+                        position: absolute !important;
+                        z-index: -100 !important;
+                        height: 0px !important;
+                        min-height: 0px !important;
                         padding: 0 !important;
                         margin: 0 !important;
                         border: none !important;
-                        min-height: 0 !important;
-                        overflow: hidden !important;
                     }
                     </style>
                 """, unsafe_allow_html=True)
