@@ -289,14 +289,17 @@ def carregar_dados_nuvem():
                         for c in df_app.columns
                     ]
 
+                    # 🔥 PASSO 1 AQUI: ADICIONAMOS AS NOVAS COLUNAS
                     cols_to_extract = ['PEDIDO']
-                    if 'STATUS'      in df_app.columns: cols_to_extract.append('STATUS')
-                    if 'OBSERVACOES' in df_app.columns: cols_to_extract.append('OBSERVACOES')
-                    if 'FOTO'        in df_app.columns: cols_to_extract.append('FOTO')
-                    if 'DATA'        in df_app.columns: cols_to_extract.append('DATA')
+                    if 'STATUS'       in df_app.columns: cols_to_extract.append('STATUS')
+                    if 'OBSERVACOES'  in df_app.columns: cols_to_extract.append('OBSERVACOES')
+                    if 'FOTO'         in df_app.columns: cols_to_extract.append('FOTO')
+                    if 'FOTO_COLETA'  in df_app.columns: cols_to_extract.append('FOTO_COLETA')
+                    if 'FOTO_ENTREGA' in df_app.columns: cols_to_extract.append('FOTO_ENTREGA')
+                    if 'DATA'         in df_app.columns: cols_to_extract.append('DATA')
                     if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
-                    if 'RECEBEDOR'   in df_app.columns: cols_to_extract.append('RECEBEDOR') # ADICIONADO
-
+                    if 'RECEBEDOR'    in df_app.columns: cols_to_extract.append('RECEBEDOR')
+                    
                     col_nome = None
                     for c in ['DETALHES', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
                         if c in df_app.columns:
@@ -307,13 +310,16 @@ def carregar_dados_nuvem():
                     cols_to_extract = list(set(cols_to_extract))
                     df_app_clean = df_app[cols_to_extract].copy()
 
+                    # 🔥 PASSO 2 AQUI: RENOMEAMOS PRO NOVO DICIONÁRIO
                     rename_dict = {
                         'STATUS': 'A_ST',
                         'OBSERVACOES': 'A_OB',
                         'FOTO': 'A_FO',
+                        'FOTO_COLETA': 'A_FOTO_COL',
+                        'FOTO_ENTREGA': 'A_FOTO_ENT',
                         'DATA': 'A_DT',
                         'DATA_ENTREGA': 'A_DT_ENTREGA',
-                        'RECEBEDOR': 'A_REC' # MAPEMENTO
+                        'RECEBEDOR': 'A_REC'
                     }
                     if col_nome:
                         rename_dict[col_nome] = 'A_CONTATO'
@@ -342,11 +348,22 @@ def carregar_dados_nuvem():
                     df['OBS_APP_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_OB'), axis=1)
                     df['CONTATO_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_CONTATO'), axis=1)
 
-                    if 'A_FO' in df.columns:
-                        df['FOTO'] = df.apply(
-                            lambda r: get_app_val(r, 'A_FO') if get_app_val(r, 'A_FO') else r.get('FOTO', ''),
-                            axis=1
-                        )
+                    # 🔥 PASSO 3 AQUI: REGRA DE OURO DA FOTO (COLETA > ENTREGA > GERAL)
+                    def definir_foto_prioritaria(r):
+                        f_col = get_app_val(r, 'A_FOTO_COL')
+                        f_ent = get_app_val(r, 'A_FOTO_ENT')
+                        f_gen = get_app_val(r, 'A_FO')
+                        
+                        if not f_col: f_col = str(r.get('FOTO_COLETA', '')).strip()
+                        if not f_ent: f_ent = str(r.get('FOTO_ENTREGA', '')).strip()
+                        if not f_gen: f_gen = str(r.get('FOTO', '')).strip()
+                        
+                        if f_col and f_col.upper() != 'NAN': return f_col
+                        if f_ent and f_ent.upper() != 'NAN': return f_ent
+                        if f_gen and f_gen.upper() != 'NAN': return f_gen
+                        return ""
+
+                    df['FOTO_FINAL'] = df.apply(definir_foto_prioritaria, axis=1)
 
                     def get_true_status_portal(row):
                         s_db  = str(row.get('STATUS', '')).strip().upper()
@@ -901,7 +918,9 @@ else:
                     ).drop(columns=['PRIORIDADE'])
 
                     df_final = df_grid.copy()
-                    df_final['COMPROVANTE'] = df_final['FOTO'].apply(tratar_foto)
+                    
+                    # 🔥 PASSO 4 AQUI: O COMPROVANTE AGORA USA A FOTO PRIORITÁRIA
+                    df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
 
                     if 'UF' not in df_final.columns:
                         df_final['UF'] = ""
