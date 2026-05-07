@@ -530,17 +530,24 @@ def get_detalhes(row):
         elif contato: return f"Recebedor(a): {contato}"
         else: return "-"
 
-    # REGRA 2: FRUSTRADA ou PROBLEMA (Protagonismo da Info do App)
+    # REGRA 2: FRUSTRADA ou PROBLEMA (Limpeza via REGEX para tirar a dupla informação)
     if 'FRUSTRADA' in status or 'PROBLEMA' in status:
-        # Se o motorista preencheu algo no app, ignoramos a obs_master (horário)
-        if obs_app and obs_app.upper() != 'NAN':
-            texto = obs_app
+        # Pega a observação e apaga padrões como "[COLETA: 06:00 - 17:00]"
+        obs_limpa = re.sub(r'\[COLETA:.*?\]', '', obs_app, flags=re.IGNORECASE).strip()
+        
+        # Se a info da master estiver poluindo com a tag padrão, limpamos também
+        if not obs_limpa:
+            obs_limpa = re.sub(r'\[COLETA:.*?\]', '', obs_master, flags=re.IGNORECASE).strip()
+
+        if obs_limpa and obs_limpa.upper() != 'NAN':
+            texto = obs_limpa
             if contato and contato.upper() != 'NAN':
                 texto += f" (Informante: {contato})"
             return texto
-        # Se não tem obs do motorista, mas tem informante
         elif contato and contato.upper() != 'NAN':
-            return f"Informante: {contato}"
+            return f"Motivo/Informante: {contato}"
+        else:
+            return obs_master if obs_master else "-"
 
     # REGRA 3: GERAL (Para Pendentes, Em Rota, etc - mantém o horário se houver)
     obs_final = obs_app if obs_app and obs_app.upper() != 'NAN' else obs_master
@@ -950,7 +957,7 @@ else:
                             .replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
                         )
 
-                    # Colunas visíveis
+                    # Colunas visíveis na tela
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
@@ -973,13 +980,10 @@ else:
                         if 'ENTREGUE' in val_str: 
                             return base + 'background-color: #F0FDF4; color: #166534; border-color: #BBF7D0;'
                         if 'ROTA' in val_str: 
-                            # Teal/Verde-Água: Moderno, indica movimento sem ser o azul bebê
                             return base + 'background-color: #F0FDFA; color: #0F766E; border-color: #99F6E4;'
                         if 'COLETADO' in val_str: 
-                            # Roxo/Violeta suave: Indica posse/etapa interna
                             return base + 'background-color: #F5F3FF; color: #6D28D9; border-color: #DDD6FE;'
                         if 'CONFERIDO' in val_str: 
-                            # Indigo/Azul Marinho: Sóbrio, etapa de auditoria
                             return base + 'background-color: #EEF2FF; color: #3730A3; border-color: #C7D2FE;'
                         if 'FRUSTRADA' in val_str: 
                             return base + 'background-color: #FFFBEB; color: #B45309; border-color: #FDE68A;'
@@ -1014,12 +1018,13 @@ else:
                         height=430
                     )
 
-                    # ── EXPORTAÇÃO CSV ENXUTA E TRADUZIDA ────────
+                    # ── EXPORTAÇÃO CSV ENXUTA COM CIDADES/UF SEPARADOS ────────
                     mapa_csv = {
                         'PEDIDO': 'Pedido',
                         'DATA': 'Data Coleta',
                         'LABORATORIO': 'Ponto de Coleta',
-                        'CIDADE_UF': 'Cidade / UF',
+                        'CIDADE': 'Cidade', # Separados!
+                        'UF': 'UF',         # Separados!
                         'DATA_LIMITE': 'Previsão',
                         'DATA_EFETIVA': 'Entrega',
                         'STATUS_DISPLAY': 'Status',
@@ -1029,9 +1034,9 @@ else:
                     if st.session_state.cliente == "LOGISTICA.LABEST":
                         mapa_csv['CNPJ'] = 'CNPJ'
 
-                    # Pega só as colunas que queremos e as renomeia para ficarem bonitas no Excel
-                    colunas_csv_finais = [c for c in mapa_csv.keys() if c in df_grid.columns]
-                    df_export = df_grid[colunas_csv_finais].rename(columns=mapa_csv)
+                    # Filtramos usando o df_final para garantir que tudo foi limpo de "NaN"
+                    colunas_csv_finais = [c for c in mapa_csv.keys() if c in df_final.columns]
+                    df_export = df_final[colunas_csv_finais].rename(columns=mapa_csv)
 
                     # Gera o CSV limpo
                     csv = df_export.to_csv(index=False, sep=';').encode('utf-8-sig')
