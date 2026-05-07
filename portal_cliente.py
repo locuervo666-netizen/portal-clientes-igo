@@ -517,24 +517,33 @@ KPI_META = [
 
 # 🔥 NOVA FUNÇÃO DE DETALHES INTELIGENTE 🔥
 def get_detalhes(row):
-    obs_master = str(row.get('OBSERVACOES', '')).strip()
-    obs_app    = str(row.get('OBS_APP_FINAL', '')).strip()
+    obs_master = str(row.get('OBSERVACOES', '')).strip() # Traz o horário da importação
+    obs_app    = str(row.get('OBS_APP_FINAL', '')).strip() # Traz a anotação do motorista no app
     contato    = str(row.get('CONTATO_FINAL', '')).strip()
     recebedor  = str(row.get('RECEBEDOR_FINAL', '')).strip()
     
     status     = str(row.get('STATUS_DISPLAY', '')).upper()
 
-    # REGRA 1: Se Entregue, foca em mostrar QUEM recebeu (se essa informação existir)
+    # REGRA 1: Se Entregue, foca em mostrar QUEM recebeu
     if 'ENTREGUE' in status:
-        if recebedor:
-            return f"Recebedor(a): {recebedor}"
-        elif contato:
-            return f"Recebedor(a): {contato}"
-        else:
-            return "-"
+        if recebedor: return f"Recebedor(a): {recebedor}"
+        elif contato: return f"Recebedor(a): {contato}"
+        else: return "-"
 
-    # REGRA 2: Se não for Entregue (Frustrada, Problema, etc), mostra a Observação (Motivo)
-    obs_final = obs_app if obs_app else obs_master
+    # REGRA 2: FRUSTRADA ou PROBLEMA (Protagonismo da Info do App)
+    if 'FRUSTRADA' in status or 'PROBLEMA' in status:
+        # Se o motorista preencheu algo no app, ignoramos a obs_master (horário)
+        if obs_app and obs_app.upper() != 'NAN':
+            texto = obs_app
+            if contato and contato.upper() != 'NAN':
+                texto += f" (Informante: {contato})"
+            return texto
+        # Se não tem obs do motorista, mas tem informante
+        elif contato and contato.upper() != 'NAN':
+            return f"Informante: {contato}"
+
+    # REGRA 3: GERAL (Para Pendentes, Em Rota, etc - mantém o horário se houver)
+    obs_final = obs_app if obs_app and obs_app.upper() != 'NAN' else obs_master
     if obs_final.upper() == 'NAN': obs_final = ""
 
     if not obs_final and not contato: return "-"
@@ -989,7 +998,7 @@ else:
                         df_estilizado,
                         column_config={
                             "PEDIDO":       st.column_config.TextColumn("📦 Pedido",         width="small"),
-                            "DATA":         st.column_config.TextColumn("📅 Emissão",         width="small"),
+                            "DATA":         st.column_config.TextColumn("📅 Data Coleta",         width="small"),
                             "LABORATORIO":  st.column_config.TextColumn("🔬 Ponto de Coleta",  width="medium"),
                             "CNPJ":         st.column_config.TextColumn("🏢 CNPJ",             width="medium"),
                             "CIDADE_UF":    st.column_config.TextColumn("📍 Cidade / UF",      width="medium"),
@@ -1006,14 +1015,45 @@ else:
                     )
 
                     # Exportar posicionado junto à busca
-                    csv = df_grid.to_csv(index=False, sep=';').encode('utf-8-sig')
+                    # ── EXPORTAÇÃO CSV ENXUTA E TRADUZIDA ────────
+                    mapa_csv = {
+                        'PEDIDO': 'Pedido',
+                        'DATA': 'Data Coleta',
+                        'LABORATORIO': 'Ponto de Coleta',
+                        'CIDADE_UF': 'Cidade / UF',
+                        'DATA_LIMITE': 'Previsão',
+                        'DATA_EFETIVA': 'Entrega',
+                        'STATUS_DISPLAY': 'Status',
+                        'DETALHES': 'Atualizações'
+                    }
+                    
+                    if st.session_state.cliente == "LOGISTICA.LABEST":
+                        mapa_csv['CNPJ'] = 'CNPJ'
+
+                    # Pega só as colunas que queremos e as renomeia para ficarem bonitas no Excel
+                    colunas_csv_finais = [c for c in mapa_csv.keys() if c in df_grid.columns]
+                    df_export = df_grid[colunas_csv_finais].rename(columns=mapa_csv)
+
+                    # Gera o CSV limpo
+                    csv = df_export.to_csv(index=False, sep=';').encode('utf-8-sig')
+                    
                     with holder_download:
                         st.download_button(
                             "⬇️ CSV",
                             data=csv,
                             file_name=f"Relatorio_{st.session_state.cliente}.csv",
                             use_container_width=True,
-                            help="Exportar relatório completo"
+                            help="Exportar relatório simplificado"
+                        )
+
+                    # Mantém também o exportar na sidebar apontando para o arquivo limpo
+                    with holder_exportar:
+                        st.download_button(
+                            "📥 Exportar Relatório (CSV Limpo)",
+                            data=csv,
+                            file_name=f"Relatorio_{st.session_state.cliente}.csv",
+                            use_container_width=True,
+                            key="export_sidebar"
                         )
 
                     # Mantém também o exportar na sidebar
