@@ -7,11 +7,9 @@ import json
 import requests
 import re
 import random
-import io
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta, timezone
 from google.oauth2.credentials import Credentials
-from fpdf import FPDF
 
 FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
@@ -209,6 +207,7 @@ st.markdown("""
         align-items: flex-end;
         margin-bottom: 8px;
     }
+
     </style>
 """, unsafe_allow_html=True)
 
@@ -241,7 +240,7 @@ CLIENTES_CONFIG = {
 }
 
 # =======================================================
-# 🔗 2. MOTOR DE DADOS & GERAÇÃO DE PDF
+# 🔗 2. MOTOR DE DADOS
 # =======================================================
 @st.cache_resource
 def conectar_banco_seguro():
@@ -264,65 +263,6 @@ def conectar_banco_seguro():
     except Exception as e:
         st.warning(f"Erro ao conectar ao banco: {e}")
         return None
-
-def tratar_foto(x):
-    xs = str(x).strip()
-    if not xs or xs.upper() in ['NAN', 'NONE']:
-        return ""
-    if xs.startswith("http"):
-        return xs
-    return (
-        f"https://www.appsheet.com/template/gettablefileurl"
-        f"?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
-    )
-
-def gerar_pdf_pod(row, nome_cliente):
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # Cabeçalho com a Logo da IGO
-    try:
-        logo_data = requests.get(LOGO_IGO).content
-        logo_stream = io.BytesIO(logo_data)
-        pdf.image(logo_stream, 10, 10, 30)
-    except Exception:
-        pass
-    
-    pdf.set_font('Arial', 'B', 16)
-    pdf.cell(0, 10, 'COMPROVANTE DE COLETA OFICIAL', 0, 1, 'C')
-    pdf.set_font('Arial', '', 10)
-    pdf.cell(0, 5, f'Gerado em: {datetime.now(FUSO_BR).strftime("%d/%m/%Y %H:%M")}', 0, 1, 'C')
-    pdf.ln(15)
-
-    # Tabela de Informações
-    pdf.set_fill_color(240, 240, 240)
-    pdf.set_font('Arial', 'B', 11)
-    pdf.cell(0, 8, f'  INFORMAÇÕES DO PEDIDO #{row.get("PEDIDO", "")}', 1, 1, 'L', fill=True)
-    pdf.set_font('Arial', '', 10)
-    pdf.cell(95, 8, f' Cliente: {nome_cliente}', 1)
-    pdf.cell(95, 8, f' Data Coleta: {row.get("DATA", "")}', 1, 1)
-    pdf.cell(95, 8, f' Local: {row.get("LABORATORIO", "")}', 1)
-    pdf.cell(95, 8, f' Cidade: {row.get("CIDADE", "")}/{row.get("UF", "")}', 1, 1)
-    
-    # Tenta usar o Status resolvido pra ficar bonito
-    status_print = row.get("STATUS_DISPLAY", row.get("STATUS", ""))
-    pdf.cell(0, 8, f' Status: {status_print}', 1, 1)
-    pdf.ln(5)
-
-    # Insere a Foto
-    if row.get('FOTO_FINAL'):
-        pdf.set_font('Arial', 'B', 11)
-        pdf.cell(0, 8, '  EVIDÊNCIA DA OPERAÇÃO', 1, 1, 'L', fill=True)
-        try:
-            url_foto = tratar_foto(row['FOTO_FINAL'])
-            img_data = requests.get(url_foto).content
-            img_stream = io.BytesIO(img_data)
-            # Centraliza e insere a foto (Largura 120, Posição X 45)
-            pdf.image(img_stream, x=45, y=pdf.get_y() + 5, w=120)
-        except Exception:
-            pdf.cell(0, 10, ' (Erro ao carregar a imagem do servidor AppSheet)', 0, 1)
-
-    return pdf.output(dest='S').encode('latin-1')
 
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem():
@@ -575,10 +515,10 @@ KPI_META = [
     ("HOJE",       "📅 Hoje",         "kpi_hoje"),
 ]
 
-# 🔥 NOVA FUNÇÃO DE DETALHES INTELIGENTE COM LIMPEZA REGEX 🔥
+# 🔥 NOVA FUNÇÃO DE DETALHES INTELIGENTE 🔥
 def get_detalhes(row):
-    obs_master = str(row.get('OBSERVACOES', '')).strip() 
-    obs_app    = str(row.get('OBS_APP_FINAL', '')).strip() 
+    obs_master = str(row.get('OBSERVACOES', '')).strip() # Traz o horário da importação
+    obs_app    = str(row.get('OBS_APP_FINAL', '')).strip() # Traz a anotação do motorista no app
     contato    = str(row.get('CONTATO_FINAL', '')).strip()
     recebedor  = str(row.get('RECEBEDOR_FINAL', '')).strip()
     
@@ -590,9 +530,9 @@ def get_detalhes(row):
         elif contato: return f"Recebedor(a): {contato}"
         else: return "-"
 
-    # REGRA 2: FRUSTRADA ou PROBLEMA (Limpeza via REGEX para tirar a dupla informação de horário)
+    # REGRA 2: FRUSTRADA ou PROBLEMA (Limpeza via REGEX para tirar a dupla informação)
     if 'FRUSTRADA' in status or 'PROBLEMA' in status:
-        # Pega a observação e apaga padrões de horários chatos, ex: "[COLETA: 06:00 - 17:00]"
+        # Pega a observação e apaga padrões como "[COLETA: 06:00 - 17:00]"
         obs_limpa = re.sub(r'\[COLETA:.*?\]', '', obs_app, flags=re.IGNORECASE).strip()
         
         # Se a info da master estiver poluindo com a tag padrão, limpamos também
@@ -626,6 +566,17 @@ def definir_prioridade_portal(status_str):
     if 'ROTA'      in s: return 4
     if 'ENTREGUE'  in s: return 5
     return 6
+
+def tratar_foto(x):
+    xs = str(x).strip()
+    if not xs or xs.upper() in ['NAN', 'NONE']:
+        return ""
+    if xs.startswith("http"):
+        return xs
+    return (
+        f"https://www.appsheet.com/template/gettablefileurl"
+        f"?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
+    )
 
 # =======================================================
 # 🔐 3. LOGIN
@@ -708,34 +659,6 @@ else:
         # 🗂️ AGRUPAMENTO 2: AÇÕES E SUPORTE
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Suporte e Relatórios</p>", unsafe_allow_html=True)
         
-        # OBTENDO DADOS PARA O GERADOR DE PDF 
-        df_raw_for_pdf = carregar_dados_nuvem()
-
-        # Botão Gerador de Comprovante Oficial (PDF)
-        if not df_raw_for_pdf.empty:
-            df_cli_pdf = df_raw_for_pdf[df_raw_for_pdf['TOMADOR'] == nome_tomador_oficial] if conf["filtro"] != "TODOS" else df_raw_for_pdf
-            if not df_cli_pdf.empty:
-                with st.popover("📄 Gerar Comprovante PDF", use_container_width=True):
-                    st.markdown("<small>Selecione o pedido para gerar o documento com foto:</small>", unsafe_allow_html=True)
-                    lista_pedidos_pdf = sorted(df_cli_pdf['PEDIDO'].dropna().unique().tolist(), reverse=True)
-                    id_pdf = st.selectbox("Nº do Pedido:", ["Selecione..."] + lista_pedidos_pdf)
-                    
-                    if id_pdf != "Selecione...":
-                        row_sel = df_cli_pdf[df_cli_pdf['PEDIDO'] == id_pdf].iloc[0].copy()
-                        row_sel['STATUS_DISPLAY'] = get_st(row_sel) # Formata o status bonito
-                        
-                        try:
-                            pdf_bytes = gerar_pdf_pod(row_sel, st.session_state.cliente)
-                            st.download_button(
-                                label=f"📥 Baixar Comprovante #{id_pdf}", 
-                                data=pdf_bytes, 
-                                file_name=f"Comprovante_IGO_{id_pdf}.pdf", 
-                                mime="application/pdf", 
-                                use_container_width=True
-                            )
-                        except Exception as e:
-                            st.error(f"Erro ao gerar o PDF: {e}")
-
         # Popover: Botão moderno que abre um mini-menu flutuante por cima da tela
         with st.popover("🎧 Abrir Chamado C.C.O.", use_container_width=True):
             st.markdown("📄 **Novo Chamado de Atendimento**")
@@ -805,7 +728,7 @@ else:
     """, unsafe_allow_html=True)
 
     # ── DADOS ───────────────────────────────────────────
-    df_raw = df_raw_for_pdf # Aproveita a consulta já feita para o PDF
+    df_raw = carregar_dados_nuvem()
 
     if df_raw.empty:
         st.info("Aguardando novas informações do C.C.O na base de dados...")
@@ -842,7 +765,7 @@ else:
                         sorted(df_cliente['CIDADE'].dropna().unique().tolist())
                     )
 
-                # Monta colunas derivadas (Incluindo os novos filtros de regex em get_detalhes)
+                # Monta colunas derivadas
                 df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
                 df_cliente['DETALHES']       = df_cliente.apply(get_detalhes, axis=1)
 
@@ -1012,9 +935,8 @@ else:
 
                     df_final = df_grid.copy()
                     
-                    # 🔥 AQUI ENTRA A MÁGICA DAS FOTOS: MINIATURA + LINK DE ZOOM 🔥
-                    df_final['📸 Preview'] = df_final['FOTO_FINAL'].apply(tratar_foto)
-                    df_final['🔗 Original'] = df_final['📸 Preview']
+                    # 🔥 PASSO 4 AQUI: O COMPROVANTE AGORA USA A FOTO PRIORITÁRIA
+                    df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
 
                     if 'UF' not in df_final.columns:
                         df_final['UF'] = ""
@@ -1035,11 +957,11 @@ else:
                             .replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
                         )
 
-                    # Colunas visíveis na tela (Tabela)
+                    # Colunas visíveis na tela
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
-                        'DETALHES', '📸 Preview', '🔗 Original'
+                        'DETALHES', 'COMPROVANTE'
                     ]
 
                     # CNPJ apenas para LABEST
@@ -1076,7 +998,6 @@ else:
 
                     df_estilizado = df_final[colunas_visiveis].style.map(colorir_status_badge, subset=['STATUS_DISPLAY'])
 
-                    # Desenhando a tabela na tela
                     st.dataframe(
                         df_estilizado,
                         column_config={
@@ -1089,8 +1010,8 @@ else:
                             "DATA_EFETIVA": st.column_config.TextColumn("🏁 Entrega",          width="small"),
                             "STATUS_DISPLAY":st.column_config.TextColumn("🚦 Status",          width="medium"),
                             "DETALHES":     st.column_config.TextColumn("💬 Atualizações",      width="large"),
-                            "📸 Preview":    st.column_config.ImageColumn("📸 Preview",        width="small"),
-                            "🔗 Original":   st.column_config.LinkColumn("📎 Original",        display_text="Ampliar"),
+                            "COMPROVANTE":  st.column_config.LinkColumn("📎 Anexo",
+                                                                        display_text="Ver Comprovante"),
                         },
                         hide_index=True,
                         use_container_width=True,
@@ -1102,8 +1023,8 @@ else:
                         'PEDIDO': 'Pedido',
                         'DATA': 'Data Coleta',
                         'LABORATORIO': 'Ponto de Coleta',
-                        'CIDADE': 'Cidade', # Separados para o Excel!
-                        'UF': 'UF',         # Separados para o Excel!
+                        'CIDADE': 'Cidade', # Separados!
+                        'UF': 'UF',         # Separados!
                         'DATA_LIMITE': 'Previsão',
                         'DATA_EFETIVA': 'Entrega',
                         'STATUS_DISPLAY': 'Status',
