@@ -998,7 +998,7 @@ else:
                         df_estilizado,
                         column_config={
                             "PEDIDO":       st.column_config.TextColumn("📦 Pedido",         width="small"),
-                            "DATA":         st.column_config.TextColumn("📅 Data Coleta",         width="small"),
+                            "DATA":         st.column_config.TextColumn("📅 Data Coleta",     width="small"),
                             "LABORATORIO":  st.column_config.TextColumn("🔬 Ponto de Coleta",  width="medium"),
                             "CNPJ":         st.column_config.TextColumn("🏢 CNPJ",             width="medium"),
                             "CIDADE_UF":    st.column_config.TextColumn("📍 Cidade / UF",      width="medium"),
@@ -1014,7 +1014,6 @@ else:
                         height=430
                     )
 
-                    # Exportar posicionado junto à busca
                     # ── EXPORTAÇÃO CSV ENXUTA E TRADUZIDA ────────
                     mapa_csv = {
                         'PEDIDO': 'Pedido',
@@ -1043,7 +1042,8 @@ else:
                             data=csv,
                             file_name=f"Relatorio_{st.session_state.cliente}.csv",
                             use_container_width=True,
-                            help="Exportar relatório simplificado"
+                            help="Exportar relatório simplificado",
+                            key="btn_download_grid_limpo"
                         )
 
                     # Mantém também o exportar na sidebar apontando para o arquivo limpo
@@ -1053,17 +1053,7 @@ else:
                             data=csv,
                             file_name=f"Relatorio_{st.session_state.cliente}.csv",
                             use_container_width=True,
-                            key="export_sidebar"
-                        )
-
-                    # Mantém também o exportar na sidebar
-                    with holder_exportar:
-                        st.download_button(
-                            "📥 Exportar Relatório Completo (CSV)",
-                            data=csv,
-                            file_name=f"Relatorio_{st.session_state.cliente}.csv",
-                            use_container_width=True,
-                            key="export_sidebar"
+                            key="btn_export_sidebar_limpo"
                         )
 
         # ===================================================
