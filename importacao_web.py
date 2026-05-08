@@ -3838,14 +3838,24 @@ elif menu == "📈 Dashboard":
             if not vol_tom.empty:
                 def get_logo_url(tomador):
                     tomador_upper = str(tomador).strip().upper()
-                    # ⚠️ Troque os links da Labest e Souza Cruz pelos links reais que você subir no postimg.cc
+                    
+                    # 🚀 LOGOS PUXADAS DIRETAMENTE DO SEU GOOGLE DRIVE 🚀
                     logos = {
-                        "GRALAB": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png",
-                        "SYNVIA": "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png",
-                        "LABEST": "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", 
-                        "SOUZA CRUZ": "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png" 
+                        "ECOLYZER": "https://drive.google.com/uc?export=view&id=1NdbO7olL6GUQDN3krRnyICfgNC07Di2Z",
+                        "GRALAB": "https://drive.google.com/uc?export=view&id=1SeNj-i590Q6ft-pUcSIk-OKKHiOYtAxU",
+                        "CUNHA": "https://drive.google.com/uc?export=view&id=1SeNj-i590Q6ft-pUcSIk-OKKHiOYtAxU",
+                        "LABEST": "https://drive.google.com/uc?export=view&id=15pSrGXFBvpaJwVYrgJkBa01RPgPNsdnT",
+                        "SOUZA CRUZ": "https://drive.google.com/uc?export=view&id=1qnaukWDnGDAJ8G5zCFBg0Zw2BsXW4QEb",
+                        "HEXALIFE": "https://drive.google.com/uc?export=view&id=1FAoDyfWdfaUFUjyB2z_7cpiWAdH5AzMd",
+                        "INNOVATOX": "https://drive.google.com/uc?export=view&id=1f-pKadqlAEeDnUw5YDMT1qJ52_LCxhPH",
+                        "SODRE": "https://drive.google.com/uc?export=view&id=1n17pTrQ6i0ymgfw0alc8Ie6BEQOuJSxq",
+                        "SYNVIA": "https://drive.google.com/uc?export=view&id=1MYi7GKT6aAtYJALMoHFOxqmOjdV_Qjoh",
+                        "CAEP": "https://drive.google.com/uc?export=view&id=1MYi7GKT6aAtYJALMoHFOxqmOjdV_Qjoh",
+                        "SAPIENS": "https://drive.google.com/uc?export=view&id=1SeimGoz8sEhF-_63LpFkHJLgXbWzrBIP"
                     }
-                    return logos.get(tomador_upper, "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png")
+                    
+                    # 📌 Se for um cliente novo sem logo, usa a "padrao.png" do seu Drive
+                    return logos.get(tomador_upper, "https://drive.google.com/uc?export=view&id=10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY")
 
                 vol_tom['Logo'] = vol_tom['Cliente'].apply(get_logo_url)
                 vol_tom = vol_tom[['Logo', 'Cliente', 'Volumes']]
