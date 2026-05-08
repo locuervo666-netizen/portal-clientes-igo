@@ -3598,18 +3598,24 @@ elif menu == "📈 Dashboard":
     import urllib.parse
 
     # 🔥 CONFIGURAÇÃO VISUAL ELITE (Fundo cinza claro para destacar os cards pastéis) 🔥
-    st.markdown("""
+    st.markdown(f"""
         <style>
-        [data-testid="stAppViewContainer"] { background-color: #F8FAFC; color: #1E293B; }
-        [data-testid="stHeader"] { background-color: transparent; }
-        .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; max-width: 100% !important; }
+        [data-testid="stAppViewContainer"] {{ background-color: {bg_app}; color: {text_app}; transition: 0.5s; }}
         
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
-        }
-        .alerta-sirene { animation: pulse-red 2s infinite; border: 1px solid #EF4444 !important; }
+        /* 🔥 MATA O CABEÇALHO FANTASMA DO STREAMLIT DE VEZ 🔥 */
+        [data-testid="stHeader"] {{ display: none !important; }}
+        
+        /* Zera o espaço inútil do topo para colar na borda da TV */
+        .block-container {{ padding-top: 0rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; margin-top: 0px !important; }}
+        
+        hr {{ margin: 0.5em 0 !important; border-color: {border_card} !important; }}
+        
+        @keyframes pulse-red {{
+            0% {{ box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }}
+            70% {{ box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }}
+            100% {{ box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }}
+        }}
+        .alerta-sirene {{ animation: pulse-red 2s infinite; border: 1px solid #EF4444 !important; }}
         </style>
     """, unsafe_allow_html=True)
     
