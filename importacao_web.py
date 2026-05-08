@@ -3617,10 +3617,8 @@ elif menu == "📈 Dashboard":
         </style>
     """, unsafe_allow_html=True)
     
-    # ⏱️ REFRESH AJUSTADO PARA 2 MINUTOS (120.000 ms)
-    components.html(
-        """<script>setTimeout(function(){ window.parent.location.reload(); }, 120000);</script>""",
-        height=0, width=0
+    # ⏱️ REFRESH NATIVO (Não apaga a memória de login)
+    st_autorefresh(interval=120000, limit=None, key="refresh_dashboard_tv")
     )
     
     df_raw = carregar_dados_completos(planilha_db)
