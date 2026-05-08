@@ -3597,29 +3597,29 @@ elif menu == "📈 Dashboard":
     import requests
     import urllib.parse
 
-    # 🔥 CONFIGURAÇÃO VISUAL ELITE (Fundo cinza claro para destacar os cards pastéis) 🔥
-    st.markdown(f"""
+    # 🔥 CONFIGURAÇÃO VISUAL ELITE (Tema Claro Fixo e Otimizado para TV com F11) 🔥
+    st.markdown("""
         <style>
-        [data-testid="stAppViewContainer"] {{ background-color: {bg_app}; color: {text_app}; transition: 0.5s; }}
+        [data-testid="stAppViewContainer"] { background-color: #F8FAFC; color: #1E293B; }
         
-        /* 🔥 MATA O CABEÇALHO FANTASMA DO STREAMLIT DE VEZ 🔥 */
-        [data-testid="stHeader"] {{ display: none !important; }}
+        /* Mata o cabeçalho fantasma do Streamlit para colar na TV */
+        [data-testid="stHeader"] { display: none !important; }
         
-        /* Zera o espaço inútil do topo para colar na borda da TV */
-        .block-container {{ padding-top: 0rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; margin-top: 0px !important; }}
+        /* Zera os espaços inúteis */
+        .block-container { padding-top: 0rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; margin-top: 0px !important; }
         
-        hr {{ margin: 0.5em 0 !important; border-color: {border_card} !important; }}
+        hr { margin: 0.5em 0 !important; border-color: #E2E8F0 !important; }
         
-        @keyframes pulse-red {{
-            0% {{ box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }}
-            70% {{ box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }}
-            100% {{ box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }}
-        }}
-        .alerta-sirene {{ animation: pulse-red 2s infinite; border: 1px solid #EF4444 !important; }}
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+        .alerta-sirene { animation: pulse-red 2s infinite; border: 1px solid #EF4444 !important; }
         </style>
     """, unsafe_allow_html=True)
     
-    # ⏱️ REFRESH NATIVO (2 minutos)
+    # ⏱️ REFRESH NATIVO (Atualiza dados a cada 2 min sem perder o login)
     st_autorefresh(interval=120000, limit=None, key="refresh_dashboard_elite")
     
     df_raw = carregar_dados_completos(planilha_db)
@@ -3697,8 +3697,8 @@ elif menu == "📈 Dashboard":
                     resp = requests.get(f"https://wttr.in/{urllib.parse.quote(cidade_busca)}?format=j1", timeout=3)
                     if resp.status_code == 200:
                         condicao = str(resp.json()['current_condition'][0]['weatherDesc'][0]['value']).lower()
-                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder']): alertas.append(f"⛈️ RADAR CLIMA: Chuva na rota de {item}!")
-                        else: alertas.append(f"☀️ RADAR CLIMA: Tempo estável em {item}.")
+                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder']): alertas.append(f"⛈️ CLIMA: Chuva na rota de {item}!")
+                        else: alertas.append(f"☀️ CLIMA: Tempo estável em {item}.")
                 except: continue
             return alertas
 
@@ -3715,15 +3715,15 @@ elif menu == "📈 Dashboard":
                         dados = resp.json()
                         if dados and isinstance(dados, list) and len(dados) > 0:
                             status = str(dados[0].get('status', 'UNK')).upper()
-                            if "EXPECTED" in status or "SCHEDULED" in status: alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} confirmado.")
-                            elif "DELAYED" in status: alertas_voos.append(f"🚨 ALERTA AÉREO: Voo {v_query} consta como ATRASADO!")
+                            if "EXPECTED" in status or "SCHEDULED" in status: alertas_voos.append(f"✈️ AÉREO: Voo {v_query} confirmado.")
+                            elif "DELAYED" in status: alertas_voos.append(f"🚨 AÉREO: Voo {v_query} ATRASADO!")
                 except: continue
             return alertas_voos
 
         # ---------------------------------------------------------
         # BARRA DE NOTÍCIAS (TICKER INTELIGENTE MEGAZORD)
         # ---------------------------------------------------------
-        manchetes = [f"🟢 OPERAÇÃO ATIVA", f"🕒 {datetime.now(FUSO_BR).strftime('%H:%M')}"]
+        manchetes = [f"🟢 OPERAÇÃO ATIVA", f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M')}"]
         
         # 1. Alertas de Helpdesk e SLA Crítico
         if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) pendente(s)")
@@ -3742,48 +3742,15 @@ elif menu == "📈 Dashboard":
                 qtd_atrasos_top = df_atrasados['AGENTE_RAW'].value_counts().iloc[0]
                 if str(top_atrasado).strip() and str(top_atrasado).upper() != 'NAN':
                     nome_mot_atrasado = dict_nomes_dash.get(str(top_atrasado).strip().lower(), str(top_atrasado).upper().split('|')[0])
-                    manchetes.append(f"⚠️ ATENÇÃO: O motorista {nome_mot_atrasado} possui {qtd_atrasos_top} volume(s) com prazo estourado.")
+                    manchetes.append(f"⚠️ ATENÇÃO: Motorista {nome_mot_atrasado} com {qtd_atrasos_top} volume(s) estourado(s).")
 
-        # 🔥 INTELIGÊNCIA 1: O "Camisa 10" (Destaque da Frota)
-        if len(frota_ordenada) > 0:
-            melhor_agente = frota_ordenada[0][0]
-            perc_melhor = frota_ordenada[0][1]['perc']
-            if perc_melhor >= 50: # Só elogia no painel se já tiver feito pelo menos metade
-                manchetes.append(f"🏆 DESTAQUE DA FROTA: {melhor_agente} liderando com {perc_melhor}% de conclusão na sua rota!")
-
-        # 🔥 INTELIGÊNCIA 2: Monitor de Grandes Contas (Top 2 Clientes do dia)
-        if not df_hoje.empty:
-            top_tomadores = df_hoje['TOMADOR'].value_counts().head(2).index.tolist()
-            for tom in top_tomadores:
-                df_tom = df_hoje[df_hoje['TOMADOR'] == tom]
-                tot_tom = len(df_tom)
-                conc_tom = len(df_tom[df_tom['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
-                pct_tom = int((conc_tom / tot_tom) * 100) if tot_tom > 0 else 0
-                manchetes.append(f"🏢 GRANDES CONTAS: {tom} com {pct_tom}% de conclusão hoje.")
-
-        # 🔥 INTELIGÊNCIA 3: Radar de Gargalo Regional
-        df_gargalo = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente', case=False)]
-        if not df_gargalo.empty:
-            cidade_gargalo = df_gargalo['CIDADE'].value_counts()
-            if not cidade_gargalo.empty:
-                cid_nome = str(cidade_gargalo.index[0]).title()
-                cid_qtd = cidade_gargalo.iloc[0]
-                if cid_qtd >= 3: # Só apita o gargalo se tiver 3 ou mais acumulados
-                    manchetes.append(f"📍 ALERTA DE ROTA: {cid_nome} concentra o maior gargalo atual com {cid_qtd} volume(s) aguardando.")
-
-        # 🔥 INTELIGÊNCIA 4: Projeção Financeira do Turno 
-        # (Usamos um Ticket Médio de R$35 para o C.C.O não travar lendo planilhas de preço a cada 2min)
-        TICKET_MEDIO_ESTIMADO = 35.00
+        # 4. Projeção Financeira do Turno (Ticket R$35)
+        TICKET_MEDIO = 35.00
         if resolvidos_h > 0:
-            projecao = resolvidos_h * TICKET_MEDIO_ESTIMADO
-            manchetes.append(f"📈 PROJEÇÃO: As operações finalizadas hoje já somam aprox. R$ {projecao:,.2f} em faturamento.")
+            projecao = resolvidos_h * TICKET_MEDIO
+            manchetes.append(f"📈 PROJEÇÃO: Aprox. R$ {projecao:,.2f} em faturamento hoje.")
 
-        # 🔥 INTELIGÊNCIA 5: Contagem Regressiva do SLA
-        df_risco_sla = df_gargalo[df_gargalo['DATA_LIMITE'] == hoje.strftime('%d/%m/%Y')]
-        if not df_risco_sla.empty:
-            manchetes.append(f"⏰ RISCO DE SLA: {len(df_risco_sla)} pedido(s) pendente(s) vencem HOJE e precisam de prioridade!")
-
-        # 6. Últimas Baixas (Tempo Real)
+        # 5. Últimas Baixas
         finalizados_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)]
         if not finalizados_hj.empty:
             for _, row in finalizados_hj.tail(2).iterrows():
@@ -3792,9 +3759,9 @@ elif menu == "📈 Dashboard":
                 hora = str(row.get('HORA_BAIXA', row.get('HORA', '')))
                 hora_str = f" às {hora}" if hora and hora.lower() != 'nan' and hora.strip() else ""
                 tipo = "Coleta" if 'COLETADO' in str(row.get('STATUS_DISPLAY', '')).upper() else "Entrega"
-                manchetes.append(f"✅ ÚLTIMA BAIXA: {tipo} no {pcl} em {cidade}{hora_str}!")
+                manchetes.append(f"✅ BAIXA: {tipo} no {pcl} em {cidade}{hora_str}!")
 
-        # 7. Clima e Voos
+        # 6. Clima e Voos
         cidades_alvo = []
         if not df_hoje.empty:
             top_cids = df_hoje['CIDADE'].value_counts().head(3).index.tolist()
@@ -3810,7 +3777,7 @@ elif menu == "📈 Dashboard":
         ticker_text = " &nbsp;&nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;&nbsp; ".join([m for m in manchetes])
         st.markdown(f"""
             <style>
-            .ticker-wrap {{ background: #FFFFFF; border: 1px solid #E2E8F0; padding: 16px 0; border-radius: 8px; margin-bottom: 20px; overflow: hidden; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }}
+            .ticker-wrap {{ background: #FFFFFF; border: 1px solid #E2E8F0; padding: 16px 0; border-radius: 8px; margin-top: 15px; margin-bottom: 20px; overflow: hidden; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }}
             .ticker-move {{ display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker 80s linear infinite; }}
             @keyframes ticker {{ 0% {{ transform: translate3d(0, 0, 0); }} 100% {{ transform: translate3d(-100%, 0, 0); }} }}
             .ticker-item {{ font-size: 18px; font-weight: 800; color: #334155; letter-spacing: 0.5px; }}
@@ -3885,8 +3852,7 @@ elif menu == "📈 Dashboard":
                 fig = px.pie(df_status, values='Qtd', names='Status', hole=0.6,
                              color='Status', color_discrete_map={'Coletado': '#6366F1', 'Pendente': '#F59E0B', 'Frustrada': '#EF4444', 'Atrasado': '#991B1B'})
                 fig.update_traces(textinfo='percent', textfont_size=12, textfont_color='white', marker=dict(line=dict(color="#FFFFFF", width=2)))
-                fig.update_layout(showlegend=True, height=230, margin=dict(t=10, b=0, l=0, r=0),
-                                  legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=11, color="#64748B")))
+                fig.update_layout(template="plotly_white", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, b=0, l=0, r=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=11, color="#64748B")), height=230)
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("Sem dados para os gráficos.")
@@ -3915,7 +3881,7 @@ elif menu == "📈 Dashboard":
                 st.info("Nenhuma movimentação registrada hoje.")
 
         # ---------------------------------------------------------
-        # RANKING DA FROTA (PÓDIO) - TONS PASTÉIS E BORDAS LIMPAS
+        # RANKING DA FROTA (PÓDIO) - TONS PASTÉIS
         # ---------------------------------------------------------
         st.markdown("<br>", unsafe_allow_html=True)
         if len(frota_ordenada) > 0:
@@ -3934,8 +3900,8 @@ elif menu == "📈 Dashboard":
                     <div style="font-size: 22px; font-weight: 900; color: {color};">{pct}%</div>
                 </div>
                 """
-            if len(frota_ordenada) >= 1: rf1.markdown(podio_ui("1", "🥇", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], frota_ordenada[0][1]['conc'], "#10B981", "#F0FDF4"), unsafe_allow_html=True)
-            if len(frota_ordenada) >= 2: rf2.markdown(podio_ui("2", "🥈", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], frota_ordenada[1][1]['conc'], "#64748B", "#F8FAFC"), unsafe_allow_html=True)
-            if len(frota_ordenada) >= 3: rf3.markdown(podio_ui("3", "🥉", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], frota_ordenada[2][1]['conc'], "#F59E0B", "#FFFBEB"), unsafe_allow_html=True)
+            if len(frota_ordenada) >= 1: rf1.markdown(podio_ui("1", "🥇", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}", "#10B981", "#F0FDF4"), unsafe_allow_html=True)
+            if len(frota_ordenada) >= 2: rf2.markdown(podio_ui("2", "🥈", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}", "#64748B", "#F8FAFC"), unsafe_allow_html=True)
+            if len(frota_ordenada) >= 3: rf3.markdown(podio_ui("3", "🥉", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}", "#F59E0B", "#FFFBEB"), unsafe_allow_html=True)
         else:
             st.info("Aguardando dados da frota para o dia atual.")
