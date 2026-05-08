@@ -3861,14 +3861,14 @@ elif menu == "📈 Dashboard":
             else: st.info("Sem dados para os gráficos.")
 
         with col_table:
-            st.markdown("<p style='font-weight: 800; font-size: 13px; color: #475569; margin-bottom: 8px;'>🏢 VOLUMES DE HOJE POR TOMADOR</p>", unsafe_allow_html=True)
+            st.markdown("<p style='font-weight: 900; font-size: 13px; color: #475569; margin-bottom: 12px; text-transform: uppercase;'>🏢 Volumes de Hoje por Tomador</p>", unsafe_allow_html=True)
             vol_tom = df_hoje['TOMADOR'].value_counts().reset_index()
             vol_tom.columns = ['Cliente', 'Volumes']
             
             if not vol_tom.empty:
                 def get_logo_url(tomador):
                     tomador_upper = str(tomador).strip().upper()
-                    # 🛠️ FORMATO OTIMIZADO PARA STREAMLIT (lh3.googleusercontent.com)
+                    # 🛠️ FORMATO OTIMIZADO PARA STREAMLIT
                     logos = {
                         "ECOLYZER": "https://lh3.googleusercontent.com/d/1NdbO7olL6GUQDN3krRnyICfgNC07Di2Z",
                         "GRALAB": "https://lh3.googleusercontent.com/d/1SeNj-i590Q6ft-pUcSIk-OKKHiOYtAxU",
@@ -3884,21 +3884,47 @@ elif menu == "📈 Dashboard":
                     }
                     return logos.get(tomador_upper, "https://lh3.googleusercontent.com/d/10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY")
 
-                vol_tom['Logo'] = vol_tom['Cliente'].apply(get_logo_url)
+                max_vol = int(vol_tom['Volumes'].max())
                 
-                # 🚀 MUDANÇA AQUI: Removemos a coluna 'Cliente' (texto) e deixamos só Logo e Volumes
-                vol_tom = vol_tom[['Logo', 'Volumes']]
-
-                st.dataframe(
-                    vol_tom,
-                    column_config={
-                        # 🚀 MUDANÇA AQUI: Título "Tomador" na logo e tamanho aumentado para "medium"
-                        "Logo": st.column_config.ImageColumn("Tomador", width="medium"),
-                        "Volumes": st.column_config.ProgressColumn("Qtd Finalizada", format="%d", min_value=0, max_value=int(vol_tom['Volumes'].max())),
-                    },
-                    hide_index=True, use_container_width=True, height=240
-                )
-            else: st.info("Nenhuma movimentação registrada hoje.")
+                # Container com barra de rolagem invisível para manter a altura do gráfico
+                html_cards = "<div style='display: flex; flex-direction: column; gap: 8px; height: 240px; overflow-y: auto; padding-right: 5px;'>"
+                
+                for _, row in vol_tom.iterrows():
+                    cliente = row['Cliente']
+                    logo = get_logo_url(cliente)
+                    vol = row['Volumes']
+                    pct = int((vol / max_vol) * 100) if max_vol > 0 else 0
+                    
+                    html_cards += f"""
+                    <div style="display: flex; align-items: center; padding: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                        <div style="width: 42px; height: 42px; border-radius: 8px; background: #F8FAFC; display: flex; justify-content: center; align-items: center; margin-right: 15px; border: 1px solid #F1F5F9; padding: 3px; flex-shrink: 0;">
+                            <img src="{logo}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                        </div>
+                        <div style="flex-grow: 1;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;">
+                                <span style="font-size: 13px; font-weight: 800; color: #1E293B;">{cliente.upper()}</span>
+                                <span style="font-size: 15px; font-weight: 900; color: #0F172A;">{vol} <span style="font-size: 10px; color: #64748B; font-weight: 700;">VOL</span></span>
+                            </div>
+                            <div style="height: 6px; background-color: #F1F5F9; border-radius: 4px; overflow: hidden;">
+                                <div style="width: {pct}%; height: 100%; background: linear-gradient(90deg, #3B82F6 0%, #2563EB 100%); border-radius: 4px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    """
+                html_cards += "</div>"
+                
+                # CSS extra para esconder a barra de rolagem feia do Windows
+                st.markdown("""
+                <style>
+                div[style*='overflow-y: auto']::-webkit-scrollbar { width: 4px; }
+                div[style*='overflow-y: auto']::-webkit-scrollbar-track { background: transparent; }
+                div[style*='overflow-y: auto']::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                st.markdown(html_cards, unsafe_allow_html=True)
+            else: 
+                st.info("Nenhuma movimentação registrada hoje.")
 
         # ---------------------------------------------------------
         # PÓDIO EQUIPE (Hoje)
