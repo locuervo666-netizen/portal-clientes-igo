@@ -3868,7 +3868,7 @@ elif menu == "📈 Dashboard":
             if not vol_tom.empty:
                 def get_logo_url(tomador):
                     tomador_upper = str(tomador).strip().upper()
-                    # 🛠️ FORMATO OTIMIZADO PARA STREAMLIT
+                    # 🛠️ URLs já convertidas para renderização direta do Google Drive
                     logos = {
                         "ECOLYZER": "https://lh3.googleusercontent.com/d/1NdbO7olL6GUQDN3krRnyICfgNC07Di2Z",
                         "GRALAB": "https://lh3.googleusercontent.com/d/1SeNj-i590Q6ft-pUcSIk-OKKHiOYtAxU",
@@ -3886,7 +3886,6 @@ elif menu == "📈 Dashboard":
 
                 max_vol = int(vol_tom['Volumes'].max())
                 
-                # Container com barra de rolagem invisível para manter a altura do gráfico
                 html_cards = "<div style='display: flex; flex-direction: column; gap: 8px; height: 240px; overflow-y: auto; padding-right: 5px;'>"
                 
                 for _, row in vol_tom.iterrows():
@@ -3895,25 +3894,23 @@ elif menu == "📈 Dashboard":
                     vol = row['Volumes']
                     pct = int((vol / max_vol) * 100) if max_vol > 0 else 0
                     
-                    html_cards += f"""
-                    <div style="display: flex; align-items: center; padding: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-                        <div style="width: 42px; height: 42px; border-radius: 8px; background: #F8FAFC; display: flex; justify-content: center; align-items: center; margin-right: 15px; border: 1px solid #F1F5F9; padding: 3px; flex-shrink: 0;">
-                            <img src="{logo}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
-                        </div>
-                        <div style="flex-grow: 1;">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;">
-                                <span style="font-size: 13px; font-weight: 800; color: #1E293B;">{cliente.upper()}</span>
-                                <span style="font-size: 15px; font-weight: 900; color: #0F172A;">{vol} <span style="font-size: 10px; color: #64748B; font-weight: 700;">VOL</span></span>
-                            </div>
-                            <div style="height: 6px; background-color: #F1F5F9; border-radius: 4px; overflow: hidden;">
-                                <div style="width: {pct}%; height: 100%; background: linear-gradient(90deg, #3B82F6 0%, #2563EB 100%); border-radius: 4px;"></div>
-                            </div>
-                        </div>
-                    </div>
-                    """
+                    # 🔥 O HTML está colado na margem propositalmente para evitar o bug do Markdown
+                    html_cards += f"""<div style="display: flex; align-items: center; padding: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+<div style="width: 42px; height: 42px; border-radius: 8px; background: #F8FAFC; display: flex; justify-content: center; align-items: center; margin-right: 15px; border: 1px solid #F1F5F9; padding: 3px; flex-shrink: 0;">
+<img src="{logo}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+</div>
+<div style="flex-grow: 1;">
+<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;">
+<span style="font-size: 13px; font-weight: 800; color: #1E293B;">{cliente.upper()}</span>
+<span style="font-size: 15px; font-weight: 900; color: #0F172A;">{vol} <span style="font-size: 10px; color: #64748B; font-weight: 700;">VOL</span></span>
+</div>
+<div style="height: 6px; background-color: #F1F5F9; border-radius: 4px; overflow: hidden;">
+<div style="width: {pct}%; height: 100%; background: linear-gradient(90deg, #3B82F6 0%, #2563EB 100%); border-radius: 4px;"></div>
+</div>
+</div>
+</div>"""
                 html_cards += "</div>"
                 
-                # CSS extra para esconder a barra de rolagem feia do Windows
                 st.markdown("""
                 <style>
                 div[style*='overflow-y: auto']::-webkit-scrollbar { width: 4px; }
