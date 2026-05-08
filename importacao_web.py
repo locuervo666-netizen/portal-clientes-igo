@@ -3589,7 +3589,7 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO TV C.C.O DARK - MEGAZORD)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO ELITE C.C.O)
 # =============================================================================
 elif menu == "📈 Dashboard":
     import plotly.express as px
@@ -3598,22 +3598,32 @@ elif menu == "📈 Dashboard":
     import requests
     import urllib.parse
     
-    # 🔥 OTIMIZAÇÃO DE ESPAÇO, MODO ESCURO FORÇADO E ANIMAÇÕES 🔥
-    st.markdown("""
-        <style>
-        /* Força o fundo escuro do C.C.O e esconde as margens */
-        [data-testid="stAppViewContainer"] { background-color: #020617; color: #F8FAFC; }
-        [data-testid="stHeader"] { background-color: rgba(2, 6, 23, 0); }
-        .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
-        hr { margin: 0.5em 0 !important; border-color: #1E293B !important; }
+    # 🔥 TOGGLE MODO CLARO / ESCURO 🔥
+    col_header, col_toggle = st.columns([8, 2])
+    with col_toggle:
+        st.markdown("<br>", unsafe_allow_html=True)
+        modo_claro = st.toggle("☀️ Modo Claro", value=False)
         
-        /* Efeito de Sirene (Pulse) para alertas críticos */
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
-        }
-        .alerta-ativo { animation: pulse-red 2s infinite; border-color: #EF4444 !important; }
+    if modo_claro:
+        bg_app, text_app, bg_card, border_card, ticker_bg = "#F8FAFC", "#0F172A", "#FFFFFF", "#E2E8F0", "#E2E8F0"
+        plotly_theme = "plotly_white"
+    else:
+        bg_app, text_app, bg_card, border_card, ticker_bg = "#020617", "#F8FAFC", "#0F172A", "#1E293B", "#0B1120"
+        plotly_theme = "plotly_dark"
+
+    st.markdown(f"""
+        <style>
+        [data-testid="stAppViewContainer"] {{ background-color: {bg_app}; color: {text_app}; transition: 0.5s; }}
+        [data-testid="stHeader"] {{ background-color: transparent; }}
+        .block-container {{ padding-top: 1rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }}
+        hr {{ margin: 0.5em 0 !important; border-color: {border_card} !important; }}
+        
+        @keyframes pulse-red {{
+            0% {{ box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }}
+            70% {{ box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }}
+            100% {{ box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }}
+        }}
+        .alerta-ativo {{ animation: pulse-red 2s infinite; border-color: #EF4444 !important; }}
         </style>
     """, unsafe_allow_html=True)
     
@@ -3669,12 +3679,8 @@ elif menu == "📈 Dashboard":
         elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
         else: v_taxa_str, s_taxa = "0 pp", "-"
 
-        df_mes = df_raw.copy()
-        df_mes['MES_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.month
-        df_mes['ANO_TEMP'] = pd.to_datetime(df_mes['DATA_OBJ']).dt.year
-        df_mes_atual = df_mes[(df_mes['MES_TEMP'] == hoje.month) & (df_mes['ANO_TEMP'] == hoje.year)]
-        
-        vol_tomadores = df_mes_atual['TOMADOR'].value_counts().reset_index()
+        # 🔥 MUDANÇA: Usando apenas o volume de HOJE para o Gráfico
+        vol_tomadores = df_hoje['TOMADOR'].value_counts().reset_index()
         vol_tomadores.columns = ['Tomador', 'Volume']
 
         # Inteligência da Frota
@@ -3754,7 +3760,7 @@ elif menu == "📈 Dashboard":
         qtd_chamados = checar_chamados_pendentes(planilha_db)
 
         # ---------------------------------------------------------
-        # ANDAR 1: TICKER CYBER COMPLETO COM TODAS AS INTEGRAÇÕES
+        # ANDAR 1: TICKER CYBER (Velocidade Ajustada e Tema Variável)
         # ---------------------------------------------------------
         manchetes = [f"🟢 SISTEMA ONLINE", f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}"]
         
@@ -3800,13 +3806,14 @@ elif menu == "📈 Dashboard":
         ticker_text = " &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
         st.markdown(f"""
             <style>
-            .nasdaq-container {{ background-color: #0B1120; color: #F8FAFC; padding: 6px 0; border-radius: 4px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; position: relative; border-bottom: 1px solid #1E293B; }}
-            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 35s linear infinite; }}
-            .nasdaq-item {{ display: inline-block; font-size: 13px; font-weight: 600; font-family: 'Segoe UI', sans-serif; color: #F8FAFC; letter-spacing: 0.5px; }}
+            .nasdaq-container {{ background-color: {ticker_bg}; color: {text_app}; padding: 6px 0; border-radius: 4px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; position: relative; border-bottom: 1px solid {border_card}; }}
+            /* 🔥 VELOCIDADE REDUZIDA (de 35s para 90s) 🔥 */
+            .nasdaq-scroller {{ display: inline-block; animation: scroll-left 90s linear infinite; }} 
+            .nasdaq-item {{ display: inline-block; font-size: 13px; font-weight: 600; font-family: 'Segoe UI', sans-serif; color: {text_app}; letter-spacing: 0.5px; }}
             @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
             </style>
             <div class="nasdaq-container">
-                <div style="position: absolute; left: 0; top: 0; bottom: 0; background: #020617; color: #F8FAFC; padding: 6px 15px; font-weight: 900; z-index: 10; display: flex; align-items: center; border-right: 2px solid #3B82F6; font-size: 14px; letter-spacing: 2px;">
+                <div style="position: absolute; left: 0; top: 0; bottom: 0; background: {bg_app}; color: {text_app}; padding: 6px 15px; font-weight: 900; z-index: 10; display: flex; align-items: center; border-right: 2px solid #3B82F6; font-size: 14px; letter-spacing: 2px;">
                     🛰️ IGO C.C.O
                 </div>
                 <div class="nasdaq-scroller" style="padding-left: 140px;">{ticker_text}</div>
@@ -3814,27 +3821,26 @@ elif menu == "📈 Dashboard":
         """, unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # ANDAR 2: CARDS DARK GLASS COM SELOS DESTACADOS
+        # ANDAR 2: CARDS ADAPTATIVOS
         # ---------------------------------------------------------
         def make_tv_card(title, value, var_str, color_hex, icon, is_alert=False):
             alert_class = "alerta-ativo" if is_alert else ""
             return f"""
-            <div class="{alert_class}" style="background: #0F172A; border: 1px solid #1E293B; border-left: 4px solid {color_hex}; padding: 10px 15px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); height: 85px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 8px;">
+            <div class="{alert_class}" style="background: {bg_card}; border: 1px solid {border_card}; border-left: 4px solid {color_hex}; padding: 10px 15px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); height: 85px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <p style="margin:0; font-size:11px; font-weight:800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">{title}</p>
+                    <p style="margin:0; font-size:11px; font-weight:800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">{title}</p>
                     <span style="font-size:16px; opacity: 0.9;">{icon}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-                    <h2 style="margin:0; font-size:28px; font-weight:900; color: #F8FAFC; text-shadow: 0 0 10px {color_hex}50; line-height: 1;">{value}</h2>
-                    <span style="font-size:13px; font-weight:800; color: #FFFFFF; background: {color_hex}; padding: 3px 8px; border-radius: 4px; box-shadow: 0 0 8px {color_hex}60;">{var_str}</span>
+                    <h2 style="margin:0; font-size:28px; font-weight:900; color: {text_app}; line-height: 1;">{value}</h2>
+                    <span style="font-size:13px; font-weight:800; color: #FFFFFF; background: {color_hex}; padding: 3px 8px; border-radius: 4px;">{var_str}</span>
                 </div>
             </div>
             """
 
-        # ✨ AJUSTE DE CORES PARA MAIOR DESTAQUE NO FUNDO ESCURO ✨
-        cor_tkt = "#EF4444" if qtd_chamados > 0 else "#94A3B8" # Cinza Prata em vez de chumbo
+        cor_tkt = "#EF4444" if qtd_chamados > 0 else "#64748B" 
         sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
-        cor_atra = "#F43F5E" if atra_h > 0 else "#94A3B8"
+        cor_atra = "#F43F5E" if atra_h > 0 else "#64748B"
 
         c1, c2, c3, c4 = st.columns(4)
         c1.markdown(make_tv_card("VOL. TOTAL", vol_total_h, f"{s_tot}{v_tot_str}", "#3B82F6", "📦"), unsafe_allow_html=True)
@@ -3844,51 +3850,68 @@ elif menu == "📈 Dashboard":
 
         c5, c6, c7, c8 = st.columns(4)
         c5.markdown(make_tv_card("ROTA/PENDENTES", pend_h, f"{s_pend}{v_pend_str}", "#F59E0B", "🚚"), unsafe_allow_html=True)
-        c6.markdown(make_tv_card("ENTREGUES", ent_h, f"{s_ent}{v_ent_str}", "#10B981", "✅"), unsafe_allow_html=True) # Padronizado para o verde mais claro
+        
+        # 🔥 MUDANÇA: "ENTREGUES" virou "COLETADOS" com cor Indigo/Roxa 🔥
+        c6.markdown(make_tv_card("COLETADOS", ent_h, f"{s_ent}{v_ent_str}", "#6366F1", "📦"), unsafe_allow_html=True) 
+        
         c7.markdown(make_tv_card("FRUSTRADAS", frus_h, f"{s_frus}{v_frus_str}", "#EF4444", "🛑"), unsafe_allow_html=True)
-        c8.markdown(make_tv_card("BASE ONTEM", vol_total_o, "Ref. Cálculo", "#94A3B8", "📊"), unsafe_allow_html=True) # Cinza Prata para dar leitura
+        c8.markdown(make_tv_card("BASE ONTEM", vol_total_o, "Ref. Cálculo", "#64748B", "📊"), unsafe_allow_html=True) 
 
         # ---------------------------------------------------------
-        # ANDAR 3: GRÁFICOS REDIMENSIONADOS (TEMA PLOTLY DARK)
+        # ANDAR 3: GRÁFICOS REDIMENSIONADOS (PLOTLY THEME DINÂMICO)
         # ---------------------------------------------------------
         col_graf1, col_graf2 = st.columns([1, 1.5])
         
         with col_graf1:
-            status_labels = ['Entregue', 'Pendente', 'Frustrada', 'Atrasado']
+            status_labels = ['Coletado', 'Pendente', 'Frustrada', 'Atrasado']
             status_vals = [ent_h, pend_h, frus_h, atra_h]
             df_donut = pd.DataFrame({'Status': status_labels, 'Volumes': status_vals})
             df_donut = df_donut[df_donut['Volumes'] > 0]
             
             if not df_donut.empty:
-                cores_map = {'Entregue': '#10B981', 'Pendente': '#F59E0B', 'Frustrada': '#EF4444', 'Atrasado': '#991B1B'}
+                cores_map = {'Coletado': '#6366F1', 'Pendente': '#F59E0B', 'Frustrada': '#EF4444', 'Atrasado': '#991B1B'}
                 fig_donut = px.pie(df_donut, values='Volumes', names='Status', hole=0.7, color='Status', color_discrete_map=cores_map)
-                fig_donut.update_traces(textinfo='percent', textfont_size=12, textfont_color='white', marker=dict(line=dict(color='#0F172A', width=2)))
-                fig_donut.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=5, b=5, l=5, r=5), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=11, color="#94A3B8")), height=220)
+                fig_donut.update_traces(textinfo='percent', textfont_size=12, textfont_color='white', marker=dict(line=dict(color=bg_card, width=2)))
+                fig_donut.update_layout(template=plotly_theme, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=5, b=5, l=5, r=5), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=11, color="#64748B")), height=220)
                 st.plotly_chart(fig_donut, use_container_width=True)
-            else: st.info("Sem dados.")
+            else: st.info("Sem dados para os gráficos.")
 
         with col_graf2:
             if not vol_tomadores.empty:
-                df_bar = vol_tomadores.head(5).sort_values(by='Volume', ascending=True)
-                fig_bar = px.bar(df_bar, x='Volume', y='Tomador', orientation='h', text='Volume')
-                fig_bar.update_traces(marker_color='#3B82F6', textposition='outside', textfont_size=12, textfont_color='#F8FAFC', textfont_weight='bold')
-                fig_bar.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=5, b=5, l=5, r=5), xaxis_showticklabels=False, xaxis_title="", yaxis_title="", height=220)
+                df_bar = vol_tomadores.head(7).sort_values(by='Volume', ascending=False)
+                
+                # 🔥 MUDANÇA: GRÁFICO VERTICAL COM RÓTULOS (TEXTO) E SEM LINHAS DE GRADE 🔥
+                fig_bar = px.bar(df_bar, x='Tomador', y='Volume', text='Volume')
+                fig_bar.update_traces(marker_color='#3B82F6', textposition='outside', textfont_size=13, textfont_color=text_app, textfont_weight='bold')
+                fig_bar.update_layout(
+                    template=plotly_theme, 
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)', 
+                    margin=dict(t=15, b=5, l=5, r=5), 
+                    xaxis_title="", 
+                    yaxis_title="", 
+                    yaxis_showticklabels=False, # Oculta os números no eixo Y para ficar mais limpo
+                    yaxis_showgrid=False,       # Oculta linhas de grade
+                    height=220
+                )
+                # Garante que as barras não cortem o número no topo
+                fig_bar.update_yaxes(range=[0, df_bar['Volume'].max() * 1.2])
                 st.plotly_chart(fig_bar, use_container_width=True)
-            else: st.info("Sem dados.")
+            else: st.info("Sem dados de volume para o dia de hoje.")
 
         # ---------------------------------------------------------
-        # ANDAR 4: PÓDIO CYBER
+        # ANDAR 4: PÓDIO CYBER ADAPTATIVO
         # ---------------------------------------------------------
         if len(frota_ordenada) > 0:
             c_f1, c_f2, c_f3 = st.columns(3)
             def min_podio(pos, ic, color, ag, pct, vols):
-                return f"""<div style="background:#0F172A; border:1px solid #1E293B; border-bottom: 2px solid {color}; padding:8px 12px; border-radius:6px; display:flex; align-items:center; justify-content:space-between; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                return f"""<div style="background:{bg_card}; border:1px solid {border_card}; border-bottom: 2px solid {color}; padding:8px 12px; border-radius:6px; display:flex; align-items:center; justify-content:space-between; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                     <div style="display:flex; align-items:center; gap:12px;"><span style="font-size:22px; filter: drop-shadow(0px 0px 5px {color}80);">{ic}</span>
-                    <div><p style="margin:0; font-size:12px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">{ag}</p><p style="margin:0; font-size:10px; color:#64748B;">{vols}</p></div></div>
-                    <h3 style="margin:0; font-size:20px; font-weight:900; color:{color}; text-shadow: 0 0 10px {color}50;">{pct}%</h3></div>"""
+                    <div><p style="margin:0; font-size:12px; font-weight:800; color:{text_app}; letter-spacing:0.5px;">{ag}</p><p style="margin:0; font-size:10px; color:#64748B;">{vols}</p></div></div>
+                    <h3 style="margin:0; font-size:20px; font-weight:900; color:{color};">{pct}%</h3></div>"""
             
             if len(frota_ordenada) >= 1: c_f1.markdown(min_podio("1º", "🥇", "#10B981", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}"), unsafe_allow_html=True)
-            if len(frota_ordenada) >= 2: c_f2.markdown(min_podio("2º", "🥈", "#94A3B8", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}"), unsafe_allow_html=True)
+            if len(frota_ordenada) >= 2: c_f2.markdown(min_podio("2º", "🥈", "#64748B", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}"), unsafe_allow_html=True)
             if len(frota_ordenada) >= 3: c_f3.markdown(min_podio("3º", "🥉", "#D97706", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}"), unsafe_allow_html=True)
         else:
-            st.info("Aguardando dados do mês atual.")
+            st.info("Aguardando dados da frota para o dia atual.")
