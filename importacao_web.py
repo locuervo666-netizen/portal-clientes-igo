@@ -3589,7 +3589,7 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO ELITE C.C.O - PASTEL THEME)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO ELITE C.C.O - HIGH CONTRAST)
 # =============================================================================
 elif menu == "📈 Dashboard":
     import plotly.express as px
@@ -3597,311 +3597,172 @@ elif menu == "📈 Dashboard":
     import requests
     import urllib.parse
 
-    # 🔥 CONFIGURAÇÃO VISUAL ELITE (Tema Claro Fixo e Otimizado para TV com F11) 🔥
+    # 🔥 CONFIGURAÇÃO VISUAL ELITE (Contraste Reforçado para TV) 🔥
     st.markdown("""
         <style>
-        [data-testid="stAppViewContainer"] { background-color: #F8FAFC; color: #1E293B; }
-        
-        /* Mata o cabeçalho fantasma do Streamlit para colar na TV */
+        [data-testid="stAppViewContainer"] { background-color: #F1F5F9; color: #0F172A; }
         [data-testid="stHeader"] { display: none !important; }
+        .block-container { padding-top: 0rem !important; padding-bottom: 0rem !important; max-width: 100% !important; }
         
-        /* Zera os espaços inúteis */
-        .block-container { padding-top: 0rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; margin-top: 0px !important; }
-        
-        hr { margin: 0.5em 0 !important; border-color: #E2E8F0 !important; }
-        
+        /* Cards com Contraste Elevado e Bordas Definidas */
+        .card-elite-v2 {
+            border-radius: 12px;
+            padding: 15px;
+            border: 2px solid rgba(0,0,0,0.05);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+            height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
         @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6); }
+            70% { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); }
             100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
         }
-        .alerta-sirene { animation: pulse-red 2s infinite; border: 1px solid #EF4444 !important; }
+        .alerta-total { animation: pulse-red 1.5s infinite; border: 3px solid #DC2626 !important; }
         </style>
     """, unsafe_allow_html=True)
     
-    # ⏱️ REFRESH NATIVO (Atualiza dados a cada 2 min sem perder o login)
-    st_autorefresh(interval=120000, limit=None, key="refresh_dashboard_elite")
+    st_autorefresh(interval=120000, limit=None, key="refresh_dashboard_v3")
     
     df_raw = carregar_dados_completos(planilha_db)
     
     if df_raw.empty:
-        st.warning("⚠️ Aguardando sincronização de dados...")
+        st.warning("🚀 Sincronizando Radar...")
     else:
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         hoje = hoje_br
-        
-        ontem_util = hoje - timedelta(days=1)
-        while ontem_util.weekday() >= 5 or ontem_util in FERIADOS_BR:
-            ontem_util -= timedelta(days=1)
-            
         df_hoje = df_raw[df_raw['DATA_OBJ'] == hoje].copy()
-        df_ontem = df_raw[df_raw['DATA_OBJ'] == ontem_util].copy()
         
-        def calc_variacao(val_hoje, val_ontem):
-            if val_ontem == 0: return ("+100%", "▲") if val_hoje > 0 else ("0%", "-")
-            var = ((val_hoje - val_ontem) / val_ontem) * 100
-            if var > 0: return f"+{var:.1f}%", "▲"
-            elif var < 0: return f"{var:.1f}%", "▼"
-            return "0%", "-"
-
-        # --- CÁLCULOS DOS KPIs ---
-        vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
+        # Cálculos de Performance
+        vol_total_h = len(df_hoje)
         resolvidos_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
-        resolvidos_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
-        ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
-        ent_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)])
+        col_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Coletado', case=False)])
         pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
-        pend_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
         frus_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
-        frus_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
         atra_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
-        atra_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
-        
-        taxa_sucesso_h = (resolvidos_h / vol_total_h * 100) if vol_total_h > 0 else 0
-        taxa_sucesso_o = (resolvidos_o / vol_total_o * 100) if vol_total_o > 0 else 0
-        var_taxa = taxa_sucesso_h - taxa_sucesso_o
-        
-        v_tot_str, s_tot = calc_variacao(vol_total_h, vol_total_o)
-        v_ent_str, s_ent = calc_variacao(ent_h, ent_o)
-        v_pend_str, s_pend = calc_variacao(pend_h, pend_o)
-        v_frus_str, s_frus = calc_variacao(frus_h, frus_o)
-        
-        if var_taxa > 0: v_taxa_str, s_taxa = f"+{var_taxa:.1f} pp", "▲"
-        elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
-        else: v_taxa_str, s_taxa = "0 pp", "-"
-
+        taxa_sucesso = (resolvidos_h / vol_total_h * 100) if vol_total_h > 0 else 0
         qtd_chamados = checar_chamados_pendentes(planilha_db)
-        
-        # Inteligência da Frota
-        dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
-        frota_stats = {}
-        if not df_hoje.empty:
-            for ag in df_hoje['AGENTE_RAW'].dropna().unique():
-                if not str(ag).strip() or str(ag).upper() == 'NAN': continue
-                nome_amigavel = dict_nomes_dash.get(str(ag).strip().lower(), str(ag).upper().split('|')[0])
-                df_ag = df_hoje[df_hoje['AGENTE_RAW'] == ag]
-                total_ag = len(df_ag)
-                concluidos_ag = len(df_ag[df_ag['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
-                perc_ag = int((concluidos_ag / total_ag) * 100) if total_ag > 0 else 0
-                frota_stats[nome_amigavel] = {"perc": perc_ag, "conc": concluidos_ag, "total": total_ag}
-        
-        frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
-
-        @st.cache_data(ttl=3600)
-        def buscar_alertas_climaticos(cidades_com_uf):
-            alertas = []
-            for item in cidades_com_uf:
-                if not item or str(item).upper() == "NAN": continue
-                try:
-                    cidade_busca = str(item).split('/')[0].strip() if '/' in str(item) else str(item).strip()
-                    resp = requests.get(f"https://wttr.in/{urllib.parse.quote(cidade_busca)}?format=j1", timeout=3)
-                    if resp.status_code == 200:
-                        condicao = str(resp.json()['current_condition'][0]['weatherDesc'][0]['value']).lower()
-                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder']): alertas.append(f"⛈️ CLIMA: Chuva na rota de {item}!")
-                        else: alertas.append(f"☀️ CLIMA: Tempo estável em {item}.")
-                except: continue
-            return alertas
-
-        @st.cache_data(ttl=900)
-        def buscar_status_voos_aerodatabox(lista_voos, data_referencia):
-            alertas_voos = []
-            headers = {"x-rapidapi-key": "726b5b7c75msh782bc334e03fcd1p1d415cjsn84ef052a00e7", "x-rapidapi-host": "aerodatabox.p.rapidapi.com"}
-            data_str = data_referencia.strftime('%Y-%m-%d')
-            for voo in lista_voos:
-                try:
-                    v_query = str(voo).upper().replace(" ", "")
-                    resp = requests.get(f"https://aerodatabox.p.rapidapi.com/flights/number/{v_query}/{data_str}", headers=headers, timeout=5)
-                    if resp.status_code == 200:
-                        dados = resp.json()
-                        if dados and isinstance(dados, list) and len(dados) > 0:
-                            status = str(dados[0].get('status', 'UNK')).upper()
-                            if "EXPECTED" in status or "SCHEDULED" in status: alertas_voos.append(f"✈️ AÉREO: Voo {v_query} confirmado.")
-                            elif "DELAYED" in status: alertas_voos.append(f"🚨 AÉREO: Voo {v_query} ATRASADO!")
-                except: continue
-            return alertas_voos
 
         # ---------------------------------------------------------
-        # BARRA DE NOTÍCIAS (TICKER INTELIGENTE MEGAZORD)
+        # BARRA DE NOTÍCIAS (RADAR)
         # ---------------------------------------------------------
-        manchetes = [f"🟢 OPERAÇÃO ATIVA", f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M')}"]
+        manchetes = [f"🕒 ATUALIZADO EM: {datetime.now(FUSO_BR).strftime('%H:%M')}", f"🎯 EFICIÊNCIA GERAL: {taxa_sucesso:.1f}%"]
+        if qtd_chamados > 0: manchetes.append(f"🎧 SUPORTE: {qtd_chamados} chamado(s) aberto(s)")
+        if atra_h > 0: manchetes.append(f"🚨 ALERTA: {atra_h} pedido(s) fora do SLA!")
         
-        # 1. Alertas de Helpdesk e SLA Crítico
-        if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) pendente(s)")
-        if atra_h > 0: manchetes.append(f"🚨 SLA CRÍTICO: {atra_h} pedido(s) em atraso na operação!")
-
-        # 2. Meta Diária de Conclusão
-        if vol_total_h > 0:
-            progresso = int((resolvidos_h / vol_total_h) * 100)
-            manchetes.append(f"🎯 META DIÁRIA: {progresso}% das operações de hoje concluídas.")
-
-        # 3. Inteligência de Cobrança (Motorista mais atrasado)
-        if atra_h > 0:
-            df_atrasados = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)]
-            if not df_atrasados.empty:
-                top_atrasado = df_atrasados['AGENTE_RAW'].value_counts().index[0]
-                qtd_atrasos_top = df_atrasados['AGENTE_RAW'].value_counts().iloc[0]
-                if str(top_atrasado).strip() and str(top_atrasado).upper() != 'NAN':
-                    nome_mot_atrasado = dict_nomes_dash.get(str(top_atrasado).strip().lower(), str(top_atrasado).upper().split('|')[0])
-                    manchetes.append(f"⚠️ ATENÇÃO: Motorista {nome_mot_atrasado} com {qtd_atrasos_top} volume(s) estourado(s).")
-
-        # 4. Projeção Financeira do Turno (Ticket R$35)
-        TICKET_MEDIO = 35.00
-        if resolvidos_h > 0:
-            projecao = resolvidos_h * TICKET_MEDIO
-            manchetes.append(f"📈 PROJEÇÃO: Aprox. R$ {projecao:,.2f} em faturamento hoje.")
-
-        # 5. Últimas Baixas
-        finalizados_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)]
-        if not finalizados_hj.empty:
-            for _, row in finalizados_hj.tail(2).iterrows():
-                pcl = str(row.get('LABORATORIO', row.get('TOMADOR', 'PCL'))).title()
-                cidade = str(row.get('CIDADE', '')).title()
-                hora = str(row.get('HORA_BAIXA', row.get('HORA', '')))
-                hora_str = f" às {hora}" if hora and hora.lower() != 'nan' and hora.strip() else ""
-                tipo = "Coleta" if 'COLETADO' in str(row.get('STATUS_DISPLAY', '')).upper() else "Entrega"
-                manchetes.append(f"✅ BAIXA: {tipo} no {pcl} em {cidade}{hora_str}!")
-
-        # 6. Clima e Voos
-        cidades_alvo = []
-        if not df_hoje.empty:
-            top_cids = df_hoje['CIDADE'].value_counts().head(3).index.tolist()
-            col_uf = 'UF' if 'UF' in df_hoje.columns else ('ESTADO' if 'ESTADO' in df_hoje.columns else None)
-            for cid in top_cids:
-                try: cidades_alvo.append(f"{str(cid).strip().title()}/{str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()}" if col_uf else str(cid).strip().title())
-                except: cidades_alvo.append(str(cid).strip().title())
-        
-        if cidades_alvo: manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
-        manchetes.extend(buscar_status_voos_aerodatabox(["G31240"], hoje))
-
-        # Renderização Visual do Ticker (Tamanho Ampliado para TV)
-        ticker_text = " &nbsp;&nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;&nbsp; ".join([m for m in manchetes])
+        ticker_text = " &nbsp;&nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;&nbsp; ".join([m.upper() for m in manchetes])
         st.markdown(f"""
-            <style>
-            .ticker-wrap {{ background: #FFFFFF; border: 1px solid #E2E8F0; padding: 16px 0; border-radius: 8px; margin-top: 15px; margin-bottom: 20px; overflow: hidden; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }}
-            .ticker-move {{ display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker 80s linear infinite; }}
-            @keyframes ticker {{ 0% {{ transform: translate3d(0, 0, 0); }} 100% {{ transform: translate3d(-100%, 0, 0); }} }}
-            .ticker-item {{ font-size: 18px; font-weight: 800; color: #334155; letter-spacing: 0.5px; }}
-            .badge-radar {{ position: absolute; left: 0; top: 0; bottom: 0; background: #3B82F6; color: white; padding: 0 30px; z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 17px; border-radius: 8px 0 0 8px; letter-spacing: 1.5px; box-shadow: 3px 0 8px rgba(0,0,0,0.15); }}
-            </style>
-            <div class="ticker-wrap">
-                <div class="badge-radar">📡 RADAR</div>
-                <div class="ticker-move">
-                    <span class="ticker-item">{ticker_text}</span>
+            <div style="background: #FFFFFF; border-bottom: 2px solid #E2E8F0; padding: 10px 0; margin-bottom: 20px; overflow: hidden; position: relative; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                <div style="position: absolute; left: 0; top: 0; bottom: 0; background: #0F172A; color: white; padding: 0 30px; z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 18px; letter-spacing: 3px;">RADAR</div>
+                <div style="display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker 90s linear infinite;">
+                    <span style="font-size: 18px; font-weight: 800; color: #1E293B;">{ticker_text}</span>
                 </div>
             </div>
+            <style> @keyframes ticker {{ 0% {{ transform: translate3d(0, 0, 0); }} 100% {{ transform: translate3d(-100%, 0, 0); }} }} </style>
         """, unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # BLOCO DE KPI CARDS (ESTILO PORTAL DO CLIENTE - PASTEL)
+        # BLOCO DE KPI (CONTRASTE ALTO)
         # ---------------------------------------------------------
-        def render_kpi_card(title, value, var_str, color, bg_color, icon, alert=False):
-            cls = "alerta-sirene" if alert else ""
+        def kpi_box(title, value, color, bg, icon, alert=False):
+            alert_class = "alerta-total" if alert else ""
             st.markdown(f"""
-                <div class="{cls}" style="background-color: {bg_color}; border: 1px solid {color}40; border-radius: 12px; padding: 14px 16px; position: relative; overflow: hidden; height: 95px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 10px;">
-                    <div style="position: absolute; right: -5px; bottom: -15px; font-size: 65px; opacity: 0.12; z-index: 0; line-height: 1;">
-                        {icon}
+                <div class="card-elite-v2 {alert_class}" style="background-color: {bg}; border-color: {color}60;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 12px; font-weight: 900; color: {color}; text-transform: uppercase;">{title}</span>
+                        <span style="font-size: 20px;">{icon}</span>
                     </div>
-                    <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; justify-content: space-between;">
-                        <div style="font-size: 11px; font-weight: 800; color: {color}; text-transform: uppercase; letter-spacing: 0.5px;">
-                            {title}
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-                            <div style="font-size: 26px; font-weight: 900; color: #0F172A; line-height: 1;">
-                                {value}
-                            </div>
-                            <div style="font-size: 11px; font-weight: 700; color: {color}; background: rgba(255,255,255,0.6); padding: 2px 6px; border-radius: 4px; border: 1px solid {color}40;">
-                                {var_str}
-                            </div>
-                        </div>
-                    </div>
+                    <div style="font-size: 34px; font-weight: 950; color: #0F172A; line-height: 1;">{value}</div>
                 </div>
             """, unsafe_allow_html=True)
 
-        # Definição das cores pastéis
-        cor_tkt, bg_tkt = ("#EF4444", "#FEF2F2") if qtd_chamados > 0 else ("#64748B", "#F8FAFC")
-        sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
-        cor_atra, bg_atra = ("#F43F5E", "#FDF2F8") if atra_h > 0 else ("#64748B", "#F8FAFC")
-
         c1, c2, c3, c4 = st.columns(4)
-        with c1: render_kpi_card("VOL. TOTAL", vol_total_h, f"{s_tot}{v_tot_str}", "#3B82F6", "#EFF6FF", "📦")
-        with c2: render_kpi_card("EFICIÊNCIA", f"{taxa_sucesso_h:.1f}%", f"{s_taxa}{v_taxa_str}", "#10B981", "#F0FDF4", "🎯")
-        with c3: render_kpi_card("CHAMADOS", qtd_chamados, sub_tkt, cor_tkt, bg_tkt, "🎧", alert=(qtd_chamados > 0))
-        with c4: render_kpi_card("ATRASADOS", atra_h, "SLA CRÍTICO", cor_atra, bg_atra, "⏳", alert=(atra_h > 0))
-
-        c5, c6, c7, c8 = st.columns(4)
-        with c5: render_kpi_card("PENDENTES", pend_h, f"{s_pend}{v_pend_str}", "#F59E0B", "#FFFBEB", "🚚")
-        with c6: render_kpi_card("COLETADOS", ent_h, f"{s_ent}{v_ent_str}", "#6366F1", "#EEF2FF", "📥")
-        with c7: render_kpi_card("FRUSTRADAS", frus_h, f"{s_frus}{v_frus_str}", "#EF4444", "#FEF2F2", "🛑")
-        with c8: render_kpi_card("BASE ONTEM", vol_total_o, "Ref. Cálculo", "#64748B", "#F8FAFC", "📊")
+        with c1: kpi_box("Volume Total", vol_total_h, "#2563EB", "#DBEAFE", "📦")
+        with c2: kpi_box("Eficiência", f"{taxa_sucesso:.1f}%", "#059669", "#DCFCE7", "🎯")
+        with c3: kpi_box("Coletados", col_h, "#4F46E5", "#E0E7FF", "📥")
+        with c4: kpi_box("Atrasos SLA", atra_h, "#E11D48", "#FFE4E6", "🚨", alert=(atra_h > 0))
 
         st.markdown("<br>", unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # ÁREA DE GRÁFICOS E TABELA
+        # GRÁFICO E TABELA DINÂMICA
         # ---------------------------------------------------------
         col_pie, col_table = st.columns([1, 1.5])
 
         with col_pie:
-            st.markdown("<p style='font-weight: 800; font-size: 13px; color: #475569; margin-bottom: 0px;'>📊 STATUS DA OPERAÇÃO</p>", unsafe_allow_html=True)
-            df_status = pd.DataFrame({
-                'Status': ['Coletado', 'Pendente', 'Frustrada', 'Atrasado'],
-                'Qtd': [ent_h, pend_h, frus_h, atra_h]
-            })
-            df_status = df_status[df_status['Qtd'] > 0]
+            st.markdown("### 📊 Status Atual")
+            df_status = pd.DataFrame({'S': ['Coletado', 'Pendente', 'Frustrada', 'Atrasado'], 'V': [col_h, pend_h, frus_h, atra_h]})
+            df_status = df_status[df_status['V'] > 0]
             if not df_status.empty:
-                fig = px.pie(df_status, values='Qtd', names='Status', hole=0.6,
-                             color='Status', color_discrete_map={'Coletado': '#6366F1', 'Pendente': '#F59E0B', 'Frustrada': '#EF4444', 'Atrasado': '#991B1B'})
-                fig.update_traces(textinfo='percent', textfont_size=12, textfont_color='white', marker=dict(line=dict(color="#FFFFFF", width=2)))
-                fig.update_layout(template="plotly_white", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, b=0, l=0, r=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=11, color="#64748B")), height=230)
+                fig = px.pie(df_status, values='V', names='S', hole=0.5,
+                             color='S', color_discrete_map={'Coletado': '#4F46E5', 'Pendente': '#D97706', 'Frustrada': '#DC2626', 'Atrasado': '#7F1D1D'})
+                fig.update_layout(showlegend=True, height=280, margin=dict(t=0,b=0,l=0,r=0), legend=dict(orientation="h", y=-0.1))
                 st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Sem dados para os gráficos.")
 
         with col_table:
-            st.markdown("<p style='font-weight: 800; font-size: 13px; color: #475569; margin-bottom: 8px;'>🏢 VOLUMES DE HOJE POR TOMADOR</p>", unsafe_allow_html=True)
-            vol_tom = df_hoje['TOMADOR'].value_counts().reset_index()
-            vol_tom.columns = ['Cliente', 'Volumes']
-            if not vol_tom.empty:
-                st.dataframe(
-                    vol_tom,
-                    column_config={
-                        "Cliente": st.column_config.TextColumn("Tomador"),
-                        "Volumes": st.column_config.ProgressColumn(
-                            "Qtd Finalizada",
-                            format="%d",
-                            min_value=0,
-                            max_value=int(vol_tom['Volumes'].max())
-                        ),
-                    },
-                    hide_index=True,
-                    use_container_width=True,
-                    height=230
+            st.markdown("### 🏢 Performance por Tomador (Hoje)")
+            if not df_hoje.empty:
+                # Agrupamento e cálculo de % de conclusão por tomador
+                df_t = df_hoje.groupby('TOMADOR').agg(
+                    Total=('PEDIDO', 'count'),
+                    Concluido=('STATUS_DISPLAY', lambda x: x.str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False).sum())
+                ).reset_index()
+                df_t['Perc'] = (df_t['Concluido'] / df_t['Total'] * 100).round(1)
+                df_t = df_t.sort_values(by='Total', ascending=False)
+
+                # Criando o gráfico "Tabela Camaleão"
+                fig_bar = go.Figure()
+                
+                # Lógica de cores: Escala de Vermelho -> Amarelo -> Verde
+                def get_color(p):
+                    if p < 40: return '#EF4444' # Vermelho
+                    if p < 80: return '#F59E0B' # Amarelo
+                    return '#22C55E'           # Verde
+
+                fig_bar.add_trace(go.Bar(
+                    y=df_t['TOMADOR'],
+                    x=df_t['Perc'],
+                    orientation='h',
+                    text=df_t.apply(lambda r: f"<b>{r['Concluido']}/{r['Total']}</b> ({r['Perc']}%)", axis=1),
+                    textposition='outside',
+                    marker=dict(color=[get_color(p) for p in df_t['Perc']], line=dict(color='#0F172A', width=1))
+                ))
+
+                fig_bar.update_layout(
+                    template="plotly_white",
+                    height=300,
+                    margin=dict(t=20, b=0, l=0, r=50),
+                    xaxis=dict(range=[0, 115], showgrid=False, showticklabels=False),
+                    yaxis=dict(autorange="reversed", tickfont=dict(size=14, family="Arial Black", color="#0F172A")) # Nomes em Negrito
                 )
+                st.plotly_chart(fig_bar, use_container_width=True)
             else:
-                st.info("Nenhuma movimentação registrada hoje.")
+                st.info("Sem dados.")
 
         # ---------------------------------------------------------
-        # RANKING DA FROTA (PÓDIO) - TONS PASTÉIS
+        # PÓDIO EQUIPE
         # ---------------------------------------------------------
-        st.markdown("<br>", unsafe_allow_html=True)
         if len(frota_ordenada) > 0:
-            st.markdown("<p style='font-weight: 800; font-size: 13px; color: #475569;'>🏆 PERFORMANCE DA EQUIPE (TOP 3)</p>", unsafe_allow_html=True)
+            st.markdown("---")
             rf1, rf2, rf3 = st.columns(3)
-            def podio_ui(pos, ic, ag, pct, vols, color, bg_color):
-                return f"""
-                <div style="background-color: {bg_color}; border: 1px solid {color}40; border-bottom: 3px solid {color}; padding: 12px 15px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 26px;">{ic}</span>
-                        <div>
-                            <div style="font-size: 13px; font-weight: 800; color: #0F172A; letter-spacing: 0.3px;">{ag}</div>
-                            <div style="font-size: 11px; color: #64748B; font-weight: 600;">{vols} volumes</div>
+            def rank_ui(ic, ag, pct, color, bg):
+                st.markdown(f"""
+                    <div style="background:{bg}; border: 2px solid {color}; border-radius: 10px; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 30px;">{ic}</span>
+                            <div style="font-weight: 900; font-size: 15px; color: #0F172A;">{ag.upper()}</div>
                         </div>
+                        <div style="font-size: 24px; font-weight: 1000; color: {color};">{pct}%</div>
                     </div>
-                    <div style="font-size: 22px; font-weight: 900; color: {color};">{pct}%</div>
-                </div>
-                """
-            if len(frota_ordenada) >= 1: rf1.markdown(podio_ui("1", "🥇", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}", "#10B981", "#F0FDF4"), unsafe_allow_html=True)
-            if len(frota_ordenada) >= 2: rf2.markdown(podio_ui("2", "🥈", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}", "#64748B", "#F8FAFC"), unsafe_allow_html=True)
-            if len(frota_ordenada) >= 3: rf3.markdown(podio_ui("3", "🥉", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}", "#F59E0B", "#FFFBEB"), unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+            
+            with rf1: rank_ui("🥇", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], "#059669", "#DCFCE7")
+            if len(frota_ordenada) >= 2:
+                with rf2: rank_ui("🥈", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], "#475569", "#F1F5F9")
+            if len(frota_ordenada) >= 3:
+                with rf3: rank_ui("🥉", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], "#B45309", "#FFEDD5")
         else:
             st.info("Aguardando dados da frota para o dia atual.")
