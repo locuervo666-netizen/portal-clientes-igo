@@ -3602,10 +3602,18 @@ elif menu == "📈 Dashboard":
         <style>
         [data-testid="stAppViewContainer"] { background-color: #F1F5F9; color: #0F172A; }
         
-        /* Deixa o cabeçalho transparente, mas NÃO apaga, para não sumir com o botão da sidebar */
+        /* Deixa o cabeçalho transparente para não sumir com o botão da sidebar */
         [data-testid="stHeader"] { background-color: transparent !important; }
         
-        .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
+        /* 🚀 MUDANÇA AQUI: max-width: 100% devolve o tamanho total pra TV sem margens! */
+        .block-container { 
+            padding-top: 2.5rem !important; /* Espaço exato para o botão da sidebar não sobrepor o letreiro */
+            padding-bottom: 1rem !important; 
+            padding-left: 1rem !important; 
+            padding-right: 1rem !important; 
+            max-width: 100% !important; 
+        }
+        
         hr { margin: 0.5em 0 !important; border-color: #E2E8F0 !important; }
         
         @keyframes pulse-red {
@@ -3614,6 +3622,28 @@ elif menu == "📈 Dashboard":
             100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
         }
         .alerta-sirene { animation: pulse-red 2s infinite; border: 1px solid #EF4444 !important; }
+        
+        /* Mágica dos Botões Invisíveis (Ghost Buttons) sobre os Cards HTML */
+        div.st-key-kpi_total, div.st-key-kpi_entregue, div.st-key-kpi_chamados, div.st-key-kpi_atra,
+        div.st-key-kpi_pend, div.st-key-kpi_col, div.st-key-kpi_frus, div.st-key-kpi_hoje {
+            margin-top: -110px !important;
+            position: relative;
+            z-index: 999;
+            opacity: 0 !important; 
+        }
+        div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_chamados button, div.st-key-kpi_atra button,
+        div.st-key-kpi_pend button, div.st-key-kpi_col button, div.st-key-kpi_frus button, div.st-key-kpi_hoje button {
+            height: 95px !important;
+            cursor: pointer !important;
+        }
+        
+        /* Estilização original dos popovers mantida */
+        div[data-testid="stPopover"] > button, button[kind="secondary"] {
+            white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
+        }
+        div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
+            border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
+        }
         </style>
     """, unsafe_allow_html=True)
     
@@ -3838,9 +3868,7 @@ elif menu == "📈 Dashboard":
             if not vol_tom.empty:
                 def get_logo_url(tomador):
                     tomador_upper = str(tomador).strip().upper()
-                    
                     # 🛠️ FORMATO OTIMIZADO PARA STREAMLIT (lh3.googleusercontent.com)
-                    # Este formato ignora as páginas de aviso do Google e entrega a imagem pura.
                     logos = {
                         "ECOLYZER": "https://lh3.googleusercontent.com/d/1NdbO7olL6GUQDN3krRnyICfgNC07Di2Z",
                         "GRALAB": "https://lh3.googleusercontent.com/d/1SeNj-i590Q6ft-pUcSIk-OKKHiOYtAxU",
@@ -3854,18 +3882,18 @@ elif menu == "📈 Dashboard":
                         "CAEP": "https://lh3.googleusercontent.com/d/1MYi7GKT6aAtYJALMoHFOxqmOjdV_Qjoh",
                         "SAPIENS": "https://lh3.googleusercontent.com/d/1SeimGoz8sEhF-_63LpFkHJLgXbWzrBIP"
                     }
-                    
-                    # 📌 Usa a "padrao.png" se o cliente não estiver na lista
                     return logos.get(tomador_upper, "https://lh3.googleusercontent.com/d/10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY")
 
                 vol_tom['Logo'] = vol_tom['Cliente'].apply(get_logo_url)
-                vol_tom = vol_tom[['Logo', 'Cliente', 'Volumes']]
+                
+                # 🚀 MUDANÇA AQUI: Removemos a coluna 'Cliente' (texto) e deixamos só Logo e Volumes
+                vol_tom = vol_tom[['Logo', 'Volumes']]
 
                 st.dataframe(
                     vol_tom,
                     column_config={
-                        "Logo": st.column_config.ImageColumn(" ", width="small"),
-                        "Cliente": st.column_config.TextColumn("Tomador"),
+                        # 🚀 MUDANÇA AQUI: Título "Tomador" na logo e tamanho aumentado para "medium"
+                        "Logo": st.column_config.ImageColumn("Tomador", width="medium"),
                         "Volumes": st.column_config.ProgressColumn("Qtd Finalizada", format="%d", min_value=0, max_value=int(vol_tom['Volumes'].max())),
                     },
                     hide_index=True, use_container_width=True, height=240
