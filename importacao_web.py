@@ -3598,10 +3598,9 @@ elif menu == "📈 Dashboard":
     import requests
     import urllib.parse
     
-    # 🔥 TOGGLE MODO CLARO / ESCURO 🔥
-    col_header, col_toggle = st.columns([8, 2])
+    # 🔥 TOGGLE MODO CLARO / ESCURO (Otimizado sem quebrar layout) 🔥
+    col_espaco, col_toggle = st.columns([8.5, 1.5])
     with col_toggle:
-        st.markdown("<br>", unsafe_allow_html=True)
         modo_claro = st.toggle("☀️ Modo Claro", value=False)
         
     if modo_claro:
@@ -3615,6 +3614,7 @@ elif menu == "📈 Dashboard":
         <style>
         [data-testid="stAppViewContainer"] {{ background-color: {bg_app}; color: {text_app}; transition: 0.5s; }}
         [data-testid="stHeader"] {{ background-color: transparent; }}
+        /* Removemos o padding desnecessário do topo para colar tudo em cima */
         .block-container {{ padding-top: 1rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }}
         hr {{ margin: 0.5em 0 !important; border-color: {border_card} !important; }}
         
@@ -3627,7 +3627,7 @@ elif menu == "📈 Dashboard":
         </style>
     """, unsafe_allow_html=True)
     
-    # ⏱️ REFRESH NATIVO (Não apaga a memória de login)
+    # ⏱️ REFRESH NATIVO (Atualiza dados a cada 2 min sem perder o login)
     st_autorefresh(interval=120000, limit=None, key="refresh_dashboard_tv")
     
     df_raw = carregar_dados_completos(planilha_db)
@@ -3635,7 +3635,6 @@ elif menu == "📈 Dashboard":
     if df_raw.empty:
         st.warning("⚠️ Banco de dados vazio.")
     else:
-        # 1. Lógica de Datas
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         hoje = hoje_br
         
@@ -3653,7 +3652,7 @@ elif menu == "📈 Dashboard":
             elif var < 0: return f"{var:.1f}%", "▼"
             return "0%", "-"
 
-        # 2. Cálculos dos KPIs
+        # Cálculos dos KPIs
         vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
         resolvidos_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
         resolvidos_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
@@ -3679,11 +3678,9 @@ elif menu == "📈 Dashboard":
         elif var_taxa < 0: v_taxa_str, s_taxa = f"{var_taxa:.1f} pp", "▼"
         else: v_taxa_str, s_taxa = "0 pp", "-"
 
-        # 🔥 MUDANÇA: Usando apenas o volume de HOJE para o Gráfico
         vol_tomadores = df_hoje['TOMADOR'].value_counts().reset_index()
         vol_tomadores.columns = ['Tomador', 'Volume']
 
-        # Inteligência da Frota
         dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         frota_stats = {}
         if not df_hoje.empty:
@@ -3698,21 +3695,14 @@ elif menu == "📈 Dashboard":
         
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
-        # =========================================================
-        # 🧠 FUNÇÕES CÉREBRO PARA O TICKER
-        # =========================================================
         @st.cache_data(ttl=1800)
         def buscar_cotacao_dolar():
             try:
                 resp = requests.get("https://economia.awesomeapi.com.br/last/USD-BRL", timeout=3)
                 if resp.status_code == 200:
                     dados = resp.json()
-                    dolar = float(dados['USDBRL']['bid'])
-                    variacao = float(dados['USDBRL']['pctChange'])
-                    sinal = "▲" if variacao > 0 else "▼" if variacao < 0 else "-"
-                    return f"💵 DÓLAR: R$ {dolar:.2f} ({sinal} {variacao}%)".replace('.', ',')
-            except:
-                pass
+                    return f"💵 DÓLAR: R$ {float(dados['USDBRL']['bid']):.2f} ({( '▲' if float(dados['USDBRL']['pctChange']) > 0 else '▼')} {float(dados['USDBRL']['pctChange'])}%)".replace('.', ',')
+            except: pass
             return ""
 
         @st.cache_data(ttl=3600)
@@ -3722,15 +3712,11 @@ elif menu == "📈 Dashboard":
                 if not item or str(item).upper() == "NAN": continue
                 try:
                     cidade_busca = str(item).split('/')[0].strip() if '/' in str(item) else str(item).strip()
-                    cid_fmt = urllib.parse.quote(cidade_busca)
-                    resp = requests.get(f"https://wttr.in/{cid_fmt}?format=j1", timeout=3)
+                    resp = requests.get(f"https://wttr.in/{urllib.parse.quote(cidade_busca)}?format=j1", timeout=3)
                     if resp.status_code == 200:
-                        dados = resp.json()
-                        condicao = str(dados['current_condition'][0]['weatherDesc'][0]['value']).lower()
-                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder', 'drizzle']):
-                            alertas.append(f"⛈️ RADAR CLIMA: Chuva na rota de {item}!")
-                        else:
-                            alertas.append(f"☀️ RADAR CLIMA: Tempo estável em {item}.")
+                        condicao = str(resp.json()['current_condition'][0]['weatherDesc'][0]['value']).lower()
+                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder']): alertas.append(f"⛈️ RADAR CLIMA: Chuva na rota de {item}!")
+                        else: alertas.append(f"☀️ RADAR CLIMA: Tempo estável em {item}.")
                 except: continue
             return alertas
 
@@ -3740,15 +3726,13 @@ elif menu == "📈 Dashboard":
             headers = {"x-rapidapi-key": "726b5b7c75msh782bc334e03fcd1p1d415cjsn84ef052a00e7", "x-rapidapi-host": "aerodatabox.p.rapidapi.com"}
             data_str = data_referencia.strftime('%Y-%m-%d')
             for voo in lista_voos:
-                v_query = str(voo).upper().replace(" ", "")
                 try:
-                    url = f"https://aerodatabox.p.rapidapi.com/flights/number/{v_query}/{data_str}"
-                    resp = requests.get(url, headers=headers, timeout=5)
+                    v_query = str(voo).upper().replace(" ", "")
+                    resp = requests.get(f"https://aerodatabox.p.rapidapi.com/flights/number/{v_query}/{data_str}", headers=headers, timeout=5)
                     if resp.status_code == 200:
                         dados = resp.json()
                         if dados and isinstance(dados, list) and len(dados) > 0:
-                            v = dados[0] 
-                            status = str(v.get('status', 'UNK')).upper()
+                            status = str(dados[0].get('status', 'UNK')).upper()
                             if "EXPECTED" in status or "SCHEDULED" in status: alertas_voos.append(f"✈️ RADAR AÉREO: Voo {v_query} confirmado. Sem atrasos.")
                             elif "DELAYED" in status: alertas_voos.append(f"🚨 ALERTA AÉREO: Voo {v_query} consta como ATRASADO!")
                             elif "CANCELED" in status or "CANCELLED" in status: alertas_voos.append(f"🚫 CRÍTICO: Voo {v_query} foi CANCELADO!")
@@ -3760,54 +3744,40 @@ elif menu == "📈 Dashboard":
         qtd_chamados = checar_chamados_pendentes(planilha_db)
 
         # ---------------------------------------------------------
-        # ANDAR 1: TICKER CYBER (Velocidade Ajustada e Tema Variável)
+        # ANDAR 1: TICKER CYBER (MOVIDO PARA CIMA DA TELA)
         # ---------------------------------------------------------
         manchetes = [f"🟢 SISTEMA ONLINE", f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}"]
-        
         cotacao_dolar = buscar_cotacao_dolar()
         if cotacao_dolar: manchetes.append(cotacao_dolar)
-
         if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) aguardando resposta do C.C.O!")
         if atra_h > 0: manchetes.append(f"⚠️ SLA CRÍTICO: {atra_h} visita(s) em atraso na operação agora!")
-        
-        if vol_total_h > 0:
-            progresso = int((resolvidos_h / vol_total_h) * 100)
-            manchetes.append(f"🎯 META DIÁRIA: {progresso}% das operações concluídas.")
+        if vol_total_h > 0: manchetes.append(f"🎯 META DIÁRIA: {int((resolvidos_h / vol_total_h) * 100)}% das operações concluídas.")
 
         finalizados_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)]
         if not finalizados_hj.empty:
             for _, row in finalizados_hj.tail(3).iterrows():
                 pcl = str(row.get('LABORATORIO', row.get('TOMADOR', 'PCL'))).title()
                 cidade = str(row.get('CIDADE', '')).title()
-                hora = str(row.get('HORA', ''))
-                if hora == 'nan' or not hora.strip(): hora = str(row.get('HORA_BAIXA', ''))
+                hora = str(row.get('HORA_BAIXA', row.get('HORA', '')))
                 hora_str = f" às {hora}" if hora and hora.lower() != 'nan' and hora.strip() else ""
-                cidade_str = f" em {cidade}" if cidade and cidade.lower() != 'nan' and cidade.strip() else ""
                 tipo = "Coleta" if 'COLETADO' in str(row.get('STATUS_DISPLAY', '')).upper() else "Entrega"
-                manchetes.append(f"✅ ÚLTIMA BAIXA: {tipo} no {pcl}{cidade_str} finalizada{hora_str}!")
+                manchetes.append(f"✅ ÚLTIMA BAIXA: {tipo} no {pcl} em {cidade}{hora_str}!")
 
         cidades_alvo = []
         if not df_hoje.empty:
             top_cids = df_hoje['CIDADE'].value_counts().head(3).index.tolist()
             col_uf = 'UF' if 'UF' in df_hoje.columns else ('ESTADO' if 'ESTADO' in df_hoje.columns else None)
             for cid in top_cids:
-                cid_nome = str(cid).strip().title()
-                if col_uf:
-                    try:
-                        uf = str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()
-                        cidades_alvo.append(f"{cid_nome}/{uf}")
-                    except: cidades_alvo.append(cid_nome)
-                else: cidades_alvo.append(cid_nome)
+                try: cidades_alvo.append(f"{str(cid).strip().title()}/{str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()}" if col_uf else str(cid).strip().title())
+                except: cidades_alvo.append(str(cid).strip().title())
         
         if cidades_alvo: manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
-        voos_monitorados = ["G31240"]
-        if voos_monitorados: manchetes.extend(buscar_status_voos_aerodatabox(voos_monitorados, hoje))
+        manchetes.extend(buscar_status_voos_aerodatabox(["G31240"], hoje))
 
         ticker_text = " &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
         st.markdown(f"""
             <style>
-            .nasdaq-container {{ background-color: {ticker_bg}; color: {text_app}; padding: 6px 0; border-radius: 4px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; position: relative; border-bottom: 1px solid {border_card}; }}
-            /* 🔥 VELOCIDADE REDUZIDA (de 35s para 90s) 🔥 */
+            .nasdaq-container {{ background-color: {ticker_bg}; color: {text_app}; padding: 6px 0; border-radius: 4px; margin-bottom: 15px; white-space: nowrap; overflow: hidden; position: relative; border-bottom: 1px solid {border_card}; }}
             .nasdaq-scroller {{ display: inline-block; animation: scroll-left 90s linear infinite; }} 
             .nasdaq-item {{ display: inline-block; font-size: 13px; font-weight: 600; font-family: 'Segoe UI', sans-serif; color: {text_app}; letter-spacing: 0.5px; }}
             @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
@@ -3851,18 +3821,19 @@ elif menu == "📈 Dashboard":
         c5, c6, c7, c8 = st.columns(4)
         c5.markdown(make_tv_card("ROTA/PENDENTES", pend_h, f"{s_pend}{v_pend_str}", "#F59E0B", "🚚"), unsafe_allow_html=True)
         
-        # 🔥 MUDANÇA: "ENTREGUES" virou "COLETADOS" com cor Indigo/Roxa 🔥
+        # 🔥 MUDANÇA 1: "ENTREGUES" virou "COLETADOS" com cor Índigo 🔥
         c6.markdown(make_tv_card("COLETADOS", ent_h, f"{s_ent}{v_ent_str}", "#6366F1", "📦"), unsafe_allow_html=True) 
         
         c7.markdown(make_tv_card("FRUSTRADAS", frus_h, f"{s_frus}{v_frus_str}", "#EF4444", "🛑"), unsafe_allow_html=True)
         c8.markdown(make_tv_card("BASE ONTEM", vol_total_o, "Ref. Cálculo", "#64748B", "📊"), unsafe_allow_html=True) 
 
         # ---------------------------------------------------------
-        # ANDAR 3: GRÁFICOS REDIMENSIONADOS (PLOTLY THEME DINÂMICO)
+        # ANDAR 3: GRÁFICOS REDIMENSIONADOS E NOVA TABELA DE TOMADOR
         # ---------------------------------------------------------
         col_graf1, col_graf2 = st.columns([1, 1.5])
         
         with col_graf1:
+            st.markdown(f"<p style='color:{text_app}; font-size:13px; font-weight:800; margin-bottom:0px;'>📍 SITUAÇÃO DA ROTA</p>", unsafe_allow_html=True)
             status_labels = ['Coletado', 'Pendente', 'Frustrada', 'Atrasado']
             status_vals = [ent_h, pend_h, frus_h, atra_h]
             df_donut = pd.DataFrame({'Status': status_labels, 'Volumes': status_vals})
@@ -3872,36 +3843,42 @@ elif menu == "📈 Dashboard":
                 cores_map = {'Coletado': '#6366F1', 'Pendente': '#F59E0B', 'Frustrada': '#EF4444', 'Atrasado': '#991B1B'}
                 fig_donut = px.pie(df_donut, values='Volumes', names='Status', hole=0.7, color='Status', color_discrete_map=cores_map)
                 fig_donut.update_traces(textinfo='percent', textfont_size=12, textfont_color='white', marker=dict(line=dict(color=bg_card, width=2)))
-                fig_donut.update_layout(template=plotly_theme, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=5, b=5, l=5, r=5), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=11, color="#64748B")), height=220)
+                fig_donut.update_layout(template=plotly_theme, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=5, b=5, l=5, r=5), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=11, color="#64748B")), height=210)
                 st.plotly_chart(fig_donut, use_container_width=True)
             else: st.info("Sem dados para os gráficos.")
 
         with col_graf2:
+            st.markdown(f"<p style='color:{text_app}; font-size:13px; font-weight:800; margin-bottom:8px;'>🏢 VOLUME DE HOJE POR TOMADOR</p>", unsafe_allow_html=True)
+            
+            # 🔥 MUDANÇA 2: Gráfico Gigante Substituído por Tabela Limpa 🔥
             if not vol_tomadores.empty:
-                df_bar = vol_tomadores.head(7).sort_values(by='Volume', ascending=False)
+                df_tab = vol_tomadores.sort_values(by='Volume', ascending=False).reset_index(drop=True)
                 
-                # 🔥 MUDANÇA: GRÁFICO VERTICAL COM RÓTULOS (TEXTO) E SEM LINHAS DE GRADE 🔥
-                fig_bar = px.bar(df_bar, x='Tomador', y='Volume', text='Volume')
-                fig_bar.update_traces(marker_color='#3B82F6', textposition='outside', textfont_size=13, textfont_color=text_app, textfont_weight='bold')
-                fig_bar.update_layout(
-                    template=plotly_theme, 
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    plot_bgcolor='rgba(0,0,0,0)', 
-                    margin=dict(t=15, b=5, l=5, r=5), 
-                    xaxis_title="", 
-                    yaxis_title="", 
-                    yaxis_showticklabels=False, # Oculta os números no eixo Y para ficar mais limpo
-                    yaxis_showgrid=False,       # Oculta linhas de grade
-                    height=220
-                )
-                # Garante que as barras não cortem o número no topo
-                fig_bar.update_yaxes(range=[0, df_bar['Volume'].max() * 1.2])
-                st.plotly_chart(fig_bar, use_container_width=True)
-            else: st.info("Sem dados de volume para o dia de hoje.")
+                # Usando HTML simples para combinar com o modo dia/noite perfeitamente
+                html_tabela = f"""
+                <div style="background: {bg_card}; border: 1px solid {border_card}; border-radius: 8px; overflow: hidden;">
+                    <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 13px;">
+                        <tr style="background-color: {ticker_bg}; color: #64748B; font-weight: 800; text-transform: uppercase;">
+                            <th style="padding: 10px 15px; border-bottom: 1px solid {border_card};">🏢 Cliente (Tomador)</th>
+                            <th style="padding: 10px 15px; border-bottom: 1px solid {border_card}; text-align: center;">📦 Volume Finalizado</th>
+                        </tr>
+                """
+                for _, r in df_tab.iterrows():
+                    html_tabela += f"""
+                        <tr style="color: {text_app}; border-bottom: 1px solid {border_card};">
+                            <td style="padding: 8px 15px; font-weight: 600;">{r['Tomador']}</td>
+                            <td style="padding: 8px 15px; text-align: center; font-weight: 800; color: #3B82F6;">{r['Volume']}</td>
+                        </tr>
+                    """
+                html_tabela += "</table></div>"
+                st.markdown(html_tabela, unsafe_allow_html=True)
+            else: 
+                st.info("Nenhum volume registrado hoje.")
 
         # ---------------------------------------------------------
         # ANDAR 4: PÓDIO CYBER ADAPTATIVO
         # ---------------------------------------------------------
+        st.markdown("<br>", unsafe_allow_html=True)
         if len(frota_ordenada) > 0:
             c_f1, c_f2, c_f3 = st.columns(3)
             def min_podio(pos, ic, color, ag, pct, vols):
