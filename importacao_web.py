@@ -3589,7 +3589,7 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO ELITE C.C.O)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO ELITE C.C.O - LIGHT THEME)
 # =============================================================================
 elif menu == "📈 Dashboard":
     import plotly.express as px
@@ -3598,32 +3598,21 @@ elif menu == "📈 Dashboard":
     import requests
     import urllib.parse
     
-    # 🔥 TOGGLE MODO CLARO / ESCURO (Otimizado sem quebrar layout) 🔥
-    col_espaco, col_toggle = st.columns([8.5, 1.5])
-    with col_toggle:
-        modo_claro = st.toggle("☀️ Modo Claro", value=False)
-        
-    if modo_claro:
-        bg_app, text_app, bg_card, border_card, ticker_bg = "#F8FAFC", "#0F172A", "#FFFFFF", "#E2E8F0", "#E2E8F0"
-        plotly_theme = "plotly_white"
-    else:
-        bg_app, text_app, bg_card, border_card, ticker_bg = "#020617", "#F8FAFC", "#0F172A", "#1E293B", "#0B1120"
-        plotly_theme = "plotly_dark"
-
-    st.markdown(f"""
+    # 🔥 TEMA CLARO FIXO E OTIMIZAÇÃO DE ESPAÇO 🔥
+    st.markdown("""
         <style>
-        [data-testid="stAppViewContainer"] {{ background-color: {bg_app}; color: {text_app}; transition: 0.5s; }}
-        [data-testid="stHeader"] {{ background-color: transparent; }}
+        [data-testid="stAppViewContainer"] { background-color: #F8FAFC; color: #0F172A; }
+        [data-testid="stHeader"] { background-color: transparent; }
         /* Removemos o padding desnecessário do topo para colar tudo em cima */
-        .block-container {{ padding-top: 1rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }}
-        hr {{ margin: 0.5em 0 !important; border-color: {border_card} !important; }}
+        .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
+        hr { margin: 0.5em 0 !important; border-color: #E2E8F0 !important; }
         
-        @keyframes pulse-red {{
-            0% {{ box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }}
-            70% {{ box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }}
-            100% {{ box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }}
-        }}
-        .alerta-ativo {{ animation: pulse-red 2s infinite; border-color: #EF4444 !important; }}
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+        .alerta-ativo { animation: pulse-red 2s infinite; border-color: #EF4444 !important; }
         </style>
     """, unsafe_allow_html=True)
     
@@ -3744,7 +3733,7 @@ elif menu == "📈 Dashboard":
         qtd_chamados = checar_chamados_pendentes(planilha_db)
 
         # ---------------------------------------------------------
-        # ANDAR 1: TICKER CYBER (MOVIDO PARA CIMA DA TELA)
+        # ANDAR 1: TICKER CYBER
         # ---------------------------------------------------------
         manchetes = [f"🟢 SISTEMA ONLINE", f"🕒 HORA: {datetime.now(FUSO_BR).strftime('%H:%M:%S')}"]
         cotacao_dolar = buscar_cotacao_dolar()
@@ -3777,13 +3766,13 @@ elif menu == "📈 Dashboard":
         ticker_text = " &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp; ".join([f"<span class='nasdaq-item'>{m}</span>" for m in manchetes])
         st.markdown(f"""
             <style>
-            .nasdaq-container {{ background-color: {ticker_bg}; color: {text_app}; padding: 6px 0; border-radius: 4px; margin-bottom: 15px; white-space: nowrap; overflow: hidden; position: relative; border-bottom: 1px solid {border_card}; }}
+            .nasdaq-container {{ background-color: #F1F5F9; color: #0F172A; padding: 6px 0; border-radius: 4px; margin-bottom: 15px; white-space: nowrap; overflow: hidden; position: relative; border-bottom: 1px solid #E2E8F0; }}
             .nasdaq-scroller {{ display: inline-block; animation: scroll-left 90s linear infinite; }} 
-            .nasdaq-item {{ display: inline-block; font-size: 13px; font-weight: 600; font-family: 'Segoe UI', sans-serif; color: {text_app}; letter-spacing: 0.5px; }}
+            .nasdaq-item {{ display: inline-block; font-size: 13px; font-weight: 600; font-family: 'Segoe UI', sans-serif; color: #0F172A; letter-spacing: 0.5px; }}
             @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
             </style>
             <div class="nasdaq-container">
-                <div style="position: absolute; left: 0; top: 0; bottom: 0; background: {bg_app}; color: {text_app}; padding: 6px 15px; font-weight: 900; z-index: 10; display: flex; align-items: center; border-right: 2px solid #3B82F6; font-size: 14px; letter-spacing: 2px;">
+                <div style="position: absolute; left: 0; top: 0; bottom: 0; background: #FFFFFF; color: #0F172A; padding: 6px 15px; font-weight: 900; z-index: 10; display: flex; align-items: center; border-right: 2px solid #3B82F6; font-size: 14px; letter-spacing: 2px;">
                     🛰️ IGO C.C.O
                 </div>
                 <div class="nasdaq-scroller" style="padding-left: 140px;">{ticker_text}</div>
@@ -3791,18 +3780,18 @@ elif menu == "📈 Dashboard":
         """, unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # ANDAR 2: CARDS ADAPTATIVOS
+        # ANDAR 2: CARDS CLAROS E MODERNOS
         # ---------------------------------------------------------
         def make_tv_card(title, value, var_str, color_hex, icon, is_alert=False):
             alert_class = "alerta-ativo" if is_alert else ""
             return f"""
-            <div class="{alert_class}" style="background: {bg_card}; border: 1px solid {border_card}; border-left: 4px solid {color_hex}; padding: 10px 15px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); height: 85px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 8px;">
+            <div class="{alert_class}" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-left: 4px solid {color_hex}; padding: 10px 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: 85px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <p style="margin:0; font-size:11px; font-weight:800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">{title}</p>
                     <span style="font-size:16px; opacity: 0.9;">{icon}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-                    <h2 style="margin:0; font-size:28px; font-weight:900; color: {text_app}; line-height: 1;">{value}</h2>
+                    <h2 style="margin:0; font-size:28px; font-weight:900; color: #0F172A; line-height: 1;">{value}</h2>
                     <span style="font-size:13px; font-weight:800; color: #FFFFFF; background: {color_hex}; padding: 3px 8px; border-radius: 4px;">{var_str}</span>
                 </div>
             </div>
@@ -3820,20 +3809,17 @@ elif menu == "📈 Dashboard":
 
         c5, c6, c7, c8 = st.columns(4)
         c5.markdown(make_tv_card("ROTA/PENDENTES", pend_h, f"{s_pend}{v_pend_str}", "#F59E0B", "🚚"), unsafe_allow_html=True)
-        
-        # 🔥 MUDANÇA 1: "ENTREGUES" virou "COLETADOS" com cor Índigo 🔥
         c6.markdown(make_tv_card("COLETADOS", ent_h, f"{s_ent}{v_ent_str}", "#6366F1", "📦"), unsafe_allow_html=True) 
-        
         c7.markdown(make_tv_card("FRUSTRADAS", frus_h, f"{s_frus}{v_frus_str}", "#EF4444", "🛑"), unsafe_allow_html=True)
         c8.markdown(make_tv_card("BASE ONTEM", vol_total_o, "Ref. Cálculo", "#64748B", "📊"), unsafe_allow_html=True) 
 
         # ---------------------------------------------------------
-        # ANDAR 3: GRÁFICOS REDIMENSIONADOS E NOVA TABELA DE TOMADOR
+        # ANDAR 3: GRÁFICO REDIMENSIONADO E TABELA PREMIUM NATIVA
         # ---------------------------------------------------------
         col_graf1, col_graf2 = st.columns([1, 1.5])
         
         with col_graf1:
-            st.markdown(f"<p style='color:{text_app}; font-size:13px; font-weight:800; margin-bottom:0px;'>📍 SITUAÇÃO DA ROTA</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='color:#0F172A; font-size:13px; font-weight:800; margin-bottom:0px;'>📍 SITUAÇÃO DA ROTA</p>", unsafe_allow_html=True)
             status_labels = ['Coletado', 'Pendente', 'Frustrada', 'Atrasado']
             status_vals = [ent_h, pend_h, frus_h, atra_h]
             df_donut = pd.DataFrame({'Status': status_labels, 'Volumes': status_vals})
@@ -3842,36 +3828,34 @@ elif menu == "📈 Dashboard":
             if not df_donut.empty:
                 cores_map = {'Coletado': '#6366F1', 'Pendente': '#F59E0B', 'Frustrada': '#EF4444', 'Atrasado': '#991B1B'}
                 fig_donut = px.pie(df_donut, values='Volumes', names='Status', hole=0.7, color='Status', color_discrete_map=cores_map)
-                fig_donut.update_traces(textinfo='percent', textfont_size=12, textfont_color='white', marker=dict(line=dict(color=bg_card, width=2)))
-                fig_donut.update_layout(template=plotly_theme, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=5, b=5, l=5, r=5), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=11, color="#64748B")), height=210)
+                fig_donut.update_traces(textinfo='percent', textfont_size=12, textfont_color='white', marker=dict(line=dict(color="#FFFFFF", width=2)))
+                fig_donut.update_layout(template="plotly_white", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=5, b=5, l=5, r=5), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=11, color="#64748B")), height=210)
                 st.plotly_chart(fig_donut, use_container_width=True)
             else: st.info("Sem dados para os gráficos.")
 
         with col_graf2:
-            st.markdown(f"<p style='color:{text_app}; font-size:13px; font-weight:800; margin-bottom:8px;'>🏢 VOLUME DE HOJE POR TOMADOR</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='color:#0F172A; font-size:13px; font-weight:800; margin-bottom:8px;'>🏢 VOLUME DE HOJE POR TOMADOR</p>", unsafe_allow_html=True)
             
-            # 🔥 MUDANÇA 2: Gráfico Gigante Substituído por Tabela Limpa 🔥
+            # 🔥 MUDANÇA: Substituí o HTML por um componente nativo incrivelmente visual 🔥
             if not vol_tomadores.empty:
                 df_tab = vol_tomadores.sort_values(by='Volume', ascending=False).reset_index(drop=True)
                 
-                # Usando HTML simples para combinar com o modo dia/noite perfeitamente
-                html_tabela = f"""
-                <div style="background: {bg_card}; border: 1px solid {border_card}; border-radius: 8px; overflow: hidden;">
-                    <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 13px;">
-                        <tr style="background-color: {ticker_bg}; color: #64748B; font-weight: 800; text-transform: uppercase;">
-                            <th style="padding: 10px 15px; border-bottom: 1px solid {border_card};">🏢 Cliente (Tomador)</th>
-                            <th style="padding: 10px 15px; border-bottom: 1px solid {border_card}; text-align: center;">📦 Volume Finalizado</th>
-                        </tr>
-                """
-                for _, r in df_tab.iterrows():
-                    html_tabela += f"""
-                        <tr style="color: {text_app}; border-bottom: 1px solid {border_card};">
-                            <td style="padding: 8px 15px; font-weight: 600;">{r['Tomador']}</td>
-                            <td style="padding: 8px 15px; text-align: center; font-weight: 800; color: #3B82F6;">{r['Volume']}</td>
-                        </tr>
-                    """
-                html_tabela += "</table></div>"
-                st.markdown(html_tabela, unsafe_allow_html=True)
+                st.dataframe(
+                    df_tab,
+                    column_config={
+                        "Tomador": st.column_config.TextColumn("🏢 Cliente (Tomador)", width="large"),
+                        "Volume": st.column_config.ProgressColumn(
+                            "📦 Volume Finalizado", 
+                            help="Acompanhamento do volume por cliente",
+                            format="%d", 
+                            min_value=0, 
+                            max_value=int(df_tab['Volume'].max())
+                        )
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    height=220
+                )
             else: 
                 st.info("Nenhum volume registrado hoje.")
 
@@ -3882,9 +3866,9 @@ elif menu == "📈 Dashboard":
         if len(frota_ordenada) > 0:
             c_f1, c_f2, c_f3 = st.columns(3)
             def min_podio(pos, ic, color, ag, pct, vols):
-                return f"""<div style="background:{bg_card}; border:1px solid {border_card}; border-bottom: 2px solid {color}; padding:8px 12px; border-radius:6px; display:flex; align-items:center; justify-content:space-between; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                    <div style="display:flex; align-items:center; gap:12px;"><span style="font-size:22px; filter: drop-shadow(0px 0px 5px {color}80);">{ic}</span>
-                    <div><p style="margin:0; font-size:12px; font-weight:800; color:{text_app}; letter-spacing:0.5px;">{ag}</p><p style="margin:0; font-size:10px; color:#64748B;">{vols}</p></div></div>
+                return f"""<div style="background:#FFFFFF; border:1px solid #E2E8F0; border-bottom: 2px solid {color}; padding:8px 12px; border-radius:6px; display:flex; align-items:center; justify-content:space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="display:flex; align-items:center; gap:12px;"><span style="font-size:22px;">{ic}</span>
+                    <div><p style="margin:0; font-size:12px; font-weight:800; color:#0F172A; letter-spacing:0.5px;">{ag}</p><p style="margin:0; font-size:10px; color:#64748B;">{vols}</p></div></div>
                     <h3 style="margin:0; font-size:20px; font-weight:900; color:{color};">{pct}%</h3></div>"""
             
             if len(frota_ordenada) >= 1: c_f1.markdown(min_podio("1º", "🥇", "#10B981", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}"), unsafe_allow_html=True)
