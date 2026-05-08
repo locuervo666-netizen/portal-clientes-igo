@@ -3619,7 +3619,6 @@ elif menu == "📈 Dashboard":
     
     # ⏱️ REFRESH NATIVO (Não apaga a memória de login)
     st_autorefresh(interval=120000, limit=None, key="refresh_dashboard_tv")
-    )
     
     df_raw = carregar_dados_completos(planilha_db)
     
