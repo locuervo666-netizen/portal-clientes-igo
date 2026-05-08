@@ -3800,15 +3800,15 @@ elif menu == "📈 Dashboard":
         if cidades_alvo: manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
         manchetes.extend(buscar_status_voos_aerodatabox(["G31240"], hoje))
 
-        # Renderização Visual
+        # Renderização Visual do Ticker (Tamanho Ampliado para TV)
         ticker_text = " &nbsp;&nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;&nbsp; ".join([m for m in manchetes])
         st.markdown(f"""
             <style>
-            .ticker-wrap {{ background: #FFFFFF; border: 1px solid #E2E8F0; padding: 8px 0; border-radius: 8px; margin-bottom: 20px; overflow: hidden; position: relative; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
+            .ticker-wrap {{ background: #FFFFFF; border: 1px solid #E2E8F0; padding: 16px 0; border-radius: 8px; margin-bottom: 20px; overflow: hidden; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }}
             .ticker-move {{ display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker 80s linear infinite; }}
             @keyframes ticker {{ 0% {{ transform: translate3d(0, 0, 0); }} 100% {{ transform: translate3d(-100%, 0, 0); }} }}
-            .ticker-item {{ font-size: 13px; font-weight: 700; color: #475569; }}
-            .badge-radar {{ position: absolute; left: 0; top: 0; bottom: 0; background: #3B82F6; color: white; padding: 0 20px; z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 13px; border-radius: 8px 0 0 8px; letter-spacing: 1px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }}
+            .ticker-item {{ font-size: 18px; font-weight: 800; color: #334155; letter-spacing: 0.5px; }}
+            .badge-radar {{ position: absolute; left: 0; top: 0; bottom: 0; background: #3B82F6; color: white; padding: 0 30px; z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 17px; border-radius: 8px 0 0 8px; letter-spacing: 1.5px; box-shadow: 3px 0 8px rgba(0,0,0,0.15); }}
             </style>
             <div class="ticker-wrap">
                 <div class="badge-radar">📡 RADAR</div>
