@@ -3715,12 +3715,42 @@ elif menu == "📈 Dashboard":
             return alertas_voos
 
         # ---------------------------------------------------------
-        # BARRA DE NOTÍCIAS (TICKER) - TOPO ABSOLUTO
+        # BARRA DE NOTÍCIAS (TICKER INTELIGENTE) - TOPO ABSOLUTO
         # ---------------------------------------------------------
         manchetes = [f"🟢 OPERAÇÃO ATIVA", f"🕒 {datetime.now(FUSO_BR).strftime('%H:%M')}"]
-        if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) pendente(s)")
-        if atra_h > 0: manchetes.append(f"🚨 SLA: {atra_h} pedido(s) em atraso!")
         
+        # 1. Alertas de Helpdesk e SLA
+        if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) pendente(s)")
+        if atra_h > 0: manchetes.append(f"🚨 SLA CRÍTICO: {atra_h} pedido(s) em atraso na operação!")
+
+        # 2. Meta Diária de Conclusão
+        if vol_total_h > 0:
+            progresso = int((resolvidos_h / vol_total_h) * 100)
+            manchetes.append(f"🎯 META DIÁRIA: {progresso}% das operações de hoje concluídas.")
+
+        # 3. Inteligência de Cobrança (Motorista mais atrasado)
+        if atra_h > 0:
+            df_atrasados = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)]
+            if not df_atrasados.empty:
+                top_atrasado = df_atrasados['AGENTE_RAW'].value_counts().index[0]
+                qtd_atrasos_top = df_atrasados['AGENTE_RAW'].value_counts().iloc[0]
+                if str(top_atrasado).strip() and str(top_atrasado).upper() != 'NAN':
+                    nome_mot_atrasado = dict_nomes_dash.get(str(top_atrasado).strip().lower(), str(top_atrasado).upper().split('|')[0])
+                    manchetes.append(f"⚠️ ATENÇÃO AGENTE: O motorista {nome_mot_atrasado} possui {qtd_atrasos_top} volume(s) com prazo estourado.")
+
+        # 4. Últimas Baixas (Tempo Real)
+        finalizados_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)]
+        if not finalizados_hj.empty:
+            for _, row in finalizados_hj.tail(3).iterrows():
+                pcl = str(row.get('LABORATORIO', row.get('TOMADOR', 'PCL'))).title()
+                cidade = str(row.get('CIDADE', '')).title()
+                # Tenta pegar a hora exata da baixa no AppSheet
+                hora = str(row.get('HORA_BAIXA', row.get('HORA', '')))
+                hora_str = f" às {hora}" if hora and hora.lower() != 'nan' and hora.strip() else ""
+                tipo = "Coleta" if 'COLETADO' in str(row.get('STATUS_DISPLAY', '')).upper() else "Entrega"
+                manchetes.append(f"✅ ÚLTIMA BAIXA: {tipo} no {pcl} em {cidade}{hora_str}!")
+
+        # 5. Radares Climáticos
         cidades_alvo = []
         if not df_hoje.empty:
             top_cids = df_hoje['CIDADE'].value_counts().head(3).index.tolist()
@@ -3730,7 +3760,6 @@ elif menu == "📈 Dashboard":
                 except: cidades_alvo.append(str(cid).strip().title())
         
         if cidades_alvo: manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
-        manchetes.extend(buscar_status_voos_aerodatabox(["G31240"], hoje))
 
         ticker_text = " &nbsp;&nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;&nbsp; ".join([m for m in manchetes])
         st.markdown(f"""
@@ -3738,8 +3767,8 @@ elif menu == "📈 Dashboard":
             .ticker-wrap {{ background: #FFFFFF; border: 1px solid #E2E8F0; padding: 8px 0; border-radius: 8px; margin-bottom: 20px; overflow: hidden; position: relative; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
             .ticker-move {{ display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker 80s linear infinite; }}
             @keyframes ticker {{ 0% {{ transform: translate3d(0, 0, 0); }} 100% {{ transform: translate3d(-100%, 0, 0); }} }}
-            .ticker-item {{ font-size: 13px; font-weight: 700; color: #475569; }}
-            .badge-radar {{ position: absolute; left: 0; top: 0; bottom: 0; background: #3B82F6; color: white; padding: 0 20px; z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 13px; border-radius: 8px 0 0 8px; letter-spacing: 1px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }}
+            .ticker-item {{ font-size: 14px; font-weight: 700; color: #475569; }}
+            .badge-radar {{ position: absolute; left: 0; top: 0; bottom: 0; background: #3B82F6; color: white; padding: 0 20px; z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 14px; border-radius: 8px 0 0 8px; letter-spacing: 1px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }}
             </style>
             <div class="ticker-wrap">
                 <div class="badge-radar">📡 RADAR</div>
