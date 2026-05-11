@@ -2124,13 +2124,11 @@ elif menu == "📥 Importações Umove":
             dados_bkp = aba_bkp_umove.get_all_values()
             if len(dados_bkp) > 1:
                 df_bkp = pd.DataFrame(dados_bkp[1:], columns=dados_bkp[0])
-                # Verifica a data do backup. Se for antigo, limpa a aba.
                 data_bkp_str = df_bkp.get('DATA_BACKUP', pd.Series([hoje_br.strftime("%d/%m/%Y")])).iloc[0]
                 if data_bkp_str != hoje_br.strftime("%d/%m/%Y"):
                     aba_bkp_umove.clear()
                     st.session_state.df_sandbox_mem = pd.DataFrame()
                 else:
-                    # Restaura os dados se forem de hoje
                     st.session_state.df_sandbox_mem = df_bkp.drop(columns=['DATA_BACKUP'], errors='ignore')
             else:
                 st.session_state.df_sandbox_mem = pd.DataFrame()
@@ -2151,7 +2149,7 @@ elif menu == "📥 Importações Umove":
             else:
                 aba_bkp_umove.clear()
         except Exception:
-            pass # Falha silenciosa para não travar a operação do usuário
+            pass 
 
     tab_matriz, tab_fixos, tab_carrinho = st.tabs(["📋 1. Colar Matriz", "🔁 2. Gestão de Pedidos Fixos", "🛒 3. Carrinho & Saída"])
 
@@ -2171,6 +2169,9 @@ elif menu == "📥 Importações Umove":
                 if not txt_sb or tom_sandbox == "Selecione...":
                     st.warning("⚠️ Preencha o Tomador e cole os dados!")
                 else:
+                    if tom_sandbox == "CAEP": tom_sandbox = "SYNVIA"
+                    elif tom_sandbox == "CUNHA": tom_sandbox = "GRALAB"
+                    
                     with st.spinner("Lendo dados colados..."):
                         try:
                             delim = '\t' if '\t' in txt_sb else (';' if ';' in txt_sb else ',')
@@ -2236,7 +2237,7 @@ elif menu == "📥 Importações Umove":
                             df_limpo_sb['TOMADOR'] = tom_sandbox
                             df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
                             
-                            df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
+                            df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(str(c).replace('BRODOSQUI', 'BRODOWSKI').replace('Brodosqui', 'Brodowski'), DF_AGENTES))
                             df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
                             
                             df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
@@ -2315,7 +2316,6 @@ elif menu == "📥 Importações Umove":
                             if st.session_state.df_sandbox_mem.empty: st.session_state.df_sandbox_mem = df_ok
                             else: st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_ok], ignore_index=True)
 
-                            # 🔥 NOVO: GATILHO DE SALVAMENTO NO BACKUP 🔥
                             salvar_backup_umove(st.session_state.df_sandbox_mem)
 
                             st.session_state.df_preview_sb = pd.DataFrame()
@@ -2330,7 +2330,6 @@ elif menu == "📥 Importações Umove":
     with tab_fixos:
         st.markdown("#### 🏭 Criar Novo Agendamento Fixo")
         
-        # 🔥 PROTEÇÃO MÁXIMA CONTRA NAME ERROR 🔥
         cols_fixos = ['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
         df_regras = pd.DataFrame(columns=cols_fixos) 
         
@@ -2345,7 +2344,6 @@ elif menu == "📥 Importações Umove":
                 aba_fixos.update("A1", [cols_fixos])
             except Exception: pass
 
-        # --- LÓGICA DE RESET INTELIGENTE ---
         if 'f_rua' not in st.session_state: st.session_state['f_rua'] = ""
         if 'f_bai' not in st.session_state: st.session_state['f_bai'] = ""
         if 'f_cid' not in st.session_state: st.session_state['f_cid'] = ""
@@ -2410,6 +2408,9 @@ elif menu == "📥 Importações Umove":
                 elif not any([b_seg, b_ter, b_qua, b_qui, b_sex, b_sab]):
                     st.error("Selecione pelo menos um dia da semana.")
                 else:
+                    if f_tomador == "CAEP": f_tomador = "SYNVIA"
+                    elif f_tomador == "CUNHA": f_tomador = "GRALAB"
+                    
                     with st.spinner("Salvando regra..."):
                         if f_agente == "Automático (Por Rota)":
                             f_agente = obter_login_agente(f_cid, f_bai, f_lab, f_rua, DF_AGENTES)
@@ -2417,7 +2418,7 @@ elif menu == "📥 Importações Umove":
                         nova_regra = [
                             f"REG-{str(uuid.uuid4())[:6].upper()}", f_tomador, padronizar_texto(f_lab), 
                             padronizar_texto(f_rua), padronizar_texto(f_num), padronizar_texto(f_bai), 
-                            padronizar_texto(f_cid), padronizar_texto(f_uf), st.session_state.get(key_dinamica, ""), 
+                            padronizar_texto(str(f_cid).replace('BRODOSQUI', 'BRODOWSKI').replace('Brodosqui', 'Brodowski')), padronizar_texto(f_uf), st.session_state.get(key_dinamica, ""), 
                             str(f_obs), f_agente,
                             "SIM" if b_seg else "NAO", "SIM" if b_ter else "NAO", "SIM" if b_qua else "NAO",
                             "SIM" if b_qui else "NAO", "SIM" if b_sex else "NAO", "SIM" if b_sab else "NAO",
@@ -2440,7 +2441,6 @@ elif menu == "📥 Importações Umove":
         st.markdown("#### 📋 Gerenciar Laboratórios Fixos")
         st.info("💡 **Edite diretamente na tabela!** Mude o Status (ATIVO/INATIVO), ajuste os dias da semana ou troque o Motorista. Para deletar, selecione a linha no canto esquerdo e aperte a tecla 'Delete' ou 'Backspace'.")
         
-        # 🔥 A TABELA DE EDIÇÃO QUE HAVIA SUMIDO COM O ERRO 🔥
         if not df_regras.empty:
             logins_p_tabela = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
             
@@ -2466,7 +2466,6 @@ elif menu == "📥 Importações Umove":
                 with st.spinner("Atualizando banco de dados..."):
                     try:
                         aba_fixos.clear()
-                        # Se apagou tudo com a tecla Delete, não quebra a planilha:
                         if df_regras_edit.empty:
                             aba_fixos.update("A1", [cols_fixos])
                         else:
@@ -2482,7 +2481,6 @@ elif menu == "📥 Importações Umove":
     # -------------------------------------------------------------------------
     with tab_carrinho:
         
-        # 1. O Robô Lê os Pedidos Fixos do Dia em Memória (Caixa B)
         df_fixos_hoje = pd.DataFrame()
         try:
             aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
@@ -2530,7 +2528,6 @@ elif menu == "📥 Importações Umove":
                         df_fixos_hoje = pd.DataFrame(novos_pedidos)
         except Exception: pass
 
-        # 2. O Checkbox Mágico (Interruptor) - DESLIGADO POR PADRÃO 🔥
         incluir_fixos = False
         if not df_fixos_hoje.empty:
             st.info(f"💡 O sistema encontrou **{len(df_fixos_hoje)} pedidos fixos** programados para hoje ({dia_atual}).")
@@ -2538,7 +2535,6 @@ elif menu == "📥 Importações Umove":
         else:
             st.info("Nenhum pedido fixo programado para hoje.")
 
-        # 3. A Fusão Visual (Caixa A + Caixa B)
         df_sb = st.session_state.df_sandbox_mem.copy()
         if incluir_fixos and not df_fixos_hoje.empty:
             if df_sb.empty:
@@ -2548,6 +2544,76 @@ elif menu == "📥 Importações Umove":
 
         st.markdown("---")
         
+        # 🔥 NOVO: MÓDULO DE RECUPERAÇÃO DE EMERGÊNCIA 🔥
+        with st.expander("🆘 RECUPERAÇÃO DE EMERGÊNCIA (Upload de Arquivos LOC e AGD)", expanded=df_sb.empty):
+            st.info("Use esta ferramenta para restaurar o carrinho caso o sistema tenha sido recarregado após você já ter gerado os arquivos de hoje.")
+            col_up1, col_up2 = st.columns(2)
+            file_loc = col_up1.file_uploader("1. Envie o arquivo .LOC baixado hoje", type=["csv"])
+            file_agd = col_up2.file_uploader("2. Envie o arquivo .AGD baixado hoje", type=["csv"])
+            
+            if st.button("🔄 Reconstruir Carrinho e Liberar WhatsApp", type="primary", use_container_width=True):
+                if file_loc and file_agd:
+                    with st.spinner("Analisando e cruzando arquivos..."):
+                        try:
+                            df_loc_in = pd.read_csv(file_loc, sep=";", dtype=str).fillna("")
+                            df_agd_in = pd.read_csv(file_agd, sep=";", header=None, dtype=str).fillna("")
+                            df_agd_in = df_agd_in[df_agd_in[1].notna() & (df_agd_in[1] != "command")]
+                            
+                            rec_data = []
+                            for _, row in df_loc_in.iterrows():
+                                id_loc = str(row.get('alternativeIdentifier', ''))
+                                if not id_loc or id_loc == 'alternativeIdentifier': continue
+                                
+                                tomador = str(row.get('CF_loc_responsavel_cliente', ''))
+                                
+                                if tomador == "CAEP": tomador = "SYNVIA"
+                                if tomador == "CUNHA": tomador = "GRALAB"
+
+                                corp_name = str(row.get('corporateName', ''))
+                                lab = corp_name.replace(f"{tomador}-", "") if corp_name.startswith(f"{tomador}-") else corp_name
+                                
+                                match_agd = df_agd_in[df_agd_in[1] == id_loc]
+                                pedido = str(match_agd.iloc[0][9]) if not match_agd.empty else "SEM NUM"
+                                agente_agd = str(match_agd.iloc[0][10]) if not match_agd.empty else ""
+                                
+                                agente_full = agente_agd
+                                if not DF_AGENTES.empty:
+                                    for ag_cad in DF_AGENTES['LOGIN DO AGENTE'].dropna().unique():
+                                        if str(ag_cad).split('|')[0] == agente_agd:
+                                            agente_full = str(ag_cad)
+                                            break
+                                            
+                                cidade_rec = str(row.get('city', '')).replace('BRODOSQUI', 'BRODOWSKI').replace('Brodosqui', 'Brodowski')
+                                            
+                                rec_data.append({
+                                    'DATA': hoje_br.strftime("%d/%m/%Y"),
+                                    'TOMADOR': tomador,
+                                    'PEDIDO': pedido,
+                                    'LABORATORIO': lab,
+                                    'CNPJ': str(row.get('CF_CNPJ', '')).replace("'", ""),
+                                    'ENDERECO': str(row.get('street', '')),
+                                    'NUMERO': str(row.get('streetNumber', '')),
+                                    'BAIRRO': str(row.get('cityNeighborhood', '')),
+                                    'CIDADE': cidade_rec,
+                                    'UF': str(row.get('state', '')),
+                                    'CEP': str(row.get('zipCode', '')),
+                                    'OBSERVACOES': "Recuperado via arquivo",
+                                    'AGENTE_RAW': agente_full
+                                })
+                            
+                            if rec_data:
+                                st.session_state.df_sandbox_mem = pd.DataFrame(rec_data)
+                                salvar_backup_umove(st.session_state.df_sandbox_mem)
+                                st.success(f"✅ {len(rec_data)} pedidos recuperados! O carrinho foi restaurado com sucesso.")
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.error("Não foi possível cruzar os dados dos arquivos.")
+                        except Exception as e:
+                            st.error(f"Erro técnico ao ler arquivos: {e}")
+                else:
+                    st.warning("⚠️ Faça o upload dos DOIS arquivos (LOC e AGD) simultaneamente para conseguir prosseguir.")
+
         # 4. Renderização do Carrinho Final
         if not df_sb.empty:
             col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
@@ -2557,9 +2623,7 @@ elif menu == "📥 Importações Umove":
                 try: planilha_sandbox.sheet1.clear()
                 except: pass
                 
-                # 🔥 NOVO: LIMPA O BACKUP TAMBÉM 🔥
                 salvar_backup_umove(st.session_state.df_sandbox_mem)
-                
                 st.rerun()
 
             c_kpi1, c_kpi2 = st.columns([1, 4])
@@ -2573,7 +2637,6 @@ elif menu == "📥 Importações Umove":
             st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
             st.markdown("<p style='font-size:12px; color:#64748B;'>Esta tabela exibe os lotes manuais e automáticos que você adicionou até agora. Dê dois cliques para editar.</p>", unsafe_allow_html=True)
             
-            # 🔥 KEY FIXA E SEGURA PARA NÃO PERDER EDIÇÕES 🔥
             df_editado_sb = st.data_editor(
                 df_sb,
                 num_rows="dynamic",
@@ -2581,7 +2644,6 @@ elif menu == "📥 Importações Umove":
                 key="sandbox_grid_master_umove"
             )
             
-            # 🔥 NOVO: BOTÃO DE SEGURANÇA PARA SALVAR EDIÇÕES DA GRID 🔥
             if st.button("💾 Salvar Edições Manuais no Backup", use_container_width=True):
                 st.session_state.df_sandbox_mem = df_editado_sb.copy()
                 salvar_backup_umove(st.session_state.df_sandbox_mem)
@@ -2664,7 +2726,6 @@ elif menu == "📥 Importações Umove":
                                     msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
                                     items = []
                                     for _, row in group.iterrows():
-                                        # 🔥 CEP ADICIONADO AQUI NA LINHA ABAIXO 🔥
                                         item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                         obs = str(row.get('OBSERVACOES', '')).strip()
                                         if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
@@ -2678,7 +2739,6 @@ elif menu == "📥 Importações Umove":
                                     
                                     if ag_login in agentes_xls_sb or ag_login.split('|')[0] in agentes_xls_sb:
                                         time.sleep(3.0)
-                                        # Lógica exclusiva para luiz.paulo já mantida
                                         if ag_login == 'luiz.paulo':
                                             df_para_xls = df_editado_sb[df_editado_sb['UF'] == 'RJ']
                                             nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
