@@ -3589,7 +3589,7 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN REAL - TV - ALINHAMENTO 100%)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN REAL - TV - PROGRESSO + APIS)
 # =============================================================================
 elif menu == "📈 Dashboard":
     import plotly.express as px
@@ -3599,15 +3599,15 @@ elif menu == "📈 Dashboard":
     
     st.markdown("""
         <style>
-        /* 1. FUNDO BRANCO, REMOÇÃO DA FAIXA E ALINHAMENTO NAS BORDAS */
+        /* 1. FUNDO BRANCO E ALINHAMENTO 100% NAS BORDAS */
         [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
-        header[data-testid="stHeader"] { display: none !important; } /* Mata o cabeçalho padrão */
+        header[data-testid="stHeader"] { display: none !important; } 
         .block-container { 
             padding-top: 1rem !important; 
-            padding-bottom: 80px !important; /* Espaço no fundo para o letreiro */
-            padding-left: 1rem !important;   /* Trava a margem esquerda */
-            padding-right: 1rem !important;  /* Trava a margem direita */
-            max-width: 100% !important;      /* Estica os blocos até o limite da tela */
+            padding-bottom: 100px !important; 
+            padding-left: 1rem !important;   
+            padding-right: 1rem !important;  
+            max-width: 100% !important;      
         }
         hr { margin: 0.5em 0 !important; border-color: #E2E8F0 !important; }
         
@@ -3637,46 +3637,13 @@ elif menu == "📈 Dashboard":
         df_hoje = df_raw[df_raw['DATA_OBJ'] == hoje].copy()
         df_ontem = df_raw[df_raw['DATA_OBJ'] == ontem_util].copy()
 
-        def calc_variacao(val_hoje, val_ontem):
-            if val_ontem == 0: return ("+100%", "▲") if val_hoje > 0 else ("0%", "-")
-            var = ((val_hoje - val_ontem) / val_ontem) * 100
-            if var > 0: return f"+{var:.1f}%", "▲"
-            elif var < 0: return f"{var:.1f}%", "▼"
-            return "0%", "-"
-
-        vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
-        resolvidos_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
-        col_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Coletado', case=False)])
-        ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue', case=False)])
-        pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
-        frus_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
-        atra_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
+        # Cálculos de Performance
+        vol_total_h = len(df_hoje)
+        realizados_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado|Conferido', case=False)])
+        taxa_sucesso_h = (realizados_h / vol_total_h * 100) if vol_total_h > 0 else 0
         
-        # 2. SLA REAL: ATRASADOS DA BASE GERAL (O BACKLOG COMPLETO)
         atra_total = len(df_raw[df_raw['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
-        
-        taxa_sucesso_h = (resolvidos_h / vol_total_h * 100) if vol_total_h > 0 else 0
-        
-        v_tot_str, s_tot = calc_variacao(vol_total_h, vol_total_o)
-        v_ent_str, s_ent = calc_variacao(ent_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue', case=False)]))
-        v_pend_str, s_pend = calc_variacao(pend_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)]))
-        v_frus_str, s_frus = calc_variacao(frus_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)]))
-        
         qtd_chamados = checar_chamados_pendentes(planilha_db)
-
-        # Inteligência da Frota
-        dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
-        frota_stats = {}
-        if not df_hoje.empty:
-            for ag in df_hoje['AGENTE_RAW'].dropna().unique():
-                if not str(ag).strip() or str(ag).upper() == 'NAN': continue
-                nome_amigavel = dict_nomes_dash.get(str(ag).strip().lower(), str(ag).upper().split('|')[0])
-                df_ag = df_hoje[df_hoje['AGENTE_RAW'] == ag]
-                total_ag = len(df_ag)
-                concluidos_ag = len(df_ag[df_ag['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
-                perc_ag = int((concluidos_ag / total_ag) * 100) if total_ag > 0 else 0
-                frota_stats[nome_amigavel] = {"perc": perc_ag, "conc": concluidos_ag, "total": total_ag}
-        frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
         # ---------------------------------------------------------
         # KPI CARDS
@@ -3696,43 +3663,26 @@ elif menu == "📈 Dashboard":
                 </div>
             """, unsafe_allow_html=True)
 
-        cor_tkt, bg_tkt = ("#EF4444", "#FEF2F2") if qtd_chamados > 0 else ("#64748B", "#F8FAFC")
-        sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
-        cor_atra, bg_atra = ("#F43F5E", "#FDF2F8") if atra_total > 0 else ("#64748B", "#F8FAFC")
-
         c1, c2, c3, c4 = st.columns(4)
-        with c1: render_kpi_card("VOL. TOTAL (HOJE)", vol_total_h, f"{s_tot}{v_tot_str}", "#3B82F6", "#EFF6FF", "📦")
-        with c2: render_kpi_card("EFICIÊNCIA (HOJE)", f"{taxa_sucesso_h:.1f}%", f"Ref. Ontem", "#10B981", "#F0FDF4", "🎯")
-        with c3: render_kpi_card("CHAMADOS", qtd_chamados, sub_tkt, cor_tkt, bg_tkt, "🎧", alert=(qtd_chamados > 0))
-        with c4: render_kpi_card("ATRASADOS (GERAL)", atra_total, "BACKLOG", cor_atra, bg_atra, "⏳", alert=(atra_total > 0))
-
-        c5, c6, c7, c8 = st.columns(4)
-        with c5: render_kpi_card("PENDENTES (HOJE)", pend_h, f"{s_pend}{v_pend_str}", "#F59E0B", "#FFFBEB", "🚚")
-        with c6: render_kpi_card("COLETADOS (HOJE)", col_h, "Visitas Hoje", "#6366F1", "#EEF2FF", "📥")
-        with c7: render_kpi_card("FRUSTRADAS (HOJE)", frus_h, f"{s_frus}{v_frus_str}", "#EF4444", "#FEF2F2", "🛑")
-        with c8: render_kpi_card("BASE ONTEM", vol_total_o, "Ref. Cálculo", "#64748B", "#F8FAFC", "📊")
+        with c1: render_kpi_card("REALIZADOS (HOJE)", f"{realizados_h}/{vol_total_h}", f"{int(taxa_sucesso_h)}% Concluído", "#3B82F6", "#EFF6FF", "📦")
+        with c2: render_kpi_card("EFICIÊNCIA (HOJE)", f"{taxa_sucesso_h:.1f}%", "Ação/Vol", "#10B981", "#F0FDF4", "🎯")
+        with c3: render_kpi_card("CHAMADOS", qtd_chamados, "🚨 Alerta" if qtd_chamados > 0 else "✅ Limpo", "#EF4444", "#FEF2F2", "🎧", alert=(qtd_chamados > 0))
+        with c4: render_kpi_card("ATRASADOS (GERAL)", atra_total, "BACKLOG", "#F43F5E", "#FDF2F8", "⏳", alert=(atra_total > 0))
 
         st.markdown("<br>", unsafe_allow_html=True)
-
-        # Gráfico e Tabela
         col_pie, col_table = st.columns([1, 1.5])
         with col_pie:
-            st.markdown("<p style='font-weight: 800; font-size: 13px; color: #475569; margin-bottom: 0px;'>📊 STATUS DA OPERAÇÃO HOJE</p>", unsafe_allow_html=True)
-            df_status = pd.DataFrame({'S': ['Coletado', 'Entregue', 'Pendente', 'Frustrada', 'Atrasado'], 'V': [col_h, ent_h, pend_h, frus_h, atra_h]})
-            df_status = df_status[df_status['V'] > 0]
-            if not df_status.empty:
-                cores_map = {'Coletado': '#6366F1', 'Entregue': '#10B981', 'Pendente': '#F59E0B', 'Frustrada': '#EF4444', 'Atrasado': '#991B1B'}
-                fig_donut = px.pie(df_status, values='V', names='S', hole=0.6, color='S', color_discrete_map=cores_map)
-                fig_donut.update_traces(textinfo='percent', textfont_size=12, textfont_color='white', marker=dict(line=dict(color="#FFFFFF", width=2)))
-                fig_donut.update_layout(template="plotly_white", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, b=0, l=0, r=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=11, color="#64748B")), height=240)
+            df_status = pd.DataFrame({'S': ['Realizado', 'Pendente'], 'V': [realizados_h, (vol_total_h - realizados_h)]})
+            if not df_status.empty and vol_total_h > 0:
+                fig_donut = px.pie(df_status, values='V', names='S', hole=0.6, color='S', color_discrete_map={'Realizado': '#10B981', 'Pendente': '#F1F5F9'})
+                fig_donut.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=240, showlegend=False)
                 st.plotly_chart(fig_donut, use_container_width=True)
-            else: st.info("Sem dados.")
 
         with col_table:
-            st.markdown("<p style='font-weight: 900; font-size: 13px; color: #475569; margin-bottom: 12px; text-transform: uppercase;'>🏢 Volumes de Hoje por Tomador</p>", unsafe_allow_html=True)
             vol_tom = df_hoje['TOMADOR'].value_counts().reset_index()
             vol_tom.columns = ['Cliente', 'Volumes']
             if not vol_tom.empty:
+                st.markdown("<p style='font-weight: 900; font-size: 13px; color: #475569; margin-bottom: 12px; text-transform: uppercase;'>🏢 Volumes de Hoje por Tomador</p>", unsafe_allow_html=True)
                 def get_logo_url(tomador):
                     logos = {"ECOLYZER": "https://lh3.googleusercontent.com/d/1NdbO7olL6GUQDN3krRnyICfgNC07Di2Z", "GRALAB": "https://lh3.googleusercontent.com/d/1SeNj-i590Q6ft-pUcSIk-OKKHiOYtAxU", "CUNHA": "https://lh3.googleusercontent.com/d/1SeNj-i590Q6ft-pUcSIk-OKKHiOYtAxU", "LABEST": "https://lh3.googleusercontent.com/d/15pSrGXFBvpaJwVYrgJkBa01RPgPNsdnT", "SOUZA CRUZ": "https://lh3.googleusercontent.com/d/1qnaukWDnGDAJ8G5zCFBg0Zw2BsXW4QEb", "HEXALIFE": "https://lh3.googleusercontent.com/d/1FAoDyfWdfaUFUjyB2z_7cpiWAdH5AzMd", "INNOVATOX": "https://lh3.googleusercontent.com/d/1f-pKadqlAEeDnUw5YDMT1qJ52_LCxhPH", "SODRE": "https://lh3.googleusercontent.com/d/1n17pTrQ6i0ymgfw0alc8Ie6BEQOuJSxq", "SYNVIA": "https://lh3.googleusercontent.com/d/1MYi7GKT6aAtYJALMoHFOxqmOjdV_Qjoh", "CAEP": "https://lh3.googleusercontent.com/d/1MYi7GKT6aAtYJALMoHFOxqmOjdV_Qjoh", "SAPIENS": "https://lh3.googleusercontent.com/d/1SeimGoz8sEhF-_63LpFkHJLgXbWzrBIP"}
                     return logos.get(str(tomador).strip().upper(), "https://lh3.googleusercontent.com/d/10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY")
@@ -3743,22 +3693,10 @@ elif menu == "📈 Dashboard":
                     html_cards += f"""<div style="display: flex; align-items: center; padding: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);"><div style="width: 42px; height: 42px; border-radius: 8px; background: #F8FAFC; display: flex; justify-content: center; align-items: center; margin-right: 15px; border: 1px solid #F1F5F9; padding: 3px; flex-shrink: 0;"><img src="{get_logo_url(row['Cliente'])}" style="max-width: 100%; max-height: 100%; object-fit: contain;"></div><div style="flex-grow: 1;"><div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;"><span style="font-size: 13px; font-weight: 800; color: #1E293B;">{row['Cliente'].upper()}</span><span style="font-size: 15px; font-weight: 900; color: #0F172A;">{row['Volumes']} <span style="font-size: 10px; color: #64748B; font-weight: 700;">VOL</span></span></div><div style="height: 6px; background-color: #F1F5F9; border-radius: 4px; overflow: hidden;"><div style="width: {pct}%; height: 100%; background: linear-gradient(90deg, #3B82F6 0%, #2563EB 100%); border-radius: 4px;"></div></div></div></div>"""
                 html_cards += "</div>"
                 st.markdown(html_cards, unsafe_allow_html=True)
-            else: st.info("Sem dados.")
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        if len(frota_ordenada) > 0:
-            st.markdown("<p style='font-weight: 800; font-size: 13px; color: #475569;'>🏆 PERFORMANCE DA EQUIPE (TOP 3 HOJE)</p>", unsafe_allow_html=True)
-            rf1, rf2, rf3 = st.columns(3)
-            def podio_ui(pos, ic, ag, pct, vols, color, bg_color):
-                return f"""<div style="background-color: {bg_color}; border: 1px solid {color}40; border-bottom: 3px solid {color}; padding: 12px 15px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.02);"><div style="display: flex; align-items: center; gap: 12px;"><span style="font-size: 26px;">{ic}</span><div><div style="font-size: 13px; font-weight: 800; color: #0F172A; letter-spacing: 0.3px;">{ag}</div><div style="font-size: 11px; color: #64748B; font-weight: 600;">{vols} volumes</div></div></div><div style="font-size: 22px; font-weight: 900; color: {color};">{pct}%</div></div>"""
-            if len(frota_ordenada) >= 1: rf1.markdown(podio_ui("1", "🥇", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}", "#10B981", "#F0FDF4"), unsafe_allow_html=True)
-            if len(frota_ordenada) >= 2: rf2.markdown(podio_ui("2", "🥈", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}", "#64748B", "#FFFFFF"), unsafe_allow_html=True)
-            if len(frota_ordenada) >= 3: rf3.markdown(podio_ui("3", "🥉", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}", "#F59E0B", "#FFFBEB"), unsafe_allow_html=True)
-        else:
-            st.info("Aguardando finalizações da frota no dia de hoje para compor o pódio.")
+            else: st.info("Sem dados de movimentação hoje.")
 
         # =========================================================
-        # 3. LETREIRO ESTILO CNN - FIXO NO RODAPÉ
+        # 3. LETREIRO CNN COM APIS, PROGRESSO E GIRO DE ROTA
         # =========================================================
         @st.cache_data(ttl=1800)
         def buscar_noticias_transito_radar(cidades_com_uf):
@@ -3774,7 +3712,7 @@ elif menu == "📈 Dashboard":
                     items = root.findall('.//item')[:1] 
                     for item in items:
                         titulo = item.find('title').text.split(" - ")[0]
-                        noticias_radar.append(f"🚨 TRÂNSITO {cidade.upper()}: {titulo}")
+                        noticias_radar.append(f"🌍 [RADAR EXTERNO] Trânsito em {cidade.upper()}: {titulo}")
                 except: continue
             return noticias_radar
 
@@ -3788,15 +3726,48 @@ elif menu == "📈 Dashboard":
                     resp = requests.get(f"https://wttr.in/{urllib.parse.quote(cidade_busca)}?format=j1", timeout=3)
                     if resp.status_code == 200:
                         condicao = str(resp.json()['current_condition'][0]['weatherDesc'][0]['value']).lower()
-                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder']): alertas.append(f"⛈️ CLIMA: Chuva na rota de {item}!")
-                        else: alertas.append(f"☀️ CLIMA: Tempo estável em {item}.")
+                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder']): alertas.append(f"🌍 [RADAR EXTERNO] Clima: Alerta de Chuva na rota de {item}!")
                 except: continue
             return alertas
+            
+        cor_progresso = "#EF4444" 
+        if taxa_sucesso_h > 40: cor_progresso = "#F59E0B" 
+        if taxa_sucesso_h > 80: cor_progresso = "#10B981" 
 
-        manchetes = [f"🟢 OPERAÇÃO ATIVA", f"🕒 AGORA: {datetime.now(FUSO_BR).strftime('%H:%M')}"]
-        if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) aberto(s)")
-        if atra_total > 0: manchetes.append(f"🚨 ALERTA: {atra_total} pedido(s) atrasados no Backlog Geral!")
-        
+        barra_html = f"""
+            <div style="display: inline-block; width: 150px; height: 12px; background: #333; border-radius: 6px; margin: 0 10px; vertical-align: middle; overflow: hidden; border: 1px solid #555;">
+                <div style="width: {taxa_sucesso_h}%; height: 100%; background: linear-gradient(90deg, #EF4444 0%, {cor_progresso} 100%); transition: width 0.5s;"></div>
+            </div>
+        """
+
+        manchetes = [
+            f"🟢 [STATUS] C.C.O OPERACIONAL - {datetime.now(FUSO_BR).strftime('%H:%M')}",
+            f"📊 [PROGRESSO] TOTAL HOJE: {realizados_h}/{vol_total_h} PEDIDOS PROCESSADOS {barra_html} {int(taxa_sucesso_h)}% DA OPERAÇÃO CONCLUÍDA"
+        ]
+
+        if not vol_tom.empty:
+            top_cliente = vol_tom.iloc[0]['Cliente']
+            df_top_cl = df_hoje[df_hoje['TOMADOR'] == top_cliente]
+            vol_top_cl = len(df_top_cl)
+            res_top_cl = len(df_top_cl[df_top_cl['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado|Conferido', case=False)])
+            perc_cl = int((res_top_cl / vol_top_cl) * 100) if vol_top_cl > 0 else 0
+            manchetes.append(f"🏢 [DESTAQUE] Cliente {str(top_cliente).upper()}: {res_top_cl}/{vol_top_cl} ({perc_cl}%) concluído hoje")
+
+        if atra_total > 0: manchetes.append(f"🚨 [ALERTA] BACKLOG: {atra_total} PEDIDOS ATRASADOS NA GRID GERAL!")
+        if qtd_chamados > 0: manchetes.append(f"🎧 [HELPDESK] EXISTEM {qtd_chamados} CHAMADOS PENDENTES!")
+
+        if not df_hoje.empty:
+            df_concluidos = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Coletado', case=False)]
+            if not df_concluidos.empty:
+                dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
+                ultimas_baixas = df_concluidos.tail(3)
+                for _, row in ultimas_baixas.iterrows():
+                    ped = str(row.get('PEDIDO', 'N/A'))
+                    st_disp = str(row.get('STATUS_DISPLAY', 'ATUALIZADO')).upper()
+                    ag_bruto = str(row.get('AGENTE_RAW', 'EQUIPE')).split('|')[0]
+                    ag = dict_nomes_dash.get(ag_bruto.lower(), ag_bruto.upper())
+                    manchetes.append(f"🚚 [GIRO DE ROTA] Pedido {ped} registado como {st_disp} por {ag}.")
+
         cidades_alvo = []
         if not df_hoje.empty:
             top_cids = df_hoje['CIDADE'].value_counts().head(3).index.tolist()
@@ -3809,35 +3780,20 @@ elif menu == "📈 Dashboard":
             manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
             manchetes.extend(buscar_noticias_transito_radar(cidades_alvo)) 
 
-        ticker_text = "      <span style='color: #FFC000; font-weight: 900;'>|</span>      ".join([m.upper() for m in manchetes])
+        ticker_text = "      <span style='color: #FFC000; font-weight: 900;'>|</span>      ".join([m for m in manchetes])
         
         st.markdown(f"""
-            <style>
-            .ticker-wrap-fixed {{ 
-                position: fixed; 
-                bottom: 0; 
-                left: 0; 
-                width: 100%; 
-                background: #09090B; 
-                padding: 14px 0; 
-                border-top: 4px solid #CC0000;
-                box-shadow: 0 -4px 15px rgba(0,0,0,0.4);
-                z-index: 999999; 
-                overflow: hidden; 
-            }}
-            .ticker-move {{ display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker 80s linear infinite; }}
-            @keyframes ticker {{ 0% {{ transform: translate3d(0, 0, 0); }} 100% {{ transform: translate3d(-100%, 0, 0); }} }}
-            .ticker-item {{ font-size: 22px; font-weight: 700; color: #FFFFFF; font-family: 'Arial', sans-serif; letter-spacing: 0.5px; }}
-            .badge-radar-fixed {{ 
-                position: absolute; left: 0; top: 0; bottom: 0; background: #CC0000; color: #FFFFFF; padding: 0 30px; 
-                z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 20px; text-transform: uppercase;
-                box-shadow: 5px 0 15px rgba(0,0,0,0.5);
-            }}
-            </style>
             <div class="ticker-wrap-fixed">
                 <div class="badge-radar-fixed">NOTÍCIAS</div>
                 <div class="ticker-move">
                     <span class="ticker-item">{ticker_text}</span>
                 </div>
             </div>
+            <style>
+            .ticker-wrap-fixed {{ position: fixed; bottom: 0; left: 0; width: 100%; background: #09090B; padding: 14px 0; border-top: 4px solid #CC0000; z-index: 999999; overflow: hidden; }}
+            .ticker-move {{ display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker 130s linear infinite; }}
+            @keyframes ticker {{ 0% {{ transform: translate3d(0, 0, 0); }} 100% {{ transform: translate3d(-100%, 0, 0); }} }}
+            .ticker-item {{ font-size: 22px; font-weight: 700; color: #FFFFFF; font-family: 'Arial', sans-serif; letter-spacing: 0.5px; }}
+            .badge-radar-fixed {{ position: absolute; left: 0; top: 0; bottom: 0; background: #CC0000; color: #FFFFFF; padding: 0 30px; z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 20px; text-transform: uppercase; }}
+            </style>
         """, unsafe_allow_html=True)
