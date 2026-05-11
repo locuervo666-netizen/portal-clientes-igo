@@ -3589,13 +3589,15 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN REAL - TV - PROGRESSO NOS TOMADORES)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN REAL - TV - PROGRESSO + ANÁLISE 30D)
 # =============================================================================
 elif menu == "📈 Dashboard":
     import plotly.express as px
     import plotly.graph_objects as go
     import requests
     import urllib.parse
+    import pandas as pd
+    from datetime import timedelta, datetime
     
     st.markdown("""
         <style>
@@ -3701,7 +3703,7 @@ elif menu == "📈 Dashboard":
         st.markdown("<br>", unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # GRÁFICO E TABELA (COM A BARRA GRADATIVA NOS TOMADORES)
+        # GRÁFICO E TABELA (COM A BARRA GRADATIVA E ANÁLISE 30D)
         # ---------------------------------------------------------
         col_pie, col_table = st.columns([1, 1.5])
         with col_pie:
@@ -3720,13 +3722,65 @@ elif menu == "📈 Dashboard":
             st.markdown("<p style='font-weight: 900; font-size: 13px; color: #475569; margin-bottom: 12px; text-transform: uppercase;'>🏢 Volumes e Conclusões por Tomador</p>", unsafe_allow_html=True)
             if not df_hoje.empty:
                 tomadores_stats = []
+                data_limite_30d = hoje - timedelta(days=30)
+                
                 for tomador in df_hoje['TOMADOR'].dropna().unique():
                     if str(tomador).strip() == "": continue
+                    
                     df_tom = df_hoje[df_hoje['TOMADOR'] == tomador]
                     vol_tot = len(df_tom)
                     vol_real = len(df_tom[df_tom['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado|Conferido', case=False)])
                     pct = int((vol_real / vol_tot) * 100) if vol_tot > 0 else 0
-                    tomadores_stats.append({'Cliente': tomador, 'Total': vol_tot, 'Realizado': vol_real, 'Pct': pct})
+                    
+                    # --- MOTOR DE ANÁLISE ---
+                    df_tom_hist = df_raw[(df_raw['TOMADOR'] == tomador) & (df_raw['DATA_OBJ'] < hoje)]
+                    
+                    # 1. Volume do Último Dia Útil com Pedidos
+                    vol_ant = 0
+                    if not df_tom_hist.empty:
+                        datas_unicas = sorted(df_tom_hist['DATA_OBJ'].unique(), reverse=True)
+                        for d in datas_unicas:
+                            dt_check = pd.to_datetime(d).date() if hasattr(d, 'date') else pd.to_datetime(d)
+                            # Pega apenas dias úteis e fora de feriados
+                            if hasattr(dt_check, 'weekday') and dt_check.weekday() < 5 and dt_check not in FERIADOS_BR:
+                                vol_ant = len(df_tom_hist[df_tom_hist['DATA_OBJ'] == d])
+                                break # Achou o último dia ativo, para a busca
+                    
+                    # Cálculo de Variação
+                    if vol_ant == 0:
+                        var_pct = 100 if vol_tot > 0 else 0
+                        var_str = f"▲ +{var_pct}%"
+                        cor_var = "#10B981"
+                    else:
+                        var_pct = ((vol_tot - vol_ant) / vol_ant) * 100
+                        if var_pct > 0:
+                            var_str = f"▲ +{var_pct:.0f}%"
+                            cor_var = "#10B981"
+                        elif var_pct < 0:
+                            var_str = f"▼ {var_pct:.0f}%"
+                            cor_var = "#EF4444"
+                        else:
+                            var_str = "- 0%"
+                            cor_var = "#64748B"
+                            
+                    # 2. Média Diária (Últimos 30 Dias)
+                    media_30d = 0
+                    if not df_tom_hist.empty:
+                        df_30d = df_tom_hist[df_tom_hist['DATA_OBJ'] >= data_limite_30d]
+                        if not df_30d.empty:
+                            dias_ativos = df_30d['DATA_OBJ'].nunique()
+                            if dias_ativos > 0:
+                                media_30d = int(len(df_30d) / dias_ativos)
+
+                    tomadores_stats.append({
+                        'Cliente': tomador, 
+                        'Total': vol_tot, 
+                        'Realizado': vol_real, 
+                        'Pct': pct,
+                        'Media': media_30d,
+                        'VarStr': var_str,
+                        'CorVar': cor_var
+                    })
                 
                 if tomadores_stats:
                     tomadores_df = pd.DataFrame(tomadores_stats).sort_values(by='Total', ascending=False)
@@ -3741,12 +3795,32 @@ elif menu == "📈 Dashboard":
                         tot = row['Total']
                         real = row['Realizado']
                         pct = row['Pct']
+                        media = row['Media']
+                        var_str = row['VarStr']
+                        cor_var = row['CorVar']
                         
                         cor_bg = "#EF4444" 
                         if pct > 40: cor_bg = "#F59E0B" 
                         if pct > 80: cor_bg = "#10B981" 
                         
-                        html_cards += f"""<div style="display: flex; align-items: center; padding: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);"><div style="width: 42px; height: 42px; border-radius: 8px; background: #F8FAFC; display: flex; justify-content: center; align-items: center; margin-right: 15px; border: 1px solid #F1F5F9; padding: 3px; flex-shrink: 0;"><img src="{get_logo_url(cli)}" style="max-width: 100%; max-height: 100%; object-fit: contain;"></div><div style="flex-grow: 1;"><div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;"><span style="font-size: 13px; font-weight: 800; color: #1E293B;">{str(cli).upper()}</span><span style="font-size: 15px; font-weight: 900; color: #0F172A;">{real}/{tot} <span style="font-size: 10px; color: #64748B; font-weight: 700;">({pct}%)</span></span></div><div style="height: 6px; background-color: #F1F5F9; border-radius: 4px; overflow: hidden;"><div style="width: {pct}%; height: 100%; background: linear-gradient(90deg, #EF4444 0%, {cor_bg} 100%); border-radius: 4px; transition: width 0.5s;"></div></div></div></div>"""
+                        html_cards += f"""<div style="display: flex; align-items: center; padding: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); margin-bottom: 2px;">
+                            <div style="width: 42px; height: 42px; border-radius: 8px; background: #F8FAFC; display: flex; justify-content: center; align-items: center; margin-right: 15px; border: 1px solid #F1F5F9; padding: 3px; flex-shrink: 0;">
+                                <img src="{get_logo_url(cli)}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                            </div>
+                            <div style="flex-grow: 1;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;">
+                                    <span style="font-size: 13px; font-weight: 800; color: #1E293B;">{str(cli).upper()}</span>
+                                    <span style="font-size: 15px; font-weight: 900; color: #0F172A;">{real}/{tot} <span style="font-size: 10px; color: #64748B; font-weight: 700;">({pct}%)</span></span>
+                                </div>
+                                <div style="height: 6px; background-color: #F1F5F9; border-radius: 4px; overflow: hidden; margin-bottom: 5px;">
+                                    <div style="width: {pct}%; height: 100%; background: linear-gradient(90deg, #EF4444 0%, {cor_bg} 100%); border-radius: 4px; transition: width 0.5s;"></div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 10.5px; font-weight: 700;">
+                                    <span style="color: #64748B;">📊 Média: {media} vols/dia</span>
+                                    <span style="color: {cor_var};">{var_str}</span>
+                                </div>
+                            </div>
+                        </div>"""
                     html_cards += "</div>"
                     st.markdown(html_cards, unsafe_allow_html=True)
             else: st.info("Sem dados de movimentação hoje.")
@@ -3835,12 +3909,10 @@ elif menu == "📈 Dashboard":
                     for col_nome in colunas_busca:
                         if col_nome in row.index:
                             val = str(row[col_nome]).strip()
-                            # Se achou algo que não seja "NAN" e não seja só número, assume que é o nome correto
                             if val and val.upper() != 'NAN' and not val.isnumeric():
                                 pcl_nome = val
                                 break
                     
-                    # Fallback de segurança se não achar nome válido
                     if not pcl_nome:
                         val_pcl = str(row.get('PCL', '')).strip()
                         if val_pcl and val_pcl.upper() != 'NAN':
