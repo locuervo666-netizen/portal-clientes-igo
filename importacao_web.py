@@ -2544,7 +2544,7 @@ elif menu == "📥 Importações Umove":
 
         st.markdown("---")
         
-        # 🔥 NOVO: MÓDULO DE RECUPERAÇÃO DE EMERGÊNCIA 🔥
+        # 🔥 NOVO: MÓDULO DE RECUPERAÇÃO DE EMERGÊNCIA (COM LEITURA AGD CORRIGIDA) 🔥
         with st.expander("🆘 RECUPERAÇÃO DE EMERGÊNCIA (Upload de Arquivos LOC e AGD)", expanded=df_sb.empty):
             st.info("Use esta ferramenta para restaurar o carrinho caso o sistema tenha sido recarregado após você já ter gerado os arquivos de hoje.")
             col_up1, col_up2 = st.columns(2)
@@ -2555,9 +2555,11 @@ elif menu == "📥 Importações Umove":
                 if file_loc and file_agd:
                     with st.spinner("Analisando e cruzando arquivos..."):
                         try:
+                            # Lê o LOC usando ponto e vírgula
                             df_loc_in = pd.read_csv(file_loc, sep=";", dtype=str).fillna("")
-                            df_agd_in = pd.read_csv(file_agd, sep=";", header=None, dtype=str).fillna("")
-                            df_agd_in = df_agd_in[df_agd_in[1].notna() & (df_agd_in[1] != "command")]
+                            
+                            # 🔥 CORREÇÃO AGD: Ignora a primeira linha ('C') que quebrava o Pandas
+                            df_agd_in = pd.read_csv(file_agd, sep=";", skiprows=1, dtype=str).fillna("")
                             
                             rec_data = []
                             for _, row in df_loc_in.iterrows():
@@ -2572,9 +2574,10 @@ elif menu == "📥 Importações Umove":
                                 corp_name = str(row.get('corporateName', ''))
                                 lab = corp_name.replace(f"{tomador}-", "") if corp_name.startswith(f"{tomador}-") else corp_name
                                 
-                                match_agd = df_agd_in[df_agd_in[1] == id_loc]
-                                pedido = str(match_agd.iloc[0][9]) if not match_agd.empty else "SEM NUM"
-                                agente_agd = str(match_agd.iloc[0][10]) if not match_agd.empty else ""
+                                # 🔥 MATCH SEGURO: Busca o local e pega as colunas corretas pelo nome (não por índice)
+                                match_agd = df_agd_in[df_agd_in['serviceLocal'] == id_loc]
+                                pedido = str(match_agd.iloc[0]['alternativeIdentifier']) if not match_agd.empty else "SEM NUM"
+                                agente_agd = str(match_agd.iloc[0]['agent']) if not match_agd.empty else ""
                                 
                                 agente_full = agente_agd
                                 if not DF_AGENTES.empty:
