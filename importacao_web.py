@@ -3589,7 +3589,7 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN - FOCO NO DIA)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN REAL - TV)
 # =============================================================================
 elif menu == "📈 Dashboard":
     import plotly.express as px
@@ -3599,7 +3599,14 @@ elif menu == "📈 Dashboard":
     
     st.markdown("""
         <style>
+        /* 1. FUNDO BRANCO E REMOÇÃO DA FAIXA BRANCA QUE ENGOLIA O TOPO */
         [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
+        header[data-testid="stHeader"] { display: none !important; } /* Mata o cabeçalho padrão do Streamlit */
+        .block-container { 
+            padding-top: 1rem !important; 
+            padding-bottom: 80px !important; /* Espaço no fundo para o letreiro não cobrir os gráficos */
+            max-width: 98% !important;
+        }
         hr { margin: 0.5em 0 !important; border-color: #E2E8F0 !important; }
         
         @keyframes pulse-red {
@@ -3625,7 +3632,6 @@ elif menu == "📈 Dashboard":
         while ontem_util.weekday() >= 5 or ontem_util in FERIADOS_BR:
             ontem_util -= timedelta(days=1)
 
-        # LÓGICA DE SEXTA: FOCO EM HOJE
         df_hoje = df_raw[df_raw['DATA_OBJ'] == hoje].copy()
         df_ontem = df_raw[df_raw['DATA_OBJ'] == ontem_util].copy()
 
@@ -3643,6 +3649,9 @@ elif menu == "📈 Dashboard":
         pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
         frus_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
         atra_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
+        
+        # 2. SLA REAL: ATRASADOS DA BASE GERAL (O BACKLOG COMPLETO)
+        atra_total = len(df_raw[df_raw['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
         
         taxa_sucesso_h = (resolvidos_h / vol_total_h * 100) if vol_total_h > 0 else 0
         
@@ -3667,86 +3676,8 @@ elif menu == "📈 Dashboard":
                 frota_stats[nome_amigavel] = {"perc": perc_ag, "conc": concluidos_ag, "total": total_ag}
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
-        # APIs do Radar
-        @st.cache_data(ttl=1800)
-        def buscar_noticias_transito_radar(cidades_com_uf):
-            noticias_radar = []
-            import xml.etree.ElementTree as ET
-            cidades_alvo = [str(c).split('/')[0].strip() for c in cidades_com_uf if str(c).strip()][:4]
-            for cidade in cidades_alvo:
-                query = f'(trânsito OR acidente OR rodovia) "{cidade}"'
-                url = f'https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419'
-                try:
-                    resp = requests.get(url, timeout=3)
-                    root = ET.fromstring(resp.content)
-                    items = root.findall('.//item')[:1] 
-                    for item in items:
-                        titulo = item.find('title').text.split(" - ")[0]
-                        noticias_radar.append(f"🚨 TRÂNSITO {cidade.upper()}: {titulo}")
-                except: continue
-            return noticias_radar
-
-        @st.cache_data(ttl=3600)
-        def buscar_alertas_climaticos(cidades_com_uf):
-            alertas = []
-            for item in cidades_com_uf:
-                if not item or str(item).upper() == "NAN": continue
-                try:
-                    cidade_busca = str(item).split('/')[0].strip() if '/' in str(item) else str(item).strip()
-                    resp = requests.get(f"https://wttr.in/{urllib.parse.quote(cidade_busca)}?format=j1", timeout=3)
-                    if resp.status_code == 200:
-                        condicao = str(resp.json()['current_condition'][0]['weatherDesc'][0]['value']).lower()
-                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder']): alertas.append(f"⛈️ CLIMA: Chuva na rota de {item}!")
-                        else: alertas.append(f"☀️ CLIMA: Tempo estável em {item}.")
-                except: continue
-            return alertas
-
-        manchetes = [f"🟢 OPERAÇÃO ATIVA", f"🕒 AGORA: {datetime.now(FUSO_BR).strftime('%H:%M')}"]
-        if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) aberto(s)")
-        if atra_h > 0: manchetes.append(f"🚨 ALERTA: {atra_h} pedido(s) fora do SLA!")
-        if len(frota_ordenada) > 0 and frota_ordenada[0][1]['perc'] >= 50:
-            manchetes.append(f"🏆 DESTAQUE: {frota_ordenada[0][0]} com {frota_ordenada[0][1]['perc']}%!")
-
-        cidades_alvo = []
-        if not df_hoje.empty:
-            top_cids = df_hoje['CIDADE'].value_counts().head(3).index.tolist()
-            col_uf = 'UF' if 'UF' in df_hoje.columns else ('ESTADO' if 'ESTADO' in df_hoje.columns else None)
-            for cid in top_cids:
-                try: cidades_alvo.append(f"{str(cid).strip().title()}/{str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()}" if col_uf else str(cid).strip().title())
-                except: cidades_alvo.append(str(cid).strip().title())
-        
-        if cidades_alvo: 
-            manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
-            manchetes.extend(buscar_noticias_transito_radar(cidades_alvo)) 
-
         # ---------------------------------------------------------
-        # RENDERIZAÇÃO DO TICKER (ESTILO CNN NEWS)
-        # ---------------------------------------------------------
-        ticker_text = "      <span style='color: #FFC000; font-weight: 900;'>|</span>      ".join([m.upper() for m in manchetes])
-        st.markdown(f"""
-            <style>
-            .ticker-wrap {{ 
-                background: #09090B; padding: 14px 0; border-radius: 4px; margin-top: 15px; margin-bottom: 20px; 
-                overflow: hidden; position: relative; border-bottom: 4px solid #CC0000; box-shadow: 0 4px 10px rgba(0,0,0,0.15); 
-            }}
-            .ticker-move {{ display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker 90s linear infinite; }}
-            @keyframes ticker {{ 0% {{ transform: translate3d(0, 0, 0); }} 100% {{ transform: translate3d(-100%, 0, 0); }} }}
-            .ticker-item {{ font-size: 20px; font-weight: 700; color: #FFFFFF; font-family: 'Arial', sans-serif; letter-spacing: 0.5px; }}
-            .badge-radar {{ 
-                position: absolute; left: 0; top: 0; bottom: 0; background: #CC0000; color: #FFFFFF; padding: 0 25px; 
-                z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 18px; text-transform: uppercase;
-            }}
-            </style>
-            <div class="ticker-wrap">
-                <div class="badge-radar">NOTÍCIAS</div>
-                <div class="ticker-move">
-                    <span class="ticker-item">{ticker_text}</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # ---------------------------------------------------------
-        # KPI CARDS (COM EMOJIS NÍTIDOS PARA TV)
+        # KPI CARDS
         # ---------------------------------------------------------
         def render_kpi_card(title, value, var_str, color, bg_color, icon, alert=False):
             cls = "alerta-sirene" if alert else ""
@@ -3765,13 +3696,14 @@ elif menu == "📈 Dashboard":
 
         cor_tkt, bg_tkt = ("#EF4444", "#FEF2F2") if qtd_chamados > 0 else ("#64748B", "#F8FAFC")
         sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
-        cor_atra, bg_atra = ("#F43F5E", "#FDF2F8") if atra_h > 0 else ("#64748B", "#F8FAFC")
+        cor_atra, bg_atra = ("#F43F5E", "#FDF2F8") if atra_total > 0 else ("#64748B", "#F8FAFC") # Usando o Atraso Total
 
         c1, c2, c3, c4 = st.columns(4)
         with c1: render_kpi_card("VOL. TOTAL (HOJE)", vol_total_h, f"{s_tot}{v_tot_str}", "#3B82F6", "#EFF6FF", "📦")
         with c2: render_kpi_card("EFICIÊNCIA (HOJE)", f"{taxa_sucesso_h:.1f}%", f"Ref. Ontem", "#10B981", "#F0FDF4", "🎯")
         with c3: render_kpi_card("CHAMADOS", qtd_chamados, sub_tkt, cor_tkt, bg_tkt, "🎧", alert=(qtd_chamados > 0))
-        with c4: render_kpi_card("ATRASADOS (HOJE)", atra_h, "SLA CRÍTICO", cor_atra, bg_atra, "⏳", alert=(atra_h > 0))
+        # Card de Atrasados puxando o Total da GRID
+        with c4: render_kpi_card("ATRASADOS (GERAL)", atra_total, "BACKLOG", cor_atra, bg_atra, "⏳", alert=(atra_total > 0))
 
         c5, c6, c7, c8 = st.columns(4)
         with c5: render_kpi_card("PENDENTES (HOJE)", pend_h, f"{s_pend}{v_pend_str}", "#F59E0B", "#FFFBEB", "🚚")
@@ -3823,3 +3755,88 @@ elif menu == "📈 Dashboard":
             if len(frota_ordenada) >= 3: rf3.markdown(podio_ui("3", "🥉", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}", "#F59E0B", "#FFFBEB"), unsafe_allow_html=True)
         else:
             st.info("Aguardando finalizações da frota no dia de hoje para compor o pódio.")
+
+        # =========================================================
+        # 3. LETREIRO ESTILO CNN - FIXO NO RODAPÉ
+        # =========================================================
+        @st.cache_data(ttl=1800)
+        def buscar_noticias_transito_radar(cidades_com_uf):
+            noticias_radar = []
+            import xml.etree.ElementTree as ET
+            cidades_alvo = [str(c).split('/')[0].strip() for c in cidades_com_uf if str(c).strip()][:4]
+            for cidade in cidades_alvo:
+                query = f'(trânsito OR acidente OR rodovia) "{cidade}"'
+                url = f'https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419'
+                try:
+                    resp = requests.get(url, timeout=3)
+                    root = ET.fromstring(resp.content)
+                    items = root.findall('.//item')[:1] 
+                    for item in items:
+                        titulo = item.find('title').text.split(" - ")[0]
+                        noticias_radar.append(f"🚨 TRÂNSITO {cidade.upper()}: {titulo}")
+                except: continue
+            return noticias_radar
+
+        @st.cache_data(ttl=3600)
+        def buscar_alertas_climaticos(cidades_com_uf):
+            alertas = []
+            for item in cidades_com_uf:
+                if not item or str(item).upper() == "NAN": continue
+                try:
+                    cidade_busca = str(item).split('/')[0].strip() if '/' in str(item) else str(item).strip()
+                    resp = requests.get(f"https://wttr.in/{urllib.parse.quote(cidade_busca)}?format=j1", timeout=3)
+                    if resp.status_code == 200:
+                        condicao = str(resp.json()['current_condition'][0]['weatherDesc'][0]['value']).lower()
+                        if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder']): alertas.append(f"⛈️ CLIMA: Chuva na rota de {item}!")
+                        else: alertas.append(f"☀️ CLIMA: Tempo estável em {item}.")
+                except: continue
+            return alertas
+
+        manchetes = [f"🟢 OPERAÇÃO ATIVA", f"🕒 AGORA: {datetime.now(FUSO_BR).strftime('%H:%M')}"]
+        if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) aberto(s)")
+        if atra_total > 0: manchetes.append(f"🚨 ALERTA: {atra_total} pedido(s) atrasados no Backlog Geral!")
+        
+        cidades_alvo = []
+        if not df_hoje.empty:
+            top_cids = df_hoje['CIDADE'].value_counts().head(3).index.tolist()
+            col_uf = 'UF' if 'UF' in df_hoje.columns else ('ESTADO' if 'ESTADO' in df_hoje.columns else None)
+            for cid in top_cids:
+                try: cidades_alvo.append(f"{str(cid).strip().title()}/{str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()}" if col_uf else str(cid).strip().title())
+                except: cidades_alvo.append(str(cid).strip().title())
+        
+        if cidades_alvo: 
+            manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
+            manchetes.extend(buscar_noticias_transito_radar(cidades_alvo)) 
+
+        ticker_text = " &nbsp;&nbsp;&nbsp;&nbsp; <span style='color: #FFC000; font-weight: 900;'>|</span> &nbsp;&nbsp;&nbsp;&nbsp; ".join([m.upper() for m in manchetes])
+        
+        st.markdown(f"""
+            <style>
+            .ticker-wrap-fixed {{ 
+                position: fixed; 
+                bottom: 0; 
+                left: 0; 
+                width: 100%; 
+                background: #09090B; 
+                padding: 14px 0; 
+                border-top: 4px solid #CC0000; /* Linha de destaque agora fica em cima */
+                box-shadow: 0 -4px 15px rgba(0,0,0,0.4); /* Sombra invertida projetando para cima */
+                z-index: 999999; 
+                overflow: hidden; 
+            }}
+            .ticker-move {{ display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker 80s linear infinite; }}
+            @keyframes ticker {{ 0% {{ transform: translate3d(0, 0, 0); }} 100% {{ transform: translate3d(-100%, 0, 0); }} }}
+            .ticker-item {{ font-size: 22px; font-weight: 700; color: #FFFFFF; font-family: 'Arial', sans-serif; letter-spacing: 0.5px; }}
+            .badge-radar-fixed {{ 
+                position: absolute; left: 0; top: 0; bottom: 0; background: #CC0000; color: #FFFFFF; padding: 0 30px; 
+                z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 20px; text-transform: uppercase;
+                box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+            }}
+            </style>
+            <div class="ticker-wrap-fixed">
+                <div class="badge-radar-fixed">NOTÍCIAS</div>
+                <div class="ticker-move">
+                    <span class="ticker-item">{ticker_text}</span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
