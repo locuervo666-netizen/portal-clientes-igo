@@ -3708,13 +3708,10 @@ elif menu == "📈 Dashboard":
     import requests
     import urllib.parse
     
-    # 🔥 CONFIGURAÇÃO VISUAL ELITE E GHOST BUTTONS PARA OS KPIS 🔥
+    # 🔥 CORREÇÃO: CSS Limpo, apenas com o Fundo Premium e sem quebrar o layout 🔥
     st.markdown("""
         <style>
-        /* 🔥 FUNDO PREMIUM APLICADO APENAS AQUI NO DASHBOARD 🔥 */
         [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; color: #0F172A; }
-        
-        /* Deixa o cabeçalho transparente para não sumir com o botão da sidebar */
         [data-testid="stHeader"] { background-color: transparent !important; }
         
         .block-container { 
@@ -3722,7 +3719,7 @@ elif menu == "📈 Dashboard":
             padding-bottom: 1rem !important;
             padding-left: 1rem !important; 
             padding-right: 1rem !important; 
-            max-width: 100% !important; 
+            max-width: 98% !important; 
         }
         
         hr { margin: 0.5em 0 !important; border-color: #E2E8F0 !important; }
@@ -3733,20 +3730,6 @@ elif menu == "📈 Dashboard":
             100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
         }
         .alerta-sirene { animation: pulse-red 2s infinite; border: 1px solid #EF4444 !important; }
-        
-        /* Mágica dos Botões Invisíveis (Ghost Buttons) sobre os Cards HTML */
-        div.st-key-kpi_total, div.st-key-kpi_entregue, div.st-key-kpi_chamados, div.st-key-kpi_atra,
-        div.st-key-kpi_pend, div.st-key-kpi_col, div.st-key-kpi_frus, div.st-key-kpi_hoje {
-            margin-top: -110px !important;
-            position: relative;
-            z-index: 999;
-            opacity: 0 !important; 
-        }
-        div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_chamados button, div.st-key-kpi_atra button,
-        div.st-key-kpi_pend button, div.st-key-kpi_col button, div.st-key-kpi_frus button, div.st-key-kpi_hoje button {
-            height: 95px !important;
-            cursor: pointer !important;
-        }
         </style>
     """, unsafe_allow_html=True)
     
