@@ -3711,15 +3711,15 @@ elif menu == "📈 Dashboard":
     # 🔥 CONFIGURAÇÃO VISUAL ELITE E GHOST BUTTONS PARA OS KPIS 🔥
     st.markdown("""
         <style>
-        [data-testid="stAppViewContainer"] { background-color: #F1F5F9; color: #0F172A; }
+        /* 🔥 FUNDO PREMIUM APLICADO APENAS AQUI NO DASHBOARD 🔥 */
+        [data-testid="stAppViewContainer"] { background-color: #F8FAFC !important; color: #0F172A; }
         
         /* Deixa o cabeçalho transparente para não sumir com o botão da sidebar */
         [data-testid="stHeader"] { background-color: transparent !important; }
         
-        /* 🚀 MUDANÇA AQUI: max-width: 100% devolve o tamanho total pra TV sem margens! */
         .block-container { 
-            padding-top: 2.5rem !important; /* Espaço exato para o botão da sidebar não sobrepor o letreiro */
-            padding-bottom: 1rem !important; 
+            padding-top: 2.5rem !important;
+            padding-bottom: 1rem !important;
             padding-left: 1rem !important; 
             padding-right: 1rem !important; 
             max-width: 100% !important; 
@@ -3746,14 +3746,6 @@ elif menu == "📈 Dashboard":
         div.st-key-kpi_pend button, div.st-key-kpi_col button, div.st-key-kpi_frus button, div.st-key-kpi_hoje button {
             height: 95px !important;
             cursor: pointer !important;
-        }
-        
-        /* Estilização original dos popovers mantida */
-        div[data-testid="stPopover"] > button, button[kind="secondary"] {
-            white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
-        }
-        div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
-            border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -3815,7 +3807,9 @@ elif menu == "📈 Dashboard":
                 frota_stats[nome_amigavel] = {"perc": perc_ag, "conc": concluidos_ag, "total": total_ag}
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
-        # Funções Inteligentes do Ticker
+        # ---------------------------------------------------------
+        # INTELIGÊNCIA DO TICKER (TRÂNSITO, SEGURANÇA, CLIMA E VOOS)
+        # ---------------------------------------------------------
         @st.cache_data(ttl=1800)
         def buscar_noticias_transito_radar(cidades_com_uf):
             noticias_radar = []
@@ -3834,28 +3828,20 @@ elif menu == "📈 Dashboard":
                 except: continue
             return noticias_radar
 
-        # 🔥 NOVA FUNÇÃO: RADAR DE SEGURANÇA PÚBLICA 🔥
-        @st.cache_data(ttl=900) # Atualiza a cada 15 min (risco é mais urgente que trânsito)
+        @st.cache_data(ttl=900)
         def buscar_noticias_seguranca_radar(cidades_com_uf):
             alertas_seguranca = []
             import xml.etree.ElementTree as ET
-            
-            # Filtra para buscar riscos com mais ênfase no RJ, mas funciona para SP também
             cidades_risco = [str(c).split('/')[0].strip() for c in cidades_com_uf if 'RJ' in str(c).upper() or 'SP' in str(c).upper()][:3]
-            
             for cidade in cidades_risco:
-                # Palavras-chave focadas em risco iminente à operação logística
                 query = f'(tiroteio OR "operação policial" OR arrastão OR "bala perdida" OR "via interditada") "{cidade}"'
                 url = f'https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419'
-                
                 try:
                     resp = requests.get(url, timeout=3)
                     root = ET.fromstring(resp.content)
-                    items = root.findall('.//item')[:1] # Pega apenas a ocorrência mais recente
+                    items = root.findall('.//item')[:1] 
                     for item in items:
                         titulo = item.find('title').text.split(" - ")[0]
-                        # Só adiciona se for uma notícia das últimas 24h para evitar falsos positivos
-                        pub_date = item.find('pubDate').text
                         alertas_seguranca.append(f"⚠️ ÁREA DE RISCO {cidade.upper()}: {titulo}")
                 except: continue
             return alertas_seguranca
@@ -3938,8 +3924,6 @@ elif menu == "📈 Dashboard":
         if cidades_alvo: 
             manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
             manchetes.extend(buscar_noticias_transito_radar(cidades_alvo)) 
-            
-            # 🔥 INJEÇÃO DA API DE SEGURANÇA AQUI 🔥
             manchetes.extend(buscar_noticias_seguranca_radar(cidades_alvo))
             
         manchetes.extend(buscar_status_voos_aerodatabox(["G31240"], hoje_br))
@@ -3968,9 +3952,11 @@ elif menu == "📈 Dashboard":
             cls = "alerta-sirene" if alert else ""
             st.markdown(f"""
                 <div class="{cls}" style="background-color: {bg_color}; border: 1px solid {color}40; border-radius: 12px; padding: 14px 16px; position: relative; overflow: hidden; height: 95px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 10px;">
+                    
                     <div style="position: absolute; right: -10px; bottom: -15px; font-size: 80px; opacity: 0.35; z-index: 0; line-height: 1;">
                         {icon}
                     </div>
+                    
                     <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; justify-content: space-between;">
                         <div style="font-size: 11px; font-weight: 800; color: {color}; text-transform: uppercase; letter-spacing: 0.5px;">
                             {title}
@@ -3979,7 +3965,8 @@ elif menu == "📈 Dashboard":
                             <div style="font-size: 26px; font-weight: 900; color: #0F172A; line-height: 1;">
                                 {value}
                             </div>
-                            <div style="font-size: 11px; font-weight: 700; color: {color}; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 4px; border: 1px solid {color}40;">
+                            
+                            <div style="font-size: 11px; font-weight: 700; color: {color}; background: rgba(255,255,255,0.9); padding: 2px 6px; border-radius: 4px; border: 1px solid {color}40;">
                                 {var_str}
                             </div>
                         </div>
@@ -4029,7 +4016,6 @@ elif menu == "📈 Dashboard":
             if not vol_tom.empty:
                 def get_logo_url(tomador):
                     tomador_upper = str(tomador).strip().upper()
-                    # 🛠️ URLs já convertidas para renderização direta do Google Drive
                     logos = {
                         "ECOLYZER": "https://lh3.googleusercontent.com/d/1NdbO7olL6GUQDN3krRnyICfgNC07Di2Z",
                         "GRALAB": "https://lh3.googleusercontent.com/d/1SeNj-i590Q6ft-pUcSIk-OKKHiOYtAxU",
@@ -4055,7 +4041,6 @@ elif menu == "📈 Dashboard":
                     vol = row['Volumes']
                     pct = int((vol / max_vol) * 100) if max_vol > 0 else 0
                     
-                    # 🔥 O HTML está colado na margem propositalmente para evitar o bug do Markdown
                     html_cards += f"""<div style="display: flex; align-items: center; padding: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
 <div style="width: 42px; height: 42px; border-radius: 8px; background: #F8FAFC; display: flex; justify-content: center; align-items: center; margin-right: 15px; border: 1px solid #F1F5F9; padding: 3px; flex-shrink: 0;">
 <img src="{logo}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
