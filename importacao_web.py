@@ -3822,7 +3822,7 @@ elif menu == "📈 Dashboard":
             import xml.etree.ElementTree as ET
             cidades_alvo = [str(c).split('/')[0].strip() for c in cidades_com_uf if str(c).strip()][:4]
             for cidade in cidades_alvo:
-                query = f'(trânsito OR acidente OR engarrafamento OR rodovia OR interdição) "{cidade}"'
+                query = f'(trânsito OR acidente OR engarrafamento OR rodovia) "{cidade}"'
                 url = f'https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419'
                 try:
                     resp = requests.get(url, timeout=3)
@@ -3833,6 +3833,32 @@ elif menu == "📈 Dashboard":
                         noticias_radar.append(f"🚨 TRÂNSITO {cidade.upper()}: {titulo}")
                 except: continue
             return noticias_radar
+
+        # 🔥 NOVA FUNÇÃO: RADAR DE SEGURANÇA PÚBLICA 🔥
+        @st.cache_data(ttl=900) # Atualiza a cada 15 min (risco é mais urgente que trânsito)
+        def buscar_noticias_seguranca_radar(cidades_com_uf):
+            alertas_seguranca = []
+            import xml.etree.ElementTree as ET
+            
+            # Filtra para buscar riscos com mais ênfase no RJ, mas funciona para SP também
+            cidades_risco = [str(c).split('/')[0].strip() for c in cidades_com_uf if 'RJ' in str(c).upper() or 'SP' in str(c).upper()][:3]
+            
+            for cidade in cidades_risco:
+                # Palavras-chave focadas em risco iminente à operação logística
+                query = f'(tiroteio OR "operação policial" OR arrastão OR "bala perdida" OR "via interditada") "{cidade}"'
+                url = f'https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419'
+                
+                try:
+                    resp = requests.get(url, timeout=3)
+                    root = ET.fromstring(resp.content)
+                    items = root.findall('.//item')[:1] # Pega apenas a ocorrência mais recente
+                    for item in items:
+                        titulo = item.find('title').text.split(" - ")[0]
+                        # Só adiciona se for uma notícia das últimas 24h para evitar falsos positivos
+                        pub_date = item.find('pubDate').text
+                        alertas_seguranca.append(f"⚠️ ÁREA DE RISCO {cidade.upper()}: {titulo}")
+                except: continue
+            return alertas_seguranca
 
         @st.cache_data(ttl=3600)
         def buscar_alertas_climaticos(cidades_com_uf):
@@ -3911,8 +3937,10 @@ elif menu == "📈 Dashboard":
         
         if cidades_alvo: 
             manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
-            # 🔥 INJEÇÃO DA API DE TRÂNSITO AQUI 🔥
             manchetes.extend(buscar_noticias_transito_radar(cidades_alvo)) 
+            
+            # 🔥 INJEÇÃO DA API DE SEGURANÇA AQUI 🔥
+            manchetes.extend(buscar_noticias_seguranca_radar(cidades_alvo))
             
         manchetes.extend(buscar_status_voos_aerodatabox(["G31240"], hoje_br))
 
