@@ -3742,10 +3742,9 @@ elif menu == "📈 Dashboard":
                         real = row['Realizado']
                         pct = row['Pct']
                         
-                        # COR GRADATIVA PARA A BARRA DO TOMADOR
-                        cor_bg = "#EF4444" # Começa Vermelho
-                        if pct > 40: cor_bg = "#F59E0B" # Passa pra Amarelo
-                        if pct > 80: cor_bg = "#10B981" # Fica Verde no final
+                        cor_bg = "#EF4444" 
+                        if pct > 40: cor_bg = "#F59E0B" 
+                        if pct > 80: cor_bg = "#10B981" 
                         
                         html_cards += f"""<div style="display: flex; align-items: center; padding: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);"><div style="width: 42px; height: 42px; border-radius: 8px; background: #F8FAFC; display: flex; justify-content: center; align-items: center; margin-right: 15px; border: 1px solid #F1F5F9; padding: 3px; flex-shrink: 0;"><img src="{get_logo_url(cli)}" style="max-width: 100%; max-height: 100%; object-fit: contain;"></div><div style="flex-grow: 1;"><div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;"><span style="font-size: 13px; font-weight: 800; color: #1E293B;">{str(cli).upper()}</span><span style="font-size: 15px; font-weight: 900; color: #0F172A;">{real}/{tot} <span style="font-size: 10px; color: #64748B; font-weight: 700;">({pct}%)</span></span></div><div style="height: 6px; background-color: #F1F5F9; border-radius: 4px; overflow: hidden;"><div style="width: {pct}%; height: 100%; background: linear-gradient(90deg, #EF4444 0%, {cor_bg} 100%); border-radius: 4px; transition: width 0.5s;"></div></div></div></div>"""
                     html_cards += "</div>"
@@ -3755,7 +3754,7 @@ elif menu == "📈 Dashboard":
         st.markdown("<br>", unsafe_allow_html=True)
         
         # ---------------------------------------------------------
-        # PÓDIO DA EQUIPE INTACTO
+        # PÓDIO DA EQUIPE
         # ---------------------------------------------------------
         dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         frota_stats = {}
@@ -3782,7 +3781,7 @@ elif menu == "📈 Dashboard":
             st.info("Aguardando finalizações da frota no dia de hoje para compor o pódio.")
 
         # =========================================================
-        # LETREIRO CNN DE NOTÍCIAS (LIMPO, SÓ COM TEXTOS E ALERTAS)
+        # LETREIRO CNN DE NOTÍCIAS (COM PCL + CIDADE)
         # =========================================================
         @st.cache_data(ttl=1800)
         def buscar_noticias_transito_radar(cidades_com_uf):
@@ -3824,16 +3823,27 @@ elif menu == "📈 Dashboard":
         if atra_total > 0: manchetes.append(f"🚨 [ALERTA] BACKLOG: {atra_total} PEDIDOS ATRASADOS NA GRID GERAL!")
         if qtd_chamados > 0: manchetes.append(f"🎧 [HELPDESK] EXISTEM {qtd_chamados} CHAMADOS PENDENTES!")
 
+        # ---------------------------------------------------------
+        # NOVA LÓGICA DO GIRO DE ROTA: PCL + CIDADE
+        # ---------------------------------------------------------
         if not df_hoje.empty:
             df_concluidos = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Coletado', case=False)]
             if not df_concluidos.empty:
                 ultimas_baixas = df_concluidos.tail(3)
                 for _, row in ultimas_baixas.iterrows():
-                    ped = str(row.get('PEDIDO', 'N/A'))
+                    # Tenta puxar o nome da coluna PCL, se não existir busca Destinatário ou cai pro Pedido
+                    pcl = str(row.get('PCL', row.get('DESTINATARIO', row.get('NOME DO PCL', row.get('PEDIDO', 'N/A'))))).strip()
+                    
+                    # Puxa a cidade formatada
+                    cidade = str(row.get('CIDADE', '')).strip().title()
+                    local_str = f" em {cidade}" if cidade and cidade.upper() != "NAN" else ""
+                    
                     st_disp = str(row.get('STATUS_DISPLAY', 'ATUALIZADO')).upper()
                     ag_bruto = str(row.get('AGENTE_RAW', 'EQUIPE')).split('|')[0]
                     ag = dict_nomes_dash.get(ag_bruto.lower(), ag_bruto.upper())
-                    manchetes.append(f"🚚 [GIRO DE ROTA] Pedido {ped} registrado como {st_disp} por {ag}.")
+                    
+                    # Manchete reformulada
+                    manchetes.append(f"🚚 [GIRO DE ROTA] PCL {pcl}{local_str} registrado como {st_disp} por {ag}.")
 
         cidades_alvo = []
         if not df_hoje.empty:
