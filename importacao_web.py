@@ -2113,10 +2113,45 @@ elif menu == "📥 Importações Umove":
         st.error("❌ Erro de conexão com as planilhas no Drive. Verifique as permissões.")
         st.stop()
         
-    if "df_sandbox_mem" not in st.session_state: 
-        st.session_state.df_sandbox_mem = pd.DataFrame()
+    # 🔥 NOVO: SISTEMA DE BACKUP DIÁRIO (PERSISTÊNCIA ANTI-QUEDA) 🔥
+    try:
+        aba_bkp_umove = planilha_sandbox.worksheet("Carrinho_Umove_BKP")
+    except:
+        aba_bkp_umove = planilha_sandbox.add_worksheet("Carrinho_Umove_BKP", 100, 20)
+
+    if "df_sandbox_mem" not in st.session_state:
+        try:
+            dados_bkp = aba_bkp_umove.get_all_values()
+            if len(dados_bkp) > 1:
+                df_bkp = pd.DataFrame(dados_bkp[1:], columns=dados_bkp[0])
+                # Verifica a data do backup. Se for antigo, limpa a aba.
+                data_bkp_str = df_bkp.get('DATA_BACKUP', pd.Series([hoje_br.strftime("%d/%m/%Y")])).iloc[0]
+                if data_bkp_str != hoje_br.strftime("%d/%m/%Y"):
+                    aba_bkp_umove.clear()
+                    st.session_state.df_sandbox_mem = pd.DataFrame()
+                else:
+                    # Restaura os dados se forem de hoje
+                    st.session_state.df_sandbox_mem = df_bkp.drop(columns=['DATA_BACKUP'], errors='ignore')
+            else:
+                st.session_state.df_sandbox_mem = pd.DataFrame()
+        except Exception:
+            st.session_state.df_sandbox_mem = pd.DataFrame()
+
     if "df_preview_sb" not in st.session_state:
         st.session_state.df_preview_sb = pd.DataFrame()
+
+    def salvar_backup_umove(df_para_salvar):
+        """Função auxiliar para espelhar o carrinho na nuvem instantaneamente."""
+        try:
+            if not df_para_salvar.empty:
+                df_bkp_save = df_para_salvar.copy()
+                df_bkp_save['DATA_BACKUP'] = hoje_br.strftime("%d/%m/%Y")
+                aba_bkp_umove.clear()
+                aba_bkp_umove.update("A1", [df_bkp_save.columns.tolist()] + df_bkp_save.fillna("").astype(str).values.tolist())
+            else:
+                aba_bkp_umove.clear()
+        except Exception:
+            pass # Falha silenciosa para não travar a operação do usuário
 
     tab_matriz, tab_fixos, tab_carrinho = st.tabs(["📋 1. Colar Matriz", "🔁 2. Gestão de Pedidos Fixos", "🛒 3. Carrinho & Saída"])
 
@@ -2146,7 +2181,7 @@ elif menu == "📥 Importações Umove":
                                 row_str = unicodedata.normalize('NFKD', " ".join(df_raw_sb.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
                                 matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP', 'HORARIO', 'FUNCIONAMENTO', 'OBSERVA'] if kw in row_str)
                                 if matches > max_matches: max_matches, idx_h = matches, i
-                                    
+                                
                             df_limpo_sb = df_raw_sb.iloc[idx_h+1:].copy()
                             df_limpo_sb.columns = [str(c).strip() for c in df_raw_sb.iloc[idx_h].values]
                             df_limpo_sb = df_limpo_sb.loc[:, ~df_limpo_sb.columns.duplicated()] 
@@ -2196,7 +2231,7 @@ elif menu == "📥 Importações Umove":
                                     if ',' in e and not n: 
                                         pts = e.split(',')
                                         df_limpo_sb.at[idx, 'ENDERECO'], df_limpo_sb.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
-                                        
+                                    
                             df_limpo_sb['UF'] = df_limpo_sb['UF'].astype(str).str.upper().str.strip()
                             df_limpo_sb['TOMADOR'] = tom_sandbox
                             df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
@@ -2272,13 +2307,16 @@ elif menu == "📥 Importações Umove":
                             for idx, row in df_ok.iterrows():
                                 df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
                                 prox_id_sb += 1
-                                
+                            
                             if aba_contador:
                                 try: aba_contador.update("A1", [[str(prox_id_sb)]])
                                 except: pass
 
                             if st.session_state.df_sandbox_mem.empty: st.session_state.df_sandbox_mem = df_ok
                             else: st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_ok], ignore_index=True)
+
+                            # 🔥 NOVO: GATILHO DE SALVAMENTO NO BACKUP 🔥
+                            salvar_backup_umove(st.session_state.df_sandbox_mem)
 
                             st.session_state.df_preview_sb = pd.DataFrame()
                             st.success("✅ Pedidos adicionados ao carrinho com sucesso!")
@@ -2518,6 +2556,10 @@ elif menu == "📥 Importações Umove":
                 st.session_state.df_sandbox_mem = pd.DataFrame()
                 try: planilha_sandbox.sheet1.clear()
                 except: pass
+                
+                # 🔥 NOVO: LIMPA O BACKUP TAMBÉM 🔥
+                salvar_backup_umove(st.session_state.df_sandbox_mem)
+                
                 st.rerun()
 
             c_kpi1, c_kpi2 = st.columns([1, 4])
@@ -2538,6 +2580,12 @@ elif menu == "📥 Importações Umove":
                 use_container_width=True,
                 key="sandbox_grid_master_umove"
             )
+            
+            # 🔥 NOVO: BOTÃO DE SEGURANÇA PARA SALVAR EDIÇÕES DA GRID 🔥
+            if st.button("💾 Salvar Edições Manuais no Backup", use_container_width=True):
+                st.session_state.df_sandbox_mem = df_editado_sb.copy()
+                salvar_backup_umove(st.session_state.df_sandbox_mem)
+                st.toast("✅ Tabela salva no servidor de backup!", icon="💾")
             
             st.markdown("---")
             st.markdown("### 🎛️ Mesa de Comando de Saída")
@@ -2611,7 +2659,7 @@ elif menu == "📥 Importações Umove":
                                 for cid, count in df_ag_sb['CIDADE'].value_counts().items():
                                     msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}"); tot_qtd += count
                                 msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
-                                
+
                                 for cid, group in df_ag_sb.groupby('CIDADE'):
                                     msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
                                     items = []
