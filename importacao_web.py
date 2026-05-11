@@ -3589,7 +3589,7 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN REAL - TV)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN REAL - TV - ALINHAMENTO 100%)
 # =============================================================================
 elif menu == "📈 Dashboard":
     import plotly.express as px
@@ -3599,13 +3599,15 @@ elif menu == "📈 Dashboard":
     
     st.markdown("""
         <style>
-        /* 1. FUNDO BRANCO E REMOÇÃO DA FAIXA BRANCA QUE ENGOLIA O TOPO */
+        /* 1. FUNDO BRANCO, REMOÇÃO DA FAIXA E ALINHAMENTO NAS BORDAS */
         [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
-        header[data-testid="stHeader"] { display: none !important; } /* Mata o cabeçalho padrão do Streamlit */
+        header[data-testid="stHeader"] { display: none !important; } /* Mata o cabeçalho padrão */
         .block-container { 
             padding-top: 1rem !important; 
-            padding-bottom: 80px !important; /* Espaço no fundo para o letreiro não cobrir os gráficos */
-            max-width: 98% !important;
+            padding-bottom: 80px !important; /* Espaço no fundo para o letreiro */
+            padding-left: 1rem !important;   /* Trava a margem esquerda */
+            padding-right: 1rem !important;  /* Trava a margem direita */
+            max-width: 100% !important;      /* Estica os blocos até o limite da tela */
         }
         hr { margin: 0.5em 0 !important; border-color: #E2E8F0 !important; }
         
@@ -3696,13 +3698,12 @@ elif menu == "📈 Dashboard":
 
         cor_tkt, bg_tkt = ("#EF4444", "#FEF2F2") if qtd_chamados > 0 else ("#64748B", "#F8FAFC")
         sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
-        cor_atra, bg_atra = ("#F43F5E", "#FDF2F8") if atra_total > 0 else ("#64748B", "#F8FAFC") # Usando o Atraso Total
+        cor_atra, bg_atra = ("#F43F5E", "#FDF2F8") if atra_total > 0 else ("#64748B", "#F8FAFC")
 
         c1, c2, c3, c4 = st.columns(4)
         with c1: render_kpi_card("VOL. TOTAL (HOJE)", vol_total_h, f"{s_tot}{v_tot_str}", "#3B82F6", "#EFF6FF", "📦")
         with c2: render_kpi_card("EFICIÊNCIA (HOJE)", f"{taxa_sucesso_h:.1f}%", f"Ref. Ontem", "#10B981", "#F0FDF4", "🎯")
         with c3: render_kpi_card("CHAMADOS", qtd_chamados, sub_tkt, cor_tkt, bg_tkt, "🎧", alert=(qtd_chamados > 0))
-        # Card de Atrasados puxando o Total da GRID
         with c4: render_kpi_card("ATRASADOS (GERAL)", atra_total, "BACKLOG", cor_atra, bg_atra, "⏳", alert=(atra_total > 0))
 
         c5, c6, c7, c8 = st.columns(4)
@@ -3808,7 +3809,7 @@ elif menu == "📈 Dashboard":
             manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
             manchetes.extend(buscar_noticias_transito_radar(cidades_alvo)) 
 
-        ticker_text = " &nbsp;&nbsp;&nbsp;&nbsp; <span style='color: #FFC000; font-weight: 900;'>|</span> &nbsp;&nbsp;&nbsp;&nbsp; ".join([m.upper() for m in manchetes])
+        ticker_text = "      <span style='color: #FFC000; font-weight: 900;'>|</span>      ".join([m.upper() for m in manchetes])
         
         st.markdown(f"""
             <style>
@@ -3819,8 +3820,8 @@ elif menu == "📈 Dashboard":
                 width: 100%; 
                 background: #09090B; 
                 padding: 14px 0; 
-                border-top: 4px solid #CC0000; /* Linha de destaque agora fica em cima */
-                box-shadow: 0 -4px 15px rgba(0,0,0,0.4); /* Sombra invertida projetando para cima */
+                border-top: 4px solid #CC0000;
+                box-shadow: 0 -4px 15px rgba(0,0,0,0.4);
                 z-index: 999999; 
                 overflow: hidden; 
             }}
