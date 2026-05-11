@@ -3780,9 +3780,9 @@ elif menu == "📈 Dashboard":
         else:
             st.info("Aguardando finalizações da frota no dia de hoje para compor o pódio.")
 
-        # =========================================================
-        # LETREIRO CNN DE NOTÍCIAS (COM PCL + CIDADE)
-        # =========================================================
+        # ---------------------------------------------------------
+        # LETREIRO CNN DE NOTÍCIAS (COM PCL + CIDADE - ALINHAMENTO CORRIGIDO)
+        # ---------------------------------------------------------
         @st.cache_data(ttl=1800)
         def buscar_noticias_transito_radar(cidades_com_uf):
             noticias_radar = []
@@ -3814,7 +3814,7 @@ elif menu == "📈 Dashboard":
                         if any(x in condicao for x in ['rain', 'shower', 'storm', 'thunder']): alertas.append(f"🌍 [RADAR EXTERNO] Clima: Alerta de Chuva na rota de {item}!")
                 except: continue
             return alertas
-            
+
         manchetes = [
             f"🟢 [STATUS] C.C.O OPERACIONAL - {datetime.now(FUSO_BR).strftime('%H:%M')}",
             f"📊 [DESEMPENHO] {realizados_h}/{vol_total_h} PEDIDOS PROCESSADOS ({int(taxa_sucesso_h)}% DA OPERAÇÃO)"
@@ -3823,26 +3823,17 @@ elif menu == "📈 Dashboard":
         if atra_total > 0: manchetes.append(f"🚨 [ALERTA] BACKLOG: {atra_total} PEDIDOS ATRASADOS NA GRID GERAL!")
         if qtd_chamados > 0: manchetes.append(f"🎧 [HELPDESK] EXISTEM {qtd_chamados} CHAMADOS PENDENTES!")
 
-        # ---------------------------------------------------------
-        # NOVA LÓGICA DO GIRO DE ROTA: PCL + CIDADE
-        # ---------------------------------------------------------
         if not df_hoje.empty:
             df_concluidos = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Coletado', case=False)]
             if not df_concluidos.empty:
                 ultimas_baixas = df_concluidos.tail(3)
                 for _, row in ultimas_baixas.iterrows():
-                    # Tenta puxar o nome da coluna PCL, se não existir busca Destinatário ou cai pro Pedido
                     pcl = str(row.get('PCL', row.get('DESTINATARIO', row.get('NOME DO PCL', row.get('PEDIDO', 'N/A'))))).strip()
-                    
-                    # Puxa a cidade formatada
                     cidade = str(row.get('CIDADE', '')).strip().title()
                     local_str = f" em {cidade}" if cidade and cidade.upper() != "NAN" else ""
-                    
                     st_disp = str(row.get('STATUS_DISPLAY', 'ATUALIZADO')).upper()
                     ag_bruto = str(row.get('AGENTE_RAW', 'EQUIPE')).split('|')[0]
                     ag = dict_nomes_dash.get(ag_bruto.lower(), ag_bruto.upper())
-                    
-                    # Manchete reformulada
                     manchetes.append(f"🚚 [GIRO DE ROTA] PCL {pcl}{local_str} registrado como {st_disp} por {ag}.")
 
         cidades_alvo = []
@@ -3852,13 +3843,13 @@ elif menu == "📈 Dashboard":
             for cid in top_cids:
                 try: cidades_alvo.append(f"{str(cid).strip().title()}/{str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()}" if col_uf else str(cid).strip().title())
                 except: cidades_alvo.append(str(cid).strip().title())
-        
+
         if cidades_alvo: 
             manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
             manchetes.extend(buscar_noticias_transito_radar(cidades_alvo)) 
 
         ticker_text = "      <span style='color: #FFC000; font-weight: 900;'>|</span>      ".join([m for m in manchetes])
-        
+
         st.markdown(f"""
             <div class="ticker-wrap-fixed">
                 <div class="badge-radar-fixed">NOTÍCIAS</div>
