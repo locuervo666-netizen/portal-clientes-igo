@@ -3700,7 +3700,7 @@ elif menu == "📱 WhatsApp":
                     else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
-# 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO ELITE C.C.O - SAAS PREMIUM)
+# 📈 MÓDULO: DASHBOARD EXECUTIVO (VERSÃO DEFINITIVA CNN + HISTÓRICO)
 # =============================================================================
 elif menu == "📈 Dashboard":
     import plotly.express as px
@@ -3708,23 +3708,10 @@ elif menu == "📈 Dashboard":
     import requests
     import urllib.parse
     
-    # 🔥 CONFIGURAÇÃO VISUAL ELITE E GHOST BUTTONS PARA OS KPIS 🔥
     st.markdown("""
         <style>
-        [data-testid="stAppViewContainer"] { background-color: #F1F5F9; color: #0F172A; }
-        
-        /* Deixa o cabeçalho transparente para não sumir com o botão da sidebar */
-        [data-testid="stHeader"] { background-color: transparent !important; }
-        
-        /* 🚀 MUDANÇA AQUI: max-width: 100% devolve o tamanho total pra TV sem margens! */
-        .block-container { 
-            padding-top: 2.5rem !important; /* Espaço exato para o botão da sidebar não sobrepor o letreiro */
-            padding-bottom: 1rem !important; 
-            padding-left: 1rem !important; 
-            padding-right: 1rem !important; 
-            max-width: 100% !important; 
-        }
-        
+        /* Fundo branco limpo, ideal para espelhamento em TV */
+        [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
         hr { margin: 0.5em 0 !important; border-color: #E2E8F0 !important; }
         
         @keyframes pulse-red {
@@ -3733,75 +3720,38 @@ elif menu == "📈 Dashboard":
             100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
         }
         .alerta-sirene { animation: pulse-red 2s infinite; border: 1px solid #EF4444 !important; }
-        
-        /* Mágica dos Botões Invisíveis (Ghost Buttons) sobre os Cards HTML */
-        div.st-key-kpi_total, div.st-key-kpi_entregue, div.st-key-kpi_chamados, div.st-key-kpi_atra,
-        div.st-key-kpi_pend, div.st-key-kpi_col, div.st-key-kpi_frus, div.st-key-kpi_hoje {
-            margin-top: -110px !important;
-            position: relative;
-            z-index: 999;
-            opacity: 0 !important; 
-        }
-        div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_chamados button, div.st-key-kpi_atra button,
-        div.st-key-kpi_pend button, div.st-key-kpi_col button, div.st-key-kpi_frus button, div.st-key-kpi_hoje button {
-            height: 95px !important;
-            cursor: pointer !important;
-        }
-        
-        /* Estilização original dos popovers mantida */
-        div[data-testid="stPopover"] > button, button[kind="secondary"] {
-            white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
-        }
-        div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
-            border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
-        }
         </style>
     """, unsafe_allow_html=True)
     
-    st_autorefresh(interval=120000, limit=None, key="refresh_dashboard_tv_elite")
+    st_autorefresh(interval=120000, limit=None, key="refresh_dashboard_v_final")
     
     df_raw = carregar_dados_completos(planilha_db)
     
     if df_raw.empty:
-        st.warning("⚠️ Aguardando sincronização de dados...")
+        st.warning("⚠️ Aguardando sincronização de dados com o servidor...")
     else:
-        # Preparação base de dados
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
 
-        hoje = hoje_br
-        ontem_util = hoje - timedelta(days=1)
-        while ontem_util.weekday() >= 5 or ontem_util in FERIADOS_BR:
-            ontem_util -= timedelta(days=1)
+        # 🔥 LÓGICA BLINDADA: CÁLCULOS DO HISTÓRICO GERAL (NUNCA MAIS SOME) 🔥
+        vol_total = len(df_raw)
+        concluidos = len(df_raw[df_raw['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
+        col_total = len(df_raw[df_raw['STATUS_DISPLAY'].str.contains('Coletado', case=False)])
+        ent_total = len(df_raw[df_raw['STATUS_DISPLAY'].str.contains('Entregue', case=False)])
+        pend_total = len(df_raw[df_raw['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
+        frus_total = len(df_raw[df_raw['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
+        atra_total = len(df_raw[df_raw['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
+        
+        taxa_eficiencia = (concluidos / vol_total * 100) if vol_total > 0 else 0
+        qtd_chamados = checar_chamados_pendentes(planilha_db)
 
-        df_hoje = df_raw[df_raw['DATA_OBJ'] == hoje].copy()
-        df_ontem = df_raw[df_raw['DATA_OBJ'] == ontem_util].copy()
-
-        def calc_variacao(val_hoje, val_ontem):
-            if val_ontem == 0: return ("+100%", "▲") if val_hoje > 0 else ("0%", "-")
-            var = ((val_hoje - val_ontem) / val_ontem) * 100
-            if var > 0: return f"+{var:.1f}%", "▲"
-            elif var < 0: return f"{var:.1f}%", "▼"
-            return "0%", "-"
-
-        # Cálculos de KPI (Global do dia)
-        vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
-        resolvidos_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado', case=False)])
+        # Isolando os dados apenas para o Ticker e Gráficos do dia
+        df_hoje = df_raw[df_raw['DATA_OBJ'] == hoje_br].copy()
         col_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Coletado', case=False)])
         ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue', case=False)])
         pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
         frus_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)])
         atra_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
-        
-        taxa_sucesso_h = (resolvidos_h / vol_total_h * 100) if vol_total_h > 0 else 0
-        
-        v_tot_str, s_tot = calc_variacao(vol_total_h, vol_total_o)
-        v_ent_str, s_ent = calc_variacao(ent_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue', case=False)]))
-        v_pend_str, s_pend = calc_variacao(pend_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)]))
-        v_frus_str, s_frus = calc_variacao(frus_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)]))
-        
-        qtd_chamados = checar_chamados_pendentes(planilha_db)
 
-        # Inteligência da Frota
         dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         frota_stats = {}
         if not df_hoje.empty:
@@ -3815,14 +3765,16 @@ elif menu == "📈 Dashboard":
                 frota_stats[nome_amigavel] = {"perc": perc_ag, "conc": concluidos_ag, "total": total_ag}
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
-        # Funções Inteligentes do Ticker
+        # ---------------------------------------------------------
+        # INTELIGÊNCIA DO TICKER (TRÂNSITO, SEGURANÇA E CLIMA)
+        # ---------------------------------------------------------
         @st.cache_data(ttl=1800)
         def buscar_noticias_transito_radar(cidades_com_uf):
             noticias_radar = []
             import xml.etree.ElementTree as ET
             cidades_alvo = [str(c).split('/')[0].strip() for c in cidades_com_uf if str(c).strip()][:4]
             for cidade in cidades_alvo:
-                query = f'(trânsito OR acidente OR engarrafamento OR rodovia OR interdição) "{cidade}"'
+                query = f'(trânsito OR acidente OR engarrafamento OR rodovia) "{cidade}"'
                 url = f'https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419'
                 try:
                     resp = requests.get(url, timeout=3)
@@ -3833,6 +3785,24 @@ elif menu == "📈 Dashboard":
                         noticias_radar.append(f"🚨 TRÂNSITO {cidade.upper()}: {titulo}")
                 except: continue
             return noticias_radar
+
+        @st.cache_data(ttl=900)
+        def buscar_noticias_seguranca_radar(cidades_com_uf):
+            alertas_seguranca = []
+            import xml.etree.ElementTree as ET
+            cidades_risco = [str(c).split('/')[0].strip() for c in cidades_com_uf if 'RJ' in str(c).upper() or 'SP' in str(c).upper()][:3]
+            for cidade in cidades_risco:
+                query = f'(tiroteio OR "operação policial" OR arrastão OR "bala perdida" OR "via interditada") "{cidade}"'
+                url = f'https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419'
+                try:
+                    resp = requests.get(url, timeout=3)
+                    root = ET.fromstring(resp.content)
+                    items = root.findall('.//item')[:1] 
+                    for item in items:
+                        titulo = item.find('title').text.split(" - ")[0]
+                        alertas_seguranca.append(f"⚠️ ÁREA DE RISCO {cidade.upper()}: {titulo}")
+                except: continue
+            return alertas_seguranca
 
         @st.cache_data(ttl=3600)
         def buscar_alertas_climaticos(cidades_com_uf):
@@ -3868,38 +3838,14 @@ elif menu == "📈 Dashboard":
             return alertas_voos
 
         # ---------------------------------------------------------
-        # BARRA DE NOTÍCIAS (TICKER MEGAZORD)
+        # RENDERIZAÇÃO DO TICKER (VISUAL CNN NEWS)
         # ---------------------------------------------------------
-        manchetes = [f"🟢 OPERAÇÃO ATIVA", f"🕒 ATUALIZADO EM: {datetime.now(FUSO_BR).strftime('%H:%M')}"]
+        manchetes = [f"🟢 SISTEMA ATIVO", f"🕒 AGORA: {datetime.now(FUSO_BR).strftime('%H:%M')}"]
         if qtd_chamados > 0: manchetes.append(f"🎧 HELPDESK: {qtd_chamados} chamado(s) aberto(s)")
-        if atra_h > 0: manchetes.append(f"🚨 ALERTA: {atra_h} pedido(s) fora do SLA!")
-        if vol_total_h > 0: manchetes.append(f"🎯 META DIÁRIA: {int(taxa_sucesso_h)}% das operações concluídas.")
+        if atra_h > 0: manchetes.append(f"🚨 ALERTA: {atra_h} pedido(s) atrasados HOJE!")
         
         if len(frota_ordenada) > 0 and frota_ordenada[0][1]['perc'] >= 50:
-            manchetes.append(f"🏆 DESTAQUE DA FROTA: {frota_ordenada[0][0]} liderando com {frota_ordenada[0][1]['perc']}%!")
-
-        if atra_h > 0:
-            df_atrasados = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)]
-            if not df_atrasados.empty:
-                top_atrasado = df_atrasados['AGENTE_RAW'].value_counts().index[0]
-                if str(top_atrasado).strip() and str(top_atrasado).upper() != 'NAN':
-                    nome_mot_atrasado = dict_nomes_dash.get(str(top_atrasado).strip().lower(), str(top_atrasado).upper().split('|')[0])
-                    manchetes.append(f"⚠️ ATENÇÃO: Motorista {nome_mot_atrasado} possui volume(s) estourado(s).")
-
-        TICKET_MEDIO_ESTIMADO = 35.00
-        if resolvidos_h > 0:
-            projecao = resolvidos_h * TICKET_MEDIO_ESTIMADO
-            manchetes.append(f"📈 PROJEÇÃO DE FATURAMENTO DO DIA: R$ {projecao:,.2f}")
-
-        finalizados_hj = df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False)]
-        if not finalizados_hj.empty:
-            for _, row in finalizados_hj.tail(2).iterrows():
-                pcl = str(row.get('LABORATORIO', row.get('TOMADOR', 'PCL'))).title()
-                cidade = str(row.get('CIDADE', '')).title()
-                hora = str(row.get('HORA_BAIXA', row.get('HORA', '')))
-                hora_str = f" às {hora}" if hora and hora.lower() != 'nan' and hora.strip() else ""
-                tipo = "Coleta" if 'COLETADO' in str(row.get('STATUS_DISPLAY', '')).upper() else "Entrega"
-                manchetes.append(f"✅ BAIXA: {tipo} no {pcl} em {cidade}{hora_str}!")
+            manchetes.append(f"🏆 DESTAQUE: {frota_ordenada[0][0]} liderando as coletas hoje com {frota_ordenada[0][1]['perc']}%!")
 
         cidades_alvo = []
         if not df_hoje.empty:
@@ -3911,22 +3857,38 @@ elif menu == "📈 Dashboard":
         
         if cidades_alvo: 
             manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
-            # 🔥 INJEÇÃO DA API DE TRÂNSITO AQUI 🔥
             manchetes.extend(buscar_noticias_transito_radar(cidades_alvo)) 
+            manchetes.extend(buscar_noticias_seguranca_radar(cidades_alvo))
             
         manchetes.extend(buscar_status_voos_aerodatabox(["G31240"], hoje_br))
 
-        ticker_text = "      •      ".join([m.upper() for m in manchetes])
+        # O separador de notícias no estilo CNN (Barra Amarela)
+        ticker_text = " &nbsp;&nbsp;&nbsp;&nbsp; <span style='color: #FFC000; font-weight: 900;'>|</span> &nbsp;&nbsp;&nbsp;&nbsp; ".join([m.upper() for m in manchetes])
+        
         st.markdown(f"""
             <style>
-            .ticker-wrap {{ background: #FFFFFF; border: 1px solid #E2E8F0; padding: 16px 0; border-radius: 8px; margin-top: 15px; margin-bottom: 20px; overflow: hidden; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }}
-            .ticker-move {{ display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker 80s linear infinite; }}
+            .ticker-wrap {{ 
+                background: #09090B; 
+                padding: 14px 0; 
+                border-radius: 4px; 
+                margin-top: 15px; 
+                margin-bottom: 20px; 
+                overflow: hidden; 
+                position: relative; 
+                border-bottom: 4px solid #CC0000; 
+                box-shadow: 0 4px 10px rgba(0,0,0,0.15); 
+            }}
+            .ticker-move {{ display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker 90s linear infinite; }}
             @keyframes ticker {{ 0% {{ transform: translate3d(0, 0, 0); }} 100% {{ transform: translate3d(-100%, 0, 0); }} }}
-            .ticker-item {{ font-size: 18px; font-weight: 800; color: #334155; letter-spacing: 0.5px; }}
-            .badge-radar {{ position: absolute; left: 0; top: 0; bottom: 0; background: #3B82F6; color: white; padding: 0 30px; z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 17px; border-radius: 8px 0 0 8px; letter-spacing: 1.5px; box-shadow: 3px 0 8px rgba(0,0,0,0.15); }}
+            .ticker-item {{ font-size: 20px; font-weight: 700; color: #FFFFFF; font-family: 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.5px; }}
+            .badge-radar {{ 
+                position: absolute; left: 0; top: 0; bottom: 0; background: #CC0000; color: #FFFFFF; padding: 0 30px; 
+                z-index: 10; display: flex; align-items: center; font-weight: 900; font-size: 18px; letter-spacing: 1px; 
+                text-transform: uppercase; box-shadow: 5px 0 15px rgba(0,0,0,0.5); 
+            }}
             </style>
             <div class="ticker-wrap">
-                <div class="badge-radar">📡 RADAR</div>
+                <div class="badge-radar">URGENTE</div>
                 <div class="ticker-move">
                     <span class="ticker-item">{ticker_text}</span>
                 </div>
@@ -3934,25 +3896,22 @@ elif menu == "📈 Dashboard":
         """, unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # BLOCO DE KPI CARDS (ESTILO PORTAL DO CLIENTE - PASTEL)
+        # BLOCO DE KPI CARDS (COM EMOJIS NÍTIDOS)
         # ---------------------------------------------------------
-        def render_kpi_card(title, value, var_str, color, bg_color, icon, alert=False):
+        def render_kpi_card(title, value, color, bg_color, icon, alert=False):
             cls = "alerta-sirene" if alert else ""
             st.markdown(f"""
-                <div class="{cls}" style="background-color: {bg_color}; border: 1px solid {color}40; border-radius: 12px; padding: 14px 16px; position: relative; overflow: hidden; height: 95px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 10px;">
-                    <div style="position: absolute; right: -10px; bottom: -15px; font-size: 80px; opacity: 0.35; z-index: 0; line-height: 1;">
+                <div class="{cls}" style="background-color: {bg_color}; border: 1px solid {color}40; border-radius: 12px; padding: 14px 16px; position: relative; overflow: hidden; height: 105px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 15px;">
+                    <div style="position: absolute; right: -5px; bottom: -15px; font-size: 80px; opacity: 0.35; z-index: 0; user-select: none;">
                         {icon}
                     </div>
                     <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; justify-content: space-between;">
-                        <div style="font-size: 11px; font-weight: 800; color: {color}; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <div style="font-size: 12px; font-weight: 800; color: {color}; text-transform: uppercase; letter-spacing: 0.5px;">
                             {title}
                         </div>
                         <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-                            <div style="font-size: 26px; font-weight: 900; color: #0F172A; line-height: 1;">
+                            <div style="font-size: 28px; font-weight: 900; color: #0F172A; line-height: 1;">
                                 {value}
-                            </div>
-                            <div style="font-size: 11px; font-weight: 700; color: {color}; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 4px; border: 1px solid {color}40;">
-                                {var_str}
                             </div>
                         </div>
                     </div>
@@ -3960,25 +3919,25 @@ elif menu == "📈 Dashboard":
             """, unsafe_allow_html=True)
 
         cor_tkt, bg_tkt = ("#EF4444", "#FEF2F2") if qtd_chamados > 0 else ("#64748B", "#F8FAFC")
-        sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
-        cor_atra, bg_atra = ("#F43F5E", "#FDF2F8") if atra_h > 0 else ("#64748B", "#F8FAFC")
+        cor_atra, bg_atra = ("#F43F5E", "#FDF2F8") if atra_total > 0 else ("#64748B", "#F8FAFC")
 
+        # 🔥 AQUI ESTÁ A SEGURANÇA: EXIBINDO OS TOTAIS GERAIS (_TOTAL) 🔥
         c1, c2, c3, c4 = st.columns(4)
-        with c1: render_kpi_card("VOL. TOTAL", vol_total_h, f"{s_tot}{v_tot_str}", "#3B82F6", "#EFF6FF", "📦")
-        with c2: render_kpi_card("EFICIÊNCIA", f"{taxa_sucesso_h:.1f}%", f"Ref. Hoje", "#10B981", "#F0FDF4", "🎯")
-        with c3: render_kpi_card("CHAMADOS", qtd_chamados, sub_tkt, cor_tkt, bg_tkt, "🎧", alert=(qtd_chamados > 0))
-        with c4: render_kpi_card("ATRASADOS", atra_h, "SLA CRÍTICO", cor_atra, bg_atra, "⏳", alert=(atra_h > 0))
+        with c1: render_kpi_card("VOL. TOTAL HISTÓRICO", vol_total, "#3B82F6", "#EFF6FF", "📦")
+        with c2: render_kpi_card("EFICIÊNCIA GERAL", f"{taxa_eficiencia:.1f}%", "#10B981", "#F0FDF4", "🎯")
+        with c3: render_kpi_card("CHAMADOS ABERTOS", qtd_chamados, cor_tkt, bg_tkt, "🎧", alert=(qtd_chamados > 0))
+        with c4: render_kpi_card("ATRASADOS (GERAL)", atra_total, cor_atra, bg_atra, "⏳", alert=(atra_total > 0))
 
         c5, c6, c7, c8 = st.columns(4)
-        with c5: render_kpi_card("PENDENTES", pend_h, f"{s_pend}{v_pend_str}", "#F59E0B", "#FFFBEB", "🚚")
-        with c6: render_kpi_card("COLETADOS", col_h, "Visitas Hoje", "#6366F1", "#EEF2FF", "📥")
-        with c7: render_kpi_card("FRUSTRADAS", frus_h, f"{s_frus}{v_frus_str}", "#EF4444", "#FEF2F2", "🛑")
-        with c8: render_kpi_card("BASE ONTEM", vol_total_o, "Ref. Cálculo", "#64748B", "#F8FAFC", "📊")
+        with c5: render_kpi_card("PENDENTES (GERAL)", pend_total, "#F59E0B", "#FFFBEB", "🚚")
+        with c6: render_kpi_card("COLETADOS", col_total, "#6366F1", "#EEF2FF", "📥")
+        with c7: render_kpi_card("ENTREGUES", ent_total, "#10B981", "#F0FDF4", "✅")
+        with c8: render_kpi_card("FRUSTRADAS (GERAL)", frus_total, "#EF4444", "#FEF2F2", "🛑")
 
         st.markdown("<br>", unsafe_allow_html=True)
 
         # ---------------------------------------------------------
-        # GRÁFICO DONUT E TABELA DE TOMADORES (COM LOGOS)
+        # GRÁFICO E TABELA (FOCO NA OPERAÇÃO DE HOJE PARA DAR DINAMISMO)
         # ---------------------------------------------------------
         col_pie, col_table = st.columns([1, 1.5])
         with col_pie:
@@ -3991,7 +3950,7 @@ elif menu == "📈 Dashboard":
                 fig_donut.update_traces(textinfo='percent', textfont_size=12, textfont_color='white', marker=dict(line=dict(color="#FFFFFF", width=2)))
                 fig_donut.update_layout(template="plotly_white", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, b=0, l=0, r=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=11, color="#64748B")), height=240)
                 st.plotly_chart(fig_donut, use_container_width=True)
-            else: st.info("Sem dados para os gráficos.")
+            else: st.info("Sem movimentações finalizadas na data de hoje.")
 
         with col_table:
             st.markdown("<p style='font-weight: 900; font-size: 13px; color: #475569; margin-bottom: 12px; text-transform: uppercase;'>🏢 Volumes de Hoje por Tomador</p>", unsafe_allow_html=True)
@@ -4001,7 +3960,6 @@ elif menu == "📈 Dashboard":
             if not vol_tom.empty:
                 def get_logo_url(tomador):
                     tomador_upper = str(tomador).strip().upper()
-                    # 🛠️ URLs já convertidas para renderização direta do Google Drive
                     logos = {
                         "ECOLYZER": "https://lh3.googleusercontent.com/d/1NdbO7olL6GUQDN3krRnyICfgNC07Di2Z",
                         "GRALAB": "https://lh3.googleusercontent.com/d/1SeNj-i590Q6ft-pUcSIk-OKKHiOYtAxU",
@@ -4018,7 +3976,6 @@ elif menu == "📈 Dashboard":
                     return logos.get(tomador_upper, "https://lh3.googleusercontent.com/d/10dZJLyT3lMO6q1pq0ZQCA9WwTu_B4bLY")
 
                 max_vol = int(vol_tom['Volumes'].max())
-                
                 html_cards = "<div style='display: flex; flex-direction: column; gap: 8px; height: 240px; overflow-y: auto; padding-right: 5px;'>"
                 
                 for _, row in vol_tom.iterrows():
@@ -4027,37 +3984,27 @@ elif menu == "📈 Dashboard":
                     vol = row['Volumes']
                     pct = int((vol / max_vol) * 100) if max_vol > 0 else 0
                     
-                    # 🔥 O HTML está colado na margem propositalmente para evitar o bug do Markdown
                     html_cards += f"""<div style="display: flex; align-items: center; padding: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-<div style="width: 42px; height: 42px; border-radius: 8px; background: #F8FAFC; display: flex; justify-content: center; align-items: center; margin-right: 15px; border: 1px solid #F1F5F9; padding: 3px; flex-shrink: 0;">
-<img src="{logo}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
-</div>
-<div style="flex-grow: 1;">
-<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;">
-<span style="font-size: 13px; font-weight: 800; color: #1E293B;">{cliente.upper()}</span>
-<span style="font-size: 15px; font-weight: 900; color: #0F172A;">{vol} <span style="font-size: 10px; color: #64748B; font-weight: 700;">VOL</span></span>
-</div>
-<div style="height: 6px; background-color: #F1F5F9; border-radius: 4px; overflow: hidden;">
-<div style="width: {pct}%; height: 100%; background: linear-gradient(90deg, #3B82F6 0%, #2563EB 100%); border-radius: 4px;"></div>
-</div>
-</div>
-</div>"""
+                        <div style="width: 42px; height: 42px; border-radius: 8px; background: #F8FAFC; display: flex; justify-content: center; align-items: center; margin-right: 15px; border: 1px solid #F1F5F9; padding: 3px; flex-shrink: 0;">
+                            <img src="{logo}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                        </div>
+                        <div style="flex-grow: 1;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px;">
+                                <span style="font-size: 13px; font-weight: 800; color: #1E293B;">{cliente.upper()}</span>
+                                <span style="font-size: 15px; font-weight: 900; color: #0F172A;">{vol} <span style="font-size: 10px; color: #64748B; font-weight: 700;">VOL</span></span>
+                            </div>
+                            <div style="height: 6px; background-color: #F1F5F9; border-radius: 4px; overflow: hidden;">
+                                <div style="width: {pct}%; height: 100%; background: linear-gradient(90deg, #3B82F6 0%, #2563EB 100%); border-radius: 4px;"></div>
+                            </div>
+                        </div>
+                    </div>"""
                 html_cards += "</div>"
-                
-                st.markdown("""
-                <style>
-                div[style*='overflow-y: auto']::-webkit-scrollbar { width: 4px; }
-                div[style*='overflow-y: auto']::-webkit-scrollbar-track { background: transparent; }
-                div[style*='overflow-y: auto']::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
-                </style>
-                """, unsafe_allow_html=True)
-                
                 st.markdown(html_cards, unsafe_allow_html=True)
             else: 
-                st.info("Nenhuma movimentação registrada hoje.")
+                st.info("Nenhuma movimentação para tomadores registrada hoje.")
 
         # ---------------------------------------------------------
-        # PÓDIO EQUIPE (Hoje)
+        # PÓDIO EQUIPE
         # ---------------------------------------------------------
         st.markdown("<br>", unsafe_allow_html=True)
         if len(frota_ordenada) > 0:
@@ -4079,4 +4026,4 @@ elif menu == "📈 Dashboard":
             if len(frota_ordenada) >= 1: rf1.markdown(podio_ui("1", "🥇", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}", "#10B981", "#F0FDF4"), unsafe_allow_html=True)
             if len(frota_ordenada) >= 2: rf2.markdown(podio_ui("2", "🥈", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}", "#64748B", "#FFFFFF"), unsafe_allow_html=True)
             if len(frota_ordenada) >= 3: rf3.markdown(podio_ui("3", "🥉", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}", "#F59E0B", "#FFFBEB"), unsafe_allow_html=True)
-        else: st.info("Aguardando dados da frota para o dia atual.")
+        else: st.info("Aguardando finalizações da frota no dia de hoje para compor o pódio.")
