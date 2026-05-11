@@ -3940,7 +3940,7 @@ elif menu == "📈 Dashboard":
             cls = "alerta-sirene" if alert else ""
             st.markdown(f"""
                 <div class="{cls}" style="background-color: {bg_color}; border: 1px solid {color}40; border-radius: 12px; padding: 14px 16px; position: relative; overflow: hidden; height: 95px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 10px;">
-                    <div style="position: absolute; right: -5px; bottom: -15px; font-size: 65px; opacity: 0.12; z-index: 0; line-height: 1;">
+                    <div style="position: absolute; right: -10px; bottom: -15px; font-size: 80px; opacity: 0.35; z-index: 0; line-height: 1;">
                         {icon}
                     </div>
                     <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; justify-content: space-between;">
@@ -3951,7 +3951,7 @@ elif menu == "📈 Dashboard":
                             <div style="font-size: 26px; font-weight: 900; color: #0F172A; line-height: 1;">
                                 {value}
                             </div>
-                            <div style="font-size: 11px; font-weight: 700; color: {color}; background: rgba(255,255,255,0.6); padding: 2px 6px; border-radius: 4px; border: 1px solid {color}40;">
+                            <div style="font-size: 11px; font-weight: 700; color: {color}; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 4px; border: 1px solid {color}40;">
                                 {var_str}
                             </div>
                         </div>
