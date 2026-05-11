@@ -3816,6 +3816,24 @@ elif menu == "📈 Dashboard":
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
 
         # Funções Inteligentes do Ticker
+        @st.cache_data(ttl=1800)
+        def buscar_noticias_transito_radar(cidades_com_uf):
+            noticias_radar = []
+            import xml.etree.ElementTree as ET
+            cidades_alvo = [str(c).split('/')[0].strip() for c in cidades_com_uf if str(c).strip()][:4]
+            for cidade in cidades_alvo:
+                query = f'(trânsito OR acidente OR engarrafamento OR rodovia OR interdição) "{cidade}"'
+                url = f'https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419'
+                try:
+                    resp = requests.get(url, timeout=3)
+                    root = ET.fromstring(resp.content)
+                    items = root.findall('.//item')[:1] 
+                    for item in items:
+                        titulo = item.find('title').text.split(" - ")[0]
+                        noticias_radar.append(f"🚨 TRÂNSITO {cidade.upper()}: {titulo}")
+                except: continue
+            return noticias_radar
+
         @st.cache_data(ttl=3600)
         def buscar_alertas_climaticos(cidades_com_uf):
             alertas = []
@@ -3891,10 +3909,14 @@ elif menu == "📈 Dashboard":
                 try: cidades_alvo.append(f"{str(cid).strip().title()}/{str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()}" if col_uf else str(cid).strip().title())
                 except: cidades_alvo.append(str(cid).strip().title())
         
-        if cidades_alvo: manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
+        if cidades_alvo: 
+            manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
+            # 🔥 INJEÇÃO DA API DE TRÂNSITO AQUI 🔥
+            manchetes.extend(buscar_noticias_transito_radar(cidades_alvo)) 
+            
         manchetes.extend(buscar_status_voos_aerodatabox(["G31240"], hoje_br))
 
-        ticker_text = " &nbsp;&nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;&nbsp; ".join([m.upper() for m in manchetes])
+        ticker_text = "      •      ".join([m.upper() for m in manchetes])
         st.markdown(f"""
             <style>
             .ticker-wrap {{ background: #FFFFFF; border: 1px solid #E2E8F0; padding: 16px 0; border-radius: 8px; margin-top: 15px; margin-bottom: 20px; overflow: hidden; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }}
