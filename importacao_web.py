@@ -2108,7 +2108,7 @@ elif menu == "📥 Importações":
 # =============================================================================
 elif menu == "📥 Importações Umove":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Zona de Importação & Pedidos Fixos</h3></div>", unsafe_allow_html=True)
-    st_autorefresh(interval=120000, limit=None, key="refresh_importacao_umove_alive")
+    
     
     if planilha_sandbox is None or planilha_db is None:
         st.error("❌ Erro de conexão com as planilhas no Drive. Verifique as permissões.")
