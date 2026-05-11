@@ -2107,8 +2107,23 @@ elif menu == "📥 Importações":
 # 🔥 MÓDULO SANDBOX (PARALELO): IMPORTAÇÕES UMOVE 🔥
 # =============================================================================
 elif menu == "📥 Importações Umove":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Zona de Importação & Pedidos Fixos</h3></div>", unsafe_allow_html=True)
+    import streamlit.components.v1 as components
     
+    # 🔥 PING SILENCIOSO (ANTI-TIMEOUT DO RENDER) 🔥
+    # Roda escondido no navegador. A cada 4 minutos ele dá um "toque" no Render 
+    # avisando que você está online, evitando o deslogue sem recarregar o carrinho!
+    components.html(
+        """
+        <script>
+        setInterval(function() {
+            fetch(window.location.href);
+        }, 240000); 
+        </script>
+        """,
+        height=0, width=0
+    )
+
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Zona de Importação & Pedidos Fixos</h3></div>", unsafe_allow_html=True)
     
     if planilha_sandbox is None or planilha_db is None:
         st.error("❌ Erro de conexão com as planilhas no Drive. Verifique as permissões.")
@@ -2147,7 +2162,7 @@ elif menu == "📥 Importações Umove":
                                 row_str = unicodedata.normalize('NFKD', " ".join(df_raw_sb.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
                                 matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP', 'HORARIO', 'FUNCIONAMENTO', 'OBSERVA'] if kw in row_str)
                                 if matches > max_matches: max_matches, idx_h = matches, i
-                                    
+                                
                             df_limpo_sb = df_raw_sb.iloc[idx_h+1:].copy()
                             df_limpo_sb.columns = [str(c).strip() for c in df_raw_sb.iloc[idx_h].values]
                             df_limpo_sb = df_limpo_sb.loc[:, ~df_limpo_sb.columns.duplicated()] 
@@ -2170,7 +2185,7 @@ elif menu == "📥 Importações Umove":
                                 elif 'CEP' in cl: mapa_sb[c] = 'CEP'
                                 elif any(x in cl for x in ['HORARIO', 'HORA', 'FUNCIONAMENTO', 'PERIODO']): mapa_sb[c] = 'HORARIO'
                                 elif any(x in cl for x in ['OBSERVA', 'OBS', 'NOTA']): mapa_sb[c] = 'OBSERVACOES'
-                                    
+                                
                             df_limpo_sb.rename(columns=mapa_sb, inplace=True)
                             
                             for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
@@ -2293,7 +2308,6 @@ elif menu == "📥 Importações Umove":
     with tab_fixos:
         st.markdown("#### 🏭 Criar Novo Agendamento Fixo")
         
-        # 🔥 PROTEÇÃO MÁXIMA CONTRA NAME ERROR 🔥
         cols_fixos = ['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
         df_regras = pd.DataFrame(columns=cols_fixos) 
         
@@ -2308,7 +2322,6 @@ elif menu == "📥 Importações Umove":
                 aba_fixos.update("A1", [cols_fixos])
             except Exception: pass
 
-        # --- LÓGICA DE RESET INTELIGENTE ---
         if 'f_rua' not in st.session_state: st.session_state['f_rua'] = ""
         if 'f_bai' not in st.session_state: st.session_state['f_bai'] = ""
         if 'f_cid' not in st.session_state: st.session_state['f_cid'] = ""
@@ -2403,7 +2416,6 @@ elif menu == "📥 Importações Umove":
         st.markdown("#### 📋 Gerenciar Laboratórios Fixos")
         st.info("💡 **Edite diretamente na tabela!** Mude o Status (ATIVO/INATIVO), ajuste os dias da semana ou troque o Motorista. Para deletar, selecione a linha no canto esquerdo e aperte a tecla 'Delete' ou 'Backspace'.")
         
-        # 🔥 A TABELA DE EDIÇÃO QUE HAVIA SUMIDO COM O ERRO 🔥
         if not df_regras.empty:
             logins_p_tabela = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
             
@@ -2429,7 +2441,6 @@ elif menu == "📥 Importações Umove":
                 with st.spinner("Atualizando banco de dados..."):
                     try:
                         aba_fixos.clear()
-                        # Se apagou tudo com a tecla Delete, não quebra a planilha:
                         if df_regras_edit.empty:
                             aba_fixos.update("A1", [cols_fixos])
                         else:
@@ -2445,7 +2456,6 @@ elif menu == "📥 Importações Umove":
     # -------------------------------------------------------------------------
     with tab_carrinho:
         
-        # 1. O Robô Lê os Pedidos Fixos do Dia em Memória (Caixa B)
         df_fixos_hoje = pd.DataFrame()
         try:
             aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
@@ -2493,7 +2503,6 @@ elif menu == "📥 Importações Umove":
                         df_fixos_hoje = pd.DataFrame(novos_pedidos)
         except Exception: pass
 
-        # 2. O Checkbox Mágico (Interruptor) - DESLIGADO POR PADRÃO 🔥
         incluir_fixos = False
         if not df_fixos_hoje.empty:
             st.info(f"💡 O sistema encontrou **{len(df_fixos_hoje)} pedidos fixos** programados para hoje ({dia_atual}).")
@@ -2501,7 +2510,6 @@ elif menu == "📥 Importações Umove":
         else:
             st.info("Nenhum pedido fixo programado para hoje.")
 
-        # 3. A Fusão Visual (Caixa A + Caixa B)
         df_sb = st.session_state.df_sandbox_mem.copy()
         if incluir_fixos and not df_fixos_hoje.empty:
             if df_sb.empty:
@@ -2511,7 +2519,6 @@ elif menu == "📥 Importações Umove":
 
         st.markdown("---")
         
-        # 4. Renderização do Carrinho Final
         if not df_sb.empty:
             col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
             col_tit.markdown("### 🛒 Carrinho de Expedição Umove")
@@ -2532,7 +2539,6 @@ elif menu == "📥 Importações Umove":
             st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
             st.markdown("<p style='font-size:12px; color:#64748B;'>Esta tabela exibe os lotes manuais e automáticos que você adicionou até agora. Dê dois cliques para editar.</p>", unsafe_allow_html=True)
             
-            # 🔥 KEY FIXA E SEGURA PARA NÃO PERDER EDIÇÕES 🔥
             df_editado_sb = st.data_editor(
                 df_sb,
                 num_rows="dynamic",
@@ -2612,17 +2618,16 @@ elif menu == "📥 Importações Umove":
                                 for cid, count in df_ag_sb['CIDADE'].value_counts().items():
                                     msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}"); tot_qtd += count
                                 msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
-                                
+
                                 for cid, group in df_ag_sb.groupby('CIDADE'):
                                     msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
                                     items = []
                                     for _, row in group.iterrows():
-                                        # 🔥 CEP ADICIONADO AQUI NA LINHA ABAIXO 🔥
                                         item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                         obs = str(row.get('OBSERVACOES', '')).strip()
                                         if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                         items.append(item_str)
-                                    msg_parts.append("\n\n      . . . . .\n\n".join(items) + "\n")
+                                    msg_parts.append("\n\n      . . . .\n\n".join(items) + "\n")
                                     
                                 if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
                                     time.sleep(2.0)
@@ -2631,7 +2636,6 @@ elif menu == "📥 Importações Umove":
                                     
                                     if ag_login in agentes_xls_sb or ag_login.split('|')[0] in agentes_xls_sb:
                                         time.sleep(3.0)
-                                        # Lógica exclusiva para luiz.paulo já mantida
                                         if ag_login == 'luiz.paulo':
                                             df_para_xls = df_editado_sb[df_editado_sb['UF'] == 'RJ']
                                             nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
