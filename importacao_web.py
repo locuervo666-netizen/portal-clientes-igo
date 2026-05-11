@@ -3665,7 +3665,7 @@ elif menu == "📈 Dashboard":
         v_frus_str, s_frus = calc_variacao(frus_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)]))
 
         # ---------------------------------------------------------
-        # OS 8 KPI CARDS INTÁCTOS
+        # OS 8 KPI CARDS INTACTOS
         # ---------------------------------------------------------
         def render_kpi_card(title, value, var_str, color, bg_color, icon, alert=False):
             cls = "alerta-sirene" if alert else ""
@@ -3781,7 +3781,7 @@ elif menu == "📈 Dashboard":
             st.info("Aguardando finalizações da frota no dia de hoje para compor o pódio.")
 
         # ---------------------------------------------------------
-        # LETREIRO CNN DE NOTÍCIAS (COM PCL + CIDADE - ALINHAMENTO CORRIGIDO)
+        # LETREIRO CNN DE NOTÍCIAS (PRIORIZANDO O LABORATÓRIO/TOMADOR)
         # ---------------------------------------------------------
         @st.cache_data(ttl=1800)
         def buscar_noticias_transito_radar(cidades_com_uf):
@@ -3828,13 +3828,33 @@ elif menu == "📈 Dashboard":
             if not df_concluidos.empty:
                 ultimas_baixas = df_concluidos.tail(3)
                 for _, row in ultimas_baixas.iterrows():
-                    pcl = str(row.get('PCL', row.get('DESTINATARIO', row.get('NOME DO PCL', row.get('PEDIDO', 'N/A'))))).strip()
+                    
+                    # BUSCA INTELIGENTE: Prioridade total para as colunas de Laboratório/Tomador
+                    pcl_nome = ""
+                    colunas_busca = ['LABORATÓRIO', 'LABORATORIO', 'NOME DO LABORATÓRIO', 'TOMADOR', 'DESTINATARIO', 'NOME DO PCL', 'NOME FANTASIA', 'CLIENTE']
+                    for col_nome in colunas_busca:
+                        if col_nome in row.index:
+                            val = str(row[col_nome]).strip()
+                            # Se achou algo que não seja "NAN" e não seja só número, assume que é o nome correto
+                            if val and val.upper() != 'NAN' and not val.isnumeric():
+                                pcl_nome = val
+                                break
+                    
+                    # Fallback de segurança se não achar nome válido
+                    if not pcl_nome:
+                        val_pcl = str(row.get('PCL', '')).strip()
+                        if val_pcl and val_pcl.upper() != 'NAN':
+                            pcl_nome = f"Cód {val_pcl}" if val_pcl.isnumeric() else val_pcl
+                        else:
+                            pcl_nome = f"Pedido {str(row.get('PEDIDO', 'N/A'))}"
+                            
                     cidade = str(row.get('CIDADE', '')).strip().title()
                     local_str = f" em {cidade}" if cidade and cidade.upper() != "NAN" else ""
                     st_disp = str(row.get('STATUS_DISPLAY', 'ATUALIZADO')).upper()
                     ag_bruto = str(row.get('AGENTE_RAW', 'EQUIPE')).split('|')[0]
                     ag = dict_nomes_dash.get(ag_bruto.lower(), ag_bruto.upper())
-                    manchetes.append(f"🚚 [GIRO DE ROTA] PCL {pcl}{local_str} registrado como {st_disp} por {ag}.")
+                    
+                    manchetes.append(f"🚚 [GIRO DE ROTA] {pcl_nome}{local_str} registrado como {st_disp} por {ag}.")
 
         cidades_alvo = []
         if not df_hoje.empty:
