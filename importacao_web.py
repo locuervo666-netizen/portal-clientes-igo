@@ -3786,21 +3786,17 @@ elif menu == "📈 Dashboard":
                     vol_real = len(df_tom[df_tom['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado|Conferido', case=False)])
                     pct = int((vol_real / vol_tot) * 100) if vol_tot > 0 else 0
                     
-                    # --- MOTOR DE ANÁLISE ---
                     df_tom_hist = df_raw[(df_raw['TOMADOR'] == tomador) & (df_raw['DATA_OBJ'] < hoje)]
                     
-                    # 1. Volume do Último Dia Útil com Pedidos
                     vol_ant = 0
                     if not df_tom_hist.empty:
                         datas_unicas = sorted(df_tom_hist['DATA_OBJ'].unique(), reverse=True)
                         for d in datas_unicas:
                             dt_check = pd.to_datetime(d).date() if hasattr(d, 'date') else pd.to_datetime(d)
-                            # Pega apenas dias úteis e fora de feriados
                             if hasattr(dt_check, 'weekday') and dt_check.weekday() < 5 and dt_check not in FERIADOS_BR:
                                 vol_ant = len(df_tom_hist[df_tom_hist['DATA_OBJ'] == d])
-                                break # Achou o último dia ativo, para a busca
+                                break 
                     
-                    # Cálculo de Variação
                     if vol_ant == 0:
                         var_pct = 100 if vol_tot > 0 else 0
                         var_str = f"▲ +{var_pct}%"
@@ -3817,7 +3813,6 @@ elif menu == "📈 Dashboard":
                             var_str = "- 0%"
                             cor_var = "#64748B"
                             
-                    # 2. Média Diária (Últimos 30 Dias)
                     media_30d = 0
                     if not df_tom_hist.empty:
                         df_30d = df_tom_hist[df_tom_hist['DATA_OBJ'] >= data_limite_30d]
@@ -3909,7 +3904,7 @@ elif menu == "📈 Dashboard":
             st.info("Aguardando finalizações da frota no dia de hoje para compor o pódio.")
 
         # ---------------------------------------------------------
-        # LETREIRO CNN DE NOTÍCIAS (PRIORIZANDO O LABORATÓRIO/TOMADOR)
+        # LETREIRO CNN DE NOTÍCIAS (AGORA COM PLACAR DE TÊNIS AO VIVO!)
         # ---------------------------------------------------------
         @st.cache_data(ttl=1800)
         def buscar_noticias_transito_radar(cidades_com_uf):
@@ -3943,6 +3938,47 @@ elif menu == "📈 Dashboard":
                 except: continue
             return alertas
 
+        # 🔥 A MÁGICA DOS PLACARES DA ESPN ENTRA AQUI 🔥
+        @st.cache_data(ttl=300) # Atualiza a cada 5 minutos para não travar
+        def buscar_placares_tenis_ao_vivo():
+            placares = []
+            try:
+                # API pública e oculta da ESPN para ATP e WTA
+                urls = [
+                    "http://site.api.espn.com/apis/site/v2/sports/tennis/atp/scoreboard",
+                    "http://site.api.espn.com/apis/site/v2/sports/tennis/wta/scoreboard"
+                ]
+                for url in urls:
+                    resp = requests.get(url, timeout=4)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        eventos = data.get('events', [])
+                        for ev in eventos:
+                            try:
+                                status_state = ev.get('status', {}).get('type', {}).get('state', '')
+                                status_detail = ev.get('status', {}).get('type', {}).get('detail', '')
+                                
+                                # 'in' = Jogo rolando / 'post' = Encerrado
+                                if status_state in ['in', 'post']:
+                                    comp = ev['competitions'][0]['competitors']
+                                    j1 = comp[0]['athlete']['shortName']
+                                    s1 = comp[0].get('score', '0')
+                                    j2 = comp[1]['athlete']['shortName']
+                                    s2 = comp[1].get('score', '0')
+                                    
+                                    torneio = ev.get('season', {}).get('slug', 'Torneio').replace('-', ' ').title()
+                                    
+                                    if status_state == 'in':
+                                        placares.append(f"🔴 [AO VIVO - {torneio}] {j1} {s1} x {s2} {j2} ({status_detail})")
+                                    elif status_state == 'post' and len(placares) < 4:
+                                        placares.append(f"🎾 [RESULTADO - {torneio}] {j1} {s1} x {s2} {j2}")
+                            except:
+                                continue
+                            if len(placares) >= 5: break # Limita a 5 placares para não poluir
+            except:
+                pass
+            return placares[:5]
+
         manchetes = [
             f"🟢 [STATUS] C.C.O OPERACIONAL - {datetime.now(FUSO_BR).strftime('%H:%M')}",
             f"📊 [DESEMPENHO] {realizados_h}/{vol_total_h} PEDIDOS PROCESSADOS ({int(taxa_sucesso_h)}% DA OPERAÇÃO)"
@@ -3956,8 +3992,6 @@ elif menu == "📈 Dashboard":
             if not df_concluidos.empty:
                 ultimas_baixas = df_concluidos.tail(3)
                 for _, row in ultimas_baixas.iterrows():
-                    
-                    # BUSCA INTELIGENTE: Prioridade total para as colunas de Laboratório/Tomador
                     pcl_nome = ""
                     colunas_busca = ['LABORATÓRIO', 'LABORATORIO', 'NOME DO LABORATÓRIO', 'TOMADOR', 'DESTINATARIO', 'NOME DO PCL', 'NOME FANTASIA', 'CLIENTE']
                     for col_nome in colunas_busca:
@@ -3990,6 +4024,9 @@ elif menu == "📈 Dashboard":
                 try: cidades_alvo.append(f"{str(cid).strip().title()}/{str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()}" if col_uf else str(cid).strip().title())
                 except: cidades_alvo.append(str(cid).strip().title())
 
+        # ADICIONANDO OS PLACARES AO VIVO E ALERTAS
+        manchetes.extend(buscar_placares_tenis_ao_vivo())
+        
         if cidades_alvo: 
             manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
             manchetes.extend(buscar_noticias_transito_radar(cidades_alvo)) 
