@@ -93,42 +93,62 @@ st.markdown("""
         padding-right: 2rem !important;
     }
 
-    /* ── KPI CARDS ── */
-    .kpi-card {
+    /* ── KPI CARDS (SAAS PREMIUM) ── */
+    .kpi-card-premium {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
         border-radius: 12px;
-        padding: 14px 12px 12px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.2s ease;
+        padding: 20px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         position: relative;
         overflow: hidden;
+        transition: all 0.3s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+        height: 100px;
     }
-    .kpi-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        transform: translateY(-2px);
+    .kpi-card-premium:hover {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+        transform: translateY(-3px);
+        border-color: #cbd5e1;
     }
-    .kpi-card.active {
-        box-shadow: 0 0 0 2px #3b82f6;
+    .kpi-accent-line {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 5px;
     }
-    .kpi-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        margin: 0 auto 8px;
+    .kpi-text-group {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        z-index: 1;
     }
-    .kpi-val {
-        font-size: 26px;
-        font-weight: 800;
-        line-height: 1;
-        color: #0f172a;
-    }
-    .kpi-label {
-        font-size: 10px;
-        font-weight: 600;
+    .kpi-label-premium {
+        font-size: 11px;
+        font-weight: 700;
         color: #64748b;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        margin-top: 5px;
+        letter-spacing: 0.5px;
+    }
+    .kpi-value-premium {
+        font-size: 30px;
+        font-weight: 900;
+        color: #0f172a;
+        line-height: 1.1;
+    }
+    .kpi-icon-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        font-size: 22px;
+        z-index: 1;
+        border: 1px solid rgba(0,0,0,0.05);
     }
 
     /* ── HEADER ── */
@@ -788,13 +808,16 @@ else:
                     "HOJE":       len(df_f[df_f['DATA_OBJ'] == hoje_br]),
                 }
 
+                # ── KPI CARDS (BLINDADOS: EFEITO GHOST BUTTON NATIVO) ────────────────
                 cols_kpi = st.columns(6)
                 for col, (filtro, label, key) in zip(cols_kpi, KPI_META):
                     is_active = st.session_state.filtro_kpi == filtro
                     dot_color = KPI_DOT_COLOR[filtro]
                     bg_color  = KPI_BG_COLOR[filtro]
 
-                    borda = f"2px solid {dot_color}" if is_active else f"1px solid {dot_color}40"
+                    # Se estiver ativo, a borda do card fica da cor do botão e ganha um glow
+                    active_style = f"border-color: {dot_color} !important; box-shadow: 0 0 0 1px {dot_color} !important;" if is_active else ""
+                    
                     valor = n_vals[filtro]
 
                     partes = label.split(' ', 1)
@@ -802,32 +825,31 @@ else:
                     texto_card = partes[1] if len(partes) > 1 else label
 
                     with col:
+                        # 1. Desenha o Card Clean UI Premium
                         st.markdown(f"""
-                            <div class="kpi-card"
-                                 style="background-color: {bg_color}; border: {borda}; text-align: left; padding: 16px; border-radius: 16px; height: 95px;">
-                                <div style="position: absolute; right: -5px; bottom: -15px; font-size: 65px; opacity: 0.12; z-index: 0; line-height: 1;">
-                                    {emoji_card}
+                            <div class="kpi-card-premium" style="{active_style}">
+                                <div class="kpi-accent-line" style="background-color: {dot_color};"></div>
+                                <div class="kpi-text-group">
+                                    <span class="kpi-label-premium">{texto_card}</span>
+                                    <span class="kpi-value-premium">{valor}</span>
                                 </div>
-                                <div style="position: relative; z-index: 1;">
-                                    <div style="font-size: 11px; font-weight: 800; color: {dot_color}; text-transform: uppercase; letter-spacing: 0.5px;">
-                                        {texto_card}
-                                    </div>
-                                    <div style="font-size: 28px; font-weight: 900; color: #0F172A; margin-top: 2px; line-height: 1;">
-                                        {valor}
-                                    </div>
+                                <div class="kpi-icon-box" style="background-color: {bg_color};">
+                                    {emoji_card}
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
 
+                        # 2. Cria o botão invisível gigante por cima
                         if st.button(label, key=key, use_container_width=True, help=f"Filtrar por: {texto_card}"):
                             st.session_state.filtro_kpi = filtro
                             st.rerun()
 
+                # 🔥 CSS MÁGICO: Transforma os botões em painéis transparentes sobre os cards 🔥
                 st.markdown("""
                     <style>
                     div.st-key-kpi_total, div.st-key-kpi_entregue, div.st-key-kpi_frus, 
                     div.st-key-kpi_pend, div.st-key-kpi_aguardando, div.st-key-kpi_hoje {
-                        margin-top: -110px !important; position: relative; z-index: 999; opacity: 0 !important;
+                        margin-top: -115px !important; position: relative; z-index: 999; opacity: 0 !important;
                     }
                     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, 
                     div.st-key-kpi_pend button, div.st-key-kpi_aguardando button, div.st-key-kpi_hoje button {
@@ -836,6 +858,7 @@ else:
                     </style>
                 """, unsafe_allow_html=True)
 
+                # ── BARRA DE PROGRESSO ───────────────────
                 df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
                 if not df_h.empty:
                     n_fim  = len(df_h[df_h['STATUS_DISPLAY'].str.contains(
@@ -846,7 +869,7 @@ else:
                     bar_w  = pct
 
                     st.markdown(f"""
-                        <div class="progress-block">
+                        <div class="progress-block" style="margin-top: -5px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
                             <div class="progress-header">
                                 <span class="progress-title">🎯 Progresso de Hoje</span>
                                 <span class="progress-pct">{pct}% concluído — {n_fim} de {n_tot} pedidos</span>
@@ -1047,6 +1070,7 @@ else:
                         allow_unsafe_jscode=True,
                         custom_css=custom_css 
                     )
+
                     # ── EXPORTAÇÃO CSV ────────
                     mapa_csv = {
                         'PEDIDO': 'Pedido',
