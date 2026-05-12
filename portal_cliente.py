@@ -933,13 +933,29 @@ else:
                         c for c in colunas_visiveis if c in df_final.columns
                     ]
 
-                    # 🔥 JAVASCRIPT: TRANSFORMA A URL DA FOTO NO EMOJI DE CÂMERA CLICÁVEL 🔥
+                    # 🔥 JAVASCRIPT CORRIGIDO: CRIA O ELEMENTO REAL DO BOTÃO 🔥
                     link_jscode = JsCode("""
                     function(params) {
                         if (params.value && params.value !== '') {
-                            return `<div style="display: flex; justify-content: center; align-items: center; height: 100%;">
-                                        <a href="${params.value}" target="_blank" style="text-decoration: none; font-size: 20px;" title="Ver Foto do Comprovante">📷</a>
-                                    </div>`;
+                            // Cria a caixa (div) para centralizar
+                            let div = document.createElement('div');
+                            div.style.display = 'flex';
+                            div.style.justifyContent = 'center';
+                            div.style.alignItems = 'center';
+                            div.style.height = '100%';
+                            
+                            // Cria o link clicável (a)
+                            let a = document.createElement('a');
+                            a.href = params.value;
+                            a.target = '_blank'; // Abre em nova guia
+                            a.style.textDecoration = 'none';
+                            a.style.fontSize = '20px';
+                            a.title = 'Ver Foto do Comprovante';
+                            a.innerText = '📷'; // O Emoji
+                            
+                            // Junta tudo e joga na tela
+                            div.appendChild(a);
+                            return div;
                         }
                         return '';
                     }
