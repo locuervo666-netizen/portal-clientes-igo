@@ -1018,8 +1018,8 @@ else:
                         ".ag-row:hover": {"background-color": "#e2e8f0 !important", "cursor": "pointer", "transition": "background-color 0.2s"},
                         
                         # 🔥 EFEITO ZEBRA (Linhas intercaladas) 🔥
-                        ".ag-row-odd": {"background-color": "#f8fafc !important"}, /* Cinza bem clarinho */
-                        ".ag-row-even": {"background-color": "#ffffff !important"}, /* Branco */
+                        ".ag-row-odd": {"background-color": "#f8fafc !important"}, # Cinza bem clarinho
+                        ".ag-row-even": {"background-color": "#ffffff !important"}, # Branco
                         
                         # Ajusta a fonte geral da tabela
                         ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
