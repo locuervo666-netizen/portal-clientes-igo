@@ -93,62 +93,23 @@ st.markdown("""
         padding-right: 2rem !important;
     }
 
-    /* ── KPI CARDS (SAAS PREMIUM) ── */
-    .kpi-card-premium {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
+    /* ── KPI CARDS (COM FUNDO PREENCHIDO E EMOJI GIGANTE) ── */
+    .kpi-card {
         border-radius: 12px;
-        padding: 20px 16px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        padding: 16px;
+        text-align: left;
+        cursor: pointer;
+        transition: all 0.2s ease;
         position: relative;
         overflow: hidden;
-        transition: all 0.3s ease;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-        height: 100px;
+        height: 95px;
     }
-    .kpi-card-premium:hover {
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
-        transform: translateY(-3px);
-        border-color: #cbd5e1;
+    .kpi-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        transform: translateY(-2px);
     }
-    .kpi-accent-line {
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 5px;
-    }
-    .kpi-text-group {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        z-index: 1;
-    }
-    .kpi-label-premium {
-        font-size: 11px;
-        font-weight: 700;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .kpi-value-premium {
-        font-size: 30px;
-        font-weight: 900;
-        color: #0f172a;
-        line-height: 1.1;
-    }
-    .kpi-icon-box {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 44px;
-        height: 44px;
-        border-radius: 10px;
-        font-size: 22px;
-        z-index: 1;
-        border: 1px solid rgba(0,0,0,0.05);
+    .kpi-card.active {
+        box-shadow: 0 0 0 2px #3b82f6;
     }
 
     /* ── HEADER ── */
@@ -518,22 +479,23 @@ def get_st(row):
     if 'PROBLEMA'   in s: return '🚨 Problema'
     return '⏳ Pendente'
 
+# 🔥 CORES DOS BLOCOS ATUALIZADAS (MAIS VIVAS PARA DAR CONTRASTE) 🔥
 KPI_DOT_COLOR = {
-    "TODOS":      "#3b82f6",
-    "ENTREGUE":   "#22c55e",
-    "FRUSTRADA":  "#ef4444", 
-    "PENDENTE":   "#f59e0b",
-    "Aguardando": "#64748b",
-    "HOJE":       "#8b5cf6",
+    "TODOS":      "#2563eb", # Azul forte
+    "ENTREGUE":   "#16a34a", # Verde forte
+    "FRUSTRADA":  "#dc2626", # Vermelho forte
+    "PENDENTE":   "#d97706", # Amarelo/Laranja forte
+    "Aguardando": "#475569", # Cinza forte
+    "HOJE":       "#7c3aed", # Roxo forte
 }
 
 KPI_BG_COLOR = {
-    "TODOS":      "#eff6ff",
-    "ENTREGUE":   "#f0fdf4",
-    "FRUSTRADA":  "#fef2f2",
-    "PENDENTE":   "#fffbeb",
-    "Aguardando": "#f8fafc",
-    "HOJE":       "#f5f3ff",
+    "TODOS":      "#dbeafe", # Azul contrastante (100)
+    "ENTREGUE":   "#dcfce7", # Verde contrastante (100)
+    "FRUSTRADA":  "#fee2e2", # Vermelho contrastante (100)
+    "PENDENTE":   "#fef3c7", # Amarelo contrastante (100)
+    "Aguardando": "#f1f5f9", # Cinza contrastante (100)
+    "HOJE":       "#ede9fe", # Roxo contrastante (100)
 }
 
 KPI_META = [
@@ -808,16 +770,14 @@ else:
                     "HOJE":       len(df_f[df_f['DATA_OBJ'] == hoje_br]),
                 }
 
-                # ── KPI CARDS (BLINDADOS: EFEITO GHOST BUTTON NATIVO) ────────────────
+                # ── KPI CARDS (COM FUNDO PREENCHIDO E MAIOR CONTRASTE) ────────────────
                 cols_kpi = st.columns(6)
                 for col, (filtro, label, key) in zip(cols_kpi, KPI_META):
                     is_active = st.session_state.filtro_kpi == filtro
                     dot_color = KPI_DOT_COLOR[filtro]
                     bg_color  = KPI_BG_COLOR[filtro]
 
-                    # Se estiver ativo, a borda do card fica da cor do botão e ganha um glow
-                    active_style = f"border-color: {dot_color} !important; box-shadow: 0 0 0 1px {dot_color} !important;" if is_active else ""
-                    
+                    borda = f"1px solid {dot_color}" if is_active else f"1px solid {bg_color}"
                     valor = n_vals[filtro]
 
                     partes = label.split(' ', 1)
@@ -825,31 +785,32 @@ else:
                     texto_card = partes[1] if len(partes) > 1 else label
 
                     with col:
-                        # 1. Desenha o Card Clean UI Premium
                         st.markdown(f"""
-                            <div class="kpi-card-premium" style="{active_style}">
-                                <div class="kpi-accent-line" style="background-color: {dot_color};"></div>
-                                <div class="kpi-text-group">
-                                    <span class="kpi-label-premium">{texto_card}</span>
-                                    <span class="kpi-value-premium">{valor}</span>
-                                </div>
-                                <div class="kpi-icon-box" style="background-color: {bg_color};">
+                            <div class="kpi-card"
+                                 style="background-color: {bg_color}; border: {borda};">
+                                <div style="position: absolute; right: -5px; bottom: -15px; font-size: 65px; opacity: 0.25; z-index: 0; line-height: 1; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.1));">
                                     {emoji_card}
+                                </div>
+                                <div style="position: relative; z-index: 1;">
+                                    <div style="font-size: 11px; font-weight: 800; color: {dot_color}; text-transform: uppercase; letter-spacing: 0.5px;">
+                                        {texto_card}
+                                    </div>
+                                    <div style="font-size: 28px; font-weight: 900; color: #0F172A; margin-top: 2px; line-height: 1;">
+                                        {valor}
+                                    </div>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
 
-                        # 2. Cria o botão invisível gigante por cima
                         if st.button(label, key=key, use_container_width=True, help=f"Filtrar por: {texto_card}"):
                             st.session_state.filtro_kpi = filtro
                             st.rerun()
 
-                # 🔥 CSS MÁGICO: Transforma os botões em painéis transparentes sobre os cards 🔥
                 st.markdown("""
                     <style>
                     div.st-key-kpi_total, div.st-key-kpi_entregue, div.st-key-kpi_frus, 
                     div.st-key-kpi_pend, div.st-key-kpi_aguardando, div.st-key-kpi_hoje {
-                        margin-top: -115px !important; position: relative; z-index: 999; opacity: 0 !important;
+                        margin-top: -110px !important; position: relative; z-index: 999; opacity: 0 !important;
                     }
                     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, 
                     div.st-key-kpi_pend button, div.st-key-kpi_aguardando button, div.st-key-kpi_hoje button {
@@ -858,7 +819,6 @@ else:
                     </style>
                 """, unsafe_allow_html=True)
 
-                # ── BARRA DE PROGRESSO ───────────────────
                 df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
                 if not df_h.empty:
                     n_fim  = len(df_h[df_h['STATUS_DISPLAY'].str.contains(
@@ -869,7 +829,7 @@ else:
                     bar_w  = pct
 
                     st.markdown(f"""
-                        <div class="progress-block" style="margin-top: -5px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                        <div class="progress-block">
                             <div class="progress-header">
                                 <span class="progress-title">🎯 Progresso de Hoje</span>
                                 <span class="progress-pct">{pct}% concluído — {n_fim} de {n_tot} pedidos</span>
@@ -1048,14 +1008,18 @@ else:
                     # ==========================================
                     custom_css = {
                         # Separação sutil de colunas
-                        ".ag-header-cell": {"border-right": "1px solid #f1f5f9 !important"},
-                        ".ag-cell": {"border-right": "1px solid #f1f5f9 !important"},
+                        ".ag-header-cell": {"border-right": "1px solid #e2e8f0 !important"},
+                        ".ag-cell": {"border-right": "1px solid #e2e8f0 !important"},
                         
                         # Remove aquela borda azul feia de quando clica em uma célula
                         ".ag-cell-focus": {"border": "none !important", "outline": "none !important"},
                         
-                        # Efeito Hover: Linha fica levemente cinza ao passar o mouse
-                        ".ag-row:hover": {"background-color": "#f8fafc !important", "cursor": "pointer", "transition": "background-color 0.2s"},
+                        # Efeito Hover: Linha fica mais escura ao passar o mouse
+                        ".ag-row:hover": {"background-color": "#e2e8f0 !important", "cursor": "pointer", "transition": "background-color 0.2s"},
+                        
+                        # 🔥 EFEITO ZEBRA (Linhas intercaladas) 🔥
+                        ".ag-row-odd": {"background-color": "#f8fafc !important"}, /* Cinza bem clarinho */
+                        ".ag-row-even": {"background-color": "#ffffff !important"}, /* Branco */
                         
                         # Ajusta a fonte geral da tabela
                         ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
