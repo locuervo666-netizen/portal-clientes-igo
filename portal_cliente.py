@@ -11,7 +11,7 @@ import streamlit.components.v1 as components
 from datetime import datetime, timedelta, timezone
 from google.oauth2.credentials import Credentials
 
-# 🚀 IMPORTAÇÃO DO AGGRID (Agora com suporte a JavaScript para o link da foto)
+# 🚀 IMPORTAÇÃO DO AGGRID
 from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
@@ -933,31 +933,20 @@ else:
                         c for c in colunas_visiveis if c in df_final.columns
                     ]
 
-                    # 🔥 JAVASCRIPT CORRIGIDO: CRIA O ELEMENTO REAL DO BOTÃO 🔥
+                    # 🔥 JAVASCRIPT À PROVA DE FALHAS (CLASS COMPONENT) 🔥
+                    # Isso impede o Streamlit de transformar código HTML em texto ou quebrar o React
                     link_jscode = JsCode("""
-                    function(params) {
+                    class EmojiLinkRenderer {
+                      init(params) {
+                        this.eGui = document.createElement('div');
+                        this.eGui.style.cssText = 'display: flex; justify-content: center; align-items: center; height: 100%;';
                         if (params.value && params.value !== '') {
-                            // Cria a caixa (div) para centralizar
-                            let div = document.createElement('div');
-                            div.style.display = 'flex';
-                            div.style.justifyContent = 'center';
-                            div.style.alignItems = 'center';
-                            div.style.height = '100%';
-                            
-                            // Cria o link clicável (a)
-                            let a = document.createElement('a');
-                            a.href = params.value;
-                            a.target = '_blank'; // Abre em nova guia
-                            a.style.textDecoration = 'none';
-                            a.style.fontSize = '20px';
-                            a.title = 'Ver Foto do Comprovante';
-                            a.innerText = '📷'; // O Emoji
-                            
-                            // Junta tudo e joga na tela
-                            div.appendChild(a);
-                            return div;
+                          this.eGui.innerHTML = `<a href="${params.value}" target="_blank" style="text-decoration: none; font-size: 20px;" title="Ver Foto">📷</a>`;
                         }
-                        return '';
+                      }
+                      getGui() {
+                        return this.eGui;
+                      }
                     }
                     """)
 
@@ -976,12 +965,11 @@ else:
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status")
                     gb.configure_column("DETALHES", header_name="💬 Atualizações")
                     
-                    # Aplica o código Javascript na coluna de comprovante
+                    # Aplica a classe Javascript construída acima
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
 
                     gridOptions = gb.build()
 
-                    # 🔥 CSS MÁGICO: ADICIONA AS LINHAS VERTICAIS SEPARANDO AS COLUNAS 🔥
                     custom_css = {
                         ".ag-header-cell": {"border-right": "1px solid #e2e8f0 !important"},
                         ".ag-cell": {"border-right": "1px solid #e2e8f0 !important"}
@@ -993,8 +981,8 @@ else:
                         theme="alpine",
                         columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
                         height=550,
-                        allow_unsafe_jscode=True, # Necessário para o script do Emoji rodar
-                        custom_css=custom_css     # Aplica as linhas separadoras
+                        allow_unsafe_jscode=True,
+                        custom_css=custom_css 
                     )
 
                     # ── EXPORTAÇÃO CSV ────────
