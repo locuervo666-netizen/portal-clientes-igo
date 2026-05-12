@@ -1085,15 +1085,15 @@ if menu == "📊 GRID":
                                             mask = df_nuvem['PEDIDO'] == pid
                                             if mask.any():
                                                 df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
-                                                df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
+                                                # 🔥 CORREÇÃO: A linha que forçava o status "PENDENTE" foi removida. O status original é preservado! 🔥
                                                 df_nuvem.loc[mask, 'ZAP_ENVIADO'] = "" 
                                                 l_app = df_nuvem[mask].iloc[0]
                                                 lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
                                         aba.clear()
                                         aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                         if lista_app_troca: despachar_para_appsheet(lista_app_troca)
-                                        st.success("🎉 Troca realizada!")
-                                        time.sleep(1); carregar_dados_completos.clear(); st.rerun()
+                                        st.success("🎉 Troca realizada preservando o status original!")
+                                        time.sleep(1.5); carregar_dados_completos.clear(); st.rerun()
                                     except Exception as e: st.error(f"Erro: {e}")
 
             with col_b4.popover("👯 Clonar Pedidos", use_container_width=True):
