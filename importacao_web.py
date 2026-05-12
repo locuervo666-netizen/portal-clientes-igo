@@ -2702,6 +2702,20 @@ elif menu == "📥 Importações Umove":
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO (COM CONTINGÊNCIA AVULSA E HISTÓRICO)
 # =============================================================================
 elif menu == "🔬 Triagem":
+    import streamlit.components.v1 as components
+    
+    # 🔥 PING SILENCIOSO (ANTI-TIMEOUT DO RENDER) 🔥
+    components.html(
+        """
+        <script>
+        setInterval(function() {
+            fetch(window.location.href);
+        }, 240000); 
+        </script>
+        """,
+        height=0, width=0
+    )
+
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🔬 Terminal de Triagem e Expedição</h3></div>", unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
     
