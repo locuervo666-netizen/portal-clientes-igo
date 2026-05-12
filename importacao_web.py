@@ -2736,6 +2736,71 @@ elif menu == "🔬 Triagem":
             gc = gspread.authorize(creds)
             return gc.open_by_key("1puECAowymzkiwAObEt4KPeAYiBeIOKtCsSLOIklZJgk")
         except: return None
+
+    # 🔥 NOVA IMPRESSORA EXCLUSIVA PARA TRIAGEM MANUAL (3 COLUNAS) 🔥
+    def gerar_pdf_triagem_manual(id_lote, data_str, tomador, lista_itens):
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_draw_color(15, 23, 42); pdf.set_line_width(0.3); pdf.rect(5, 5, 200, 287)
+        try:
+            logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
+            if not os.path.exists(logo_path):
+                req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file: out_file.write(response.read())
+            pdf.image(logo_path, x=10, y=8, w=30) 
+        except: pass
+            
+        pdf.set_y(15)
+        pdf.set_font("Arial", "B", 14); pdf.set_text_color(15, 23, 42)
+        pdf.cell(0, 6, "PROTOCOLO DE TRIAGEM MANUAL DE ENVELOPES", ln=True, align="C") 
+        pdf.set_font("Arial", "B", 10)
+        pdf.set_text_color(2, 132, 199) 
+        pdf.cell(0, 5, f"LOTE: {id_lote}", ln=True, align="C")
+        pdf.set_font("Arial", "", 8)
+        pdf.set_text_color(100, 116, 139) 
+        
+        dt_s = data_str if isinstance(data_str, str) else data_str.strftime('%d/%m/%Y')
+        pdf.cell(0, 4, f"Data da Triagem: {dt_s} | Hub de Destino: {tomador}", ln=True, align="C")
+        pdf.ln(3)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(3)
+        
+        # CABEÇALHO DA TABELA
+        pdf.set_fill_color(15, 23, 42); pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 8)
+        pdf.cell(20, 6, "ITEM", 1, 0, "C", True)
+        pdf.cell(90, 6, "NUMERO DO ENVELOPE", 1, 0, "C", True)
+        pdf.cell(40, 6, "DATA DA BIPAGEM", 1, 0, "C", True)
+        pdf.cell(40, 6, "HORA DA BIPAGEM", 1, 1, "C", True)
+        
+        # LINHAS DA TABELA
+        pdf.set_text_color(51, 65, 85)
+        pdf.set_font("Arial", "", 8)
+        
+        for idx, item in enumerate(lista_itens, 1):
+            fill = (idx % 2 == 0)
+            pdf.set_fill_color(241, 245, 249) if fill else pdf.set_fill_color(255, 255, 255)
+            
+            env = str(item.get('ENVELOPE', ''))
+            dt_bip = str(item.get('DATA', ''))
+            hr_bip = str(item.get('HORA', ''))
+            
+            pdf.cell(20, 6, str(idx), 1, 0, "C", True)
+            pdf.cell(90, 6, env, 1, 0, "C", True)
+            pdf.cell(40, 6, dt_bip, 1, 0, "C", True)
+            pdf.cell(40, 6, hr_bip, 1, 1, "C", True)
+            
+        pdf.ln(6)
+        pdf.set_font("Arial", "B", 8); pdf.set_text_color(15, 23, 42)
+        pdf.cell(0, 5, f"TOTAL DE ENVELOPES CONFERIDOS: {len(lista_itens)}", ln=True, align="R")
+        pdf.set_y(-25)
+        pdf.line(55, pdf.get_y(), 155, pdf.get_y())
+        pdf.set_font("Arial", "B", 7)
+        pdf.cell(0, 4, "ASSINATURA DO RESPONSAVEL PELA TRIAGEM", 0, 1, "C")
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+            pdf.output(tmp_pdf.name)
+            with open(tmp_pdf.name, "rb") as f: pdf_bytes = f.read()
+        return pdf_bytes
     
     # --- CONTROLES DE MEMÓRIA ---
     if 'triagem_avulsa_lote' not in st.session_state: st.session_state.triagem_avulsa_lote = []
@@ -2743,9 +2808,8 @@ elif menu == "🔬 Triagem":
     if 'id_avulso_pronto' not in st.session_state: st.session_state.id_avulso_pronto = None
     if 'log_triagem' not in st.session_state: st.session_state.log_triagem = []
     
-    t1, t2, t3, t4 = st.tabs(["📦 1. Validação Manual & Bipar", "🚚 2. Gerar Documento de Romaneio", "🕒 3. Histórico de Varredura", "📝 4. Triagem Manual (Avulsa)"])
+    t1, t2, t3, t4 = st.tabs(["📦 1. Validação Manual & Bipar", "🚚 2. Gerar Documento de Romaneio", "🕒 3. Histórico de Varredura", "📝 4. Triagem Manual (Envelopes)"])
     
-    # --- ABA 1 E ABA 2 MANTIDAS COM OS AJUSTES DE BUSCA E LOG ANTERIORES ---
     with t1:
         if df_raw.empty:
             st.warning("O banco de dados oficial está vazio.")
@@ -2863,9 +2927,9 @@ elif menu == "🔬 Triagem":
                 st.dataframe(df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']], hide_index=True, use_container_width=True)
             else: st.warning("Arquivo histórico em branco.")
 
-    # 🔥 ABA 4: TRIAGEM MANUAL (AVULSA) - 100% REESTRUTURADA PARA ENVELOPES 🔥
+    # 🔥 ABA 4: TRIAGEM MANUAL (AVULSA) - IMPRESSORA EXCLUSIVA 🔥
     with t4:
-        st.markdown("#### 📝 Triagem Manual de Contingência (Avulsa)")
+        st.markdown("#### 📝 Triagem Manual de Contingência (Envelopes)")
         
         # 1. CABEÇALHO SIMPLIFICADO (Só Hub e Data)
         with st.container(border=True):
@@ -2887,8 +2951,7 @@ elif menu == "🔬 Triagem":
                             'ENVELOPE': bip_envelope.strip(),
                             'DATA': av_data.strftime("%d/%m/%Y"),
                             'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S'),
-                            # Campos secundários vazios para o PDF não carregar lixo
-                            'PEDIDO': "", 'LABORATORIO': "", 'CIDADE': "", 'UF': "", 'TOMADOR': av_tomador if av_tomador != "Selecione..." else ""
+                            'TOMADOR': av_tomador if av_tomador != "Selecione..." else ""
                         }
                         st.session_state.triagem_avulsa_lote.append(novo_item_manual)
                         st.rerun()
@@ -2906,19 +2969,19 @@ elif menu == "🔬 Triagem":
                     st.session_state.triagem_avulsa_lote.clear(); st.rerun()
                     
                 if c_ctrl3.button("📄 GERAR PROTOCOLO MANUAL", type="primary", use_container_width=True):
-                    with st.spinner("Registrando..."):
+                    with st.spinner("Registrando e desenhando PDF limpo..."):
                         id_rom_av = f"MAN-{datetime.now().strftime('%d%m%H%M')}"
                         plan_av = obter_planilha_avulsos()
                         if plan_av:
                             try:
                                 aba_av = plan_av.sheet1
-                                linhas_bkp = [[id_rom_av, i['DATA'], "TRIAGEM MANUAL", i['TOMADOR'], "", "", i['ENVELOPE'], i['HORA']] for i in st.session_state.triagem_avulsa_lote]
+                                linhas_bkp = [[id_rom_av, i['DATA'], "TRIAGEM MANUAL", i.get('TOMADOR', ''), "", "", i['ENVELOPE'], i['HORA']] for i in st.session_state.triagem_avulsa_lote]
                                 aba_av.append_rows(linhas_bkp, value_input_option='USER_ENTERED')
                             except: pass
                         
-                        # Função de PDF adaptada para triagem manual (3 colunas)
-                        # Passamos apenas as colunas solicitadas para a tabela do PDF
-                        pdf_manual = gerar_pdf_romaneio(id_rom_av, av_data, "CONFERÊNCIA MANUAL", st.session_state.triagem_avulsa_lote)
+                        # 🔥 AGORA CHAMA A NOVA FUNÇÃO DE PDF EXCLUSIVA PARA ESSA ABA 🔥
+                        pdf_manual = gerar_pdf_triagem_manual(id_rom_av, av_data, av_tomador, st.session_state.triagem_avulsa_lote)
+                        
                         st.session_state.pdf_avulso_pronto = pdf_manual
                         st.session_state.id_avulso_pronto = id_rom_av
                         st.session_state.triagem_avulsa_lote.clear(); st.rerun()
@@ -2944,8 +3007,11 @@ elif menu == "🔬 Triagem":
                     lote_re = c_h1.selectbox("Reimprimir Lote Manual:", ["Selecione..."] + sorted(lotes_man_list, reverse=True))
                     if lote_re != "Selecione...":
                         df_l_re = df_h_av[df_h_av['LOTE_AVULSO'] == lote_re]
-                        lista_re = [{'ENVELOPE': r.get('ENVELOPE',''), 'DATA': r.get('DATA',''), 'HORA': r.get('HORA_TRIAGEM',''), 'PEDIDO': "", 'LABORATORIO': "", 'CIDADE': "", 'UF': ""} for _, r in df_l_re.iterrows()]
-                        pdf_rep_man = gerar_pdf_romaneio(lote_re, df_l_re.iloc[0].get('DATA',''), "REIMPRESSÃO MANUAL", lista_re)
+                        lista_re = [{'ENVELOPE': r.get('ENVELOPE', r.iloc[6] if len(r)>6 else ''), 'DATA': r.get('DATA',''), 'HORA': r.get('HORA_TRIAGEM', r.get('HORA', ''))} for _, r in df_l_re.iterrows()]
+                        
+                        # 🔥 REIMPRESSÃO TAMBÉM USA A NOVA FUNÇÃO 🔥
+                        pdf_rep_man = gerar_pdf_triagem_manual(lote_re, df_l_re.iloc[0].get('DATA',''), df_l_re.iloc[0].get('TOMADOR',''), lista_re)
+                        
                         c_h2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
                         c_h2.download_button("📥 REIMPRIMIR", pdf_rep_man, file_name=f"Reprint_{lote_re}.pdf", mime="application/pdf", type="primary", use_container_width=True)
             except: pass
