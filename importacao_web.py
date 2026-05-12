@@ -2741,6 +2741,7 @@ elif menu == "🔬 Triagem":
     if 'triagem_avulsa_lote' not in st.session_state: st.session_state.triagem_avulsa_lote = []
     if 'pdf_avulso_pronto' not in st.session_state: st.session_state.pdf_avulso_pronto = None
     if 'id_avulso_pronto' not in st.session_state: st.session_state.id_avulso_pronto = None
+    if 'log_triagem' not in st.session_state: st.session_state.log_triagem = []
     
     t1, t2, t3, t4 = st.tabs(["📦 1. Validação Manual & Bipar", "🚚 2. Gerar Documento de Romaneio", "🕒 3. Histórico de Varredura", "📝 4. Triagem Manual (Avulsa)"])
     
@@ -2758,11 +2759,15 @@ elif menu == "🔬 Triagem":
                     bip_input = col_bip.text_input("🔍 Bipar QR Code de Validação:")
                     if col_btn.form_submit_button("Auditar", use_container_width=True) and bip_input:
                         termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
-                        df_raw['PED_LIMPO'] = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
-                        mask = (df_raw['PED_LIMPO'] == termo)
+                        
+                        # 🚨 CORREÇÃO: Criação de Máscara de Busca Virtual (Sem modificar o cache do df_raw)
+                        ped_limpo = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
+                        mask = (ped_limpo == termo)
+                        
                         if 'QR_CODE' in df_raw.columns:
-                            df_raw['QR_LIMPO'] = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
-                            mask = mask | (df_raw['QR_LIMPO'] == termo)
+                            qr_limpo = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
+                            mask = mask | (qr_limpo == termo)
+                            
                         if mask.any():
                             idx = df_raw[mask].index[-1]
                             if str(df_raw.at[idx, 'STATUS']).strip().upper() == 'COLETADO':
@@ -2783,14 +2788,14 @@ elif menu == "🔬 Triagem":
                                         
                                         st.success(f"✅ Pedido {str(df_raw.at[idx, 'PEDIDO'])} VALIDADO!")
                                         time.sleep(1.0); carregar_dados_completos.clear(); st.rerun() 
-                                except Exception as e: st.error(f"Erro: {e}")
+                                except Exception as e: st.error(f"Erro ao salvar na nuvem: {e}")
                             else: st.error("❌ Volume não está com status COLETADO.")
-                        else: st.error("❌ Assinatura não reconhecida.")
+                        else: st.error("❌ Assinatura ou Pedido não reconhecido na base de dados.")
 
             with col_bip_dir:
                 st.markdown("<div style='border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; background-color: #F8FAFC; height: 130px; overflow-y: auto;'>", unsafe_allow_html=True)
                 st.markdown("<p style='margin-bottom: 5px; font-weight: bold; color: #0F172A; font-size: 14px;'>⏱️ Últimos Bips Realizados:</p>", unsafe_allow_html=True)
-                if st.session_state.log_triagem:
+                if 'log_triagem' in st.session_state and st.session_state.log_triagem:
                     for item in st.session_state.log_triagem[:5]: 
                         st.markdown(f"<div style='font-size: 12px; color: #334155; margin-bottom: 3px;'>🟢 <b>{item['PEDIDO']}</b> - {item['TOMADOR']} - {item['CIDADE']} <span style='color: #94A3B8;'>({item['HORA']})</span></div>", unsafe_allow_html=True)
                 else:
