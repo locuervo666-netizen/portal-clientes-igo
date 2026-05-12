@@ -3704,7 +3704,11 @@ elif menu == "📈 Dashboard":
         # VARIÁVEIS DOS 8 BLOCOS
         # ---------------------------------------------------------
         vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
+        
+        # Realizados Hoje x Ontem para o novo cálculo
         realizados_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado|Conferido', case=False)])
+        realizados_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado|Conferido', case=False)])
+        
         col_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Coletado', case=False)])
         ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue', case=False)])
         pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
@@ -3716,6 +3720,7 @@ elif menu == "📈 Dashboard":
         qtd_chamados = checar_chamados_pendentes(planilha_db)
 
         v_tot_str, s_tot = calc_variacao(vol_total_h, vol_total_o)
+        v_real_str, s_real = calc_variacao(realizados_h, realizados_o)
         v_ent_str, s_ent = calc_variacao(ent_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue', case=False)]))
         v_pend_str, s_pend = calc_variacao(pend_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)]))
         v_frus_str, s_frus = calc_variacao(frus_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)]))
@@ -3732,7 +3737,7 @@ elif menu == "📈 Dashboard":
                         <div style="font-size: 12px; font-weight: 800; color: {color}; text-transform: uppercase;">{title}</div>
                         <div style="display: flex; justify-content: space-between; align-items: flex-end;">
                             <div style="font-size: 30px; font-weight: 900; color: #0F172A;">{value}</div>
-                            <div style="font-size: 11px; font-weight: 700; color: {color}; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 4px;">{var_str}</div>
+                            <div style="font-size: 11px; font-weight: 700; color: {color}; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 4px; white-space: nowrap;">{var_str}</div>
                         </div>
                     </div>
                 </div>
@@ -3742,8 +3747,10 @@ elif menu == "📈 Dashboard":
         sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
         cor_atra, bg_atra = ("#F43F5E", "#FDF2F8") if atra_total > 0 else ("#64748B", "#F8FAFC")
 
+        texto_badge_realizados = f"{int(taxa_sucesso_h)}% Conc. | {s_real}{v_real_str}"
+
         c1, c2, c3, c4 = st.columns(4)
-        with c1: render_kpi_card("REALIZADOS (HOJE)", f"{realizados_h}/{vol_total_h}", f"{int(taxa_sucesso_h)}% Concluído", "#3B82F6", "#EFF6FF", "📦")
+        with c1: render_kpi_card("REALIZADOS (HOJE)", f"{realizados_h}/{vol_total_h}", texto_badge_realizados, "#3B82F6", "#EFF6FF", "📦")
         with c2: render_kpi_card("EFICIÊNCIA (HOJE)", f"{taxa_sucesso_h:.1f}%", "Ação/Vol", "#10B981", "#F0FDF4", "🎯")
         with c3: render_kpi_card("CHAMADOS", qtd_chamados, sub_tkt, cor_tkt, bg_tkt, "🎧", alert=(qtd_chamados > 0))
         with c4: render_kpi_card("ATRASADOS (GERAL)", atra_total, "BACKLOG", cor_atra, bg_atra, "⏳", alert=(atra_total > 0))
@@ -3904,7 +3911,7 @@ elif menu == "📈 Dashboard":
             st.info("Aguardando finalizações da frota no dia de hoje para compor o pódio.")
 
         # ---------------------------------------------------------
-        # LETREIRO CNN DE NOTÍCIAS (AGORA COM PLACAR DE TÊNIS AO VIVO!)
+        # LETREIRO CNN DE NOTÍCIAS (COM TÊNIS, CLIMA E TRÂNSITO)
         # ---------------------------------------------------------
         @st.cache_data(ttl=1800)
         def buscar_noticias_transito_radar(cidades_com_uf):
@@ -3938,12 +3945,10 @@ elif menu == "📈 Dashboard":
                 except: continue
             return alertas
 
-        # 🔥 A MÁGICA DOS PLACARES DA ESPN ENTRA AQUI 🔥
-        @st.cache_data(ttl=300) # Atualiza a cada 5 minutos para não travar
+        @st.cache_data(ttl=300)
         def buscar_placares_tenis_ao_vivo():
             placares = []
             try:
-                # API pública e oculta da ESPN para ATP e WTA
                 urls = [
                     "http://site.api.espn.com/apis/site/v2/sports/tennis/atp/scoreboard",
                     "http://site.api.espn.com/apis/site/v2/sports/tennis/wta/scoreboard"
@@ -3958,7 +3963,6 @@ elif menu == "📈 Dashboard":
                                 status_state = ev.get('status', {}).get('type', {}).get('state', '')
                                 status_detail = ev.get('status', {}).get('type', {}).get('detail', '')
                                 
-                                # 'in' = Jogo rolando / 'post' = Encerrado
                                 if status_state in ['in', 'post']:
                                     comp = ev['competitions'][0]['competitors']
                                     j1 = comp[0]['athlete']['shortName']
@@ -3974,7 +3978,7 @@ elif menu == "📈 Dashboard":
                                         placares.append(f"🎾 [RESULTADO - {torneio}] {j1} {s1} x {s2} {j2}")
                             except:
                                 continue
-                            if len(placares) >= 5: break # Limita a 5 placares para não poluir
+                            if len(placares) >= 5: break 
             except:
                 pass
             return placares[:5]
@@ -4024,7 +4028,6 @@ elif menu == "📈 Dashboard":
                 try: cidades_alvo.append(f"{str(cid).strip().title()}/{str(df_hoje[df_hoje['CIDADE'] == cid][col_uf].mode()[0]).strip().upper()}" if col_uf else str(cid).strip().title())
                 except: cidades_alvo.append(str(cid).strip().title())
 
-        # ADICIONANDO OS PLACARES AO VIVO E ALERTAS
         manchetes.extend(buscar_placares_tenis_ao_vivo())
         
         if cidades_alvo: 
