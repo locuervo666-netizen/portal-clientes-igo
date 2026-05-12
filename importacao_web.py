@@ -3704,11 +3704,7 @@ elif menu == "📈 Dashboard":
         # VARIÁVEIS DOS 8 BLOCOS
         # ---------------------------------------------------------
         vol_total_h, vol_total_o = len(df_hoje), len(df_ontem)
-        
-        # Realizados Hoje x Ontem para o novo cálculo
         realizados_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado|Conferido', case=False)])
-        realizados_o = len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue|Coletado|Frustrada|Problema|Cancelado|Conferido', case=False)])
-        
         col_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Coletado', case=False)])
         ent_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue', case=False)])
         pend_h = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)])
@@ -3719,8 +3715,9 @@ elif menu == "📈 Dashboard":
         atra_total = len(df_raw[df_raw['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)])
         qtd_chamados = checar_chamados_pendentes(planilha_db)
 
+        # Cálculo da variação seca de volume total (hoje vs ontem)
         v_tot_str, s_tot = calc_variacao(vol_total_h, vol_total_o)
-        v_real_str, s_real = calc_variacao(realizados_h, realizados_o)
+        
         v_ent_str, s_ent = calc_variacao(ent_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Entregue', case=False)]))
         v_pend_str, s_pend = calc_variacao(pend_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Pendente|Rota', case=False)]))
         v_frus_str, s_frus = calc_variacao(frus_h, len(df_ontem[df_ontem['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado', case=False)]))
@@ -3747,7 +3744,8 @@ elif menu == "📈 Dashboard":
         sub_tkt = "🚨 Atenção" if qtd_chamados > 0 else "✅ Limpo"
         cor_atra, bg_atra = ("#F43F5E", "#FDF2F8") if atra_total > 0 else ("#64748B", "#F8FAFC")
 
-        texto_badge_realizados = f"{int(taxa_sucesso_h)}% Conc. | {s_real}{v_real_str}"
+        # Injeção da taxa de sucesso + Variação do Volume Total Seco
+        texto_badge_realizados = f"{int(taxa_sucesso_h)}% Conc. | Vol: {s_tot}{v_tot_str}"
 
         c1, c2, c3, c4 = st.columns(4)
         with c1: render_kpi_card("REALIZADOS (HOJE)", f"{realizados_h}/{vol_total_h}", texto_badge_realizados, "#3B82F6", "#EFF6FF", "📦")
@@ -3884,7 +3882,7 @@ elif menu == "📈 Dashboard":
         st.markdown("<br>", unsafe_allow_html=True)
         
         # ---------------------------------------------------------
-        # PÓDIO DA EQUIPE
+        # PÓDIO DA EQUIPE (AGORA TOP 5!)
         # ---------------------------------------------------------
         dict_nomes_dash = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         frota_stats = {}
@@ -3900,13 +3898,19 @@ elif menu == "📈 Dashboard":
         frota_ordenada = sorted(frota_stats.items(), key=lambda x: x[1]['perc'], reverse=True)
         
         if len(frota_ordenada) > 0:
-            st.markdown("<p style='font-weight: 800; font-size: 13px; color: #475569;'>🏆 PERFORMANCE DA EQUIPE (TOP 3 HOJE)</p>", unsafe_allow_html=True)
-            rf1, rf2, rf3 = st.columns(3)
+            st.markdown("<p style='font-weight: 800; font-size: 13px; color: #475569;'>🏆 PERFORMANCE DA EQUIPE (TOP 5 HOJE)</p>", unsafe_allow_html=True)
+            # Layout em 5 colunas
+            rf1, rf2, rf3, rf4, rf5 = st.columns(5)
+            
+            # Layout do card ajustado sutilmente para acomodar os 5 blocos sem quebrar o texto
             def podio_ui(pos, ic, ag, pct, vols, color, bg_color):
-                return f"""<div style="background-color: {bg_color}; border: 1px solid {color}40; border-bottom: 3px solid {color}; padding: 12px 15px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.02);"><div style="display: flex; align-items: center; gap: 12px;"><span style="font-size: 26px;">{ic}</span><div><div style="font-size: 13px; font-weight: 800; color: #0F172A; letter-spacing: 0.3px;">{ag}</div><div style="font-size: 11px; color: #64748B; font-weight: 600;">{vols} volumes</div></div></div><div style="font-size: 22px; font-weight: 900; color: {color};">{pct}%</div></div>"""
+                return f"""<div style="background-color: {bg_color}; border: 1px solid {color}40; border-bottom: 3px solid {color}; padding: 10px 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.02);"><div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 22px;">{ic}</span><div><div style="font-size: 11.5px; font-weight: 800; color: #0F172A; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;">{ag}</div><div style="font-size: 10px; color: #64748B; font-weight: 600;">{vols} vols</div></div></div><div style="font-size: 18px; font-weight: 900; color: {color};">{pct}%</div></div>"""
+                
             if len(frota_ordenada) >= 1: rf1.markdown(podio_ui("1", "🥇", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}", "#10B981", "#F0FDF4"), unsafe_allow_html=True)
             if len(frota_ordenada) >= 2: rf2.markdown(podio_ui("2", "🥈", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}", "#64748B", "#FFFFFF"), unsafe_allow_html=True)
             if len(frota_ordenada) >= 3: rf3.markdown(podio_ui("3", "🥉", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}", "#F59E0B", "#FFFBEB"), unsafe_allow_html=True)
+            if len(frota_ordenada) >= 4: rf4.markdown(podio_ui("4", "🎖️", frota_ordenada[3][0], frota_ordenada[3][1]['perc'], f"{frota_ordenada[3][1]['conc']}/{frota_ordenada[3][1]['total']}", "#8B5CF6", "#F5F3FF"), unsafe_allow_html=True)
+            if len(frota_ordenada) >= 5: rf5.markdown(podio_ui("5", "🎖️", frota_ordenada[4][0], frota_ordenada[4][1]['perc'], f"{frota_ordenada[4][1]['conc']}/{frota_ordenada[4][1]['total']}", "#06B6D4", "#ECFEFF"), unsafe_allow_html=True)
         else:
             st.info("Aguardando finalizações da frota no dia de hoje para compor o pódio.")
 
