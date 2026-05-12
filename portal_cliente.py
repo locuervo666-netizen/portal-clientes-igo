@@ -11,6 +11,9 @@ import streamlit.components.v1 as components
 from datetime import datetime, timedelta, timezone
 from google.oauth2.credentials import Credentials
 
+# 🚀 IMPORTAÇÃO DO NOVO AGGRID (GRID SAAS PREMIUM)
+from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode
+
 FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
 
@@ -63,6 +66,20 @@ st.markdown("""
     [data-testid="stSidebar"] [data-testid="stForm"] textarea:focus {
         border-color: #3b82f6 !important;
         box-shadow: 0 0 0 1px #3b82f6 !important;
+    }
+
+    /* ── BOTÃO PRIMÁRIO (LOGIN) AZUL PREMIUM ── */
+    button[kind="primary"] {
+        background-color: #3b82f6 !important;
+        border-color: #3b82f6 !important;
+        color: #ffffff !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    button[kind="primary"]:hover {
+        background-color: #2563eb !important;
+        border-color: #2563eb !important;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
     }
 
     /* ── LAYOUT ── */
@@ -189,17 +206,6 @@ st.markdown("""
         overflow: hidden;
     }
 
-    /* ── TABLE ── */
-    .table-container {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        overflow: hidden;
-    }
-    .stDataFrame {
-        border: none !important;
-    }
-
     /* ── SEARCH ROW ── */
     .search-export-row {
         display: flex;
@@ -278,6 +284,12 @@ def carregar_dados_nuvem():
             df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
             df.columns = df.columns.str.strip().str.upper()
             df = df.loc[:, ~df.columns.duplicated()]
+
+            # 🧹 HIGIENIZAÇÃO DE DADOS OFICIAL
+            if 'TOMADOR' in df.columns:
+                df['TOMADOR'] = df['TOMADOR'].str.replace('CAEP', 'SYNVIA').str.replace('CUNHA', 'GRALAB')
+            if 'CIDADE' in df.columns:
+                df['CIDADE'] = df['CIDADE'].str.replace('Brodosqui', 'Brodowski', case=False).str.replace('BRODOSQUI', 'BRODOWSKI')
 
             try:
                 aba_app = planilha.worksheet("App_Tarefas")
@@ -472,7 +484,6 @@ if 'logado'     not in st.session_state: st.session_state.logado     = False
 if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 
 # ── Helpers de status ──────────────────────────────────
-# 🔥 STATUS AGORA INCLUEM EMOJIS NATIVOS 🔥
 def get_st(row):
     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
     if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação'
@@ -487,7 +498,6 @@ def get_st(row):
     if 'PROBLEMA'   in s: return '🚨 Problema'
     return '⏳ Pendente'
 
-# 🔥 CORES DOS BLOCOS (Mais sutis em tons pastéis) 🔥
 KPI_DOT_COLOR = {
     "TODOS":      "#3b82f6",
     "ENTREGUE":   "#22c55e",
@@ -498,12 +508,12 @@ KPI_DOT_COLOR = {
 }
 
 KPI_BG_COLOR = {
-    "TODOS":      "#eff6ff", # Azul bem claro
-    "ENTREGUE":   "#f0fdf4", # Verde bem claro
-    "FRUSTRADA":  "#fef2f2", # Vermelho bem claro
-    "PENDENTE":   "#fffbeb", # Amarelo/Laranja bem claro
-    "Aguardando": "#f8fafc", # Cinza bem claro
-    "HOJE":       "#f5f3ff", # Roxo bem claro
+    "TODOS":      "#eff6ff",
+    "ENTREGUE":   "#f0fdf4",
+    "FRUSTRADA":  "#fef2f2",
+    "PENDENTE":   "#fffbeb",
+    "Aguardando": "#f8fafc",
+    "HOJE":       "#f5f3ff",
 }
 
 KPI_META = [
@@ -515,27 +525,20 @@ KPI_META = [
     ("HOJE",       "📅 Hoje",         "kpi_hoje"),
 ]
 
-# 🔥 NOVA FUNÇÃO DE DETALHES INTELIGENTE 🔥
 def get_detalhes(row):
-    obs_master = str(row.get('OBSERVACOES', '')).strip() # Traz o horário da importação
-    obs_app    = str(row.get('OBS_APP_FINAL', '')).strip() # Traz a anotação do motorista no app
+    obs_master = str(row.get('OBSERVACOES', '')).strip()
+    obs_app    = str(row.get('OBS_APP_FINAL', '')).strip()
     contato    = str(row.get('CONTATO_FINAL', '')).strip()
     recebedor  = str(row.get('RECEBEDOR_FINAL', '')).strip()
-    
     status     = str(row.get('STATUS_DISPLAY', '')).upper()
 
-    # REGRA 1: Se Entregue, foca em mostrar QUEM recebeu
     if 'ENTREGUE' in status:
         if recebedor: return f"Recebedor(a): {recebedor}"
         elif contato: return f"Recebedor(a): {contato}"
         else: return "-"
 
-    # REGRA 2: FRUSTRADA ou PROBLEMA (Limpeza via REGEX para tirar a dupla informação)
     if 'FRUSTRADA' in status or 'PROBLEMA' in status:
-        # Pega a observação e apaga padrões como "[COLETA: 06:00 - 17:00]"
         obs_limpa = re.sub(r'\[COLETA:.*?\]', '', obs_app, flags=re.IGNORECASE).strip()
-        
-        # Se a info da master estiver poluindo com a tag padrão, limpamos também
         if not obs_limpa:
             obs_limpa = re.sub(r'\[COLETA:.*?\]', '', obs_master, flags=re.IGNORECASE).strip()
 
@@ -549,7 +552,6 @@ def get_detalhes(row):
         else:
             return obs_master if obs_master else "-"
 
-    # REGRA 3: GERAL (Para Pendentes, Em Rota, etc - mantém o horário se houver)
     obs_final = obs_app if obs_app and obs_app.upper() != 'NAN' else obs_master
     if obs_final.upper() == 'NAN': obs_final = ""
 
@@ -618,7 +620,6 @@ if not st.session_state.logado:
 # 🖥️ 4. PAINEL PRINCIPAL
 # =======================================================
 else:
-    # Auto-refresh a cada 5 minutos
     components.html(
         "<script>setTimeout(function(){ window.parent.location.reload(); }, 300000);</script>",
         height=0, width=0
@@ -628,7 +629,7 @@ else:
     hoje_br           = datetime.now(FUSO_BR).date()
     nome_tomador_oficial = conf["filtro"] if conf["filtro"] != "TODOS" else "MATRIZ IGO"
 
-    # ── SIDEBAR (ORGANIZAÇÃO SAAS PREMIUM) ────────────────────────────────────────
+    # ── SIDEBAR ────────────────────────────────────────
     with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 4, 1])
@@ -643,7 +644,6 @@ else:
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 🗂️ AGRUPAMENTO 1: FILTROS DE VISÃO
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Filtros de Visão</p>", unsafe_allow_html=True)
         with st.container(border=True):
             datas_sel = st.date_input(
@@ -651,21 +651,19 @@ else:
                 value=(hoje_br - timedelta(days=15), hoje_br),
                 format="DD/MM/YYYY"
             )
-            # Placeholder preservado para receber as cidades depois
             holder_cidades = st.empty()
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 🗂️ AGRUPAMENTO 2: AÇÕES E SUPORTE
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Suporte e Relatórios</p>", unsafe_allow_html=True)
         
-        # Popover: Botão moderno que abre um mini-menu flutuante por cima da tela
-        with st.popover("🎧 Abrir Chamado Suporte", use_container_width=True):
+        # 🔥 AJUSTE 1: NOMENCLATURA DO BOTÃO DE SUPORTE
+        with st.popover("🎧 Abrir Chamado ao Suporte", use_container_width=True):
             st.markdown("📄 **Novo Chamado de Atendimento**")
             with st.form("form_chamado_zap", clear_on_submit=True):
                 pedido_chamado = st.text_input("Número do Pedido (Opcional):")
                 msg_chamado    = st.text_area("Sua Mensagem *:", placeholder="Ex: Preciso de urgência neste pedido...")
-                
+                 
                 if st.form_submit_button("🚀 Enviar Solicitação", type="primary", use_container_width=True):
                     if not msg_chamado.strip():
                         st.error("Digite uma mensagem!")
@@ -673,21 +671,18 @@ else:
                         with st.spinner("Gerando ticket e notificando a base..."):
                             tkt_id = f"TKT-{random.randint(10000, 99999)}"
                             data_tkt = datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M')
-                            
                             try:
-                                # 1. SALVA NO BANCO DE DADOS
                                 gc = conectar_banco_seguro()
                                 planilha = gc.open("DB_IGO_Logistica")
                                 try:
                                     aba_chamados = planilha.worksheet("Base_Chamados")
                                 except:
                                     aba_chamados = planilha.add_worksheet(title="Base_Chamados", rows="100", cols="7")
-                                    aba_chamados.update("A1", [["TICKET", "DATA", "TOMADOR", "PEDIDO", "MENSAGEM", "STATUS", "RESPOSTA"]])
+                                aba_chamados.update("A1", [["TICKET", "DATA", "TOMADOR", "PEDIDO", "MENSAGEM", "STATUS", "RESPOSTA"]])
                                 
                                 linha_ticket = [tkt_id, data_tkt, nome_tomador_oficial, pedido_chamado, msg_chamado, "🟡 EM ANÁLISE", ""]
                                 aba_chamados.append_row(linha_ticket)
                                 
-                                # 2. MANDA O ZAP PARA A SUA BASE
                                 texto_final = (
                                     f"🚨 *NOVO TICKET DE SUPORTE* [{tkt_id}]\n\n"
                                     f"🏢 *Cliente:* {nome_tomador_oficial}\n"
@@ -697,17 +692,13 @@ else:
                                 texto_final += f"💬 *Mensagem:* {msg_chamado}\n\n⏳ _Acesse o C.C.O. para responder._"
                                 
                                 enviar_whatsapp_zapi_cliente("5511947996371", texto_final)
-                                
                                 st.success(f"✅ Ticket {tkt_id} aberto com sucesso! Acompanhe na aba 'Meus Chamados'.")
                             except Exception as e:
                                 st.error(f"Erro ao criar ticket: {e}")
 
-        # Placeholder reservado para o botão de exportar
         holder_exportar = st.empty()
 
         st.markdown("<br>", unsafe_allow_html=True)
-        
-        # 🗂️ AGRUPAMENTO 3: SAÍDA DO SISTEMA
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Sistema</p>", unsafe_allow_html=True)
         if st.button("🚪 Sair com Segurança", use_container_width=True, type="secondary"):
             st.session_state.logado = False
@@ -740,9 +731,6 @@ else:
                 df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]
             ].copy()
 
-        # ===================================================
-        # DECLARAÇÃO DAS 3 ABAS DO SISTEMA
-        # ===================================================
         tab_grid, tab_solicitar, tab_chamados = st.tabs([
             "📊 Meus Pedidos e Monitoramento",
             "➕ Solicitar Nova Coleta",
@@ -758,18 +746,15 @@ else:
                     f"Nenhum pedido registrado sob a titularidade '{conf['filtro']}'."
                 )
             else:
-                # Filtro de cidades na sidebar
                 with holder_cidades:
                     cidades_sel = st.multiselect(
                         "📍 Cidades:",
                         sorted(df_cliente['CIDADE'].dropna().unique().tolist())
                     )
 
-                # Monta colunas derivadas
                 df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
                 df_cliente['DETALHES']       = df_cliente.apply(get_detalhes, axis=1)
 
-                # Filtro por data e cidade
                 df_f = df_cliente.copy()
                 if isinstance(datas_sel, (tuple, list)) and len(datas_sel) == 2:
                     df_f = df_f[
@@ -779,7 +764,6 @@ else:
                 if cidades_sel:
                     df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
-                # Detecta atrasados (Mantemos para alertar na tabela)
                 df_f['DT_LIMITE_OBJ'] = pd.to_datetime(
                     df_f['DATA_LIMITE'], format='%d/%m/%Y', errors='coerce'
                 ).dt.date
@@ -796,7 +780,6 @@ else:
                     df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] + ' 🚨 ATRASADO'
                 )
 
-                # ── KPI CARDS ────────────────────────────
                 n_vals = {
                     "TODOS":      len(df_f),
                     "ENTREGUE":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', case=False)]),
@@ -806,24 +789,20 @@ else:
                     "HOJE":       len(df_f[df_f['DATA_OBJ'] == hoje_br]),
                 }
 
-                # ── KPI CARDS (BLINDADOS: EFEITO GHOST BUTTON NATIVO) ────────────────
                 cols_kpi = st.columns(6)
                 for col, (filtro, label, key) in zip(cols_kpi, KPI_META):
                     is_active = st.session_state.filtro_kpi == filtro
                     dot_color = KPI_DOT_COLOR[filtro]
                     bg_color  = KPI_BG_COLOR[filtro]
 
-                    # Borda mais grossa e colorida se estiver selecionado
                     borda = f"2px solid {dot_color}" if is_active else f"1px solid {dot_color}40"
                     valor = n_vals[filtro]
 
-                    # Separa o emoji do texto
                     partes = label.split(' ', 1)
                     emoji_card = partes[0]
                     texto_card = partes[1] if len(partes) > 1 else label
 
                     with col:
-                        # 1. Desenha o Card Visual (HTML/CSS) sem eventos bloqueáveis
                         st.markdown(f"""
                             <div class="kpi-card"
                                  style="background-color: {bg_color}; border: {borda}; text-align: left; padding: 16px; border-radius: 16px; height: 95px;">
@@ -841,32 +820,23 @@ else:
                             </div>
                         """, unsafe_allow_html=True)
 
-                        # 2. Cria o botão invisível gigante por cima (A lógica fica 100% no Python)
                         if st.button(label, key=key, use_container_width=True, help=f"Filtrar por: {texto_card}"):
                             st.session_state.filtro_kpi = filtro
                             st.rerun()
 
-                # 🔥 CSS MÁGICO: Transforma os botões em painéis transparentes sobre os cards 🔥
                 st.markdown("""
                     <style>
-                    /* Puxa o botão para cima, exatamente em cima do card desenhado */
                     div.st-key-kpi_total, div.st-key-kpi_entregue, div.st-key-kpi_frus, 
                     div.st-key-kpi_pend, div.st-key-kpi_aguardando, div.st-key-kpi_hoje {
-                        margin-top: -110px !important;
-                        position: relative;
-                        z-index: 999;
-                        opacity: 0 !important; /* Fica 100% invisível */
+                        margin-top: -110px !important; position: relative; z-index: 999; opacity: 0 !important;
                     }
-                    /* Estica o botão fantasma para cobrir toda a área clicável */
                     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, 
                     div.st-key-kpi_pend button, div.st-key-kpi_aguardando button, div.st-key-kpi_hoje button {
-                        height: 105px !important;
-                        cursor: pointer !important;
+                        height: 105px !important; cursor: pointer !important;
                     }
                     </style>
                 """, unsafe_allow_html=True)
 
-                # ── BARRA DE PROGRESSO ───────────────────
                 df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
                 if not df_h.empty:
                     n_fim  = len(df_h[df_h['STATUS_DISPLAY'].str.contains(
@@ -883,15 +853,13 @@ else:
                                 <span class="progress-pct">{pct}% concluído — {n_fim} de {n_tot} pedidos</span>
                             </div>
                             <div class="progress-bar-bg">
-                                <div style="height:6px;width:{bar_w}%;background:#22c55e;
-                                            border-radius:99px;transition:width 0.6s ease;"></div>
+                                <div style="height:6px;width:{bar_w}%;background:#22c55e; border-radius:99px;transition:width 0.6s ease;"></div>
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
                 else:
                     st.info("Nenhum pedido despachado para hoje.")
 
-                # ── BUSCA + EXPORTAR (mesma linha) ────────
                 col_busca, col_export = st.columns([5, 1])
                 with col_busca:
                     busca = st.text_input(
@@ -900,10 +868,8 @@ else:
                         label_visibility="collapsed"
                     )
                 with col_export:
-                    # placeholder reservado para o download button após montar df_grid
                     holder_download = st.empty()
 
-                # ── MONTA GRID ───────────────────────────
                 df_grid = df_f.copy()
                 if st.session_state.filtro_kpi != "TODOS":
                     if st.session_state.filtro_kpi == "HOJE":
@@ -934,8 +900,6 @@ else:
                     ).drop(columns=['PRIORIDADE'])
 
                     df_final = df_grid.copy()
-                    
-                    # 🔥 PASSO 4 AQUI: O COMPROVANTE AGORA USA A FOTO PRIORITÁRIA
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
 
                     if 'UF' not in df_final.columns:
@@ -957,14 +921,12 @@ else:
                             .replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
                         )
 
-                    # Colunas visíveis na tela
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
                         'DETALHES', 'COMPROVANTE'
                     ]
 
-                    # CNPJ apenas para LABEST
                     if st.session_state.cliente == "LOGISTICA.LABEST":
                         colunas_visiveis.insert(3, 'CNPJ')
 
@@ -972,59 +934,41 @@ else:
                         c for c in colunas_visiveis if c in df_final.columns
                     ]
 
-                    # 🔥 PANDAS STYLER: PALETA PREMIUM PARA AS PÍLULAS DE STATUS 🔥
-                    def colorir_status_badge(val):
-                        val_str = str(val).upper()
-                        base = "font-weight: 700; font-size: 12px; border-radius: 99px; padding: 4px 12px; text-align: center; border-width: 1px; border-style: solid; "
-                        
-                        if 'ENTREGUE' in val_str: 
-                            return base + 'background-color: #F0FDF4; color: #166534; border-color: #BBF7D0;'
-                        if 'ROTA' in val_str: 
-                            return base + 'background-color: #F0FDFA; color: #0F766E; border-color: #99F6E4;'
-                        if 'COLETADO' in val_str: 
-                            return base + 'background-color: #F5F3FF; color: #6D28D9; border-color: #DDD6FE;'
-                        if 'CONFERIDO' in val_str: 
-                            return base + 'background-color: #EEF2FF; color: #3730A3; border-color: #C7D2FE;'
-                        if 'FRUSTRADA' in val_str: 
-                            return base + 'background-color: #FFFBEB; color: #B45309; border-color: #FDE68A;'
-                        if 'ATRASADO' in val_str or 'PROBLEMA' in val_str or 'CANCELADO' in val_str or 'RECUSA' in val_str: 
-                            return base + 'background-color: #FEF2F2; color: #991B1B; border-color: #FECACA;'
-                        if 'AGUARDANDO' in val_str: 
-                            return base + 'background-color: #F8FAFC; color: #475569; border-color: #CBD5E1;'
-                        if 'PENDENTE' in val_str: 
-                            return base + 'background-color: #FFF7ED; color: #9A3412; border-color: #FED7AA;'
-                        
-                        return ''
+                    # 🔥 AJUSTE 4: SUBSTITUIÇÃO PARA O AGGRID (GRID SAAS PREMIUM)
+                    gb = GridOptionsBuilder.from_dataframe(df_final[colunas_visiveis])
+                    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
+                    gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
-                    df_estilizado = df_final[colunas_visiveis].style.map(colorir_status_badge, subset=['STATUS_DISPLAY'])
+                    gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
+                    gb.configure_column("DATA", header_name="📅 Data Coleta", width=130)
+                    gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta")
+                    if 'CNPJ' in colunas_visiveis:
+                        gb.configure_column("CNPJ", header_name="🏢 CNPJ")
+                    gb.configure_column("CIDADE_UF", header_name="📍 Cidade / UF")
+                    gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
+                    gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
+                    gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status")
+                    gb.configure_column("DETALHES", header_name="💬 Atualizações")
+                    gb.configure_column("COMPROVANTE", header_name="📎 Anexo")
 
-                    st.dataframe(
-                        df_estilizado,
-                        column_config={
-                            "PEDIDO":       st.column_config.TextColumn("📦 Pedido",         width="small"),
-                            "DATA":         st.column_config.TextColumn("📅 Data Coleta",     width="small"),
-                            "LABORATORIO":  st.column_config.TextColumn("🔬 Ponto de Coleta",  width="medium"),
-                            "CNPJ":         st.column_config.TextColumn("🏢 CNPJ",             width="medium"),
-                            "CIDADE_UF":    st.column_config.TextColumn("📍 Cidade / UF",      width="medium"),
-                            "DATA_LIMITE":  st.column_config.TextColumn("🎯 Previsão",         width="small"),
-                            "DATA_EFETIVA": st.column_config.TextColumn("🏁 Entrega",          width="small"),
-                            "STATUS_DISPLAY":st.column_config.TextColumn("🚦 Status",          width="medium"),
-                            "DETALHES":     st.column_config.TextColumn("💬 Atualizações",      width="large"),
-                            "COMPROVANTE":  st.column_config.LinkColumn("📎 Anexo",
-                                                                        display_text="Ver Comprovante"),
-                        },
-                        hide_index=True,
-                        use_container_width=True,
-                        height=430
+                    gridOptions = gb.build()
+
+                    AgGrid(
+                        df_final[colunas_visiveis],
+                        gridOptions=gridOptions,
+                        theme="alpine",
+                        columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+                        height=550,
+                        allow_unsafe_jscode=True
                     )
 
-                    # ── EXPORTAÇÃO CSV ENXUTA COM CIDADES/UF SEPARADOS ────────
+                    # ── EXPORTAÇÃO CSV ────────
                     mapa_csv = {
                         'PEDIDO': 'Pedido',
                         'DATA': 'Data Coleta',
                         'LABORATORIO': 'Ponto de Coleta',
-                        'CIDADE': 'Cidade', # Separados!
-                        'UF': 'UF',         # Separados!
+                        'CIDADE': 'Cidade',
+                        'UF': 'UF',
                         'DATA_LIMITE': 'Previsão',
                         'DATA_EFETIVA': 'Entrega',
                         'STATUS_DISPLAY': 'Status',
@@ -1034,11 +978,9 @@ else:
                     if st.session_state.cliente == "LOGISTICA.LABEST":
                         mapa_csv['CNPJ'] = 'CNPJ'
 
-                    # Filtramos usando o df_final para garantir que tudo foi limpo de "NaN"
                     colunas_csv_finais = [c for c in mapa_csv.keys() if c in df_final.columns]
                     df_export = df_final[colunas_csv_finais].rename(columns=mapa_csv)
 
-                    # Gera o CSV limpo
                     csv = df_export.to_csv(index=False, sep=';').encode('utf-8-sig')
                     
                     with holder_download:
@@ -1051,10 +993,10 @@ else:
                             key="btn_download_grid_limpo"
                         )
 
-                    # Mantém também o exportar na sidebar apontando para o arquivo limpo
+                    # 🔥 AJUSTE 2: NOMENCLATURA DO BOTÃO DE EXPORTAÇÃO NA SIDEBAR
                     with holder_exportar:
                         st.download_button(
-                            "📥 Exportar Relatório ",
+                            "📥 Exportar Relatório",
                             data=csv,
                             file_name=f"Relatorio_{st.session_state.cliente}.csv",
                             use_container_width=True,
@@ -1108,8 +1050,7 @@ else:
                                     f"| CEP: {local_data.get('CEP','')}"
                                 )
                                 st.markdown(f"""
-                                    <div style="background:#f0f9ff;border-left:4px solid #3b82f6;
-                                                padding:12px 15px;border-radius:4px;margin-bottom:15px;">
+                                    <div style="background:#f0f9ff;border-left:4px solid #3b82f6; padding:12px 15px;border-radius:4px;margin-bottom:15px;">
                                         <p style="margin:0;font-size:11px;color:#64748b;font-weight:700;">
                                             DESTINO CONFIRMADO
                                         </p>
@@ -1150,8 +1091,7 @@ else:
                                     st.error("⚠️ Selecione um Ponto de Coleta válido.")
                                 elif data_coleta.weekday() >= 5:
                                     st.error(
-                                        "⚠️ Coletas não são realizadas aos finais de semana. "
-                                        "Escolha um dia útil."
+                                        "⚠️ Coletas não são realizadas aos finais de semana. Escolha um dia útil."
                                     )
                                 else:
                                     with st.spinner("Registrando pedido e notificando o C.C.O..."):
@@ -1231,13 +1171,11 @@ else:
                 
                 if len(dados_tkt) > 1:
                     df_tkt = pd.DataFrame(dados_tkt[1:], columns=dados_tkt[0])
-                    # Filtra só os chamados deste cliente
                     df_cli_tkt = df_tkt[df_tkt['TOMADOR'] == nome_tomador_oficial]
                     
                     if df_cli_tkt.empty:
                         st.info("Você ainda não possui nenhum chamado de suporte aberto.")
                     else:
-                        # Inverte para mostrar o mais recente primeiro
                         df_cli_tkt = df_cli_tkt.iloc[::-1]
                         
                         for idx, row in df_cli_tkt.iterrows():
