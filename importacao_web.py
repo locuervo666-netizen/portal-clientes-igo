@@ -2760,12 +2760,12 @@ elif menu == "🔬 Triagem":
                     if col_btn.form_submit_button("Auditar", use_container_width=True) and bip_input:
                         termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
                         
-                        # 🚨 CORREÇÃO: Criação de Máscara de Busca Virtual (Sem modificar o cache do df_raw)
-                        ped_limpo = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
+                        # 🚨 CORREÇÃO DEFINITIVA: str(x) adicionado dentro do lambda para evitar erro de float em células vazias
+                        ped_limpo = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', str(x)))
                         mask = (ped_limpo == termo)
                         
                         if 'QR_CODE' in df_raw.columns:
-                            qr_limpo = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', x))
+                            qr_limpo = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', str(x)))
                             mask = mask | (qr_limpo == termo)
                             
                         if mask.any():
