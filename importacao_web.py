@@ -2737,7 +2737,7 @@ elif menu == "🔬 Triagem":
             return gc.open_by_key("1puECAowymzkiwAObEt4KPeAYiBeIOKtCsSLOIklZJgk")
         except: return None
 
-    # 🔥 NOVA IMPRESSORA EXCLUSIVA PARA TRIAGEM MANUAL (3 COLUNAS) 🔥
+    # 🔥 IMPRESSORA EXCLUSIVA PARA TRIAGEM MANUAL (3 COLUNAS) 🔥
     def gerar_pdf_triagem_manual(id_lote, data_str, tomador, lista_itens):
         pdf = FPDF()
         pdf.add_page()
@@ -2927,7 +2927,7 @@ elif menu == "🔬 Triagem":
                 st.dataframe(df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']], hide_index=True, use_container_width=True)
             else: st.warning("Arquivo histórico em branco.")
 
-    # 🔥 ABA 4: TRIAGEM MANUAL (AVULSA) - IMPRESSORA EXCLUSIVA 🔥
+    # 🔥 ABA 4: TRIAGEM MANUAL (AVULSA) - 100% REESTRUTURADA PARA ENVELOPES 🔥
     with t4:
         st.markdown("#### 📝 Triagem Manual de Contingência (Envelopes)")
         
@@ -2969,52 +2969,65 @@ elif menu == "🔬 Triagem":
                     st.session_state.triagem_avulsa_lote.clear(); st.rerun()
                     
                 if c_ctrl3.button("📄 GERAR PROTOCOLO MANUAL", type="primary", use_container_width=True):
-                    with st.spinner("Registrando e desenhando PDF limpo..."):
-                        id_rom_av = f"MAN-{datetime.now().strftime('%d%m%H%M')}"
-                        plan_av = obter_planilha_avulsos()
-                        if plan_av:
-                            try:
-                                aba_av = plan_av.sheet1
-                                linhas_bkp = [[id_rom_av, i['DATA'], "TRIAGEM MANUAL", i.get('TOMADOR', ''), "", "", i['ENVELOPE'], i['HORA']] for i in st.session_state.triagem_avulsa_lote]
-                                aba_av.append_rows(linhas_bkp, value_input_option='USER_ENTERED')
-                            except: pass
-                        
-                        # 🔥 AGORA CHAMA A NOVA FUNÇÃO DE PDF EXCLUSIVA PARA ESSA ABA 🔥
-                        pdf_manual = gerar_pdf_triagem_manual(id_rom_av, av_data, av_tomador, st.session_state.triagem_avulsa_lote)
-                        
-                        st.session_state.pdf_avulso_pronto = pdf_manual
-                        st.session_state.id_avulso_pronto = id_rom_av
-                        st.session_state.triagem_avulsa_lote.clear(); st.rerun()
+                    # TRAVA: OBRIGA A PREENCHER O HUB DE DESTINO
+                    if av_tomador == "Selecione...":
+                        st.error("⚠️ Preencha o Hub de Destino no cabeçalho antes de gerar o PDF!")
+                    else:
+                        with st.spinner("Registrando e desenhando PDF limpo..."):
+                            id_rom_av = f"MAN-{datetime.now().strftime('%d%m%H%M')}"
+                            plan_av = obter_planilha_avulsos()
+                            if plan_av:
+                                try:
+                                    aba_av = plan_av.sheet1
+                                    linhas_bkp = [[id_rom_av, i['DATA'], "TRIAGEM MANUAL", i.get('TOMADOR', ''), "", "", i['ENVELOPE'], i['HORA']] for i in st.session_state.triagem_avulsa_lote]
+                                    aba_av.append_rows(linhas_bkp, value_input_option='USER_ENTERED')
+                                except: pass
+                            
+                            pdf_manual = gerar_pdf_triagem_manual(id_rom_av, av_data, av_tomador, st.session_state.triagem_avulsa_lote)
+                            
+                            st.session_state.pdf_avulso_pronto = pdf_manual
+                            st.session_state.id_avulso_pronto = id_rom_av
+                            st.session_state.triagem_avulsa_lote = []
+                            time.sleep(0.5) # Dá um respiro pro Streamlit atualizar o botão
+                            st.rerun()
             else: st.info("Aguardando bipagem de envelopes...")
         
-        # 4. TELA DE SUCESSO
+        # 4. TELA DE SUCESSO (Renderiza de primeira agora!)
         if st.session_state.pdf_avulso_pronto:
             st.success(f"✅ Protocolo Manual {st.session_state.id_avulso_pronto} pronto!")
             st.download_button("📥 BAIXAR PROTOCOLO (ENVELOPES)", st.session_state.pdf_avulso_pronto, file_name=f"Triagem_Manual_{st.session_state.id_avulso_pronto}.pdf", mime="application/pdf", type="primary", use_container_width=True)
             if st.button("Nova Triagem"): st.session_state.pdf_avulso_pronto = None; st.rerun()
 
-        # 5. HISTÓRICO DE MANUAIS
+        # 5. HISTÓRICO DE MANUAIS (BLINDADO PARA LER A HORA CORRETAMENTE)
         st.markdown("---")
         plan_av = obter_planilha_avulsos()
         if plan_av:
             try:
                 aba_av = plan_av.sheet1
-                dados_av = aba_av.get_all_values()
+                # Lendo a matriz pura do Google Sheets pra evitar que o cabeçalho antigo corte a coluna da hora
+                dados_av = aba_av.get_all_values() 
                 if len(dados_av) > 1:
-                    df_h_av = pd.DataFrame(dados_av[1:], columns=dados_av[0])
-                    lotes_man_list = [l for l in df_h_av['LOTE_AVULSO'].unique() if "MAN-" in str(l)]
+                    lotes_man_list = list(set([linha[0] for linha in dados_av[1:] if "MAN-" in str(linha[0])]))
+                    
                     c_h1, c_h2 = st.columns([2, 1])
                     lote_re = c_h1.selectbox("Reimprimir Lote Manual:", ["Selecione..."] + sorted(lotes_man_list, reverse=True))
+                    
                     if lote_re != "Selecione...":
-                        df_l_re = df_h_av[df_h_av['LOTE_AVULSO'] == lote_re]
-                        lista_re = [{'ENVELOPE': r.get('ENVELOPE', r.iloc[6] if len(r)>6 else ''), 'DATA': r.get('DATA',''), 'HORA': r.get('HORA_TRIAGEM', r.get('HORA', ''))} for _, r in df_l_re.iterrows()]
+                        linhas_re = [linha for linha in dados_av[1:] if linha[0] == lote_re]
+                        lista_re = []
+                        for ln in linhas_re:
+                            # Puxando as posições exatas (Índice 6 = Envelope, Índice 7 = Hora)
+                            env_val = ln[6] if len(ln) > 6 else ""
+                            hora_val = ln[7] if len(ln) > 7 else ""
+                            data_val = ln[1] if len(ln) > 1 else ""
+                            tomador_val = ln[3] if len(ln) > 3 else ""
+                            lista_re.append({'ENVELOPE': env_val, 'DATA': data_val, 'HORA': hora_val, 'TOMADOR': tomador_val})
                         
-                        # 🔥 REIMPRESSÃO TAMBÉM USA A NOVA FUNÇÃO 🔥
-                        pdf_rep_man = gerar_pdf_triagem_manual(lote_re, df_l_re.iloc[0].get('DATA',''), df_l_re.iloc[0].get('TOMADOR',''), lista_re)
+                        pdf_rep_man = gerar_pdf_triagem_manual(lote_re, lista_re[0].get('DATA',''), lista_re[0].get('TOMADOR',''), lista_re)
                         
                         c_h2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
                         c_h2.download_button("📥 REIMPRIMIR", pdf_rep_man, file_name=f"Reprint_{lote_re}.pdf", mime="application/pdf", type="primary", use_container_width=True)
-            except: pass
+            except Exception as e: st.warning(f"Erro ao ler histórico: {e}")
 
 # =============================================================================
 # 📁 MÓDULO 4: EXPORTAR RELATÓRIOS (NOVO E INTELIGENTE)
