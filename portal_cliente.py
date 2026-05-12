@@ -933,28 +933,75 @@ else:
                         c for c in colunas_visiveis if c in df_final.columns
                     ]
 
-                    # 🔥 JAVASCRIPT À PROVA DE FALHAS (CLASS COMPONENT) 🔥
-                    # Isso impede o Streamlit de transformar código HTML em texto ou quebrar o React
+                    # ==========================================
+                    # 🔥 JAVASCRIPT 1: EMOJI DE CÂMERA 🔥
+                    # ==========================================
                     link_jscode = JsCode("""
                     class EmojiLinkRenderer {
                       init(params) {
                         this.eGui = document.createElement('div');
                         this.eGui.style.cssText = 'display: flex; justify-content: center; align-items: center; height: 100%;';
                         if (params.value && params.value !== '') {
-                          this.eGui.innerHTML = `<a href="${params.value}" target="_blank" style="text-decoration: none; font-size: 20px;" title="Ver Foto">📷</a>`;
+                          this.eGui.innerHTML = `<a href="${params.value}" target="_blank" style="text-decoration: none; font-size: 20px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'" title="Ver Foto do Comprovante">📷</a>`;
                         }
                       }
-                      getGui() {
-                        return this.eGui;
-                      }
+                      getGui() { return this.eGui; }
                     }
                     """)
 
+                    # ==========================================
+                    # 🔥 JAVASCRIPT 2: PÍLULAS DE STATUS 🔥
+                    # ==========================================
+                    status_jscode = JsCode("""
+                    class StatusBadgeRenderer {
+                      init(params) {
+                        this.eGui = document.createElement('div');
+                        // Container para centralizar verticalmente
+                        this.eGui.style.cssText = 'display: flex; align-items: center; height: 100%;';
+                        
+                        let badge = document.createElement('span');
+                        badge.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; height: 22px;';
+                        
+                        let status = params.value ? params.value.toUpperCase() : '';
+                        let text = params.value || '';
+                        
+                        // Lógica de Cores SaaS (Tailwind Colors)
+                        if (status.includes('ENTREGUE') || status.includes('CONFERIDO')) {
+                          badge.style.backgroundColor = '#dcfce7'; // Verde Claro
+                          badge.style.color = '#166534'; // Texto Verde Escuro
+                          badge.style.border = '1px solid #bbf7d0';
+                        } else if (status.includes('FRUSTRADA') || status.includes('PROBLEMA') || status.includes('ATRASADO') || status.includes('RECUSA')) {
+                          badge.style.backgroundColor = '#fee2e2'; // Vermelho Claro
+                          badge.style.color = '#991b1b'; // Texto Vermelho Escuro
+                          badge.style.border = '1px solid #fecaca';
+                        } else if (status.includes('PENDENTE') || status.includes('ROTA') || status.includes('COLETADO')) {
+                          badge.style.backgroundColor = '#fef3c7'; // Amarelo Claro
+                          badge.style.color = '#92400e'; // Texto Amarelo Escuro
+                          badge.style.border = '1px solid #fde68a';
+                        } else {
+                          badge.style.backgroundColor = '#f1f5f9'; // Cinza Claro
+                          badge.style.color = '#475569'; // Texto Cinza Escuro
+                          badge.style.border = '1px solid #e2e8f0';
+                        }
+                        
+                        badge.innerText = text;
+                        this.eGui.appendChild(badge);
+                      }
+                      getGui() { return this.eGui; }
+                    }
+                    """)
+
+                    # ==========================================
+                    # 🛠️ CONFIGURAÇÃO DA GRID
+                    # ==========================================
                     gb = GridOptionsBuilder.from_dataframe(df_final[colunas_visiveis])
                     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
+                    
+                    # Removemos as bordas de foco da configuração geral
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
-                    gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
+                    # ❄️ CONGELANDO A COLUNA DO PEDIDO À ESQUERDA (pinned='left')
+                    gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120, pinned='left')
                     gb.configure_column("DATA", header_name="📅 Data Coleta", width=130)
                     gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta")
                     if 'CNPJ' in colunas_visiveis:
@@ -962,17 +1009,33 @@ else:
                     gb.configure_column("CIDADE_UF", header_name="📍 Cidade / UF")
                     gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
-                    gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status")
+                    
+                    # Aplicando a classe da Pílula Colorida no Status
+                    gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=180)
+                    
                     gb.configure_column("DETALHES", header_name="💬 Atualizações")
                     
-                    # Aplica a classe Javascript construída acima
+                    # Aplicando a classe do Emoji no Comprovante
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
 
                     gridOptions = gb.build()
 
+                    # ==========================================
+                    # 🎨 CSS CUSTOMIZADO PREMIUM
+                    # ==========================================
                     custom_css = {
-                        ".ag-header-cell": {"border-right": "1px solid #e2e8f0 !important"},
-                        ".ag-cell": {"border-right": "1px solid #e2e8f0 !important"}
+                        # Separação sutil de colunas
+                        ".ag-header-cell": {"border-right": "1px solid #f1f5f9 !important"},
+                        ".ag-cell": {"border-right": "1px solid #f1f5f9 !important"},
+                        
+                        # Remove aquela borda azul feia de quando clica em uma célula
+                        ".ag-cell-focus": {"border": "none !important", "outline": "none !important"},
+                        
+                        # Efeito Hover: Linha fica levemente cinza ao passar o mouse
+                        ".ag-row:hover": {"background-color": "#f8fafc !important", "cursor": "pointer", "transition": "background-color 0.2s"},
+                        
+                        # Ajusta a fonte geral da tabela
+                        ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
                     }
 
                     AgGrid(
@@ -984,7 +1047,6 @@ else:
                         allow_unsafe_jscode=True,
                         custom_css=custom_css 
                     )
-
                     # ── EXPORTAÇÃO CSV ────────
                     mapa_csv = {
                         'PEDIDO': 'Pedido',
