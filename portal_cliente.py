@@ -660,7 +660,7 @@ else:
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Suporte e Relatórios</p>", unsafe_allow_html=True)
         
         # Popover: Botão moderno que abre um mini-menu flutuante por cima da tela
-        with st.popover("🎧 Abrir Chamado C.C.O.", use_container_width=True):
+        with st.popover("🎧 Abrir Chamado Suporte", use_container_width=True):
             st.markdown("📄 **Novo Chamado de Atendimento**")
             with st.form("form_chamado_zap", clear_on_submit=True):
                 pedido_chamado = st.text_input("Número do Pedido (Opcional):")
@@ -1054,7 +1054,7 @@ else:
                     # Mantém também o exportar na sidebar apontando para o arquivo limpo
                     with holder_exportar:
                         st.download_button(
-                            "📥 Exportar Relatório (CSV Limpo)",
+                            "📥 Exportar Relatório ",
                             data=csv,
                             file_name=f"Relatorio_{st.session_state.cliente}.csv",
                             use_container_width=True,
