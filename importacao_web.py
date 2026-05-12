@@ -2760,7 +2760,6 @@ elif menu == "🔬 Triagem":
                     if col_btn.form_submit_button("Auditar", use_container_width=True) and bip_input:
                         termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
                         
-                        # 🚨 CORREÇÃO DEFINITIVA: str(x) adicionado dentro do lambda para evitar erro de float em células vazias
                         ped_limpo = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', str(x)))
                         mask = (ped_limpo == termo)
                         
@@ -2779,25 +2778,28 @@ elif menu == "🔬 Triagem":
                                         df_nuvem.loc[mask_nuvem, 'STATUS'] = 'CONFERIDO'
                                         aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                         
+                                        # ADICIONADO LABORATORIO NO LOG DE BIPAGEM
                                         st.session_state.log_triagem.insert(0, {
                                             'PEDIDO': str(df_raw.at[idx, 'PEDIDO']),
                                             'TOMADOR': str(df_raw.at[idx, 'TOMADOR']),
+                                            'LABORATORIO': str(df_raw.at[idx, 'LABORATORIO']),
                                             'CIDADE': str(df_raw.at[idx, 'CIDADE']),
                                             'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S')
                                         })
                                         
                                         st.success(f"✅ Pedido {str(df_raw.at[idx, 'PEDIDO'])} VALIDADO!")
                                         time.sleep(1.0); carregar_dados_completos.clear(); st.rerun() 
-                                except Exception as e: st.error(f"Erro ao salvar na nuvem: {e}")
+                                except Exception as e: st.error(f"Erro: {e}")
                             else: st.error("❌ Volume não está com status COLETADO.")
-                        else: st.error("❌ Assinatura ou Pedido não reconhecido na base de dados.")
+                        else: st.error("❌ Assinatura ou Pedido não reconhecido.")
 
             with col_bip_dir:
                 st.markdown("<div style='border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; background-color: #F8FAFC; height: 130px; overflow-y: auto;'>", unsafe_allow_html=True)
                 st.markdown("<p style='margin-bottom: 5px; font-weight: bold; color: #0F172A; font-size: 14px;'>⏱️ Últimos Bips Realizados:</p>", unsafe_allow_html=True)
-                if 'log_triagem' in st.session_state and st.session_state.log_triagem:
+                if st.session_state.log_triagem:
                     for item in st.session_state.log_triagem[:5]: 
-                        st.markdown(f"<div style='font-size: 12px; color: #334155; margin-bottom: 3px;'>🟢 <b>{item['PEDIDO']}</b> - {item['TOMADOR']} - {item['CIDADE']} <span style='color: #94A3B8;'>({item['HORA']})</span></div>", unsafe_allow_html=True)
+                        # EXIBIÇÃO AJUSTADA COM LABORATÓRIO
+                        st.markdown(f"<div style='font-size: 11px; color: #334155; margin-bottom: 3px;'>🟢 <b>{item['PEDIDO']}</b> - {item['LABORATORIO']} <br><span style='color: #64748B; padding-left: 15px;'>{item['TOMADOR']} | {item['CIDADE']} ({item['HORA']})</span></div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<p style='font-size: 12px; color: #94A3B8;'>Nenhum volume bipado ainda.</p>", unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -2849,7 +2851,7 @@ elif menu == "🔬 Triagem":
                     else:
                         sel_lista = selecionados.to_dict('records')
                         tomadores_unicos = list(set([str(r.get('TOMADOR', '')).strip() for r in sel_lista]))
-                        if len(tomadores_unicos) > 1: st.error(f"🚨 VIOLAÇÃO DE ROTA: Destinos diferentes selecionados ({', '.join(tomadores_unicos)}). Use o filtro no topo.")
+                        if len(tomadores_unicos) > 1: st.error(f"🚨 VIOLAÇÃO DE ROTA: Destinos diferentes selecionados.")
                         else:
                             with st.spinner("Selando romaneio..."):
                                 id_romaneio = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100,999)}"
@@ -2857,19 +2859,16 @@ elif menu == "🔬 Triagem":
                                 try:
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                    
                                     df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), ['STATUS', 'ROMANEIO', 'AGENTE_RAW']] = ['EM ROTA DE ENTREGA', id_romaneio, motorista_escolhido]
-                                    
                                     aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     base_tomador = tomadores_unicos[0]
                                     base_cidade = sel_lista[0].get('CIDADE', '')
                                     despachar_para_appsheet([{'PEDIDO': id_romaneio, 'MOTORISTA': motorista_escolhido, 'ENDERECO': "ENTREGA LOTE NO TOMADOR", 'NUMERO': f"{len(p_ids)} VOLUMES", 'BAIRRO': base_tomador, 'CIDADE': base_cidade, 'CEP': "---", 'LABORATORIO': f"CONJUNTO DE {len(sel_lista)} PEDIDOS", 'TOMADOR': base_tomador, 'ROMANEIO': id_romaneio}])
                                     pdf_bytes = gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_lista)
                                     carregar_dados_completos.clear()
-                                    st.success(f"🎉 Lote {id_romaneio} gerado com sucesso!")
-                                    st.download_button(label="📥 BAIXAR PROTOCOLO TÉCNICO (PDF)", data=pdf_bytes, file_name=f"Romaneio_IGO_{id_romaneio}.pdf", mime="application/pdf", type="primary")
-                                except Exception as e: st.error(f"Erro na Geração: {e}")
-            else: st.info("O salão está vazio. Somente lotes validados na Triagem aparecem para despacho.")
+                                    st.success(f"🎉 Lote {id_romaneio} gerado!"); st.download_button(label="📥 BAIXAR PROTOCOLO TÉCNICO (PDF)", data=pdf_bytes, file_name=f"Romaneio_IGO_{id_romaneio}.pdf", mime="application/pdf", type="primary")
+                                except Exception as e: st.error(f"Erro: {e}")
+            else: st.info("O salão está vazio.")
 
     with t3:
         if df_raw.empty:
@@ -2879,46 +2878,35 @@ elif menu == "🔬 Triagem":
             if not df_hist.empty:
                 st.markdown("#### 🖨️ Reimpressão de Romaneio")
                 romaneios_disponiveis = [r for r in df_hist['ROMANEIO'].unique() if str(r).strip() and str(r).upper() != 'NAN']
-                
                 if romaneios_disponiveis:
                     col_re_1, col_re_2 = st.columns([2, 1])
                     rom_selecionado = col_re_1.selectbox("Selecione o Lote / Romaneio:", ["Selecione..."] + sorted(romaneios_disponiveis, reverse=True))
-                    
                     if rom_selecionado != "Selecione...":
                         df_rom = df_hist[df_hist['ROMANEIO'] == rom_selecionado].copy()
                         agente_rom = df_rom.iloc[0].get('AGENTE_RAW', 'Desconhecido')
-                        
                         pdf_reprint = gerar_pdf_romaneio(rom_selecionado, hoje_br, agente_rom, df_rom.to_dict('records'))
-                        
                         col_re_2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-                        col_re_2.download_button(
-                            label="📥 REIMPRIMIR PDF", 
-                            data=pdf_reprint, 
-                            file_name=f"Reimpressao_{rom_selecionado}.pdf", 
-                            mime="application/pdf", 
-                            type="primary",
-                            use_container_width=True
-                        )
-                        
+                        col_re_2.download_button(label="📥 REIMPRIMIR PDF", data=pdf_reprint, file_name=f"Reimpressao_{rom_selecionado}.pdf", mime="application/pdf", type="primary", use_container_width=True)
                 st.markdown("---")
                 st.markdown("#### 🕒 Histórico Geral de Varredura")
                 st.dataframe(df_hist.sort_values(by=['DATA_OBJ', 'PEDIDO'], ascending=[False, False])[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO']], hide_index=True, use_container_width=True)
-            else: 
-                st.warning("O arquivo histórico de varreduras está temporariamente em branco.")
+            else: st.warning("Arquivo histórico em branco.")
 
-    # 🔥 MÓDULO 4: TRIAGEM MANUAL (AVULSA) E HISTÓRICO 🔥
+    # 🔥 ABA 4: TRIAGEM MANUAL (AVULSA) - ATUALIZADA COM ENVELOPE E HORA 🔥
     with t4:
         st.markdown("#### 📝 Triagem Manual de Contingência (Avulsa)")
-        st.info("💡 Lotes gerados aqui **não afetam sua GRID principal**. Eles servem para documentar despachos de última hora e ficam salvos no seu Cofre de Avulsos para futuras reimpressões.")
         
-        # 1. CABEÇALHO DO LOTE
+        # 1. CABEÇALHO DO LOTE (Com Envelope)
         with st.container(border=True):
-            c1, c2, c3, c4 = st.columns(4)
-            av_tomador = c1.selectbox("🏢 Tomador Destino:", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="av_tomador")
-            av_pcl = c2.text_input("🔬 Ponto de Coleta (Opcional):", placeholder="Ex: Matriz ou Devolução", key="av_pcl")
-            av_data = c3.date_input("📅 Data do Romaneio:", value=hoje_br, format="DD/MM/YYYY", key="av_data")
+            c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+            av_tomador = c1.selectbox("🏢 Hub de Destino:", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="av_tomador")
+            av_envelope = c2.text_input("✉️ Número do Envelope:", placeholder="Opcional", key="av_env")
+            av_pcl = c3.text_input("🔬 Ponto de Coleta:", placeholder="Opcional (Ex: Posto ou Coleta)", key="av_pcl")
             logins_av = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
             av_mot = c4.selectbox("👤 Motorista:", ["Selecione..."] + logins_av, key="av_mot")
+            
+            c_data, c_spacer = st.columns([1, 3])
+            av_data = c_data.date_input("📅 Data do Romaneio:", value=hoje_br, format="DD/MM/YYYY", key="av_data")
             
         st.markdown("---")
         
@@ -2926,89 +2914,72 @@ elif menu == "🔬 Triagem":
         if not st.session_state.pdf_avulso_pronto:
             with st.form("form_bip_avulso", clear_on_submit=True):
                 col_bip, col_add = st.columns([4, 1], vertical_alignment="bottom")
-                bip_avulso = col_bip.text_input("🔍 Bipar Código ou Digitar Identificador:", placeholder="Posicione o cursor aqui e use o leitor...")
+                bip_avulso = col_bip.text_input("🔍 Bipar Código ou Digitar Pedido:")
                 
-                if col_add.form_submit_button("➕ Adicionar ao Lote", use_container_width=True):
+                if col_add.form_submit_button("➕ Adicionar", use_container_width=True):
                     if bip_avulso.strip():
                         novo_item = {
                             'PEDIDO': bip_avulso.strip(),
-                            'LABORATORIO': av_pcl.strip() if av_pcl.strip() else "VOLUME AVULSO",
-                            'TOMADOR': av_tomador if av_tomador != "Selecione..." else "NÃO INFORMADO",
-                            'CIDADE': "---",
-                            'UF': "---",
+                            'ENVELOPE': av_envelope.strip() if av_envelope.strip() else "---",
+                            'LABORATORIO': av_pcl.strip() if av_pcl.strip() else "",
+                            'TOMADOR': av_tomador if av_tomador != "Selecione..." else "",
+                            'CIDADE': "", # Campo flexível/vazio
+                            'UF': "",     # Campo flexível/vazio
+                            'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S'),
                             'QR_CODE': bip_avulso.strip()
                         }
                         st.session_state.triagem_avulsa_lote.append(novo_item)
                         st.rerun()
                         
-            # 3. CARRINHO AVULSO E BOTÕES
+            # 3. GRID DO CARRINHO AVULSO
             if st.session_state.triagem_avulsa_lote:
-                st.markdown(f"**📦 Volumes no Lote Atual:** {len(st.session_state.triagem_avulsa_lote)}")
-                df_avulso = pd.DataFrame(st.session_state.triagem_avulsa_lote)
-                st.dataframe(df_avulso[['PEDIDO', 'LABORATORIO', 'TOMADOR']], hide_index=True, use_container_width=True)
+                st.markdown(f"**📦 Itens no Lote:** {len(st.session_state.triagem_avulsa_lote)}")
+                df_avulso_disp = pd.DataFrame(st.session_state.triagem_avulsa_lote)
+                # Exibe as colunas principais incluindo Envelope e Hora
+                st.dataframe(df_avulso_disp[['PEDIDO', 'ENVELOPE', 'HORA', 'LABORATORIO', 'TOMADOR']], hide_index=True, use_container_width=True)
                 
                 c_ctrl1, c_ctrl2, c_ctrl3 = st.columns([1, 1, 2])
-                
-                if c_ctrl1.button("↩️ Desfazer Último Bip", use_container_width=True):
-                    st.session_state.triagem_avulsa_lote.pop()
-                    st.rerun()
+                if c_ctrl1.button("↩️ Desfazer Último", use_container_width=True):
+                    if st.session_state.triagem_avulsa_lote: st.session_state.triagem_avulsa_lote.pop(); st.rerun()
+                if c_ctrl2.button("🗑️ Esvaziar", use_container_width=True):
+                    st.session_state.triagem_avulsa_lote.clear(); st.rerun()
                     
-                if c_ctrl2.button("🗑️ Esvaziar Lote", use_container_width=True):
-                    st.session_state.triagem_avulsa_lote.clear()
-                    st.rerun()
-                    
-                if c_ctrl3.button("📄 SALVAR E GERAR PDF (AVULSO)", type="primary", use_container_width=True):
-                    if av_tomador == "Selecione..." or av_mot == "Selecione...":
-                        st.error("⚠️ Preencha o Tomador e o Motorista no cabeçalho para poder gerar o documento.")
+                if c_ctrl3.button("📄 SALVAR E GERAR PROTOCOLO", type="primary", use_container_width=True):
+                    if av_mot == "Selecione...": st.error("⚠️ Informe o Motorista!")
                     else:
-                        with st.spinner("Registrando no cofre e desenhando PDF..."):
-                            id_rom_av = f"AVULSO-{datetime.now().strftime('%d%m%H%M')}"
-                            
+                        with st.spinner("Registrando..."):
+                            id_rom_av = f"AV-{datetime.now().strftime('%d%m%H%M')}"
                             plan_av = obter_planilha_avulsos()
                             if plan_av:
                                 try:
                                     aba_av = plan_av.sheet1
-                                    linhas_app = []
+                                    linhas_backup = []
                                     for item in st.session_state.triagem_avulsa_lote:
-                                        linhas_app.append([
-                                            id_rom_av,
-                                            av_data.strftime("%d/%m/%Y"),
-                                            av_mot,
-                                            item['TOMADOR'],
-                                            item['LABORATORIO'],
-                                            item['PEDIDO']
+                                        linhas_backup.append([
+                                            id_rom_av, av_data.strftime("%d/%m/%Y"), av_mot, 
+                                            item['TOMADOR'], item['LABORATORIO'], item['PEDIDO'], 
+                                            item['ENVELOPE'], item['HORA'] # Campos novos no cofre
                                         ])
-                                    aba_av.append_rows(linhas_app, value_input_option='USER_ENTERED')
-                                except Exception as e:
-                                    st.error(f"Erro ao salvar na planilha do cofre: {e}")
+                                    aba_av.append_rows(linhas_backup, value_input_option='USER_ENTERED')
+                                except: pass
                             
+                            # Lógica Flexível para o PDF
+                            # Se Lab/Cidade/UF estiverem vazios, o PDF usará Envelope e Hora nos detalhes
                             pdf_gerado = gerar_pdf_romaneio(id_rom_av, av_data, av_mot, st.session_state.triagem_avulsa_lote)
                             st.session_state.pdf_avulso_pronto = pdf_gerado
                             st.session_state.id_avulso_pronto = id_rom_av
-                            
-                            st.session_state.triagem_avulsa_lote.clear()
-                            st.rerun()
-            else:
-                st.info("Nenhum item bipado neste lote avulso. Use a caixa de texto acima para começar.")
+                            st.session_state.triagem_avulsa_lote.clear(); st.rerun()
+            else: st.info("Bipe materiais para iniciar o lote avulso.")
         
         # 4. TELA DE SUCESSO (DOWNLOAD)
         if st.session_state.pdf_avulso_pronto:
-            st.success(f"✅ Lote {st.session_state.id_avulso_pronto} salvo com sucesso no cofre!")
-            st.download_button(
-                label="📥 BAIXAR PROTOCOLO AVULSO (PDF)", 
-                data=st.session_state.pdf_avulso_pronto, 
-                file_name=f"Romaneio_{st.session_state.id_avulso_pronto}.pdf", 
-                mime="application/pdf", 
-                type="primary",
-                use_container_width=True
-            )
-            if st.button("Limpar e Iniciar Novo Lote"):
-                st.session_state.pdf_avulso_pronto = None
-                st.rerun()
+            st.success(f"✅ Protocolo {st.session_state.id_avulso_pronto} gerado com sucesso!")
+            st.download_button(label="📥 BAIXAR PROTOCOLO AVULSO (PDF)", data=st.session_state.pdf_avulso_pronto, file_name=f"Triagem_{st.session_state.id_avulso_pronto}.pdf", mime="application/pdf", type="primary", use_container_width=True)
+            if st.button("Novo Lote Manual"): st.session_state.pdf_avulso_pronto = None; st.rerun()
 
-        # 5. HISTÓRICO E REIMPRESSÃO DO COFRE
+        # 5. HISTÓRICO DE AVULSOS
         st.markdown("---")
-        st.markdown("#### 🔎 Histórico e Reimpressão de Avulsos")
+        st.markdown("#### 🔎 Histórico de Avulsos")
         plan_av = obter_planilha_avulsos()
         if plan_av:
             try:
@@ -3016,46 +2987,25 @@ elif menu == "🔬 Triagem":
                 dados_av = aba_av.get_all_values()
                 if len(dados_av) > 1:
                     df_av = pd.DataFrame(dados_av[1:], columns=dados_av[0])
-                    
                     c_busc1, c_busc2 = st.columns([2, 1])
-                    lotes_disponiveis = df_av['LOTE_AVULSO'].dropna().unique().tolist()
-                    lote_sel = c_busc1.selectbox("Selecione o Lote Avulso para Reimprimir:", ["Selecione..."] + sorted(lotes_disponiveis, reverse=True))
-                    
+                    lotes_av_list = df_av['LOTE_AVULSO'].dropna().unique().tolist()
+                    lote_sel = c_busc1.selectbox("Reimprimir Lote Avulso:", ["Selecione..."] + sorted(lotes_av_list, reverse=True))
                     if lote_sel != "Selecione...":
-                        df_lote_sel = df_av[df_av['LOTE_AVULSO'] == lote_sel].copy()
-                        agente_av = df_lote_sel.iloc[0].get('MOTORISTA', 'Desconhecido')
-                        data_av_str = df_lote_sel.iloc[0].get('DATA', hoje_br.strftime('%d/%m/%Y'))
-                        
+                        df_l = df_av[df_av['LOTE_AVULSO'] == lote_sel]
                         lista_reprint = []
-                        for _, r in df_lote_sel.iterrows():
+                        for _, r in df_l.iterrows():
                             lista_reprint.append({
                                 'PEDIDO': r.get('CODIGO_BIPADO', ''),
+                                'ENVELOPE': r.get('ENVELOPE', '---'),
+                                'HORA': r.get('HORA_TRIAGEM', '---'),
                                 'LABORATORIO': r.get('PONTO_COLETA', ''),
                                 'TOMADOR': r.get('TOMADOR', ''),
-                                'CIDADE': "---",
-                                'UF': "---",
-                                'QR_CODE': r.get('CODIGO_BIPADO', '')
+                                'CIDADE': "", 'UF': "", 'QR_CODE': r.get('CODIGO_BIPADO', '')
                             })
-                            
-                        pdf_reprint_av = gerar_pdf_romaneio(lote_sel, data_av_str, agente_av, lista_reprint)
-                        
+                        pdf_rep = gerar_pdf_romaneio(lote_sel, df_l.iloc[0].get('DATA',''), df_l.iloc[0].get('MOTORISTA',''), lista_reprint)
                         c_busc2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-                        c_busc2.download_button(
-                            label="📥 REIMPRIMIR LOTE", 
-                            data=pdf_reprint_av, 
-                            file_name=f"Reimpressao_{lote_sel}.pdf", 
-                            mime="application/pdf", 
-                            type="primary",
-                            use_container_width=True
-                        )
-                        
-                    with st.expander("👁️ Ver Tabela Completa do Cofre de Avulsos"):
-                        st.dataframe(df_av, hide_index=True, use_container_width=True)
-                        
-            except Exception as e:
-                st.warning(f"Erro ao carregar histórico: {e}")
-        else:
-            st.warning("Não foi possível conectar à planilha de histórico. Verifique as permissões.")
+                        c_busc2.download_button("📥 REIMPRIMIR", pdf_rep, file_name=f"Reprint_{lote_sel}.pdf", mime="application/pdf", type="primary", use_container_width=True)
+            except: pass
 
 # =============================================================================
 # 📁 MÓDULO 4: EXPORTAR RELATÓRIOS (NOVO E INTELIGENTE)
