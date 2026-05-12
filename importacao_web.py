@@ -1801,6 +1801,20 @@ elif menu == "📝 Pedido Manual":
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES (OFICIAL)
 # =============================================================================
 elif menu == "📥 Importações":
+    import streamlit.components.v1 as components
+    
+    # 🔥 PING SILENCIOSO (ANTI-TIMEOUT DO RENDER) 🔥
+    components.html(
+        """
+        <script>
+        setInterval(function() {
+            fetch(window.location.href);
+        }, 240000); 
+        </script>
+        """,
+        height=0, width=0
+    )
+
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes (Oficial)</h3></div>", unsafe_allow_html=True)
     
     if "df_preview_oficial" not in st.session_state: st.session_state.df_preview_oficial = pd.DataFrame()
@@ -1811,7 +1825,7 @@ elif menu == "📥 Importações":
         c1, c2, c3 = st.columns([1, 1, 2])
         with c1: tom = st.selectbox("🏢 Tomador Central:", ["Selecione..."] + CLIENTES_AUTORIZADOS)
         with c2: dt_c = st.date_input("📅 Data da Rota:", format="DD/MM/YYYY", value=hoje_br)
-            
+        
         txt = st.text_area("📋 Cole os dados (Ctrl+V):", height=150)
         
         if st.columns([1, 2])[0].button("🔍 1. Processar Matriz", type="primary", use_container_width=True):
@@ -1866,7 +1880,7 @@ elif menu == "📥 Importações":
                                     df_limpo.at[idx, 'OBSERVACOES'] = nova_obs
                         
                         df_limpo['PEDIDO'] = ""
-                            
+                        
                         for idx, row in df_limpo.iterrows():
                             e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
                             if e and (not n or not b):
@@ -1877,7 +1891,7 @@ elif menu == "📥 Importações":
                                 if ',' in e and not n: 
                                     pts = e.split(',')
                                     df_limpo.at[idx, 'ENDERECO'], df_limpo.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
-                                
+                                        
                         df_limpo['UF'] = df_limpo['UF'].astype(str).str.upper().str.strip()
                         df_limpo['TOMADOR'] = tom
                         df_limpo['DATA'] = dt_c.strftime("%d/%m/%Y")
@@ -1938,7 +1952,6 @@ elif menu == "📥 Importações":
             st.success(f"✅ Lote validado! {len(df_ok)} pedidos prontos.")
             st.dataframe(df_ok, hide_index=True)
             
-            # 🔥 MUDANÇA 1: ADICIONAR AO CARRINHO COM IDs OFICIAIS SEQUENCIAIS 🔥
             if st.button("➕ Adicionar ao Carrinho Oficial (Cumulativo)", type="primary", key="add_carrinho_oficial"):
                 with st.spinner("Gerando IDs sequenciais e adicionando ao carrinho..."):
                     try:
@@ -1977,7 +1990,7 @@ elif menu == "📥 Importações":
                         time.sleep(1.5); st.rerun()
                     except Exception as e: st.error(f"Erro: {e}")
 
-    # 🔥 MUDANÇA 2: O CARRINHO E A MESA DE COMANDO OFICIAL 🔥
+    # 🔥 MUDANÇA 2: O CARRINHO E A MESA DE COMANDO DE 3 PASSOS 🔥
     if not st.session_state.df_carrinho_oficial.empty:
         df_cart_of = st.session_state.df_carrinho_oficial
         
@@ -1999,13 +2012,15 @@ elif menu == "📥 Importações":
         
         st.markdown("---")
         st.markdown("### 🎛️ Mesa de Comando Oficial")
-        col_cmd1, col_cmd2 = st.columns([1, 1])
         
-        with col_cmd1:
-            if st.button("🚀 1. Injetar Lote no Banco de Dados", type="primary", use_container_width=True):
+        col_inj, col_zap, col_limp = st.columns(3)
+        
+        # PASSO 1: INJETAR
+        with col_inj:
+            if st.button("🚀 1. Injetar Lote no Banco", type="primary", use_container_width=True):
                 with st.spinner("🚀 Injetando lotes no banco de dados principal e AppSheet..."):
                     try:
-                        # 🔥 BLINDAGEM: Garantir que apenas as colunas corretas subam para não sujar a GRID 🔥
+                        # Blindagem: Garantir que apenas colunas oficiais subam
                         colunas_bd_oficiais = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO', 'ZAP_ENVIADO', 'FATURA', 'OBSERVACOES']
                         
                         df_to_insert = df_editado_oficial.copy()
@@ -2015,33 +2030,36 @@ elif menu == "📥 Importações":
 
                         aba_m = planilha_db.worksheet("Memoria_Sistema")
                         df_up_final = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-                        df_up_final = pd.concat([df_up_final, df_to_insert], ignore_index=True)
                         
-                        aba_m.clear()
-                        aba_m.update("A1", [df_up_final.columns.tolist()] + df_up_final.fillna("").astype(str).values.tolist())
-                        
-                        lista_app_of = []
-                        for _, r in df_to_insert.iterrows():
-                            if str(r.get('AGENTE_RAW','')).strip():
-                                lista_app_of.append({
-                                    'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'], 
-                                    'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'], 
-                                    'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'], 
-                                    'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'], 
-                                    'TOMADOR': r['TOMADOR'], 'OBSERVACOES': r.get('OBSERVACOES', '')
-                                })
-                        if lista_app_of: despachar_para_appsheet(lista_app_of)
-                        
-                        # Limpa o carrinho após injetar com sucesso
-                        st.session_state.df_carrinho_oficial = pd.DataFrame()
-                        if 'contador_oficial_temp' in st.session_state: del st.session_state.contador_oficial_temp
-                        
-                        st.success(f"🎉 SUCESSO! {len(df_to_insert)} pedidos importados no C.C.O.")
+                        # Evitar duplicações caso haja um duplo clique
+                        pedidos_existentes = df_up_final['PEDIDO'].astype(str).tolist()
+                        df_to_insert_clean = df_to_insert[~df_to_insert['PEDIDO'].astype(str).isin(pedidos_existentes)]
+
+                        if not df_to_insert_clean.empty:
+                            df_up_final = pd.concat([df_up_final, df_to_insert_clean], ignore_index=True)
+                            aba_m.clear()
+                            aba_m.update("A1", [df_up_final.columns.tolist()] + df_up_final.fillna("").astype(str).values.tolist())
+                            
+                            lista_app_of = []
+                            for _, r in df_to_insert_clean.iterrows():
+                                if str(r.get('AGENTE_RAW','')).strip():
+                                    lista_app_of.append({
+                                        'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'], 
+                                        'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'], 
+                                        'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'], 
+                                        'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'], 
+                                        'TOMADOR': r['TOMADOR'], 'OBSERVACOES': r.get('OBSERVACOES', '')
+                                    })
+                            if lista_app_of: despachar_para_appsheet(lista_app_of)
+                            
+                        # 🚨 O CARRINHO É PRESERVADO NA TELA APÓS A INJEÇÃO 🚨
+                        st.success(f"🎉 SUCESSO! O Lote foi injetado no C.C.O. Prossiga para o Passo 2.")
                         time.sleep(2.5); carregar_dados_completos.clear(); st.rerun()
                     except Exception as e: st.error(f"Erro ao injetar: {e}")
 
-        with col_cmd2.popover("📲 2. Disparar WhatsApp", use_container_width=True):
-            st.markdown("Isso disparará as rotas de todos os clientes no carrinho para os motoristas. **Lembre-se de clicar em Injetar no Banco depois para salvar o status do disparo!**")
+        # PASSO 2: WHATSAPP
+        with col_zap.popover("📲 2. Disparar WhatsApp", use_container_width=True):
+            st.markdown("Isso disparará as rotas para todos os motoristas. **Lembre-se de clicar em Injetar no Banco depois para salvar o status do disparo!**")
             if st.button("🚀 Confirmar Disparos", use_container_width=True, key="zap_oficial"):
                 dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
                 dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
@@ -2080,7 +2098,7 @@ elif menu == "📥 Importações":
                                     obs = str(row.get('OBSERVACOES', '')).strip()
                                     if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                     items.append(item_str)
-                                msg_parts.append("\n\n      . . . . .\n\n".join(items) + "\n")
+                                msg_parts.append("\n\n      . . . .\n\n".join(items) + "\n")
                                 
                             if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
                                 time.sleep(2.0)
@@ -2093,15 +2111,32 @@ elif menu == "📥 Importações":
                                     enviar_excel_zapi(tel, xls_bytes_of, f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{dt_ref.strftime('%d%m')}.xlsx")
                                 
                                 sucessos_of += 1
-                                st.session_state.df_carrinho_oficial.loc[st.session_state.df_carrinho_oficial['PEDIDO'].isin(df_ag_of['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
                                 
+                                # Tenta carimbar na base que foi enviado, se já estiver injetado
+                                try:
+                                    aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                    df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                                    if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
+                                    df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_ag_of['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
+                                    aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                except: pass
+                                    
                         progress_bar.progress((idx_ag + 1) / len(agentes_selecionados))
                     
                     status_txt.markdown("✅ **Processo finalizado!**")
                     if sucessos_of > 0: 
-                        st.success(f"🎉 Disparo concluído para {sucessos_of} motorista(s)! (Clique em Injetar no Banco para salvar as informações).")
+                        st.success(f"🎉 Disparo concluído para {sucessos_of} motorista(s)!")
                         time.sleep(3.5); st.rerun()
                     else: st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
+
+        # PASSO 3: LIMPAR MESA
+        with col_limp:
+            if st.button("🧹 3. Limpar Mesa e Finalizar", type="secondary", use_container_width=True):
+                st.session_state.df_carrinho_oficial = pd.DataFrame()
+                if 'contador_oficial_temp' in st.session_state: del st.session_state.contador_oficial_temp
+                st.success("Mesa limpa e pronta para o próximo lote!")
+                time.sleep(1)
+                st.rerun()
 
 # =============================================================================
 # 🔥 MÓDULO SANDBOX (PARALELO): IMPORTAÇÕES UMOVE 🔥
