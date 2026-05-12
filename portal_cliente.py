@@ -11,8 +11,8 @@ import streamlit.components.v1 as components
 from datetime import datetime, timedelta, timezone
 from google.oauth2.credentials import Credentials
 
-# 🚀 IMPORTAÇÃO DO NOVO AGGRID (GRID SAAS PREMIUM)
-from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode
+# 🚀 IMPORTAÇÃO DO AGGRID (Agora com suporte a JavaScript para o link da foto)
+from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
@@ -657,7 +657,6 @@ else:
 
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Suporte e Relatórios</p>", unsafe_allow_html=True)
         
-        # 🔥 AJUSTE 1: NOMENCLATURA DO BOTÃO DE SUPORTE
         with st.popover("🎧 Abrir Chamado ao Suporte", use_container_width=True):
             st.markdown("📄 **Novo Chamado de Atendimento**")
             with st.form("form_chamado_zap", clear_on_submit=True):
@@ -934,7 +933,18 @@ else:
                         c for c in colunas_visiveis if c in df_final.columns
                     ]
 
-                    # 🔥 AJUSTE 4: SUBSTITUIÇÃO PARA O AGGRID (GRID SAAS PREMIUM)
+                    # 🔥 JAVASCRIPT: TRANSFORMA A URL DA FOTO NO EMOJI DE CÂMERA CLICÁVEL 🔥
+                    link_jscode = JsCode("""
+                    function(params) {
+                        if (params.value && params.value !== '') {
+                            return `<div style="display: flex; justify-content: center; align-items: center; height: 100%;">
+                                        <a href="${params.value}" target="_blank" style="text-decoration: none; font-size: 20px;" title="Ver Foto do Comprovante">📷</a>
+                                    </div>`;
+                        }
+                        return '';
+                    }
+                    """)
+
                     gb = GridOptionsBuilder.from_dataframe(df_final[colunas_visiveis])
                     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
@@ -949,9 +959,17 @@ else:
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status")
                     gb.configure_column("DETALHES", header_name="💬 Atualizações")
-                    gb.configure_column("COMPROVANTE", header_name="📎 Anexo")
+                    
+                    # Aplica o código Javascript na coluna de comprovante
+                    gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
 
                     gridOptions = gb.build()
+
+                    # 🔥 CSS MÁGICO: ADICIONA AS LINHAS VERTICAIS SEPARANDO AS COLUNAS 🔥
+                    custom_css = {
+                        ".ag-header-cell": {"border-right": "1px solid #e2e8f0 !important"},
+                        ".ag-cell": {"border-right": "1px solid #e2e8f0 !important"}
+                    }
 
                     AgGrid(
                         df_final[colunas_visiveis],
@@ -959,7 +977,8 @@ else:
                         theme="alpine",
                         columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
                         height=550,
-                        allow_unsafe_jscode=True
+                        allow_unsafe_jscode=True, # Necessário para o script do Emoji rodar
+                        custom_css=custom_css     # Aplica as linhas separadoras
                     )
 
                     # ── EXPORTAÇÃO CSV ────────
@@ -993,7 +1012,6 @@ else:
                             key="btn_download_grid_limpo"
                         )
 
-                    # 🔥 AJUSTE 2: NOMENCLATURA DO BOTÃO DE EXPORTAÇÃO NA SIDEBAR
                     with holder_exportar:
                         st.download_button(
                             "📥 Exportar Relatório",
