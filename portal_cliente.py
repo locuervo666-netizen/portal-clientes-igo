@@ -624,12 +624,15 @@ else:
         st.markdown("<br>", unsafe_allow_html=True)
 
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Filtros de Visão</p>", unsafe_allow_html=True)
+        
+        # 🔥 OPÇÃO 1 APLICADA AQUI: CALENDÁRIOS SEPARADOS 🔥
         with st.container(border=True):
-            datas_sel = st.date_input(
-                "🗓️ Período:",
-                value=(hoje_br - timedelta(days=15), hoje_br),
-                format="DD/MM/YYYY"
-            )
+            st.markdown("<p style='font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: -10px;'>🗓️ Período de Análise</p>", unsafe_allow_html=True)
+            c1_dt, c2_dt = st.columns(2)
+            dt_inicio = c1_dt.date_input("De", value=hoje_br - timedelta(days=15), format="DD/MM/YYYY")
+            dt_fim    = c2_dt.date_input("Até", value=hoje_br, format="DD/MM/YYYY")
+            datas_sel = (dt_inicio, dt_fim)
+            
             holder_cidades = st.empty()
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -1079,7 +1082,6 @@ else:
                     df_export = df_final[colunas_csv_finais].rename(columns=mapa_csv)
 
                     # 🔥 CORREÇÃO DO CNPJ NO EXCEL 🔥
-                    # Força o Excel a entender a coluna como texto, evitando notação científica (451E+13)
                     if 'CNPJ' in df_export.columns:
                         df_export['CNPJ'] = df_export['CNPJ'].astype(str).apply(lambda x: f'="{x}"' if x.strip() else '')
 
