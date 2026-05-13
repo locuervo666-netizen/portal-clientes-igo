@@ -19,7 +19,7 @@ FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
 
 # =======================================================
-# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE
+# 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE DO DASHBOARD
 # =======================================================
 st.set_page_config(
     page_title="Monitoramento IGO Logística",
@@ -69,7 +69,7 @@ st.markdown("""
         box-shadow: 0 0 0 1px #3b82f6 !important;
     }
 
-    /* ── BOTÃO PRIMÁRIO (LOGIN) AZUL PREMIUM ── */
+    /* ── BOTÃO PRIMÁRIO ── */
     button[kind="primary"] {
         background-color: #3b82f6 !important;
         border-color: #3b82f6 !important;
@@ -94,7 +94,7 @@ st.markdown("""
         padding-right: 2rem !important;
     }
 
-    /* ── KPI CARDS (COM FUNDO PREENCHIDO E EMOJI GIGANTE) ── */
+    /* ── KPI CARDS ── */
     .kpi-card {
         border-radius: 12px;
         padding: 16px;
@@ -188,14 +188,6 @@ st.markdown("""
         overflow: hidden;
     }
 
-    /* ── SEARCH ROW ── */
-    .search-export-row {
-        display: flex;
-        gap: 10px;
-        align-items: flex-end;
-        margin-bottom: 8px;
-    }
-
     </style>
 """, unsafe_allow_html=True)
 
@@ -210,13 +202,13 @@ CLIENTES_CONFIG = {
         "logo": LOGO_IGO,
         "filtro": "TODOS"
     },
-    "DANILO.DUARTE": {
-        "senha": "1234",
+    "LOGISTICA.LABEST": {
+        "senha": "123",
         "logo": "logo_labest.png",
         "filtro": "LABEST"
     },
-    "LOGISTICA.LABEST": {
-        "senha": "123",
+    "DANILO.DUARTE": {
+        "senha": "labest",
         "logo": "logo_labest.png",
         "filtro": "LABEST"
     },
@@ -225,7 +217,7 @@ CLIENTES_CONFIG = {
         "logo": LOGO_IGO,
         "filtro": "SYNVIA"
     },
-    "LOGISTICA.APISUL": {
+    "LOGISTICA.BAT": {
         "senha": "123",
         "logo": "souza cruz.png",
         "filtro": "SOUZA CRUZ"
@@ -272,7 +264,6 @@ def carregar_dados_nuvem():
             df.columns = df.columns.str.strip().str.upper()
             df = df.loc[:, ~df.columns.duplicated()]
 
-            # 🧹 HIGIENIZAÇÃO DE DADOS OFICIAL
             if 'TOMADOR' in df.columns:
                 df['TOMADOR'] = df['TOMADOR'].str.replace('CAEP', 'SYNVIA').str.replace('CUNHA', 'GRALAB')
             if 'CIDADE' in df.columns:
@@ -462,7 +453,6 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
         return False
 
 # ── Session State ──────────────────────────────────────
-# Lógica de Persistência Invisível na URL para evitar deslogar no Reload
 if 'logado' not in st.session_state:
     if "token_cli" in st.query_params:
         st.session_state.logado = True
@@ -574,51 +564,92 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🔐 3. LOGIN
+# 🔐 3. TELA DE LOGIN (SPLIT-SCREEN)
 # =======================================================
 if not st.session_state.logado:
     st.markdown("""
         <style>
+        /* Remove o fundo branco do dashboard */
         [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
+        /* Remove paddings da container principal */
+        .block-container { padding: 0px !important; max-width: 100% !important; }
+        [data-testid="stSidebar"] { display: none; }
+        header { display: none !important; }
+        
+        /* Estrutura Split-Screen */
+        .login-split-screen { display: flex; width: 100vw; height: 100vh; overflow: hidden; }
+        
+        /* Lado Esquerdo - Branding IGO */
+        .login-left {
+            flex: 1.1; 
+            background: linear-gradient(135deg, #0f172a 0%, #1e40af 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 40px; position: relative;
+        }
+        
+        /* Efeito de rede no fundo esquerdo */
+        .login-left::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url('https://i.postimg.cc/9F4B3C5r/nodes-network.png'); 
+            background-size: cover; opacity: 0.15;
+        }
+
+        .left-logo { max-width: 180px; margin-bottom: 30px; position: relative; z-index: 10; }
+        .left-title { font-size: 32px; font-weight: 800; color: #FFFFFF; letter-spacing: -1px; position: relative; z-index: 10; margin-bottom: 8px;}
+        .left-subtitle { font-size: 14px; font-weight: 400; color: rgba(255,255,255,0.7); position: relative; z-index: 10; text-align: center; max-width: 320px; line-height: 1.5; }
+        
+        /* Lado Direito - Formulário Clean */
+        .login-right { flex: 0.9; background-color: #FFFFFF; display: flex; align-items: center; justify-content: center; padding: 60px; }
+        .login-form-box { width: 100%; max-width: 360px; }
+        .form-welcome { font-size: 13px; font-weight: 600; color: #3b82f6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;}
+        .form-title { font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; margin-bottom: 30px;}
+
+        /* Estilos Lado Direito */
+        .stTextInput > div { border-radius: 8px !important; }
+        .stTextInput > label { font-size: 12px !important; font-weight: 600 !important; color: #64748b !important; }
+        button[kind="primary"] { height: 45px !important; font-weight: 700 !important; font-size: 14px !important; border-radius: 8px !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    _, c2, _ = st.columns([1, 1.1, 1])
-    with c2:
-        st.markdown("<br><br><br>", unsafe_allow_html=True)
-        with st.container(border=True):
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                st.image(LOGO_IGO, use_container_width=True)
+    st.markdown('<div class="login-split-screen">', unsafe_allow_html=True)
+    
+    st.markdown(f"""
+        <div class="login-left">
+            <img src="{LOGO_IGO}" class="left-logo">
+            <div class="left-title">Portal do Cliente</div>
+            <div class="left-subtitle">Acompanhe suas operações, gerencie coletas e acesse comprovantes em tempo real na maior rede logística.</div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="login-right">', unsafe_allow_html=True)
+    st.markdown('<div class="login-form-box">', unsafe_allow_html=True)
+    
+    st.markdown('<p class="form-welcome">Bem-vindo(a)</p>', unsafe_allow_html=True)
+    st.markdown('<p class="form-title">Acesse sua conta</p>', unsafe_allow_html=True)
+    
+    u = st.text_input("👤 Usuário", placeholder="DIGITE SEU USUÁRIO").upper().strip()
+    s = st.text_input("🔒 Senha", type="password", placeholder="••••••••••••")
+    st.markdown('<br>', unsafe_allow_html=True)
+    
+    if st.button("🚀 Entrar no Painel", type="primary", use_container_width=True):
+        if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
+            st.session_state.logado = True
+            st.session_state.cliente = u
+            st.query_params["token_cli"] = u
+            st.rerun()
+        else:
+            st.error("❌ Credenciais Incorretas. Tente novamente.")
 
-            st.markdown(
-                "<h3 style='text-align:center;color:#1e293b;margin-top:-10px;"
-                "margin-bottom:20px;font-size:18px;font-weight:700;'>Portal do Cliente</h3>",
-                unsafe_allow_html=True
-            )
-
-            u = st.text_input("👤 Usuário").upper().strip()
-            s = st.text_input("🔒 Senha", type="password")
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            if st.button("🚀 Acessar Sistema", type="primary", use_container_width=True):
-                if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
-                    st.session_state.logado  = True
-                    st.session_state.cliente = u
-                    st.query_params["token_cli"] = u
-                    st.rerun()
-                else:
-                    st.error("❌ Credenciais Incorretas")
+    st.markdown('</div></div></div>', unsafe_allow_html=True)
 
 # =======================================================
-# 🖥️ 4. PAINEL PRINCIPAL
+# 🖥️ 4. PAINEL PRINCIPAL (DASHBOARD)
 # =======================================================
 else:
-    # 🔥 NOVO: RECARREGAMENTO 100% SILENCIOSO (SEM TELA BRANCA / SEM F5) 🔥
-    # Vai atualizar invisivelmente a cada 5 minutos (300.000 ms)
+    # 🔥 RECARREGAMENTO SILENCIOSO 🔥
     st_autorefresh(interval=300000, limit=None, key="autorefresh_dados")
 
-    # 🔥 MAGIA DO JAVASCRIPT: Apenas Tradutor Forçado (F5 forçado foi removido) 🔥
+    # 🔥 MAGIA DO JAVASCRIPT: Tradutor Forçado 🔥
     components.html(
         """
         <script>
