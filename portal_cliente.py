@@ -576,26 +576,13 @@ if not st.session_state.logado:
             font-family: 'Inter', sans-serif;
         }
 
-        /* 100% Garantia de Centralização usando Flexbox nativo do Streamlit */
-        .block-container {
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: center !important;
-            align-items: center !important;
-            min-height: 100vh !important;
-            padding: 0 !important;
-            max-width: 100% !important;
-        }
-
         /* O "Cartão Branco" do formulário */
         [data-testid="stForm"] {
             background-color: #ffffff !important;
-            padding: 45px 40px !important;
+            padding: 40px !important;
             border-radius: 20px !important;
             box-shadow: 0 15px 35px -5px rgba(0,0,0,0.1), 0 5px 15px rgba(0,0,0,0.05) !important;
-            border: 1px solid #ffffff !important;
-            width: 100% !important;
-            max-width: 400px !important;
+            border: none !important;
         }
 
         /* Textos e Ajustes do Card */
@@ -626,30 +613,36 @@ if not st.session_state.logado:
         </style>
     """, unsafe_allow_html=True)
 
-    # Criação do Formulário blindado
-    with st.form("form_login", clear_on_submit=False):
-        
-        # Centralizando a logo dentro do formulário
-        col_espaco1, col_logo, col_espaco2 = st.columns([1, 1.5, 1])
-        with col_logo:
-            st.image(LOGO_IGO, use_container_width=True)
+    # Adiciona quebras de linha para centralizar verticalmente no Streamlit
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+
+    # Usa colunas para garantir que o formulário fique no meio horizontalmente
+    _, col_login, _ = st.columns([1, 1.2, 1])
+    
+    with col_login:
+        with st.form("form_login", clear_on_submit=False):
             
-        st.markdown('<div class="login-title">Acesse sua conta</div>', unsafe_allow_html=True)
-        st.markdown('<div class="login-subtitle">Portal de Monitoramento Logístico</div>', unsafe_allow_html=True)
-        
-        u = st.text_input("👤 Usuário", placeholder="Digite seu usuário").upper().strip()
-        s = st.text_input("🔒 Senha", type="password", placeholder="••••••••••••")
-        
-        submit = st.form_submit_button("🚀 Entrar no Painel")
-        
-        if submit:
-            if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
-                st.session_state.logado = True
-                st.session_state.cliente = u
-                st.query_params["token_cli"] = u
-                st.rerun()
-            else:
-                st.error("❌ Credenciais Incorretas. Tente novamente.")
+            # Centralizando a logo dentro do formulário
+            col_espaco1, col_logo, col_espaco2 = st.columns([1, 1.5, 1])
+            with col_logo:
+                st.image(LOGO_IGO, use_container_width=True)
+                
+            st.markdown('<div class="login-title">Acesse sua conta</div>', unsafe_allow_html=True)
+            st.markdown('<div class="login-subtitle">Portal de Monitoramento Logístico</div>', unsafe_allow_html=True)
+            
+            u = st.text_input("👤 Usuário", placeholder="Digite seu usuário").upper().strip()
+            s = st.text_input("🔒 Senha", type="password", placeholder="••••••••••••")
+            
+            submit = st.form_submit_button("🚀 Entrar no Painel")
+            
+            if submit:
+                if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
+                    st.session_state.logado = True
+                    st.session_state.cliente = u
+                    st.query_params["token_cli"] = u
+                    st.rerun()
+                else:
+                    st.error("❌ Credenciais Incorretas. Tente novamente.")
 
 # =======================================================
 # 🖥️ 4. PAINEL PRINCIPAL (DASHBOARD)
