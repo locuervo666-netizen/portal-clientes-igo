@@ -903,7 +903,6 @@ else:
                             .replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
                         )
 
-                    # 🔥 A ORDEM INVERTIDA AQUI: COMPROVANTE (Penúltima), DETALHES (Última) 🔥
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
@@ -1032,8 +1031,6 @@ else:
                     gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=180)
-                    
-                    # 🔥 INVERTIDOS AQUI NA CONFIGURAÇÃO TAMBÉM 🔥
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
                     gb.configure_column("DETALHES", header_name="💬 Atualizações")
 
@@ -1080,6 +1077,11 @@ else:
 
                     colunas_csv_finais = [c for c in mapa_csv.keys() if c in df_final.columns]
                     df_export = df_final[colunas_csv_finais].rename(columns=mapa_csv)
+
+                    # 🔥 CORREÇÃO DO CNPJ NO EXCEL 🔥
+                    # Força o Excel a entender a coluna como texto, evitando notação científica (451E+13)
+                    if 'CNPJ' in df_export.columns:
+                        df_export['CNPJ'] = df_export['CNPJ'].astype(str).apply(lambda x: f'="{x}"' if x.strip() else '')
 
                     csv = df_export.to_csv(index=False, sep=';').encode('utf-8-sig')
                     
