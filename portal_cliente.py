@@ -11,8 +11,9 @@ import streamlit.components.v1 as components
 from datetime import datetime, timedelta, timezone
 from google.oauth2.credentials import Credentials
 
-# 🚀 IMPORTAÇÃO DO AGGRID
+# 🚀 IMPORTAÇÃO DO AGGRID E DO AUTO-REFRESH SILENCIOSO
 from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
+from streamlit_autorefresh import st_autorefresh
 
 FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
@@ -455,6 +456,18 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
     except Exception:
         return False
 
+# ── Session State ──────────────────────────────────────
+# Lógica de Persistência Invisível na URL para evitar deslogar no Reload
+if 'logado' not in st.session_state:
+    if "token_cli" in st.query_params:
+        st.session_state.logado = True
+        st.session_state.cliente = st.query_params["token_cli"]
+    else:
+        st.session_state.logado = False
+
+if 'filtro_kpi' not in st.session_state: 
+    st.session_state.filtro_kpi = "TODOS"
+
 # ── Helpers de status ──────────────────────────────────
 def get_st(row):
     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
@@ -556,20 +569,8 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🔐 3. SESSION STATE & LOGIN COM PERSISTÊNCIA (URL)
+# 🔐 3. LOGIN
 # =======================================================
-# Se o utilizador der um F5 ou ocorrer um reload automático, 
-# verificamos se ele já tinha um token salvo invisivelmente na URL.
-if 'logado' not in st.session_state:
-    if "token_cli" in st.query_params:
-        st.session_state.logado = True
-        st.session_state.cliente = st.query_params["token_cli"]
-    else:
-        st.session_state.logado = False
-
-if 'filtro_kpi' not in st.session_state: 
-    st.session_state.filtro_kpi = "TODOS"
-
 if not st.session_state.logado:
     st.markdown("""
         <style>
@@ -599,7 +600,6 @@ if not st.session_state.logado:
                 if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
                     st.session_state.logado  = True
                     st.session_state.cliente = u
-                    # Salva um crachá invisível na barra de endereços para não perder a sessão
                     st.query_params["token_cli"] = u
                     st.rerun()
                 else:
@@ -609,14 +609,14 @@ if not st.session_state.logado:
 # 🖥️ 4. PAINEL PRINCIPAL
 # =======================================================
 else:
-    # 🔥 MAGIA DO JAVASCRIPT: Auto-Reload + Tradutor Forçado 🔥
+    # 🔥 NOVO: RECARREGAMENTO 100% SILENCIOSO (SEM TELA BRANCA / SEM F5) 🔥
+    # Vai atualizar invisivelmente a cada 5 minutos (300.000 ms)
+    st_autorefresh(interval=300000, limit=None, key="autorefresh_dados")
+
+    # 🔥 MAGIA DO JAVASCRIPT: Apenas Tradutor Forçado (F5 forçado foi removido) 🔥
     components.html(
         """
         <script>
-        // 1. Auto Reload a cada 5 minutos (A persistência agora suporta isto sem deslogar)
-        setTimeout(function(){ window.parent.location.reload(); }, 300000);
-        
-        // 2. Tradutor Forçado (Calendário e Dropdowns)
         const parentDoc = window.parent.document;
         const dict = {
             "Su": "Dom", "Mo": "Seg", "Tu": "Ter", "We": "Qua", "Th": "Qui", "Fr": "Sex", "Sa": "Sáb",
@@ -724,8 +724,6 @@ else:
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Sistema</p>", unsafe_allow_html=True)
-        
-        # 🔥 Quando clica em sair, limpamos o crachá da URL 🔥
         if st.button("🚪 Sair com Segurança", use_container_width=True, type="secondary"):
             st.session_state.logado = False
             st.query_params.clear() 
