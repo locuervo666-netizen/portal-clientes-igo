@@ -325,7 +325,7 @@ def carregar_dados_nuvem():
                     df['OBS_APP_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_OB'), axis=1)
                     df['CONTATO_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_CONTATO'), axis=1)
 
-                    def definir_foto_prioritaria(r):
+                    def defining_foto_prioritaria(r):
                         f_col = get_app_val(r, 'A_FOTO_COL')
                         f_ent = get_app_val(r, 'A_FOTO_ENT')
                         f_gen = get_app_val(r, 'A_FO')
@@ -339,7 +339,7 @@ def carregar_dados_nuvem():
                         if f_gen and f_gen.upper() != 'NAN': return f_gen
                         return ""
 
-                    df['FOTO_FINAL'] = df.apply(definir_foto_prioritaria, axis=1)
+                    df['FOTO_FINAL'] = df.apply(defining_foto_prioritaria, axis=1)
 
                     def get_true_status_portal(row):
                         s_db  = str(row.get('STATUS', '')).strip().upper()
@@ -576,6 +576,17 @@ if not st.session_state.logado:
             font-family: 'Inter', sans-serif;
         }
 
+        /* 100% Garantia de Centralização usando Flexbox nativo do Streamlit */
+        .block-container {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+            min-height: 100vh !important;
+            padding: 0 !important;
+            max-width: 100% !important;
+        }
+
         /* O "Cartão Branco" do formulário */
         [data-testid="stForm"] {
             background-color: #ffffff !important;
@@ -702,10 +713,11 @@ else:
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Filtros de Visão</p>", unsafe_allow_html=True)
         
         with st.container(border=True):
-            st.markdown("<p style='font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: -10px;'>🗓️ Período de Análise</p>", unsafe_allow_html=True)
+            # 🔥 CORREÇÃO DA MARGEM: Removida a margem negativa que causava a colisão com os labels "De" e "Até" 🔥
+            st.markdown("<p style='font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 5px;'>🗓️ Período de Análise</p>", unsafe_allow_html=True)
             c1_dt, c2_dt = st.columns(2)
-            dt_inicio = c1_dt.date_input("De", value=hoje_br - timedelta(days=15), format="DD/MM/YYYY")
-            dt_fim    = c2_dt.date_input("Até", value=hoje_br, format="DD/MM/YYYY")
+            dt_inicio = c1_dt.date_input("De:", value=hoje_br - timedelta(days=15), format="DD/MM/YYYY")
+            dt_fim    = c2_dt.date_input("Até:", value=hoje_br, format="DD/MM/YYYY")
             datas_sel = (dt_inicio, dt_fim)
             holder_cidades = st.empty()
 
