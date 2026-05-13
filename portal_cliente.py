@@ -490,12 +490,12 @@ KPI_DOT_COLOR = {
 }
 
 KPI_BG_COLOR = {
-    "TODOS":      "#dbeafe", # Azul contrastante (100)
-    "ENTREGUE":   "#dcfce7", # Verde contrastante (100)
-    "FRUSTRADA":  "#fee2e2", # Vermelho contrastante (100)
-    "PENDENTE":   "#fef3c7", # Amarelo contrastante (100)
-    "Aguardando": "#f1f5f9", # Cinza contrastante (100)
-    "HOJE":       "#ede9fe", # Roxo contrastante (100)
+    "TODOS":      "#dbeafe", # Azul contrastante
+    "ENTREGUE":   "#dcfce7", # Verde contrastante
+    "FRUSTRADA":  "#fee2e2", # Vermelho contrastante
+    "PENDENTE":   "#fef3c7", # Amarelo contrastante
+    "Aguardando": "#f1f5f9", # Cinza contrastante
+    "HOJE":       "#ede9fe", # Roxo contrastante
 }
 
 KPI_META = [
@@ -939,7 +939,6 @@ else:
                     class StatusBadgeRenderer {
                       init(params) {
                         this.eGui = document.createElement('div');
-                        // Container para centralizar verticalmente
                         this.eGui.style.cssText = 'display: flex; align-items: center; height: 100%;';
                         
                         let badge = document.createElement('span');
@@ -948,22 +947,27 @@ else:
                         let status = params.value ? params.value.toUpperCase() : '';
                         let text = params.value || '';
                         
-                        // Lógica de Cores SaaS (Tailwind Colors)
                         if (status.includes('ENTREGUE') || status.includes('CONFERIDO')) {
-                          badge.style.backgroundColor = '#dcfce7'; // Verde Claro
-                          badge.style.color = '#166534'; // Texto Verde Escuro
+                          badge.style.backgroundColor = '#dcfce7'; 
+                          badge.style.color = '#166534'; 
                           badge.style.border = '1px solid #bbf7d0';
                         } else if (status.includes('FRUSTRADA') || status.includes('PROBLEMA') || status.includes('ATRASADO') || status.includes('RECUSA')) {
-                          badge.style.backgroundColor = '#fee2e2'; // Vermelho Claro
-                          badge.style.color = '#991b1b'; // Texto Vermelho Escuro
+                          badge.style.backgroundColor = '#fee2e2'; 
+                          badge.style.color = '#991b1b'; 
                           badge.style.border = '1px solid #fecaca';
-                        } else if (status.includes('PENDENTE') || status.includes('ROTA') || status.includes('COLETADO')) {
-                          badge.style.backgroundColor = '#fef3c7'; // Amarelo Claro
-                          badge.style.color = '#92400e'; // Texto Amarelo Escuro
+                        } else if (status.includes('COLETADO') || status.includes('ROTA')) {
+                          // 🔥 NOVO: AZUL PARA STATUS EM ANDAMENTO 🔥
+                          badge.style.backgroundColor = '#dbeafe'; 
+                          badge.style.color = '#1e40af'; 
+                          badge.style.border = '1px solid #bfdbfe';
+                        } else if (status.includes('PENDENTE')) {
+                          // 🔥 MANTIDO: AMARELO PARA PENDENTE 🔥
+                          badge.style.backgroundColor = '#fef3c7'; 
+                          badge.style.color = '#b45309'; 
                           badge.style.border = '1px solid #fde68a';
                         } else {
-                          badge.style.backgroundColor = '#f1f5f9'; // Cinza Claro
-                          badge.style.color = '#475569'; // Texto Cinza Escuro
+                          badge.style.backgroundColor = '#f1f5f9'; 
+                          badge.style.color = '#475569'; 
                           badge.style.border = '1px solid #e2e8f0';
                         }
                         
