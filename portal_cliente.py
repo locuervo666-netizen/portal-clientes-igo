@@ -599,8 +599,39 @@ if not st.session_state.logado:
 # 🖥️ 4. PAINEL PRINCIPAL
 # =======================================================
 else:
+    # 🔥 AQUI ESTÁ A "MAGIA": SCRIPT DE RELOAD + TRADUTOR DO CALENDÁRIO 🔥
     components.html(
-        "<script>setTimeout(function(){ window.parent.location.reload(); }, 300000);</script>",
+        """
+        <script>
+        // 1. Auto Reload a cada 5 minutos
+        setTimeout(function(){ window.parent.location.reload(); }, 300000);
+        
+        // 2. Tradutor Forçado do Calendário para Português
+        const parentDoc = window.parent.document;
+        const dict = {
+            "Su": "Dom", "Mo": "Seg", "Tu": "Ter", "We": "Qua", "Th": "Qui", "Fr": "Sex", "Sa": "Sáb",
+            "January": "Janeiro", "February": "Fevereiro", "March": "Março", "April": "Abril", "May": "Maio", 
+            "June": "Junho", "July": "Julho", "August": "Agosto", "September": "Setembro", "October": "Outubro", 
+            "November": "Novembro", "December": "Dezembro",
+            "Today": "Hoje", "Clear": "Limpar"
+        };
+        const observer = new MutationObserver(() => {
+            const calendar = parentDoc.querySelector('[data-baseweb="calendar"]');
+            if (calendar) {
+                // 4 é a constante para NodeFilter.SHOW_TEXT
+                const walker = parentDoc.createTreeWalker(calendar, 4, null, false);
+                let node;
+                while (node = walker.nextNode()) {
+                    let text = node.nodeValue.trim();
+                    if (dict[text]) {
+                        node.nodeValue = dict[text];
+                    }
+                }
+            }
+        });
+        observer.observe(parentDoc.body, { childList: true, subtree: true });
+        </script>
+        """,
         height=0, width=0
     )
 
@@ -624,8 +655,6 @@ else:
         st.markdown("<br>", unsafe_allow_html=True)
 
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Filtros de Visão</p>", unsafe_allow_html=True)
-        
-        # 🔥 OPÇÃO 1 APLICADA AQUI: CALENDÁRIOS SEPARADOS 🔥
         with st.container(border=True):
             st.markdown("<p style='font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: -10px;'>🗓️ Período de Análise</p>", unsafe_allow_html=True)
             c1_dt, c2_dt = st.columns(2)
@@ -1081,7 +1110,6 @@ else:
                     colunas_csv_finais = [c for c in mapa_csv.keys() if c in df_final.columns]
                     df_export = df_final[colunas_csv_finais].rename(columns=mapa_csv)
 
-                    # 🔥 CORREÇÃO DO CNPJ NO EXCEL 🔥
                     if 'CNPJ' in df_export.columns:
                         df_export['CNPJ'] = df_export['CNPJ'].astype(str).apply(lambda x: f'="{x}"' if x.strip() else '')
 
