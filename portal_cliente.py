@@ -225,7 +225,7 @@ CLIENTES_CONFIG = {
         "logo": LOGO_IGO,
         "filtro": "SYNVIA"
     },
-    "LOGISTICA.BAT": {
+    "LOGISTICA.APISUL": {
         "senha": "123",
         "logo": "souza cruz.png",
         "filtro": "SOUZA CRUZ"
