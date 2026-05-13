@@ -282,7 +282,6 @@ def carregar_dados_nuvem():
                         for c in df_app.columns
                     ]
 
-                    # 🔥 PASSO 1 AQUI: ADICIONAMOS AS NOVAS COLUNAS
                     cols_to_extract = ['PEDIDO']
                     if 'STATUS'       in df_app.columns: cols_to_extract.append('STATUS')
                     if 'OBSERVACOES'  in df_app.columns: cols_to_extract.append('OBSERVACOES')
@@ -303,7 +302,6 @@ def carregar_dados_nuvem():
                     cols_to_extract = list(set(cols_to_extract))
                     df_app_clean = df_app[cols_to_extract].copy()
 
-                    # 🔥 PASSO 2 AQUI: RENOMEAMOS PRO NOVO DICIONÁRIO
                     rename_dict = {
                         'STATUS': 'A_ST',
                         'OBSERVACOES': 'A_OB',
@@ -318,7 +316,6 @@ def carregar_dados_nuvem():
                         rename_dict[col_nome] = 'A_CONTATO'
                     df_app_clean.rename(columns=rename_dict, inplace=True)
 
-                    # Inteligência de Romaneios
                     rom_mask = df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)
                     rom_dict = df_app_clean[rom_mask].set_index('PEDIDO').to_dict('index')
 
@@ -327,7 +324,6 @@ def carregar_dados_nuvem():
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
 
-                    # Função de cruzamento robusto para Romaneios
                     def get_app_val(row, col_app):
                         val = str(row.get(col_app, '')).strip()
                         rom_id = str(row.get('ROMANEIO', '')).strip()
@@ -341,7 +337,6 @@ def carregar_dados_nuvem():
                     df['OBS_APP_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_OB'), axis=1)
                     df['CONTATO_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_CONTATO'), axis=1)
 
-                    # 🔥 PASSO 3 AQUI: REGRA DE OURO DA FOTO (COLETA > ENTREGA > GERAL)
                     def definir_foto_prioritaria(r):
                         f_col = get_app_val(r, 'A_FOTO_COL')
                         f_ent = get_app_val(r, 'A_FOTO_ENT')
@@ -479,35 +474,33 @@ def get_st(row):
     if 'PROBLEMA'   in s: return '🚨 Problema'
     return '⏳ Pendente'
 
-# 🔥 CORES DOS BLOCOS (SEPARAÇÃO DE COLETADOS E PENDENTES) 🔥
 KPI_DOT_COLOR = {
-    "TODOS":      "#2563eb", # Azul forte
-    "ENTREGUE":   "#16a34a", # Verde forte
-    "FRUSTRADA":  "#dc2626", # Vermelho forte
-    "COLETADO":   "#0ea5e9", # Azul Ciano forte (Diferencia de Todos)
-    "PENDENTE":   "#d97706", # Amarelo/Laranja forte
-    "Aguardando": "#475569", # Cinza forte
-    "HOJE":       "#7c3aed", # Roxo forte
+    "TODOS":      "#2563eb", 
+    "ENTREGUE":   "#16a34a", 
+    "FRUSTRADA":  "#dc2626", 
+    "COLETADO":   "#0ea5e9", 
+    "PENDENTE":   "#d97706", 
+    "Aguardando": "#475569", 
+    "HOJE":       "#7c3aed", 
 }
 
 KPI_BG_COLOR = {
-    "TODOS":      "#dbeafe", # Azul contrastante
-    "ENTREGUE":   "#dcfce7", # Verde contrastante
-    "FRUSTRADA":  "#fee2e2", # Vermelho contrastante
-    "COLETADO":   "#e0f2fe", # Azul Ciano contrastante
-    "PENDENTE":   "#fef3c7", # Amarelo contrastante
-    "Aguardando": "#f1f5f9", # Cinza contrastante
-    "HOJE":       "#ede9fe", # Roxo contrastante
+    "TODOS":      "#dbeafe", 
+    "ENTREGUE":   "#dcfce7", 
+    "FRUSTRADA":  "#fee2e2", 
+    "COLETADO":   "#e0f2fe", 
+    "PENDENTE":   "#fef3c7", 
+    "Aguardando": "#f1f5f9", 
+    "HOJE":       "#ede9fe", 
 }
 
-# Agora temos 7 blocos
 KPI_META = [
     ("TODOS",      "📦 Total",        "kpi_total"),
     ("ENTREGUE",   "✅ Entregues",    "kpi_entregue"),
     ("FRUSTRADA",  "❌ Frustradas",   "kpi_frus"),
-    ("COLETADO",   "🚐 Coletados",    "kpi_coletado"), # Novo Bloco Isolado
+    ("COLETADO",   "🚐 Coletados",    "kpi_coletado"), 
     ("PENDENTE",   "⏳ Pendentes",    "kpi_pend"),
-    ("Aguardando", "🎧 Chamados",     "kpi_aguardando"), # Nome renomeado de Aguard. CCO
+    ("Aguardando", "🎧 Chamados",     "kpi_aguardando"), 
     ("HOJE",       "📅 Hoje",         "kpi_hoje"),
 ]
 
@@ -765,7 +758,6 @@ else:
                     df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] + ' 🚨 ATRASADO'
                 )
 
-                # 🔥 LÓGICA ATUALIZADA: CONTAGEM SEPARADA PARA COLETADOS E PENDENTES 🔥
                 n_vals = {
                     "TODOS":      len(df_f),
                     "ENTREGUE":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', case=False)]),
@@ -776,8 +768,7 @@ else:
                     "HOJE":       len(df_f[df_f['DATA_OBJ'] == hoje_br]),
                 }
 
-                # ── KPI CARDS: AGORA SÃO 7 BLOCOS NA TELA ────────────────
-                cols_kpi = st.columns(7) # 7 Colunas!
+                cols_kpi = st.columns(7) 
                 for col, (filtro, label, key) in zip(cols_kpi, KPI_META):
                     is_active = st.session_state.filtro_kpi == filtro
                     dot_color = KPI_DOT_COLOR[filtro]
@@ -860,7 +851,6 @@ else:
 
                 df_grid = df_f.copy()
                 
-                # 🔥 LÓGICA DE FILTRAGEM ATUALIZADA PARA O CLIQUE NA GRID 🔥
                 if st.session_state.filtro_kpi != "TODOS":
                     if st.session_state.filtro_kpi == "HOJE":
                         df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
@@ -913,10 +903,11 @@ else:
                             .replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
                         )
 
+                    # 🔥 A ORDEM INVERTIDA AQUI: COMPROVANTE (Penúltima), DETALHES (Última) 🔥
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
-                        'DETALHES', 'COMPROVANTE'
+                        'COMPROVANTE', 'DETALHES'
                     ]
 
                     if st.session_state.cliente == "LOGISTICA.LABEST":
@@ -927,7 +918,7 @@ else:
                     ]
 
                     # ==========================================
-                    # 🔥 JAVASCRIPT 1: EMOJI DE CÂMERA COM EXPANSÃO AO PASSAR O MOUSE 🔥
+                    # 🔥 JAVASCRIPT 1: EMOJI COM EFEITO DE LUPA INTELIGENTE 🔥
                     # ==========================================
                     link_jscode = JsCode("""
                     class EmojiLinkRenderer {
@@ -936,23 +927,19 @@ else:
                         this.eGui.style.cssText = 'display: flex; justify-content: center; align-items: center; height: 100%;';
                         
                         if (params.value && params.value !== '') {
-                          // O emoji clicável normal
                           let a = document.createElement('a');
                           a.href = params.value;
                           a.target = '_blank';
                           a.innerHTML = '📷';
-                          a.title = 'Clique para abrir o anexo';
+                          a.title = 'Clique para abrir o anexo completo';
                           a.style.cssText = 'text-decoration: none; font-size: 20px; transition: transform 0.2s; cursor: pointer;';
                           
-                          // A imagem flutuante invisível (Preview)
                           let preview = document.createElement('img');
                           preview.src = params.value;
                           preview.style.cssText = 'position: fixed; display: none; z-index: 99999; max-width: 350px; max-height: 350px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4); border: 3px solid white; pointer-events: none;';
                           
-                          // Colocamos o preview diretamente no body da página para nunca ser cortado pelas linhas da tabela
                           document.body.appendChild(preview);
 
-                          // Quando passa o mouse em cima da câmera
                           a.onmouseover = (e) => {
                             a.style.transform = 'scale(1.3)';
                             preview.style.display = 'block';
@@ -960,25 +947,22 @@ else:
                             preview.style.top = (e.clientY + 20) + 'px';
                           };
                           
-                          // Acompanha o mouse
                           a.onmousemove = (e) => {
                             preview.style.left = (e.clientX + 20) + 'px';
                             preview.style.top = (e.clientY + 20) + 'px';
                           };
                           
-                          // Quando tira o mouse
                           a.onmouseout = () => {
                             a.style.transform = 'scale(1)';
                             preview.style.display = 'none';
                           };
 
                           this.eGui.appendChild(a);
-                          this.previewElement = preview; // Guarda referência para limpar depois
+                          this.previewElement = preview; 
                         }
                       }
                       getGui() { return this.eGui; }
                       
-                      // Limpeza importante para a memória não travar o app
                       destroy() {
                         if (this.previewElement && this.previewElement.parentNode) {
                           this.previewElement.parentNode.removeChild(this.previewElement);
@@ -1011,12 +995,10 @@ else:
                           badge.style.color = '#991b1b'; 
                           badge.style.border = '1px solid #fecaca';
                         } else if (status.includes('COLETADO') || status.includes('ROTA')) {
-                          // 🔥 AZUL PARA STATUS EM ANDAMENTO 🔥
                           badge.style.backgroundColor = '#dbeafe'; 
                           badge.style.color = '#1e40af'; 
                           badge.style.border = '1px solid #bfdbfe';
                         } else if (status.includes('PENDENTE')) {
-                          // 🔥 AMARELO PARA PENDENTE 🔥
                           badge.style.backgroundColor = '#fef3c7'; 
                           badge.style.color = '#b45309'; 
                           badge.style.border = '1px solid #fde68a';
@@ -1049,10 +1031,11 @@ else:
                     gb.configure_column("CIDADE_UF", header_name="📍 Cidade / UF")
                     gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
-                    
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=180)
-                    gb.configure_column("DETALHES", header_name="💬 Atualizações")
+                    
+                    # 🔥 INVERTIDOS AQUI NA CONFIGURAÇÃO TAMBÉM 🔥
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
+                    gb.configure_column("DETALHES", header_name="💬 Atualizações")
 
                     gridOptions = gb.build()
 
@@ -1064,11 +1047,8 @@ else:
                         ".ag-cell": {"border-right": "1px solid #e2e8f0 !important"},
                         ".ag-cell-focus": {"border": "none !important", "outline": "none !important"},
                         ".ag-row:hover": {"background-color": "#e2e8f0 !important", "cursor": "pointer", "transition": "background-color 0.2s"},
-                        
-                        # 🔥 EFEITO ZEBRA (Linhas intercaladas na tabela) 🔥
                         ".ag-row-odd": {"background-color": "#f8fafc !important"}, 
                         ".ag-row-even": {"background-color": "#ffffff !important"}, 
-                        
                         ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
                     }
 
