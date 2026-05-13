@@ -210,6 +210,11 @@ CLIENTES_CONFIG = {
         "logo": LOGO_IGO,
         "filtro": "TODOS"
     },
+    "danilo.duarte": {
+        "senha": "labest",
+        "logo": "logo_labest.png",
+        "filtro": "LABEST"
+    },
     "LOGISTICA.LABEST": {
         "senha": "123",
         "logo": "logo_labest.png",
