@@ -1060,7 +1060,7 @@ else:
                     
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
-                    gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120, pinned='left')
+                    gb.configure_column("PEDIDO", header_name="📦 ID", width=120, pinned='left')
                     gb.configure_column("DATA", header_name="📅 Data Coleta", width=130)
                     gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta")
                     if 'CNPJ' in colunas_visiveis:
