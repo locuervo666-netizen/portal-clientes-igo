@@ -760,7 +760,6 @@ else:
                     f"Nenhum pedido registrado sob a titularidade '{conf['filtro']}'."
                 )
             else:
-                # 🔥 OPÇÃO 1 APLICADA AQUI: PLACEHOLDER EM PORTUGUÊS NO SELECTBOX 🔥
                 with holder_cidades:
                     cidades_sel = st.multiselect(
                         "📍 Cidades:",
@@ -1060,7 +1059,7 @@ else:
                     
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
-                    gb.configure_column("PEDIDO", header_name="📦 ID", width=90, pinned='left')
+                    gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120, pinned='left')
                     gb.configure_column("DATA", header_name="📅 Data Coleta", width=130)
                     gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta")
                     if 'CNPJ' in colunas_visiveis:
@@ -1075,9 +1074,20 @@ else:
                     gridOptions = gb.build()
 
                     # ==========================================
-                    # 🎨 CSS CUSTOMIZADO PREMIUM
+                    # 🎨 CSS CUSTOMIZADO PREMIUM (COM CABEÇALHO DESTACADO)
                     # ==========================================
                     custom_css = {
+                        # 🔥 NOVO: CABEÇALHO COM DESTAQUE PREMIUM 🔥
+                        ".ag-header": {
+                            "background-color": "#f1f5f9 !important", 
+                            "border-bottom": "2px solid #e2e8f0 !important"
+                        },
+                        ".ag-header-cell-text": {
+                            "color": "#0f172a !important", 
+                            "font-weight": "700 !important", 
+                            "font-size": "13px !important"
+                        },
+                        # Separação sutil de colunas
                         ".ag-header-cell": {"border-right": "1px solid #e2e8f0 !important"},
                         ".ag-cell": {"border-right": "1px solid #e2e8f0 !important"},
                         ".ag-cell-focus": {"border": "none !important", "outline": "none !important"},
