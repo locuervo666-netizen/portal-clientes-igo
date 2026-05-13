@@ -69,20 +69,6 @@ st.markdown("""
         box-shadow: 0 0 0 1px #3b82f6 !important;
     }
 
-    /* ── BOTÃO PRIMÁRIO ── */
-    button[kind="primary"] {
-        background-color: #3b82f6 !important;
-        border-color: #3b82f6 !important;
-        color: #ffffff !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    button[kind="primary"]:hover {
-        background-color: #2563eb !important;
-        border-color: #2563eb !important;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
-    }
-
     /* ── LAYOUT ── */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -564,83 +550,75 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🔐 3. TELA DE LOGIN (SPLIT-SCREEN)
+# 🔐 3. TELA DE LOGIN (MODELO 3: MINIMALISTA PREMIUM)
 # =======================================================
 if not st.session_state.logado:
     st.markdown("""
         <style>
-        /* Remove o fundo branco do dashboard */
-        [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
-        /* Remove paddings da container principal */
-        .block-container { padding: 0px !important; max-width: 100% !important; }
+        /* Fundo da tela toda off-white */
+        [data-testid="stAppViewContainer"] { background-color: #f1f5f9 !important; }
         [data-testid="stSidebar"] { display: none; }
         header { display: none !important; }
-        
-        /* Estrutura Split-Screen */
-        .login-split-screen { display: flex; width: 100vw; height: 100vh; overflow: hidden; }
-        
-        /* Lado Esquerdo - Branding IGO */
-        .login-left {
-            flex: 1.1; 
-            background: linear-gradient(135deg, #0f172a 0%, #1e40af 100%);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 40px; position: relative;
+
+        /* Card flutuante central (A mágica acontece aqui) */
+        div[data-testid="column"]:nth-of-type(2) {
+            background-color: #ffffff;
+            padding: 45px 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            margin-top: 15vh;
         }
         
-        /* Efeito de rede no fundo esquerdo */
-        .login-left::before {
-            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background-image: url('https://i.postimg.cc/9F4B3C5r/nodes-network.png'); 
-            background-size: cover; opacity: 0.15;
-        }
-
-        .left-logo { max-width: 180px; margin-bottom: 30px; position: relative; z-index: 10; }
-        .left-title { font-size: 32px; font-weight: 800; color: #FFFFFF; letter-spacing: -1px; position: relative; z-index: 10; margin-bottom: 8px;}
-        .left-subtitle { font-size: 14px; font-weight: 400; color: rgba(255,255,255,0.7); position: relative; z-index: 10; text-align: center; max-width: 320px; line-height: 1.5; }
+        .logo-container { text-align: center; margin-bottom: 20px; }
+        .logo-container img { max-width: 150px; }
+        .login-title { text-align: center; font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 5px; }
+        .login-subtitle { text-align: center; font-size: 14px; color: #64748b; margin-bottom: 35px; }
         
-        /* Lado Direito - Formulário Clean */
-        .login-right { flex: 0.9; background-color: #FFFFFF; display: flex; align-items: center; justify-content: center; padding: 60px; }
-        .login-form-box { width: 100%; max-width: 360px; }
-        .form-welcome { font-size: 13px; font-weight: 600; color: #3b82f6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;}
-        .form-title { font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; margin-bottom: 30px;}
-
-        /* Estilos Lado Direito */
+        /* Inputs e Botão Premium */
         .stTextInput > div { border-radius: 8px !important; }
-        .stTextInput > label { font-size: 12px !important; font-weight: 600 !important; color: #64748b !important; }
-        button[kind="primary"] { height: 45px !important; font-weight: 700 !important; font-size: 14px !important; border-radius: 8px !important; }
+        .stTextInput > label { font-size: 13px !important; font-weight: 600 !important; color: #475569 !important; }
+        
+        button[kind="primary"] { 
+            height: 48px !important; 
+            font-weight: 700 !important; 
+            font-size: 15px !important; 
+            border-radius: 8px !important; 
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            border: none !important;
+            transition: all 0.2s ease !important;
+            margin-top: 10px !important;
+        }
+        button[kind="primary"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(59, 130, 246, 0.3) !important;
+        }
+        button[kind="primary"]:active {
+            transform: translateY(0px);
+        }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="login-split-screen">', unsafe_allow_html=True)
+    # Usa as colunas para centralizar o Card perfeitamente
+    _, col_login, _ = st.columns([1.2, 1, 1.2])
     
-    st.markdown(f"""
-        <div class="login-left">
-            <img src="{LOGO_IGO}" class="left-logo">
-            <div class="left-title">Portal do Cliente</div>
-            <div class="left-subtitle">Acompanhe suas operações, gerencie coletas e acesse comprovantes em tempo real na maior rede logística.</div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown('<div class="login-right">', unsafe_allow_html=True)
-    st.markdown('<div class="login-form-box">', unsafe_allow_html=True)
-    
-    st.markdown('<p class="form-welcome">Bem-vindo(a)</p>', unsafe_allow_html=True)
-    st.markdown('<p class="form-title">Acesse sua conta</p>', unsafe_allow_html=True)
-    
-    u = st.text_input("👤 Usuário", placeholder="DIGITE SEU USUÁRIO").upper().strip()
-    s = st.text_input("🔒 Senha", type="password", placeholder="••••••••••••")
-    st.markdown('<br>', unsafe_allow_html=True)
-    
-    if st.button("🚀 Entrar no Painel", type="primary", use_container_width=True):
-        if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
-            st.session_state.logado = True
-            st.session_state.cliente = u
-            st.query_params["token_cli"] = u
-            st.rerun()
-        else:
-            st.error("❌ Credenciais Incorretas. Tente novamente.")
-
-    st.markdown('</div></div></div>', unsafe_allow_html=True)
+    with col_login:
+        st.markdown(f'''
+            <div class="logo-container"><img src="{LOGO_IGO}"></div>
+            <div class="login-title">Acesse sua conta</div>
+            <div class="login-subtitle">Portal de Monitoramento Logístico</div>
+        ''', unsafe_allow_html=True)
+        
+        u = st.text_input("👤 Usuário", placeholder="Digite seu usuário").upper().strip()
+        s = st.text_input("🔒 Senha", type="password", placeholder="••••••••••••")
+        
+        if st.button("🚀 Entrar no Painel", type="primary", use_container_width=True):
+            if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
+                st.session_state.logado = True
+                st.session_state.cliente = u
+                st.query_params["token_cli"] = u
+                st.rerun()
+            else:
+                st.error("❌ Credenciais Incorretas. Tente novamente.")
 
 # =======================================================
 # 🖥️ 4. PAINEL PRINCIPAL (DASHBOARD)
