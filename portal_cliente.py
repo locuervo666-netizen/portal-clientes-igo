@@ -455,10 +455,6 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
     except Exception:
         return False
 
-# ── Session State ──────────────────────────────────────
-if 'logado'     not in st.session_state: st.session_state.logado     = False
-if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
-
 # ── Helpers de status ──────────────────────────────────
 def get_st(row):
     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
@@ -560,8 +556,20 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🔐 3. LOGIN
+# 🔐 3. SESSION STATE & LOGIN COM PERSISTÊNCIA (URL)
 # =======================================================
+# Se o utilizador der um F5 ou ocorrer um reload automático, 
+# verificamos se ele já tinha um token salvo invisivelmente na URL.
+if 'logado' not in st.session_state:
+    if "token_cli" in st.query_params:
+        st.session_state.logado = True
+        st.session_state.cliente = st.query_params["token_cli"]
+    else:
+        st.session_state.logado = False
+
+if 'filtro_kpi' not in st.session_state: 
+    st.session_state.filtro_kpi = "TODOS"
+
 if not st.session_state.logado:
     st.markdown("""
         <style>
@@ -591,6 +599,8 @@ if not st.session_state.logado:
                 if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
                     st.session_state.logado  = True
                     st.session_state.cliente = u
+                    # Salva um crachá invisível na barra de endereços para não perder a sessão
+                    st.query_params["token_cli"] = u
                     st.rerun()
                 else:
                     st.error("❌ Credenciais Incorretas")
@@ -603,7 +613,7 @@ else:
     components.html(
         """
         <script>
-        // 1. Auto Reload a cada 5 minutos
+        // 1. Auto Reload a cada 5 minutos (A persistência agora suporta isto sem deslogar)
         setTimeout(function(){ window.parent.location.reload(); }, 300000);
         
         // 2. Tradutor Forçado (Calendário e Dropdowns)
@@ -714,8 +724,11 @@ else:
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Sistema</p>", unsafe_allow_html=True)
+        
+        # 🔥 Quando clica em sair, limpamos o crachá da URL 🔥
         if st.button("🚪 Sair com Segurança", use_container_width=True, type="secondary"):
             st.session_state.logado = False
+            st.query_params.clear() 
             st.rerun()
 
     # ── HEADER ─────────────────────────────────────────
@@ -1074,10 +1087,9 @@ else:
                     gridOptions = gb.build()
 
                     # ==========================================
-                    # 🎨 CSS CUSTOMIZADO PREMIUM (COM CABEÇALHO DESTACADO)
+                    # 🎨 CSS CUSTOMIZADO PREMIUM
                     # ==========================================
                     custom_css = {
-                        # 🔥 NOVO: CABEÇALHO COM DESTAQUE PREMIUM 🔥
                         ".ag-header": {
                             "background-color": "#f1f5f9 !important", 
                             "border-bottom": "2px solid #e2e8f0 !important"
@@ -1087,7 +1099,6 @@ else:
                             "font-weight": "700 !important", 
                             "font-size": "13px !important"
                         },
-                        # Separação sutil de colunas
                         ".ag-header-cell": {"border-right": "1px solid #e2e8f0 !important"},
                         ".ag-cell": {"border-right": "1px solid #e2e8f0 !important"},
                         ".ag-cell-focus": {"border": "none !important", "outline": "none !important"},
