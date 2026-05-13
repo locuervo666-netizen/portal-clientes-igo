@@ -210,7 +210,7 @@ CLIENTES_CONFIG = {
         "logo": LOGO_IGO,
         "filtro": "TODOS"
     },
-    "danilo.duarte": {
+    "DANILO.DUARTE": {
         "senha": "labest",
         "logo": "logo_labest.png",
         "filtro": "LABEST"
