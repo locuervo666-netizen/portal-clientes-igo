@@ -599,35 +599,38 @@ if not st.session_state.logado:
 # 🖥️ 4. PAINEL PRINCIPAL
 # =======================================================
 else:
-    # 🔥 AQUI ESTÁ A "MAGIA": SCRIPT DE RELOAD + TRADUTOR DO CALENDÁRIO 🔥
+    # 🔥 MAGIA DO JAVASCRIPT: Auto-Reload + Tradutor Forçado 🔥
     components.html(
         """
         <script>
         // 1. Auto Reload a cada 5 minutos
         setTimeout(function(){ window.parent.location.reload(); }, 300000);
         
-        // 2. Tradutor Forçado do Calendário para Português
+        // 2. Tradutor Forçado (Calendário e Dropdowns)
         const parentDoc = window.parent.document;
         const dict = {
             "Su": "Dom", "Mo": "Seg", "Tu": "Ter", "We": "Qua", "Th": "Qui", "Fr": "Sex", "Sa": "Sáb",
             "January": "Janeiro", "February": "Fevereiro", "March": "Março", "April": "Abril", "May": "Maio", 
             "June": "Junho", "July": "Julho", "August": "Agosto", "September": "Setembro", "October": "Outubro", 
             "November": "Novembro", "December": "Dezembro",
-            "Today": "Hoje", "Clear": "Limpar"
+            "Today": "Hoje", "Clear": "Limpar",
+            "Choose options": "Escolha as cidades...",
+            "Select all": "Selecionar todas",
+            "Clear all": "Limpar tudo",
+            "No results": "Nenhuma cidade encontrada"
         };
         const observer = new MutationObserver(() => {
-            const calendar = parentDoc.querySelector('[data-baseweb="calendar"]');
-            if (calendar) {
-                // 4 é a constante para NodeFilter.SHOW_TEXT
-                const walker = parentDoc.createTreeWalker(calendar, 4, null, false);
+            const targets = parentDoc.querySelectorAll('[data-baseweb="calendar"], [data-baseweb="popover"], [data-testid="stMultiSelect"]');
+            targets.forEach(target => {
+                const walker = parentDoc.createTreeWalker(target, 4, null, false);
                 let node;
                 while (node = walker.nextNode()) {
                     let text = node.nodeValue.trim();
                     if (dict[text]) {
-                        node.nodeValue = dict[text];
+                        node.nodeValue = node.nodeValue.replace(text, dict[text]);
                     }
                 }
-            }
+            });
         });
         observer.observe(parentDoc.body, { childList: true, subtree: true });
         </script>
@@ -655,6 +658,7 @@ else:
         st.markdown("<br>", unsafe_allow_html=True)
 
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Filtros de Visão</p>", unsafe_allow_html=True)
+        
         with st.container(border=True):
             st.markdown("<p style='font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: -10px;'>🗓️ Período de Análise</p>", unsafe_allow_html=True)
             c1_dt, c2_dt = st.columns(2)
@@ -756,10 +760,12 @@ else:
                     f"Nenhum pedido registrado sob a titularidade '{conf['filtro']}'."
                 )
             else:
+                # 🔥 OPÇÃO 1 APLICADA AQUI: PLACEHOLDER EM PORTUGUÊS NO SELECTBOX 🔥
                 with holder_cidades:
                     cidades_sel = st.multiselect(
                         "📍 Cidades:",
-                        sorted(df_cliente['CIDADE'].dropna().unique().tolist())
+                        sorted(df_cliente['CIDADE'].dropna().unique().tolist()),
+                        placeholder="Escolha as cidades..."
                     )
 
                 df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
