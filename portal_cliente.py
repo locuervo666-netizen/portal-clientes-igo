@@ -28,7 +28,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.markdown("""
+# CSS do Dashboard (Só será aplicado quando o usuário estiver logado)
+CSS_DASHBOARD = """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
@@ -78,6 +79,7 @@ st.markdown("""
         padding-bottom: 1rem !important;
         padding-left: 2rem !important;
         padding-right: 2rem !important;
+        display: block !important;
     }
 
     /* ── KPI CARDS ── */
@@ -173,9 +175,8 @@ st.markdown("""
         border-radius: 99px;
         overflow: hidden;
     }
-
     </style>
-""", unsafe_allow_html=True)
+"""
 
 CLIENTES_CONFIG = {
     "GRALAB": {
@@ -241,6 +242,7 @@ def carregar_dados_nuvem():
         gc = conectar_banco_seguro()
         if not gc:
             return pd.DataFrame()
+        
         planilha = gc.open("DB_IGO_Logistica")
         aba_m = planilha.worksheet("Memoria_Sistema")
         dados_m = aba_m.get_all_values()
@@ -250,6 +252,7 @@ def carregar_dados_nuvem():
             df.columns = df.columns.str.strip().str.upper()
             df = df.loc[:, ~df.columns.duplicated()]
 
+            # 🧹 HIGIENIZAÇÃO DE DADOS OFICIAL
             if 'TOMADOR' in df.columns:
                 df['TOMADOR'] = df['TOMADOR'].str.replace('CAEP', 'SYNVIA').str.replace('CUNHA', 'GRALAB')
             if 'CIDADE' in df.columns:
@@ -258,6 +261,7 @@ def carregar_dados_nuvem():
             try:
                 aba_app = planilha.worksheet("App_Tarefas")
                 dados_app = aba_app.get_all_values()
+                
                 if len(dados_app) > 1:
                     df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
                     df_app.columns = [
@@ -297,6 +301,7 @@ def carregar_dados_nuvem():
                     }
                     if col_nome:
                         rename_dict[col_nome] = 'A_CONTATO'
+                        
                     df_app_clean.rename(columns=rename_dict, inplace=True)
 
                     rom_mask = df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)
@@ -386,6 +391,7 @@ def carregar_dados_nuvem():
                 df['DATA_OBJ'] = pd.to_datetime(
                     df['DATA'], format='%d/%m/%Y', errors='coerce'
                 ).dt.date
+            
             return df
 
     except Exception as e:
@@ -401,10 +407,12 @@ def carregar_base_locais():
         planilha = gc.open("DB_IGO_Logistica")
         aba = planilha.worksheet("Base_Clientes_Locais")
         dados = aba.get_all_values()
+        
         if len(dados) > 1:
             df = pd.DataFrame(dados[1:], columns=dados[0])
             return df[df['STATUS'].str.upper() == 'ATIVO']
         return pd.DataFrame()
+        
     except Exception as e:
         st.warning(f"Erro ao carregar locais: {e}")
         return pd.DataFrame()
@@ -422,9 +430,11 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
     INSTANCIA    = "3F14E62A63D2B28DC385B20DE66F3711"
     TOKEN        = "2321563615C4242CB6031504"
     CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S"
+    
     tel_limpo = re.sub(r'\D', '', str(telefone_destino))
     if not tel_limpo.startswith('55') and len(tel_limpo) in [10, 11]:
         tel_limpo = '55' + tel_limpo
+        
     url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/send-text"
     payload = {"phone": tel_limpo, "message": texto_mensagem}
     headers = {
@@ -432,6 +442,7 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
         "Content-Type": "application/json",
         "Client-Token": CLIENT_TOKEN
     }
+    
     try:
         requests.post(url, json=payload, headers=headers)
         return True
@@ -550,68 +561,88 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🔐 3. TELA DE LOGIN (MODELO 3: MINIMALISTA PREMIUM)
+# 🔐 3. TELA DE LOGIN (MODELO BLINDADO E CENTRALIZADO)
 # =======================================================
 if not st.session_state.logado:
     st.markdown("""
         <style>
-        /* Fundo da tela toda off-white */
-        [data-testid="stAppViewContainer"] { background-color: #f1f5f9 !important; }
+        /* Oculta tudo que não é o login */
         [data-testid="stSidebar"] { display: none; }
         header { display: none !important; }
-
-        /* Card flutuante central (A mágica acontece aqui) */
-        div[data-testid="column"]:nth-of-type(2) {
-            background-color: #ffffff;
-            padding: 45px 40px;
-            border-radius: 20px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
-            margin-top: 15vh;
+        
+        /* Fundo da tela toda: Degradê suave e elegante */
+        [data-testid="stAppViewContainer"] { 
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+            font-family: 'Inter', sans-serif;
         }
+
+        /* 100% Garantia de Centralização usando Flexbox nativo do Streamlit */
+        .block-container {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+            min-height: 100vh !important;
+            padding: 0 !important;
+            max-width: 100% !important;
+        }
+
+        /* O "Cartão Branco" do formulário */
+        [data-testid="stForm"] {
+            background-color: #ffffff !important;
+            padding: 45px 40px !important;
+            border-radius: 20px !important;
+            box-shadow: 0 15px 35px -5px rgba(0,0,0,0.1), 0 5px 15px rgba(0,0,0,0.05) !important;
+            border: 1px solid #ffffff !important;
+            width: 100% !important;
+            max-width: 400px !important;
+        }
+
+        /* Textos e Ajustes do Card */
+        .login-title { text-align: center; font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 5px; }
+        .login-subtitle { text-align: center; font-size: 13px; color: #64748b; margin-bottom: 30px; }
         
-        .logo-container { text-align: center; margin-bottom: 20px; }
-        .logo-container img { max-width: 150px; }
-        .login-title { text-align: center; font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 5px; }
-        .login-subtitle { text-align: center; font-size: 14px; color: #64748b; margin-bottom: 35px; }
-        
-        /* Inputs e Botão Premium */
-        .stTextInput > div { border-radius: 8px !important; }
-        .stTextInput > label { font-size: 13px !important; font-weight: 600 !important; color: #475569 !important; }
-        
-        button[kind="primary"] { 
+        /* Inputs do Form */
+        .stTextInput > div > div > input { border-radius: 8px !important; }
+        .stTextInput > label { font-size: 12px !important; font-weight: 600 !important; color: #475569 !important; }
+
+        /* Botão do Form */
+        [data-testid="stFormSubmitButton"] > button {
             height: 48px !important; 
             font-weight: 700 !important; 
-            font-size: 15px !important; 
+            font-size: 14px !important; 
             border-radius: 8px !important; 
             background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: #ffffff !important;
             border: none !important;
+            width: 100% !important;
+            margin-top: 15px !important;
             transition: all 0.2s ease !important;
-            margin-top: 10px !important;
         }
-        button[kind="primary"]:hover {
+        [data-testid="stFormSubmitButton"] > button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 15px rgba(59, 130, 246, 0.3) !important;
-        }
-        button[kind="primary"]:active {
-            transform: translateY(0px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3) !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Usa as colunas para centralizar o Card perfeitamente
-    _, col_login, _ = st.columns([1.2, 1, 1.2])
-    
-    with col_login:
-        st.markdown(f'''
-            <div class="logo-container"><img src="{LOGO_IGO}"></div>
-            <div class="login-title">Acesse sua conta</div>
-            <div class="login-subtitle">Portal de Monitoramento Logístico</div>
-        ''', unsafe_allow_html=True)
+    # Criação do Formulário blindado
+    with st.form("form_login", clear_on_submit=False):
+        
+        # Centralizando a logo dentro do formulário
+        col_espaco1, col_logo, col_espaco2 = st.columns([1, 1.5, 1])
+        with col_logo:
+            st.image(LOGO_IGO, use_container_width=True)
+            
+        st.markdown('<div class="login-title">Acesse sua conta</div>', unsafe_allow_html=True)
+        st.markdown('<div class="login-subtitle">Portal de Monitoramento Logístico</div>', unsafe_allow_html=True)
         
         u = st.text_input("👤 Usuário", placeholder="Digite seu usuário").upper().strip()
         s = st.text_input("🔒 Senha", type="password", placeholder="••••••••••••")
         
-        if st.button("🚀 Entrar no Painel", type="primary", use_container_width=True):
+        submit = st.form_submit_button("🚀 Entrar no Painel")
+        
+        if submit:
             if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
                 st.session_state.logado = True
                 st.session_state.cliente = u
@@ -624,12 +655,14 @@ if not st.session_state.logado:
 # 🖥️ 4. PAINEL PRINCIPAL (DASHBOARD)
 # =======================================================
 else:
+    # Carrega o CSS do Dashboard apenas quando logado
+    st.markdown(CSS_DASHBOARD, unsafe_allow_html=True)
+
     # 🔥 RECARREGAMENTO SILENCIOSO 🔥
     st_autorefresh(interval=300000, limit=None, key="autorefresh_dados")
 
     # 🔥 MAGIA DO JAVASCRIPT: Tradutor Forçado 🔥
-    components.html(
-        """
+    components.html("""
         <script>
         const parentDoc = window.parent.document;
         const dict = {
@@ -650,17 +683,13 @@ else:
                 let node;
                 while (node = walker.nextNode()) {
                     let text = node.nodeValue.trim();
-                    if (dict[text]) {
-                        node.nodeValue = node.nodeValue.replace(text, dict[text]);
-                    }
+                    if (dict[text]) { node.nodeValue = node.nodeValue.replace(text, dict[text]); }
                 }
             });
         });
         observer.observe(parentDoc.body, { childList: true, subtree: true });
         </script>
-        """,
-        height=0, width=0
-    )
+        """, height=0, width=0)
 
     conf              = CLIENTES_CONFIG[st.session_state.cliente]
     hoje_br           = datetime.now(FUSO_BR).date()
@@ -674,13 +703,9 @@ else:
             try:
                 st.image(conf["logo"], use_container_width=True)
             except Exception:
-                st.markdown(
-                    f"<h3 style='text-align:center;'>{st.session_state.cliente}</h3>",
-                    unsafe_allow_html=True
-                )
+                st.markdown(f"<h3 style='text-align:center;'>{st.session_state.cliente}</h3>", unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
-
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Filtros de Visão</p>", unsafe_allow_html=True)
         
         with st.container(border=True):
@@ -689,11 +714,9 @@ else:
             dt_inicio = c1_dt.date_input("De", value=hoje_br - timedelta(days=15), format="DD/MM/YYYY")
             dt_fim    = c2_dt.date_input("Até", value=hoje_br, format="DD/MM/YYYY")
             datas_sel = (dt_inicio, dt_fim)
-            
             holder_cidades = st.empty()
 
         st.markdown("<br>", unsafe_allow_html=True)
-
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Suporte e Relatórios</p>", unsafe_allow_html=True)
         
         with st.popover("🎧 Abrir Chamado ao Suporte", use_container_width=True):
@@ -716,7 +739,7 @@ else:
                                     aba_chamados = planilha.worksheet("Base_Chamados")
                                 except:
                                     aba_chamados = planilha.add_worksheet(title="Base_Chamados", rows="100", cols="7")
-                                aba_chamados.update("A1", [["TICKET", "DATA", "TOMADOR", "PEDIDO", "MENSAGEM", "STATUS", "RESPOSTA"]])
+                                    aba_chamados.update("A1", [["TICKET", "DATA", "TOMADOR", "PEDIDO", "MENSAGEM", "STATUS", "RESPOSTA"]])
                                 
                                 linha_ticket = [tkt_id, data_tkt, nome_tomador_oficial, pedido_chamado, msg_chamado, "🟡 EM ANÁLISE", ""]
                                 aba_chamados.append_row(linha_ticket)
@@ -738,6 +761,7 @@ else:
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Sistema</p>", unsafe_allow_html=True)
+        
         if st.button("🚪 Sair com Segurança", use_container_width=True, type="secondary"):
             st.session_state.logado = False
             st.query_params.clear() 
@@ -766,9 +790,7 @@ else:
         if conf["filtro"] == "TODOS":
             df_cliente = df_raw.copy()
         else:
-            df_cliente = df_raw[
-                df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]
-            ].copy()
+            df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
 
         tab_grid, tab_solicitar, tab_chamados = st.tabs([
             "📊 Meus Pedidos e Monitoramento",
@@ -781,9 +803,7 @@ else:
         # ===================================================
         with tab_grid:
             if df_cliente.empty:
-                st.warning(
-                    f"Nenhum pedido registrado sob a titularidade '{conf['filtro']}'."
-                )
+                st.warning(f"Nenhum pedido registrado sob a titularidade '{conf['filtro']}'.")
             else:
                 with holder_cidades:
                     cidades_sel = st.multiselect(
@@ -796,29 +816,21 @@ else:
                 df_cliente['DETALHES']       = df_cliente.apply(get_detalhes, axis=1)
 
                 df_f = df_cliente.copy()
+                
                 if isinstance(datas_sel, (tuple, list)) and len(datas_sel) == 2:
-                    df_f = df_f[
-                        (df_f['DATA_OBJ'] >= datas_sel[0]) &
-                        (df_f['DATA_OBJ'] <= datas_sel[1])
-                    ]
+                    df_f = df_f[(df_f['DATA_OBJ'] >= datas_sel[0]) & (df_f['DATA_OBJ'] <= datas_sel[1])]
+                
                 if cidades_sel:
                     df_f = df_f[df_f['CIDADE'].isin(cidades_sel)]
 
-                df_f['DT_LIMITE_OBJ'] = pd.to_datetime(
-                    df_f['DATA_LIMITE'], format='%d/%m/%Y', errors='coerce'
-                ).dt.date
+                df_f['DT_LIMITE_OBJ'] = pd.to_datetime(df_f['DATA_LIMITE'], format='%d/%m/%Y', errors='coerce').dt.date
 
                 mask_atrasado = (
-                    (~df_f['STATUS_DISPLAY'].str.contains(
-                        'Entregue|Frustrada|Cancelado|Aguardando|Recusada',
-                        case=False, na=False
-                    )) &
+                    (~df_f['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Aguardando|Recusada', case=False, na=False)) &
                     (df_f['DT_LIMITE_OBJ'] < hoje_br) &
                     (df_f['DT_LIMITE_OBJ'].notnull())
                 )
-                df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] = (
-                    df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] + ' 🚨 ATRASADO'
-                )
+                df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] = df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] + ' 🚨 ATRASADO'
 
                 n_vals = {
                     "TODOS":      len(df_f),
@@ -845,8 +857,7 @@ else:
 
                     with col:
                         st.markdown(f"""
-                            <div class="kpi-card"
-                                 style="background-color: {bg_color}; border: {borda};">
+                            <div class="kpi-card" style="background-color: {bg_color}; border: {borda};">
                                 <div style="position: absolute; right: -5px; bottom: -15px; font-size: 65px; opacity: 0.25; z-index: 0; line-height: 1; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.1));">
                                     {emoji_card}
                                 </div>
@@ -880,12 +891,9 @@ else:
 
                 df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
                 if not df_h.empty:
-                    n_fim  = len(df_h[df_h['STATUS_DISPLAY'].str.contains(
-                        'Entregue|Frustrada|Cancelado|Recusada|Coletado', case=False
-                    )])
+                    n_fim  = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Recusada|Coletado', case=False)])
                     n_tot  = len(df_h)
                     pct    = round((n_fim / n_tot) * 100) if n_tot else 0
-                    bar_w  = pct
 
                     st.markdown(f"""
                         <div class="progress-block">
@@ -894,7 +902,7 @@ else:
                                 <span class="progress-pct">{pct}% concluído — {n_fim} de {n_tot} pedidos</span>
                             </div>
                             <div class="progress-bar-bg">
-                                <div style="height:6px;width:{bar_w}%;background:#22c55e; border-radius:99px;transition:width 0.6s ease;"></div>
+                                <div style="height:6px;width:{pct}%;background:#22c55e; border-radius:99px;transition:width 0.6s ease;"></div>
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
@@ -903,11 +911,7 @@ else:
 
                 col_busca, col_export = st.columns([5, 1])
                 with col_busca:
-                    busca = st.text_input(
-                        "🔎 Busca Rápida:",
-                        placeholder="Buscar por pedido, laboratório, cidade...",
-                        label_visibility="collapsed"
-                    )
+                    busca = st.text_input("🔎 Busca Rápida:", placeholder="Buscar por pedido, laboratório, cidade...", label_visibility="collapsed")
                 with col_export:
                     holder_download = st.empty()
 
@@ -921,27 +925,14 @@ else:
                     elif st.session_state.filtro_kpi == "COLETADO":
                         df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Coletado|Rota', case=False, na=False)]
                     else:
-                        df_grid = df_grid[
-                            df_grid['STATUS_DISPLAY'].str.contains(
-                                st.session_state.filtro_kpi, case=False
-                            )
-                        ]
+                        df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False)]
 
                 if busca:
-                    df_grid = df_grid[
-                        df_grid.astype(str)
-                        .apply(lambda x: x.str.lower().str.contains(busca.lower()))
-                        .any(axis=1)
-                    ]
+                    df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
                 if not df_grid.empty:
-                    df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(
-                        definir_prioridade_portal
-                    )
-                    df_grid = df_grid.sort_values(
-                        by=['PRIORIDADE', 'DATA_OBJ', 'PEDIDO'],
-                        ascending=[True, False, False]
-                    ).drop(columns=['PRIORIDADE'])
+                    df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(definir_prioridade_portal)
+                    df_grid = df_grid.sort_values(by=['PRIORIDADE', 'DATA_OBJ', 'PEDIDO'], ascending=[True, False, False]).drop(columns=['PRIORIDADE'])
 
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
@@ -950,20 +941,12 @@ else:
                         df_final['UF'] = ""
 
                     df_final['CIDADE_UF'] = df_final.apply(
-                        lambda r: (
-                            f"{str(r.get('CIDADE','')).strip()}/{str(r.get('UF','')).strip()}"
-                            if str(r.get('UF', '')).strip() and str(r.get('UF', '')).upper() != 'NAN'
-                            else str(r.get('CIDADE', '')).strip()
-                        ),
+                        lambda r: f"{str(r.get('CIDADE','')).strip()}/{str(r.get('UF','')).strip()}" if str(r.get('UF', '')).strip() and str(r.get('UF', '')).upper() != 'NAN' else str(r.get('CIDADE', '')).strip(),
                         axis=1
                     )
 
                     for col in df_final.columns:
-                        df_final[col] = (
-                            df_final[col]
-                            .astype(str)
-                            .replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
-                        )
+                        df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
@@ -974,13 +957,8 @@ else:
                     if st.session_state.cliente == "LOGISTICA.LABEST":
                         colunas_visiveis.insert(3, 'CNPJ')
 
-                    colunas_visiveis = [
-                        c for c in colunas_visiveis if c in df_final.columns
-                    ]
+                    colunas_visiveis = [c for c in colunas_visiveis if c in df_final.columns]
 
-                    # ==========================================
-                    # 🔥 JAVASCRIPT 1: EMOJI COM EFEITO DE LUPA INTELIGENTE 🔥
-                    # ==========================================
                     link_jscode = JsCode("""
                     class EmojiLinkRenderer {
                       init(params) {
@@ -1032,9 +1010,6 @@ else:
                     }
                     """)
 
-                    # ==========================================
-                    # 🔥 JAVASCRIPT 2: PÍLULAS DE STATUS 🔥
-                    # ==========================================
                     status_jscode = JsCode("""
                     class StatusBadgeRenderer {
                       init(params) {
@@ -1076,12 +1051,8 @@ else:
                     }
                     """)
 
-                    # ==========================================
-                    # 🛠️ CONFIGURAÇÃO DA GRID
-                    # ==========================================
                     gb = GridOptionsBuilder.from_dataframe(df_final[colunas_visiveis])
                     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
-                    
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
                     gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120, pinned='left')
@@ -1098,9 +1069,6 @@ else:
 
                     gridOptions = gb.build()
 
-                    # ==========================================
-                    # 🎨 CSS CUSTOMIZADO PREMIUM
-                    # ==========================================
                     custom_css = {
                         ".ag-header": {
                             "background-color": "#f1f5f9 !important", 
@@ -1190,13 +1158,10 @@ else:
             if df_locais.empty:
                 st.warning("O banco de dados de locais de coleta ainda não foi sincronizado.")
             else:
-                df_cli_locais = df_locais[
-                    df_locais['TOMADOR'].str.upper().str.strip() == nome_tomador_oficial.upper().strip()
-                ]
+                df_cli_locais = df_locais[df_locais['TOMADOR'].str.upper().str.strip() == nome_tomador_oficial.upper().strip()]
+                
                 if df_cli_locais.empty:
-                    st.warning(
-                        f"Nenhum ponto de coleta cadastrado para {nome_tomador_oficial}."
-                    )
+                    st.warning(f"Nenhum ponto de coleta cadastrado para {nome_tomador_oficial}.")
                 else:
                     with st.container(border=True):
                         with st.form("form_nova_coleta", clear_on_submit=True):
@@ -1207,18 +1172,9 @@ else:
                             )
 
                             if lab_sel != "Selecione...":
-                                local_data  = df_cli_locais[
-                                    df_cli_locais['LABORATORIO'] == lab_sel
-                                ].iloc[0]
-                                end_fmt = (
-                                    f"{local_data.get('ENDERECO','')}, "
-                                    f"{local_data.get('NUMERO','')} — "
-                                    f"{local_data.get('BAIRRO','')}"
-                                )
-                                cid_fmt = (
-                                    f"{local_data.get('CIDADE','')}/{local_data.get('UF','')} "
-                                    f"| CEP: {local_data.get('CEP','')}"
-                                )
+                                local_data  = df_cli_locais[df_cli_locais['LABORATORIO'] == lab_sel].iloc[0]
+                                end_fmt = f"{local_data.get('ENDERECO','')}, {local_data.get('NUMERO','')} — {local_data.get('BAIRRO','')}"
+                                cid_fmt = f"{local_data.get('CIDADE','')}/{local_data.get('UF','')} | CEP: {local_data.get('CEP','')}"
                                 st.markdown(f"""
                                     <div style="background:#f0f9ff;border-left:4px solid #3b82f6; padding:12px 15px;border-radius:4px;margin-bottom:15px;">
                                         <p style="margin:0;font-size:11px;color:#64748b;font-weight:700;">
@@ -1231,11 +1187,8 @@ else:
                                 """, unsafe_allow_html=True)
 
                             agora_sp    = datetime.now(FUSO_BR)
-                            data_minima = (
-                                agora_sp.date()
-                                if agora_sp.hour < 10
-                                else agora_sp.date() + timedelta(days=1)
-                            )
+                            data_minima = agora_sp.date() if agora_sp.hour < 10 else agora_sp.date() + timedelta(days=1)
+                            
                             while data_minima.weekday() >= 5:
                                 data_minima += timedelta(days=1)
 
@@ -1252,17 +1205,11 @@ else:
                                 height=100
                             )
 
-                            if st.form_submit_button(
-                                "🚀 Enviar Solicitação ao C.C.O.",
-                                type="primary",
-                                use_container_width=True
-                            ):
+                            if st.form_submit_button("🚀 Enviar Solicitação ao C.C.O.", type="primary", use_container_width=True):
                                 if lab_sel == "Selecione...":
                                     st.error("⚠️ Selecione um Ponto de Coleta válido.")
                                 elif data_coleta.weekday() >= 5:
-                                    st.error(
-                                        "⚠️ Coletas não são realizadas aos finais de semana. Escolha um dia útil."
-                                    )
+                                    st.error("⚠️ Coletas não são realizadas aos finais de semana. Escolha um dia útil.")
                                 else:
                                     with st.spinner("Registrando pedido e notificando o C.C.O..."):
                                         try:
@@ -1271,9 +1218,7 @@ else:
                                             aba_m    = planilha.worksheet("Memoria_Sistema")
                                             dados_m  = aba_m.get_all_values()
 
-                                            df_m_temp = pd.DataFrame(
-                                                dados_m[1:], columns=dados_m[0]
-                                            )
+                                            df_m_temp = pd.DataFrame(dados_m[1:], columns=dados_m[0])
                                             prox_id = obter_proximo_id(df_m_temp)
 
                                             nova_linha_dict = {
@@ -1293,34 +1238,21 @@ else:
                                             }
 
                                             cabecalhos   = dados_m[0]
-                                            linha_append = [
-                                                nova_linha_dict.get(c, "") for c in cabecalhos
-                                            ]
-                                            aba_m.append_row(
-                                                linha_append,
-                                                value_input_option='USER_ENTERED'
-                                            )
+                                            linha_append = [nova_linha_dict.get(c, "") for c in cabecalhos]
+                                            aba_m.append_row(linha_append, value_input_option='USER_ENTERED')
 
                                             texto_zap = (
                                                 f"🔔 *NOVA SOLICITAÇÃO DE COLETA* 🔔\n\n"
                                                 f"🏢 *Cliente:* {nome_tomador_oficial}\n"
                                                 f"🔬 *Local:* {local_data['LABORATORIO']}\n"
-                                                f"📍 *Cidade:* {local_data.get('CIDADE','')} - "
-                                                f"{local_data.get('UF','')}\n"
-                                                f"📅 *Data Desejada:* "
-                                                f"{data_coleta.strftime('%d/%m/%Y')}\n"
+                                                f"📍 *Cidade:* {local_data.get('CIDADE','')} - {local_data.get('UF','')}\n"
+                                                f"📅 *Data Desejada:* {data_coleta.strftime('%d/%m/%Y')}\n"
                                                 f"📦 *ID do Pedido:* {prox_id}\n\n"
                                                 f"Acesse o painel do C.C.O para aprovar ou recusar."
                                             )
-                                            enviar_whatsapp_zapi_cliente(
-                                                "5511947996371", texto_zap
-                                            )
+                                            enviar_whatsapp_zapi_cliente("5511947996371", texto_zap)
 
-                                            st.success(
-                                                f"🎉 Pedido #{prox_id} criado para "
-                                                f"{data_coleta.strftime('%d/%m/%Y')}. "
-                                                f"Aguardando aprovação do C.C.O."
-                                            )
+                                            st.success(f"🎉 Pedido #{prox_id} criado para {data_coleta.strftime('%d/%m/%Y')}. Aguardando aprovação do C.C.O.")
                                             carregar_dados_nuvem.clear()
 
                                         except Exception as e:
