@@ -479,11 +479,12 @@ def get_st(row):
     if 'PROBLEMA'   in s: return '🚨 Problema'
     return '⏳ Pendente'
 
-# 🔥 CORES DOS BLOCOS ATUALIZADAS (MAIS VIVAS PARA DAR CONTRASTE) 🔥
+# 🔥 CORES DOS BLOCOS (SEPARAÇÃO DE COLETADOS E PENDENTES) 🔥
 KPI_DOT_COLOR = {
     "TODOS":      "#2563eb", # Azul forte
     "ENTREGUE":   "#16a34a", # Verde forte
     "FRUSTRADA":  "#dc2626", # Vermelho forte
+    "COLETADO":   "#0ea5e9", # Azul Ciano forte (Diferencia de Todos)
     "PENDENTE":   "#d97706", # Amarelo/Laranja forte
     "Aguardando": "#475569", # Cinza forte
     "HOJE":       "#7c3aed", # Roxo forte
@@ -493,17 +494,20 @@ KPI_BG_COLOR = {
     "TODOS":      "#dbeafe", # Azul contrastante
     "ENTREGUE":   "#dcfce7", # Verde contrastante
     "FRUSTRADA":  "#fee2e2", # Vermelho contrastante
+    "COLETADO":   "#e0f2fe", # Azul Ciano contrastante
     "PENDENTE":   "#fef3c7", # Amarelo contrastante
     "Aguardando": "#f1f5f9", # Cinza contrastante
     "HOJE":       "#ede9fe", # Roxo contrastante
 }
 
+# Agora temos 7 blocos
 KPI_META = [
     ("TODOS",      "📦 Total",        "kpi_total"),
     ("ENTREGUE",   "✅ Entregues",    "kpi_entregue"),
     ("FRUSTRADA",  "❌ Frustradas",   "kpi_frus"),
+    ("COLETADO",   "🚐 Coletados",    "kpi_coletado"), # Novo Bloco Isolado
     ("PENDENTE",   "⏳ Pendentes",    "kpi_pend"),
-    ("Aguardando", "⏱️ Aguard. CCO",  "kpi_aguardando"),
+    ("Aguardando", "🎧 Chamados",     "kpi_aguardando"), # Nome renomeado de Aguard. CCO
     ("HOJE",       "📅 Hoje",         "kpi_hoje"),
 ]
 
@@ -761,17 +765,19 @@ else:
                     df_f.loc[mask_atrasado, 'STATUS_DISPLAY'] + ' 🚨 ATRASADO'
                 )
 
+                # 🔥 LÓGICA ATUALIZADA: CONTAGEM SEPARADA PARA COLETADOS E PENDENTES 🔥
                 n_vals = {
                     "TODOS":      len(df_f),
                     "ENTREGUE":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', case=False)]),
                     "FRUSTRADA":  len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', case=False)]),
-                    "PENDENTE":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Pendente|Rota|Coletado', case=False, na=False)]),
+                    "COLETADO":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Coletado|Rota', case=False, na=False)]),
+                    "PENDENTE":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False)]),
                     "Aguardando": len(df_f[df_f['STATUS_DISPLAY'].str.contains('Aguardando', case=False)]),
                     "HOJE":       len(df_f[df_f['DATA_OBJ'] == hoje_br]),
                 }
 
-                # ── KPI CARDS (COM FUNDO PREENCHIDO E MAIOR CONTRASTE) ────────────────
-                cols_kpi = st.columns(6)
+                # ── KPI CARDS: AGORA SÃO 7 BLOCOS NA TELA ────────────────
+                cols_kpi = st.columns(7) # 7 Colunas!
                 for col, (filtro, label, key) in zip(cols_kpi, KPI_META):
                     is_active = st.session_state.filtro_kpi == filtro
                     dot_color = KPI_DOT_COLOR[filtro]
@@ -809,11 +815,11 @@ else:
                 st.markdown("""
                     <style>
                     div.st-key-kpi_total, div.st-key-kpi_entregue, div.st-key-kpi_frus, 
-                    div.st-key-kpi_pend, div.st-key-kpi_aguardando, div.st-key-kpi_hoje {
+                    div.st-key-kpi_coletado, div.st-key-kpi_pend, div.st-key-kpi_aguardando, div.st-key-kpi_hoje {
                         margin-top: -110px !important; position: relative; z-index: 999; opacity: 0 !important;
                     }
                     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, 
-                    div.st-key-kpi_pend button, div.st-key-kpi_aguardando button, div.st-key-kpi_hoje button {
+                    div.st-key-kpi_coletado button, div.st-key-kpi_pend button, div.st-key-kpi_aguardando button, div.st-key-kpi_hoje button {
                         height: 105px !important; cursor: pointer !important;
                     }
                     </style>
@@ -853,11 +859,15 @@ else:
                     holder_download = st.empty()
 
                 df_grid = df_f.copy()
+                
+                # 🔥 LÓGICA DE FILTRAGEM ATUALIZADA PARA O CLIQUE NA GRID 🔥
                 if st.session_state.filtro_kpi != "TODOS":
                     if st.session_state.filtro_kpi == "HOJE":
                         df_grid = df_grid[df_grid['DATA_OBJ'] == hoje_br]
                     elif st.session_state.filtro_kpi == "PENDENTE":
-                        df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Pendente|Rota|Coletado', case=False, na=False)]
+                        df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False)]
+                    elif st.session_state.filtro_kpi == "COLETADO":
+                        df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Coletado|Rota', case=False, na=False)]
                     else:
                         df_grid = df_grid[
                             df_grid['STATUS_DISPLAY'].str.contains(
@@ -917,18 +927,63 @@ else:
                     ]
 
                     # ==========================================
-                    # 🔥 JAVASCRIPT 1: EMOJI DE CÂMERA 🔥
+                    # 🔥 JAVASCRIPT 1: EMOJI DE CÂMERA COM EXPANSÃO AO PASSAR O MOUSE 🔥
                     # ==========================================
                     link_jscode = JsCode("""
                     class EmojiLinkRenderer {
                       init(params) {
                         this.eGui = document.createElement('div');
                         this.eGui.style.cssText = 'display: flex; justify-content: center; align-items: center; height: 100%;';
+                        
                         if (params.value && params.value !== '') {
-                          this.eGui.innerHTML = `<a href="${params.value}" target="_blank" style="text-decoration: none; font-size: 20px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'" title="Ver Foto do Comprovante">📷</a>`;
+                          // O emoji clicável normal
+                          let a = document.createElement('a');
+                          a.href = params.value;
+                          a.target = '_blank';
+                          a.innerHTML = '📷';
+                          a.title = 'Clique para abrir o anexo';
+                          a.style.cssText = 'text-decoration: none; font-size: 20px; transition: transform 0.2s; cursor: pointer;';
+                          
+                          // A imagem flutuante invisível (Preview)
+                          let preview = document.createElement('img');
+                          preview.src = params.value;
+                          preview.style.cssText = 'position: fixed; display: none; z-index: 99999; max-width: 350px; max-height: 350px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4); border: 3px solid white; pointer-events: none;';
+                          
+                          // Colocamos o preview diretamente no body da página para nunca ser cortado pelas linhas da tabela
+                          document.body.appendChild(preview);
+
+                          // Quando passa o mouse em cima da câmera
+                          a.onmouseover = (e) => {
+                            a.style.transform = 'scale(1.3)';
+                            preview.style.display = 'block';
+                            preview.style.left = (e.clientX + 20) + 'px';
+                            preview.style.top = (e.clientY + 20) + 'px';
+                          };
+                          
+                          // Acompanha o mouse
+                          a.onmousemove = (e) => {
+                            preview.style.left = (e.clientX + 20) + 'px';
+                            preview.style.top = (e.clientY + 20) + 'px';
+                          };
+                          
+                          // Quando tira o mouse
+                          a.onmouseout = () => {
+                            a.style.transform = 'scale(1)';
+                            preview.style.display = 'none';
+                          };
+
+                          this.eGui.appendChild(a);
+                          this.previewElement = preview; // Guarda referência para limpar depois
                         }
                       }
                       getGui() { return this.eGui; }
+                      
+                      // Limpeza importante para a memória não travar o app
+                      destroy() {
+                        if (this.previewElement && this.previewElement.parentNode) {
+                          this.previewElement.parentNode.removeChild(this.previewElement);
+                        }
+                      }
                     }
                     """)
 
@@ -956,12 +1011,12 @@ else:
                           badge.style.color = '#991b1b'; 
                           badge.style.border = '1px solid #fecaca';
                         } else if (status.includes('COLETADO') || status.includes('ROTA')) {
-                          // 🔥 NOVO: AZUL PARA STATUS EM ANDAMENTO 🔥
+                          // 🔥 AZUL PARA STATUS EM ANDAMENTO 🔥
                           badge.style.backgroundColor = '#dbeafe'; 
                           badge.style.color = '#1e40af'; 
                           badge.style.border = '1px solid #bfdbfe';
                         } else if (status.includes('PENDENTE')) {
-                          // 🔥 MANTIDO: AMARELO PARA PENDENTE 🔥
+                          // 🔥 AMARELO PARA PENDENTE 🔥
                           badge.style.backgroundColor = '#fef3c7'; 
                           badge.style.color = '#b45309'; 
                           badge.style.border = '1px solid #fde68a';
@@ -984,10 +1039,8 @@ else:
                     gb = GridOptionsBuilder.from_dataframe(df_final[colunas_visiveis])
                     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
                     
-                    # Removemos as bordas de foco da configuração geral
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
-                    # ❄️ CONGELANDO A COLUNA DO PEDIDO À ESQUERDA (pinned='left')
                     gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120, pinned='left')
                     gb.configure_column("DATA", header_name="📅 Data Coleta", width=130)
                     gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta")
@@ -997,12 +1050,8 @@ else:
                     gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
                     
-                    # Aplicando a classe da Pílula Colorida no Status
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=180)
-                    
                     gb.configure_column("DETALHES", header_name="💬 Atualizações")
-                    
-                    # Aplicando a classe do Emoji no Comprovante
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
 
                     gridOptions = gb.build()
@@ -1011,21 +1060,15 @@ else:
                     # 🎨 CSS CUSTOMIZADO PREMIUM
                     # ==========================================
                     custom_css = {
-                        # Separação sutil de colunas
                         ".ag-header-cell": {"border-right": "1px solid #e2e8f0 !important"},
                         ".ag-cell": {"border-right": "1px solid #e2e8f0 !important"},
-                        
-                        # Remove aquela borda azul feia de quando clica em uma célula
                         ".ag-cell-focus": {"border": "none !important", "outline": "none !important"},
-                        
-                        # Efeito Hover: Linha fica mais escura ao passar o mouse
                         ".ag-row:hover": {"background-color": "#e2e8f0 !important", "cursor": "pointer", "transition": "background-color 0.2s"},
                         
-                        # 🔥 EFEITO ZEBRA (Linhas intercaladas) 🔥
-                        ".ag-row-odd": {"background-color": "#f8fafc !important"}, # Cinza bem clarinho
-                        ".ag-row-even": {"background-color": "#ffffff !important"}, # Branco
+                        # 🔥 EFEITO ZEBRA (Linhas intercaladas na tabela) 🔥
+                        ".ag-row-odd": {"background-color": "#f8fafc !important"}, 
+                        ".ag-row-even": {"background-color": "#ffffff !important"}, 
                         
-                        # Ajusta a fonte geral da tabela
                         ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
                     }
 
