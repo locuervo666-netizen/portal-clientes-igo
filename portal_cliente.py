@@ -278,7 +278,7 @@ def carregar_dados_nuvem():
                     if 'DATA'         in df_app.columns: cols_to_extract.append('DATA')
                     if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
                     if 'RECEBEDOR'    in df_app.columns: cols_to_extract.append('RECEBEDOR')
-                    if 'HORA_STATUS'  in df_app.columns: cols_to_extract.append('HORA_STATUS') # 🔥 COLUNA DE HORA
+                    if 'HORA_STATUS'  in df_app.columns: cols_to_extract.append('HORA_STATUS')
                     
                     col_nome = None
                     for c in ['DETALHES', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
@@ -299,7 +299,7 @@ def carregar_dados_nuvem():
                         'DATA': 'A_DT',
                         'DATA_ENTREGA': 'A_DT_ENTREGA',
                         'RECEBEDOR': 'A_REC',
-                        'HORA_STATUS': 'A_HORA_STATUS' # 🔥 MAPEAMENTO DA HORA
+                        'HORA_STATUS': 'A_HORA_STATUS'
                     }
                     if col_nome:
                         rename_dict[col_nome] = 'A_CONTATO'
@@ -474,22 +474,20 @@ if 'filtro_kpi' not in st.session_state:
     st.session_state.filtro_kpi = "TODOS"
 
 # ── Helpers de status ──────────────────────────────────
-# 🔥 INJEÇÃO DA HORA LIMPA DIRETO NO EMOJI DE STATUS 🔥
+# 🔥 A CÁPSULA VOLTOU A FICAR LIMPA, SEM HORÁRIOS 🔥
 def get_st(row):
     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
-    hora = str(row.get('HORA_LIMPA', ''))
-    sufixo = f" às {hora}" if hora else ""
 
     if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação'
     if 'RECUSA'     in s: return '❌ Solicitação Recusada'
-    if 'ENTREGUE'   in s: return f'✅ Entregue{sufixo}'
-    if 'COLETADO'   in s: return f'📦 Coletado{sufixo}'
+    if 'ENTREGUE'   in s: return '✅ Entregue'
+    if 'COLETADO'   in s: return '📦 Coletado'
     if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
     if 'ROTA'       in s: return '🚚 Em Rota de Entrega'
     if 'CONFERIDO'  in s: return '☑️ Conferido'
-    if 'FRUSTRADA'  in s: return f'⚠️ Frustrada{sufixo}'
+    if 'FRUSTRADA'  in s: return '⚠️ Frustrada'
     if 'CANCELADO'  in s: return '🚫 Cancelado'
-    if 'PROBLEMA'   in s: return f'🚨 Problema{sufixo}'
+    if 'PROBLEMA'   in s: return '🚨 Problema'
     return '⏳ Pendente'
 
 KPI_DOT_COLOR = {
@@ -522,33 +520,60 @@ KPI_META = [
     ("HOJE",       "📅 Hoje",         "kpi_hoje"),
 ]
 
+# 🔥 A MAGIA DA ATUALIZAÇÃO INTELIGENTE ACONTECE AQUI 🔥
 def get_detalhes(row):
     obs_master = str(row.get('OBSERVACOES', '')).strip()
     obs_app    = str(row.get('OBS_APP_FINAL', '')).strip()
     contato    = str(row.get('CONTATO_FINAL', '')).strip()
     recebedor  = str(row.get('RECEBEDOR_FINAL', '')).strip()
     status     = str(row.get('STATUS_DISPLAY', '')).upper()
+    hora       = str(row.get('HORA_LIMPA', '')).strip()
+    dt_efetiva = str(row.get('DATA_EFETIVA', '')).strip()
 
+    dt_curta = dt_efetiva
+    if len(dt_efetiva) >= 10: 
+        dt_curta = dt_efetiva[:5] # Extrai apenas DD/MM para ficar elegante
+
+    str_coleta = f"Coletado às {hora}" if hora else ""
+
+    # SE ENTREGUE: Concatena a Coleta e a Entrega
     if 'ENTREGUE' in status:
-        if recebedor: return f"Recebedor(a): {recebedor}"
-        elif contato: return f"Recebedor(a): {contato}"
-        else: return "-"
+        rec_final = recebedor if recebedor else contato if contato else ""
+        dt_str = f" em {dt_curta}" if dt_curta and dt_curta != "-" else ""
+        
+        texto_entrega = f"Entregue para {rec_final}{dt_str}" if rec_final else f"Entregue{dt_str}"
+        
+        if str_coleta:
+            return f"{str_coleta} / {texto_entrega}"
+        return texto_entrega
 
+    # SE FRUSTRADA: Concatena o Horário da Frustrada com o Motivo
     if 'FRUSTRADA' in status or 'PROBLEMA' in status:
         obs_limpa = re.sub(r'\[COLETA:.*?\]', '', obs_app, flags=re.IGNORECASE).strip()
         if not obs_limpa:
             obs_limpa = re.sub(r'\[COLETA:.*?\]', '', obs_master, flags=re.IGNORECASE).strip()
 
+        texto_frustrada = ""
         if obs_limpa and obs_limpa.upper() != 'NAN':
-            texto = obs_limpa
+            texto_frustrada = obs_limpa
             if contato and contato.upper() != 'NAN':
-                texto += f" (Informante: {contato})"
-            return texto
+                texto_frustrada += f" (Informante: {contato})"
         elif contato and contato.upper() != 'NAN':
-            return f"Motivo/Informante: {contato}"
+            texto_frustrada = f"Motivo/Informante: {contato}"
         else:
-            return obs_master if obs_master else "-"
+            texto_frustrada = obs_master if obs_master else ""
 
+        if hora:
+            if texto_frustrada and texto_frustrada != "-":
+                return f"Ocorrência às {hora} / {texto_frustrada}"
+            return f"Ocorrência registrada às {hora}"
+        return texto_frustrada if texto_frustrada else "-"
+        
+    # SE COLETADO: Mostra apenas a Coleta
+    if 'COLETADO' in status or 'ROTA' in status:
+        return str_coleta if str_coleta else "-"
+
+    # DEFAULT PENDENTE: Retorna as observações padrões
     obs_final = obs_app if obs_app and obs_app.upper() != 'NAN' else obs_master
     if obs_final.upper() == 'NAN': obs_final = ""
 
@@ -583,17 +608,14 @@ def tratar_foto(x):
 if not st.session_state.logado:
     st.markdown("""
         <style>
-        /* Oculta tudo que não é o login */
         [data-testid="stSidebar"] { display: none; }
         header { display: none !important; }
         
-        /* Fundo da tela toda: Degradê suave e elegante */
         [data-testid="stAppViewContainer"] { 
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
             font-family: 'Inter', sans-serif;
         }
 
-        /* 100% Garantia de Centralização usando Flexbox nativo do Streamlit */
         .block-container {
             display: flex !important;
             flex-direction: column !important;
@@ -604,7 +626,6 @@ if not st.session_state.logado:
             max-width: 100% !important;
         }
 
-        /* O "Cartão Branco" do formulário */
         [data-testid="stForm"] {
             background-color: #ffffff !important;
             padding: 40px !important;
@@ -613,15 +634,12 @@ if not st.session_state.logado:
             border: none !important;
         }
 
-        /* Textos e Ajustes do Card */
         .login-title { text-align: center; font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 5px; }
         .login-subtitle { text-align: center; font-size: 13px; color: #64748b; margin-bottom: 30px; }
         
-        /* Inputs do Form */
         .stTextInput > div > div > input { border-radius: 8px !important; }
         .stTextInput > label { font-size: 12px !important; font-weight: 600 !important; color: #475569 !important; }
 
-        /* Botão do Form */
         [data-testid="stFormSubmitButton"] > button {
             height: 48px !important;
             font-weight: 700 !important; 
@@ -641,16 +659,13 @@ if not st.session_state.logado:
         </style>
     """, unsafe_allow_html=True)
 
-    # Adiciona quebras de linha para centralizar verticalmente no Streamlit
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
-    # Usa colunas para garantir que o formulário fique no meio horizontalmente
     _, col_login, _ = st.columns([1, 1.2, 1])
     
     with col_login:
         with st.form("form_login", clear_on_submit=False):
             
-            # Centralizando a logo dentro do formulário
             col_espaco1, col_logo, col_espaco2 = st.columns([1, 1.5, 1])
             with col_logo:
                 st.image(LOGO_IGO, use_container_width=True)
@@ -676,13 +691,9 @@ if not st.session_state.logado:
 # 🖥️ 4. PAINEL PRINCIPAL (DASHBOARD)
 # =======================================================
 else:
-    # Carrega o CSS do Dashboard apenas quando logado
     st.markdown(CSS_DASHBOARD, unsafe_allow_html=True)
-
-    # 🔥 RECARREGAMENTO SILENCIOSO 🔥
     st_autorefresh(interval=300000, limit=None, key="autorefresh_dados")
 
-    # 🔥 MAGIA DO JAVASCRIPT: Tradutor Forçado 🔥
     components.html("""
         <script>
         const parentDoc = window.parent.document;
@@ -969,7 +980,6 @@ else:
                     for col in df_final.columns:
                         df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
-                    # 🔥 AQUI ESTÁ A REMOÇÃO DA COLUNA 'HORA_LIMPA' DA EXIBIÇÃO 🔥
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
@@ -1093,8 +1103,7 @@ else:
                     gb.configure_column("CIDADE_UF", header_name="📍 Cidade / UF")
                     gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
-                    # 🔥 A CONFIGURAÇÃO DE COLUNA "HORA_LIMPA" FOI RETIRADA PARA LIMPAR A TELA 🔥
-                    gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=180)
+                    gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=150)
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
                     gb.configure_column("DETALHES", header_name="💬 Atualizações")
 
@@ -1138,7 +1147,6 @@ else:
                         'UF': 'UF',
                         'DATA_LIMITE': 'Previsão',
                         'DATA_EFETIVA': 'Entrega',
-                        # 🔥 TAMBÉM RETIREI DO CSV PARA NÃO DAR DUPLA INFORMAÇÃO, JÁ QUE ESTÁ NO STATUS 🔥
                         'STATUS_DISPLAY': 'Status',
                         'DETALHES': 'Atualizações'
                     }
