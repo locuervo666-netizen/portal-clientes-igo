@@ -991,17 +991,21 @@ if menu == "📊 GRID":
         
         df_grid['COMPROVANTE'] = df_grid['FOTO_URL']
 
-        def definir_prioridade(status_str):
+        # 🔥 MOTOR DE ORDENAÇÃO: RANKING DE 1 A 7 🔥
+        def definir_prioridade_cco(status_str):
             s = str(status_str).upper()
-            if 'PENDENTE' in s: return 1
-            if 'COLETADO' in s: return 2
-            if 'CONFERIDO' in s: return 3
-            if 'ROTA' in s: return 4
-            if 'ENTREGUE' in s: return 5
-            return 6 
-            
-        df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(definir_prioridade)
-        df_grid = df_grid.sort_values(by=['PRIORIDADE', 'PEDIDO'], ascending=[True, False]).drop(columns=['PRIORIDADE'])
+            if 'PENDENTE' in s or 'AGUARDANDO' in s: return 1
+            if 'ROTA DE COLETA' in s: return 2
+            if 'COLETADO' in s: return 3
+            if 'FRUSTRADA' in s or 'PROBLEMA' in s or 'RECUSA' in s or 'ATRASADO' in s: return 4
+            if 'CONFERIDO' in s: return 5
+            if 'ROTA DE ENTREGA' in s or 'EM ROTA' in s: return 6
+            if 'ENTREGUE' in s: return 7
+            return 8
+
+        df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(definir_prioridade_cco)
+        # Ordena PRIMEIRO por Data (Mais recente no topo) e DEPOIS por Prioridade
+        df_grid = df_grid.sort_values(by=['DATA_OBJ', 'PRIORIDADE', 'PEDIDO'], ascending=[False, True, False]).drop(columns=['PRIORIDADE'])
         
         if busca:
             mask = df_grid.apply(lambda row: row.astype(str).str.contains(busca, case=False).any(), axis=1)
@@ -1016,39 +1020,141 @@ if menu == "📊 GRID":
             
         df_grid_final = df_grid_final[df_grid_final['PEDIDO'].astype(str).str.strip() != ""] 
         for col in df_grid_final.columns: df_grid_final[col] = df_grid_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
-        
+         
         df_grid_final['COMPROVANTE'] = df_grid_final['COMPROVANTE'].apply(lambda x: x if str(x).startswith("http") else "")
         df_grid_final = df_grid_final.reset_index(drop=True)
-        df_grid_final.insert(0, "SELECIONAR", False)
+        # 🔥 Removido o insert("SELECIONAR") pois o AgGrid faz isso nativamente 🔥
 
-        st.markdown(f"<p style='color:#64748B; font-size:13px; margin-bottom: 5px;'>Selecione as caixinhas na tabela para liberar os botões de ação. Clique no link FOTO para abrir a imagem original.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#64748B; font-size:13px; margin-bottom: 5px;'>Selecione as caixinhas na tabela para liberar os botões de ação. Passe o mouse na 📷 para abrir a foto original.</p>", unsafe_allow_html=True)
         box_botoes = st.empty()
 
-        tabela_renderizada = st.data_editor(
+        # 🔥 MAGIA VISUAL: FOTO AO PASSAR O RATO 🔥
+        link_jscode = JsCode("""
+        class EmojiLinkRenderer {
+          init(params) {
+            this.eGui = document.createElement('div');
+            this.eGui.style.cssText = 'display: flex; justify-content: center; align-items: center; height: 100%;';
+            if (params.value && params.value !== '') {
+              let a = document.createElement('a');
+              a.href = params.value;
+              a.target = '_blank';
+              a.innerHTML = '📷';
+              a.title = 'Clique para abrir o anexo';
+              a.style.cssText = 'text-decoration: none; font-size: 20px; transition: transform 0.2s; cursor: pointer;';
+              
+              let previewContainer = document.createElement('div');
+              previewContainer.style.cssText = 'position: fixed; display: none; z-index: 99999; pointer-events: none;';
+              
+              let preview = document.createElement('img');
+              preview.src = params.value;
+              preview.style.cssText = 'max-width: 350px; max-height: 350px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4); border: 3px solid white; display: block;';
+              
+              let timeOverlay = document.createElement('div');
+              let statusText = params.data && params.data.STATUS_DISPLAY ? params.data.STATUS_DISPLAY : '';
+              timeOverlay.innerHTML = statusText;
+              timeOverlay.style.cssText = 'position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.9); color: #fff; padding: 5px 12px; border-radius: 99px; font-family: Inter, sans-serif; font-size: 12px; font-weight: bold; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.3);';
+
+              previewContainer.appendChild(preview);
+              if (statusText) { previewContainer.appendChild(timeOverlay); }
+              document.body.appendChild(previewContainer);
+              
+              a.onmouseover = (e) => {
+                a.style.transform = 'scale(1.3)';
+                previewContainer.style.display = 'block';
+                previewContainer.style.left = (e.clientX + 20) + 'px';
+                previewContainer.style.top = (e.clientY + 20) + 'px';
+              };
+              a.onmousemove = (e) => {
+                previewContainer.style.left = (e.clientX + 20) + 'px';
+                previewContainer.style.top = (e.clientY + 20) + 'px';
+              };
+              a.onmouseout = () => {
+                a.style.transform = 'scale(1)';
+                previewContainer.style.display = 'none';
+              };
+
+              this.eGui.appendChild(a);
+              this.previewElement = previewContainer; 
+            }
+          }
+          getGui() { return this.eGui; }
+          destroy() { if (this.previewElement && this.previewElement.parentNode) { this.previewElement.parentNode.removeChild(this.previewElement); } }
+        }
+        """)
+
+        # 🔥 MAGIA VISUAL: SELOS DE STATUS 🔥
+        status_jscode = JsCode("""
+        class StatusBadgeRenderer {
+          init(params) {
+            this.eGui = document.createElement('div');
+            this.eGui.style.cssText = 'display: flex; align-items: center; height: 100%;';
+            let badge = document.createElement('span');
+            badge.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; height: 22px;';
+            let text = params.value || '';
+            let status = text.toUpperCase();
+            
+            if (status.includes('ENTREGUE') || status.includes('CONFERIDO')) { badge.style.backgroundColor = '#dcfce7'; badge.style.color = '#166534'; badge.style.border = '1px solid #bbf7d0'; } 
+            else if (status.includes('FRUSTRADA') || status.includes('PROBLEMA') || status.includes('ATRASADO') || status.includes('RECUSA')) { badge.style.backgroundColor = '#fee2e2'; badge.style.color = '#991b1b'; badge.style.border = '1px solid #fecaca'; } 
+            else if (status.includes('COLETADO') || status.includes('ROTA')) { badge.style.backgroundColor = '#dbeafe'; badge.style.color = '#1e40af'; badge.style.border = '1px solid #bfdbfe'; } 
+            else if (status.includes('PENDENTE') || status.includes('AGUARDANDO')) { badge.style.backgroundColor = '#fef3c7'; badge.style.color = '#b45309'; badge.style.border = '1px solid #fde68a'; } 
+            else { badge.style.backgroundColor = '#f1f5f9'; badge.style.color = '#475569'; badge.style.border = '1px solid #e2e8f0'; }
+            
+            badge.innerText = text;
+            this.eGui.appendChild(badge);
+          }
+          getGui() { return this.eGui; }
+        }
+        """)
+
+        gb = GridOptionsBuilder.from_dataframe(df_grid_final)
+        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
+        gb.configure_default_column(resizable=True, filterable=True, sortable=True)
+        
+        # Ativa caixas de seleção
+        gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
+        
+        gb.configure_column("DATA", header_name="📅 Data", width=110)
+        gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
+        gb.configure_column("TOMADOR", header_name="🏢 Tomador", width=150)
+        gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta", width=250)
+        gb.configure_column("CIDADE", header_name="📍 Cidade", width=150)
+        gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=170)
+        gb.configure_column("AGENTE_NOME", header_name="👤 Motorista", width=150)
+        gb.configure_column("AGENTE_RAW", hide=True) 
+        gb.configure_column("DATA_ENTREGA", header_name="🏁 Entrega", width=120)
+        gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
+        gb.configure_column("COMPROVANTE", header_name="📎 Foto", cellRenderer=link_jscode, width=90)
+        gb.configure_column("DETALHES", header_name="💬 Atualizações / Motivo", width=250)
+
+        gridOptions = gb.build()
+
+        custom_css = {
+            ".ag-header": {"background-color": "#f1f5f9 !important", "border-bottom": "2px solid #e2e8f0 !important"},
+            ".ag-header-cell-text": {"color": "#0f172a !important", "font-weight": "700 !important", "font-size": "13px !important"},
+            ".ag-row:hover": {"background-color": "#e2e8f0 !important", "cursor": "pointer", "transition": "background-color 0.2s"},
+            ".ag-row-odd": {"background-color": "#f8fafc !important"}, 
+            ".ag-row-even": {"background-color": "#ffffff !important"},
+            ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
+        }
+
+        tabela_renderizada = AgGrid(
             df_grid_final,
-            column_config={
-                "SELECIONAR": st.column_config.CheckboxColumn("✔ AÇÃO", default=False),
-                "STATUS_DISPLAY": st.column_config.TextColumn("STATUS"),
-                "COMPROVANTE": st.column_config.LinkColumn("FOTO", display_text="🔎 Abrir Foto"),
-                "DETALHES": st.column_config.TextColumn("DETALHES / MOTIVO", width="large"),
-                "AGENTE_NOME": st.column_config.TextColumn("MOTORISTA"), 
-                "AGENTE_RAW": None, 
-                "DATA_ENTREGA": st.column_config.TextColumn("ENTREGA"),
-                "DATA_LIMITE": st.column_config.TextColumn("PREVISÃO"),
-                "DATA": st.column_config.TextColumn("DATA"),
-                "PEDIDO": st.column_config.TextColumn("PEDIDO"),
-                "TOMADOR": st.column_config.TextColumn("TOMADOR"),
-                "LABORATORIO": st.column_config.TextColumn("LABORATÓRIO"),
-                "CIDADE": st.column_config.TextColumn("CIDADE")
-            },
-            disabled=[c for c in df_grid_final.columns if c != "SELECIONAR"],
-            hide_index=True,
-            use_container_width=True,
-            height=500,
-            key="tabela_nativa_indestrutivel_final" 
+            gridOptions=gridOptions,
+            theme="alpine",
+            columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+            height=550,
+            allow_unsafe_jscode=True,
+            custom_css=custom_css,
+            update_mode="SELECTION_CHANGED"
         )
 
-        linhas_selecionadas = tabela_renderizada[tabela_renderizada["SELECIONAR"]]
+        # 🔥 CONVERTE A SELEÇÃO DO AGGRID PARA SEUS BOTÕES 🔥
+        sel_list = tabela_renderizada.get('selected_rows', [])
+        if sel_list is not None and len(sel_list) > 0:
+            linhas_selecionadas = pd.DataFrame(sel_list)
+        else:
+            linhas_selecionadas = pd.DataFrame(columns=df_grid_final.columns)
+
         p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
 
