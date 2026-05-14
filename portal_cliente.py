@@ -278,6 +278,7 @@ def carregar_dados_nuvem():
                     if 'DATA'         in df_app.columns: cols_to_extract.append('DATA')
                     if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
                     if 'RECEBEDOR'    in df_app.columns: cols_to_extract.append('RECEBEDOR')
+                    if 'HORA_STATUS'  in df_app.columns: cols_to_extract.append('HORA_STATUS') # 🔥 NOVA COLUNA DE HORA
                     
                     col_nome = None
                     for c in ['DETALHES', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
@@ -297,7 +298,8 @@ def carregar_dados_nuvem():
                         'FOTO_ENTREGA': 'A_FOTO_ENT',
                         'DATA': 'A_DT',
                         'DATA_ENTREGA': 'A_DT_ENTREGA',
-                        'RECEBEDOR': 'A_REC'
+                        'RECEBEDOR': 'A_REC',
+                        'HORA_STATUS': 'A_HORA_STATUS' # 🔥 MAPEAMENTO DA HORA
                     }
                     if col_nome:
                         rename_dict[col_nome] = 'A_CONTATO'
@@ -324,6 +326,17 @@ def carregar_dados_nuvem():
                     df['RECEBEDOR_FINAL'] = df.apply(lambda r: get_app_val(r, 'A_REC'), axis=1)
                     df['OBS_APP_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_OB'), axis=1)
                     df['CONTATO_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_CONTATO'), axis=1)
+                    df['HORA_APP_FINAL']  = df.apply(lambda r: get_app_val(r, 'A_HORA_STATUS'), axis=1) # 🔥 CAPTURA DA HORA
+
+                    # 🔥 FUNÇÃO PARA LIMPAR A HORA E DEIXAR NO FORMATO HH:MM
+                    def extrair_hora(hora_str):
+                        h = str(hora_str).strip()
+                        if not h or h.upper() == 'NAN': return ""
+                        if " " in h: h = h.split(" ")[-1]
+                        parts = h.split(":")
+                        if len(parts) >= 2: return f"{parts[0].zfill(2)}:{parts[1].zfill(2)}"
+                        return h
+                    df['HORA_LIMPA'] = df['HORA_APP_FINAL'].apply(extrair_hora)
 
                     def defining_foto_prioritaria(r):
                         f_col = get_app_val(r, 'A_FOTO_COL')
@@ -386,6 +399,7 @@ def carregar_dados_nuvem():
                 st.warning(f"Aviso AppSheet: {e}")
                 df['STATUS_RESOLVIDO'] = df['STATUS']
                 df['DATA_EFETIVA'] = "-"
+                df['HORA_LIMPA'] = "" # 🔥 Tratamento de erro
 
             if 'DATA' in df.columns:
                 df['DATA_OBJ'] = pd.to_datetime(
@@ -461,18 +475,22 @@ if 'filtro_kpi' not in st.session_state:
     st.session_state.filtro_kpi = "TODOS"
 
 # ── Helpers de status ──────────────────────────────────
+# 🔥 INJEÇÃO DA HORA LIMPA DIRETO NO EMOJI DE STATUS 🔥
 def get_st(row):
     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
+    hora = str(row.get('HORA_LIMPA', ''))
+    sufixo = f" às {hora}" if hora else ""
+
     if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação'
     if 'RECUSA'     in s: return '❌ Solicitação Recusada'
-    if 'ENTREGUE'   in s: return '✅ Entregue'
-    if 'COLETADO'   in s: return '📦 Coletado'
+    if 'ENTREGUE'   in s: return f'✅ Entregue{sufixo}'
+    if 'COLETADO'   in s: return f'📦 Coletado{sufixo}'
     if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
     if 'ROTA'       in s: return '🚚 Em Rota de Entrega'
     if 'CONFERIDO'  in s: return '☑️ Conferido'
-    if 'FRUSTRADA'  in s: return '⚠️ Frustrada'
+    if 'FRUSTRADA'  in s: return f'⚠️ Frustrada{sufixo}'
     if 'CANCELADO'  in s: return '🚫 Cancelado'
-    if 'PROBLEMA'   in s: return '🚨 Problema'
+    if 'PROBLEMA'   in s: return f'🚨 Problema{sufixo}'
     return '⏳ Pendente'
 
 KPI_DOT_COLOR = {
@@ -606,7 +624,7 @@ if not st.session_state.logado:
 
         /* Botão do Form */
         [data-testid="stFormSubmitButton"] > button {
-            height: 48px !important; 
+            height: 48px !important;
             font-weight: 700 !important; 
             font-size: 14px !important; 
             border-radius: 8px !important; 
@@ -713,7 +731,6 @@ else:
         st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Filtros de Visão</p>", unsafe_allow_html=True)
         
         with st.container(border=True):
-            # 🔥 CORREÇÃO DA MARGEM: Removida a margem negativa que causava a colisão com os labels "De" e "Até" 🔥
             st.markdown("<p style='font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 5px;'>🗓️ Período de Análise</p>", unsafe_allow_html=True)
             c1_dt, c2_dt = st.columns(2)
             dt_inicio = c1_dt.date_input("De:", value=hoje_br - timedelta(days=15), format="DD/MM/YYYY")
@@ -955,7 +972,7 @@ else:
 
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
-                        'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
+                        'DATA_LIMITE', 'DATA_EFETIVA', 'HORA_LIMPA', 'STATUS_DISPLAY',
                         'COMPROVANTE', 'DETALHES'
                     ]
 
@@ -969,7 +986,6 @@ else:
                       init(params) {
                         this.eGui = document.createElement('div');
                         this.eGui.style.cssText = 'display: flex; justify-content: center; align-items: center; height: 100%;';
-                        
                         if (params.value && params.value !== '') {
                           let a = document.createElement('a');
                           a.href = params.value;
@@ -978,31 +994,40 @@ else:
                           a.title = 'Clique para abrir o anexo completo';
                           a.style.cssText = 'text-decoration: none; font-size: 20px; transition: transform 0.2s; cursor: pointer;';
                           
+                          let previewContainer = document.createElement('div');
+                          previewContainer.style.cssText = 'position: fixed; display: none; z-index: 99999; pointer-events: none;';
+                          
                           let preview = document.createElement('img');
                           preview.src = params.value;
-                          preview.style.cssText = 'position: fixed; display: none; z-index: 99999; max-width: 350px; max-height: 350px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4); border: 3px solid white; pointer-events: none;';
+                          preview.style.cssText = 'max-width: 350px; max-height: 350px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4); border: 3px solid white; display: block;';
                           
-                          document.body.appendChild(preview);
+                          let timeOverlay = document.createElement('div');
+                          let statusText = params.data && params.data.STATUS_DISPLAY ? params.data.STATUS_DISPLAY : '';
+                          timeOverlay.innerHTML = statusText;
+                          timeOverlay.style.cssText = 'position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.9); color: #fff; padding: 5px 12px; border-radius: 99px; font-family: Inter, sans-serif; font-size: 12px; font-weight: bold; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.3);';
 
+                          previewContainer.appendChild(preview);
+                          if (statusText) { previewContainer.appendChild(timeOverlay); }
+                          document.body.appendChild(previewContainer);
+                          
                           a.onmouseover = (e) => {
                             a.style.transform = 'scale(1.3)';
-                            preview.style.display = 'block';
-                            preview.style.left = (e.clientX + 20) + 'px';
-                            preview.style.top = (e.clientY + 20) + 'px';
+                            previewContainer.style.display = 'block';
+                            previewContainer.style.left = (e.clientX + 20) + 'px';
+                            previewContainer.style.top = (e.clientY + 20) + 'px';
                           };
-                          
                           a.onmousemove = (e) => {
-                            preview.style.left = (e.clientX + 20) + 'px';
-                            preview.style.top = (e.clientY + 20) + 'px';
+                            previewContainer.style.left = (e.clientX + 20) + 'px';
+                            previewContainer.style.top = (e.clientY + 20) + 'px';
                           };
                           
                           a.onmouseout = () => {
                             a.style.transform = 'scale(1)';
-                            preview.style.display = 'none';
+                            previewContainer.style.display = 'none';
                           };
 
                           this.eGui.appendChild(a);
-                          this.previewElement = preview; 
+                          this.previewElement = previewContainer; 
                         }
                       }
                       getGui() { return this.eGui; }
@@ -1028,23 +1053,23 @@ else:
                         let text = params.value || '';
                         
                         if (status.includes('ENTREGUE') || status.includes('CONFERIDO')) {
-                          badge.style.backgroundColor = '#dcfce7'; 
+                          badge.style.backgroundColor = '#dcfce7';
                           badge.style.color = '#166534'; 
                           badge.style.border = '1px solid #bbf7d0';
                         } else if (status.includes('FRUSTRADA') || status.includes('PROBLEMA') || status.includes('ATRASADO') || status.includes('RECUSA')) {
-                          badge.style.backgroundColor = '#fee2e2'; 
+                          badge.style.backgroundColor = '#fee2e2';
                           badge.style.color = '#991b1b'; 
                           badge.style.border = '1px solid #fecaca';
                         } else if (status.includes('COLETADO') || status.includes('ROTA')) {
-                          badge.style.backgroundColor = '#dbeafe'; 
+                          badge.style.backgroundColor = '#dbeafe';
                           badge.style.color = '#1e40af'; 
                           badge.style.border = '1px solid #bfdbfe';
                         } else if (status.includes('PENDENTE')) {
-                          badge.style.backgroundColor = '#fef3c7'; 
+                          badge.style.backgroundColor = '#fef3c7';
                           badge.style.color = '#b45309'; 
                           badge.style.border = '1px solid #fde68a';
                         } else {
-                          badge.style.backgroundColor = '#f1f5f9'; 
+                          badge.style.backgroundColor = '#f1f5f9';
                           badge.style.color = '#475569'; 
                           badge.style.border = '1px solid #e2e8f0';
                         }
@@ -1068,6 +1093,7 @@ else:
                     gb.configure_column("CIDADE_UF", header_name="📍 Cidade / UF")
                     gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
+                    gb.configure_column("HORA_LIMPA", header_name="🕒 Hora Evento", width=100) # 🔥 NOVA COLUNA DE HORA ADICIONADA AQUI
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=180)
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
                     gb.configure_column("DETALHES", header_name="💬 Atualizações")
@@ -1112,6 +1138,7 @@ else:
                         'UF': 'UF',
                         'DATA_LIMITE': 'Previsão',
                         'DATA_EFETIVA': 'Entrega',
+                        'HORA_LIMPA': 'Hora Status', # 🔥 HORA NO CSV
                         'STATUS_DISPLAY': 'Status',
                         'DETALHES': 'Atualizações'
                     }
