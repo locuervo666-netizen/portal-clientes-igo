@@ -717,7 +717,7 @@ if menu == "📊 GRID":
     # 🔥 AUTO-SYNC SILENCIOSO (A MÁGICA INVISÍVEL) 🔥
     # Se o App marcou entregue mas a Memória ainda tá velha, ele escreve na planilha sozinho!
     if not df_raw.empty and 'STATUS_DB_ORIGINAL' in df_raw.columns:
-        mask_sync = (df_raw['STATUS_DB_ORIGINAL'] != df_raw['STATUS']) & (df_raw['STATUS'].isin(['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO', 'CONFERIDO']))
+        mask_sync = (df_raw['STATUS_DB_ORIGINAL'] != df_raw['STATUS']) & (df_raw['STATUS'].isin(['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO', 'CONFERIDO', 'COLETADO']))
         df_to_sync = df_raw[mask_sync]
         
         if not df_to_sync.empty:
