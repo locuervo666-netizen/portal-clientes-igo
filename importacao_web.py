@@ -3897,12 +3897,17 @@ elif menu == "📱 WhatsApp":
                             
                             saudacao, fechamento = gerar_saudacao_spintax(nome_amigavel)
                             
-                            # MENSAGEM COMPLETA E DETALHADA RESTAURADA
-                            msg_base = f"🚚 *ORDEM DE ENTREGA LIBERADA* 🚚\n\n{saudacao}a triagem finalizou o seu veículo e o romaneio está liberado para saída.\n\n"
-                            msg_base += f"🏢 *Destino (Entregar em):* {tomador_lote}\n"
-                            msg_base += f"📦 *Total de Volumes:* {len(df_rom)} pacotes\n"
-                            msg_base += f"🔖 *Lote de Expedição:* {rom}\n\n"
-                            msg_base += f"⚠️ *ATENÇÃO NA ENTREGA:*\nÉ OBRIGATÓRIO pegar a *assinatura de quem recebeu* e anexar a *foto nítida do comprovante* no aplicativo no exato momento da entrega. O processo só fecha com essas duas confirmações.\n\n"
+                           saudacao, fechamento = gerar_saudacao_spintax(nome_amigavel)
+                            
+                            # MENSAGEM AJUSTADA: FOCO EM COLETA E REGRAS DE FRUSTRADA
+                            msg_base = f"🚐 *NOVO ROMANEIO DE COLETA* 🚐\n\n"
+                            msg_base += f"{saudacao}o seu romaneio já está disponível para início das atividades.\n\n"
+                            msg_base += f"🏢 *Cliente Principal:* {tomador_lote}\n"
+                            msg_base += f"📦 *Volumes Previstos:* {len(df_rom)} itens\n"
+                            msg_base += f"🔖 *Lote de Referência:* {rom}\n\n"
+                            msg_base += f"⚠️ *INSTRUÇÕES OBRIGATÓRIAS:*\n"
+                            msg_base += f"📸 *Sucesso:* Anexar a foto nítida do comprovante ou protocolo no aplicativo.\n"
+                            msg_base += f"🚫 *Frustrada:* Caso a coleta não ocorra, é OBRIGATÓRIO informar o *NOME DO RESPONSÁVEL* que te atendeu no local e o motivo.\n\n"
                             msg_base += f"{fechamento}"
                             
                             simular_digitacao_zapi(telefone, random.uniform(3.0, 5.0))
