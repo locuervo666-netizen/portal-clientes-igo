@@ -3897,8 +3897,6 @@ elif menu == "📱 WhatsApp":
                             
                             saudacao, fechamento = gerar_saudacao_spintax(nome_amigavel)
                             
-                           saudacao, fechamento = gerar_saudacao_spintax(nome_amigavel)
-                            
                             # MENSAGEM AJUSTADA: FOCO EM COLETA E REGRAS DE FRUSTRADA
                             msg_base = f"🚐 *NOVO ROMANEIO DE COLETA* 🚐\n\n"
                             msg_base += f"{saudacao}o seu romaneio já está disponível para início das atividades.\n\n"
