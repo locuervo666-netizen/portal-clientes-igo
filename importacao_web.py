@@ -20,12 +20,14 @@ import difflib
 from streamlit_autorefresh import st_autorefresh
 from fpdf import FPDF
 
+# 🚀 NOVAS BIBLIOTECAS PARA A TABELA MODERNA
+from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
+
 FUSO_BR = timezone(timedelta(hours=-3))
 # =============================================================================
 # ⚙️ CONFIGURAÇÕES GERAIS DO SISTEMA
 # =============================================================================
 AGENTES_XLS_AUTORIZADOS = ['veloz.express', 'robson.melo', 'william.bertoldo', 'ludmila', 'helio.frade']
-# --- INÍCIO DO PASSO 1 ---
 AGENTES_PDF_AUTORIZADOS = ['veloz.express', 'francisco.gru', 'adilson.lima']
 
 def gerar_saudacao_spintax(nome):
@@ -38,7 +40,7 @@ def gerar_saudacao_spintax(nome):
     ]
     fechamentos = [
         "Por favor, confirme a receção com um 'OK'. Boa rota!",
-        "Qualquer dúvida, chame no Supoerte. Bom trabalho!",
+        "Qualquer dúvida, chame no Suporte. Bom trabalho!",
         "Não se esqueça de validar no app. Um abraço!",
         "Confirme o recebimento assim que possível. Sucesso hoje!",
         "Dirija com cuidado e boa entrega!"
@@ -47,57 +49,105 @@ def gerar_saudacao_spintax(nome):
     inicio = random.choice(saudacoes)
     fim = random.choice(fechamentos)
     return inicio, fim
-# --- FIM DO PASSO 1 ---
 
 # =============================================================================
-# 🔗 1. CONFIGURAÇÃO DA PÁGINA E ESTILOS NATIVOS
+# 🔗 1. CONFIGURAÇÃO DA PÁGINA E ESTILOS MODERNOS (MÓDULO 1)
 # =============================================================================
 st.set_page_config(page_title="C.C.O - IGO Logística", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
-st.markdown("""
+CSS_DASHBOARD = """
     <style>
-    #MainMenu { visibility: hidden !important; }
-    footer { visibility: hidden !important; }
-    .stAppDeployButton { display: none !important; }
-    
-    [data-testid="stSidebar"] { background-color: #FFFFFF !important; border-right: 1px solid #E2E8F0; }
-    
-    .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; max-width: 98% !important; }
-    
-    [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
-    
-    div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button { 
-        border-radius: 8px !important; border: none !important; height: 70px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    [data-testid="stAppViewContainer"] {
+        transition: background-color 0.3s ease;
+        font-family: 'Inter', sans-serif;
+        background-color: #F8FAFC !important;
     }
-    div.st-key-kpi_total button { background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important; }
-    div.st-key-kpi_entregue button { background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important; }
-    div.st-key-kpi_pend button { background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%) !important; }
-    div.st-key-kpi_frus button { background: linear-gradient(135deg, #991B1B 0%, #EF4444 100%) !important; }
-    div.st-key-kpi_atra button { background: linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%) !important; }
-    div.st-key-kpi_hoje button { background: linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%) !important; }
-    div.st-key-kpi_total button p, div.st-key-kpi_entregue button p, div.st-key-kpi_pend button p, div.st-key-kpi_frus button p, div.st-key-kpi_atra button p, div.st-key-kpi_hoje button p { 
-        color: white !important; font-weight: 800 !important; font-size: 13px !important; margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
+
+    /* ── SIDEBAR ── */
+    [data-testid="stSidebar"],
+    [data-testid="stSidebar"] > div:first-child {
+        background-color: #ffffff !important;
+        border-right: 1px solid #e2e8f0 !important;
     }
-    
-    div[data-testid="stPopover"] > button, button[kind="secondary"] {
-        white-space: nowrap !important; overflow: hidden !important; font-weight: 600 !important; font-size: 13px !important; border-radius: 6px !important; height: 36px !important; min-height: 36px !important; padding: 0px 12px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #475569 !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; margin-bottom: 10px;
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] h3 {
+        color: #1e293b !important;
     }
-    div[data-testid="stPopover"] > button:hover, button[kind="secondary"]:hover {
-        border-color: #0284C7 !important; color: #0369A1 !important; background-color: #F0F9FF !important; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.1) !important;
+
+    /* ── LAYOUT ── */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {background-color: transparent !important;}
+    .block-container {
+        padding-top: 1.2rem !important;
+        padding-bottom: 1rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+        max-width: 98% !important;
     }
-    
-    .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
-    .sync-status { font-size: 12px; color: #10B981; font-weight: 700; }
-    
-    div[data-testid="stSidebar"] button[kind="primary"] {
-        background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%) !important;
-        color: white !important;
-        border: none !important;
-        font-weight: bold !important;
-        box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3) !important;
+
+    /* ── KPI CARDS MODERNOS ── */
+    .kpi-card {
+        border-radius: 12px;
+        padding: 16px;
+        text-align: left;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+        height: 95px;
+    }
+    .kpi-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        transform: translateY(-2px);
+    }
+    .kpi-card.active {
+        box-shadow: 0 0 0 2px #3b82f6;
+    }
+
+    /* ── HEADER SUPERIOR ── */
+    .header-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+        padding-bottom: 14px;
+        border-bottom: 1.5px solid #e2e8f0;
+    }
+    .header-title {
+        font-size: 22px;
+        font-weight: 900;
+        color: #0f172a;
+        letter-spacing: -0.3px;
+    }
+    .sync-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #10b981;
+        font-weight: 700;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 99px;
+        padding: 5px 12px;
+    }
+    .sync-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #10b981;
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
     }
     </style>
-""", unsafe_allow_html=True)
+"""
 
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
@@ -105,19 +155,32 @@ if 'autenticado' not in st.session_state:
 if 'log_triagem' not in st.session_state:
     st.session_state.log_triagem = []
 
+# TELA DE LOGIN BLINDADA
 if not st.session_state.autenticado:
-    col_vazia1, col_login, col_vazia2 = st.columns([1, 1.5, 1])
+    st.markdown("""
+        <style>
+        [data-testid="stSidebar"] { display: none; }
+        header { display: none !important; }
+        [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important; font-family: 'Inter', sans-serif; }
+        .block-container { display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; min-height: 100vh !important; }
+        [data-testid="stForm"] { background-color: #ffffff !important; padding: 40px !important; border-radius: 20px !important; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.1) !important; border: none !important; }
+        .login-title { text-align: center; font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 25px; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+    _, col_login, _ = st.columns([1, 1.2, 1])
     with col_login:
-        st.markdown("<br><br><br>", unsafe_allow_html=True) 
-        st.markdown("<div style='text-align: center;'><img src='https://i.postimg.cc/x84nnjjq/IGO-LOGO.png' width='250'></div>", unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center; color: #0F172A; margin-top: 15px; margin-bottom: 25px; font-weight: 800;'>PORTAL CORPORATIVO</h2>", unsafe_allow_html=True)
-        
-        with st.form("form_login"):
-            usuario = st.text_input("👤 Usuário")
+        with st.form("form_login", clear_on_submit=False):
+            col_espaco1, col_logo, col_espaco2 = st.columns([1, 1.5, 1])
+            with col_logo: st.image('https://i.postimg.cc/x84nnjjq/IGO-LOGO.png', use_container_width=True)
+            st.markdown('<div class="login-title">PORTAL CORPORATIVO C.C.O</div>', unsafe_allow_html=True)
+            
+            usuario = st.text_input("👤 Usuário").upper().strip()
             senha = st.text_input("🔑 Senha", type="password")
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary"):
-                logins_autorizados = {"robson.melo": "123", "william.bertoldo": "123"}
+            
+            if st.form_submit_button("🚀 ACESSAR SISTEMA", type="primary", use_container_width=True):
+                logins_autorizados = {"ROBSON.MELO": "123", "WILLIAM.BERTOLDO": "123"}
                 if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
                     st.session_state.autenticado = True
                     st.rerun()
@@ -125,8 +188,11 @@ if not st.session_state.autenticado:
                     st.error("❌ Credenciais inválidas.")
     st.stop()
 
+# Aplica o CSS do painel
+st.markdown(CSS_DASHBOARD, unsafe_allow_html=True)
+
 # =============================================================================
-# 🔗 2. CONEXÕES OFICIAL E SANDBOX
+# 🔗 2. CONEXÕES OFICIAL E SANDBOX (MOTOR DE DADOS INTACTO)
 # =============================================================================
 @st.cache_resource
 def conectar_banco():
@@ -190,7 +256,6 @@ planilha_db = conectar_banco()
 planilha_sandbox = conectar_sandbox()
 planilha_financeiro = conectar_financeiro()
 
-# 🔹 LISTA DE CLIENTES AUTORIZADOS EM ORDEM ALFABÉTICA 🔹
 CLIENTES_AUTORIZADOS = sorted(["CAEP", "MB_CAEP", "CUNHA", "SAPIENS", "GRALAB", "SYNVIA", "INNOVATOX", "LABEST", "AIRLAB", "UNILABOR", "SODRE", "BRASILIENSE", "SOUZA CRUZ", "HEXALIFE", "ECOLYZER"])
 
 def corrigir_nomes_relatorio(texto):
@@ -199,6 +264,7 @@ def corrigir_nomes_relatorio(texto):
     t = re.sub(r'\bCAEP\b', 'SYNVIA', t, flags=re.IGNORECASE)
     t = re.sub(r'\bCUNHA\b', 'GRALAB', t, flags=re.IGNORECASE)
     return t
+
 @st.cache_data(ttl=60)
 def checar_chamados_pendentes(_planilha):
     if not _planilha: return 0
@@ -207,10 +273,10 @@ def checar_chamados_pendentes(_planilha):
         dados = aba.get_all_values()
         if len(dados) > 1:
             df = pd.DataFrame(dados[1:], columns=dados[0])
-            # Conta apenas os que estão EM ANÁLISE
             return len(df[df['STATUS'].str.contains('ANÁLISE', case=False, na=False)])
     except: pass
     return 0
+
 @st.cache_data(ttl=20)
 def carregar_dados_agentes(_planilha):
     if not _planilha: return pd.DataFrame()
@@ -234,6 +300,11 @@ def carregar_dados_completos(_planilha):
             
             if 'ZAP_ENVIADO' not in df.columns: df['ZAP_ENVIADO'] = ""
             if 'CNPJ' not in df.columns: df['CNPJ'] = "" 
+            
+            if 'TOMADOR' in df.columns:
+                df['TOMADOR'] = df['TOMADOR'].str.replace('CAEP', 'SYNVIA').str.replace('CUNHA', 'GRALAB')
+            if 'CIDADE' in df.columns:
+                df['CIDADE'] = df['CIDADE'].str.replace('Brodosqui', 'Brodowski', case=False).str.replace('BRODOSQUI', 'BRODOWSKI')
 
             try:
                 aba_app = _planilha.worksheet("App_Tarefas")
@@ -250,7 +321,6 @@ def carregar_dados_completos(_planilha):
                     col_qr_app = next((c for c in ['QR_CODE', 'QRCODE', 'QR', 'CODIGO'] if c in df_app.columns), None)
                     if col_qr_app: cols_to_extract.append(col_qr_app)
                     
-                    # 🔥 INTELIGÊNCIA: PUXAR A COLUNA DE DETALHES/NOME DO APP 🔥
                     col_nome = None
                     for c in ['DETALHES', 'RECEBEDOR', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
                         if c in df_app.columns:
@@ -262,7 +332,7 @@ def carregar_dados_completos(_planilha):
                     rename_map = {'STATUS': 'APP_STATUS', 'OBSERVACOES': 'APP_OBS', 'FOTO': 'APP_FOTO'}
                     if 'DATA_ENTREGA' in df_app.columns: rename_map['DATA_ENTREGA'] = 'APP_DATA_ENTREGA'
                     if col_qr_app: rename_map[col_qr_app] = 'APP_QR'
-                    if col_nome: rename_map[col_nome] = 'A_CONTATO' # <--- Renomeia para o nome que a GRID espera
+                    if col_nome: rename_map[col_nome] = 'A_CONTATO' 
                         
                     df_app_clean.rename(columns=rename_map, inplace=True)
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(str).str.strip()
@@ -292,7 +362,7 @@ def carregar_dados_completos(_planilha):
                         if s_app and s_app != 'NAN': return s_app
                         return s_db
                     
-                    df['STATUS_DB_ORIGINAL'] = df['STATUS'].copy() # 🔥 GUARDA O ORIGINAL PARA O AUTO-SYNC
+                    df['STATUS_DB_ORIGINAL'] = df['STATUS'].copy() 
                     df['STATUS'] = df.apply(get_true_status, axis=1)
                     
                     def get_true_data_entrega(row):
@@ -319,7 +389,7 @@ def carregar_dados_completos(_planilha):
                             if f_rom and f_rom.upper() != 'NAN': return f_rom
                         if f_app and f_app.upper() != 'NAN': return f_app
                         return f_db
-                        
+                    
                     if 'APP_FOTO' in df.columns or len(rom_dict) > 0:
                         df['FOTO'] = df.apply(get_true_foto, axis=1)
             except Exception: pass
@@ -339,27 +409,19 @@ def padronizar_texto(texto):
     if pd.isna(texto) or not texto: return ""
     return unicodedata.normalize('NFKD', str(texto).strip()).encode('ASCII', 'ignore').decode('utf-8').upper()
 
-# 🔥 A MÁGICA: FUNÇÃO DE CORREÇÃO ORTOGRÁFICA INTELIGENTE 🔥
 def corrigir_cidade_inteligente(cidade_suja, df_rotas):
     if pd.isna(cidade_suja) or not str(cidade_suja).strip() or df_rotas.empty:
         return padronizar_texto(cidade_suja)
-    
     c_limpa = padronizar_texto(str(cidade_suja))
-    
-    # Extrair as cidades oficiais da aba de agentes
     cidades_conhecidas = []
     for rota in df_rotas['ROTA MAPEADA'].dropna():
-        # Corta a string antes da seta ou do traço para pegar só a Cidade
         cid = str(rota).split('➔')[0].split('---')[0].strip().upper()
         if cid and cid not in cidades_conhecidas:
             cidades_conhecidas.append(cid)
             
-    # Difflib compara a palavra suja com a lista. 0.8 = 80% de semelhança.
     correcoes = difflib.get_close_matches(c_limpa, cidades_conhecidas, n=1, cutoff=0.8)
-    
-    if correcoes:
-        return correcoes[0] # Retorna a cidade perfeitamente escrita
-    return c_limpa # Se for uma cidade totalmente nova, mantém o que foi digitado
+    if correcoes: return correcoes[0]
+    return c_limpa
 
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts: return False
@@ -368,28 +430,12 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         linhas = []
         for p in lista_pedidos_dicts:
             mot_raw = str(p.get('MOTORISTA', p.get('AGENTE_RAW', '')))
-            # Corta o nome na barra "|" e manda só o login base para o AppSheet
             mot_app = mot_raw.split('|')[0].strip() 
-            
             linhas.append([
-                str(uuid.uuid4())[:8].upper(),    
-                str(p.get('PEDIDO','')),          
-                mot_app,                          
-                "PENDENTE",                        
-                str(p.get('ENDERECO','')),        
-                str(p.get('NUMERO','')),          
-                str(p.get('BAIRRO','')),          
-                str(p.get('CIDADE','')),          
-                str(p.get('CEP','')),             
-                "",                               
-                str(p.get('OBSERVACOES','')),     
-                str(p.get('LABORATORIO','')),     
-                str(p.get('TOMADOR','')),         
-                str(p.get('QR_CODE','')),         
-                "",                               
-                str(p.get('ROMANEIO','')),        
-                "",                               
-                ""                                
+                str(uuid.uuid4())[:8].upper(), str(p.get('PEDIDO','')), mot_app, "PENDENTE", str(p.get('ENDERECO','')),        
+                str(p.get('NUMERO','')), str(p.get('BAIRRO','')), str(p.get('CIDADE','')), str(p.get('CEP','')), "",                               
+                str(p.get('OBSERVACOES','')), str(p.get('LABORATORIO','')), str(p.get('TOMADOR','')), str(p.get('QR_CODE','')), "",                               
+                str(p.get('ROMANEIO','')), "", ""                     
             ])
         aba.append_rows(linhas, value_input_option='USER_ENTERED')
         return True
@@ -448,14 +494,12 @@ def obter_proximo_id(df):
         return int(nums.max() + 1) if not nums.empty else 1
     except: return 1
 
-# 🔥 LÓGICA DE PRAZO (SLA) COM REGRA SOUZA CRUZ 🔥
 def calcular_sla_dias(uf, cidade, tomador=""):
     uf, cidade = str(uf).upper().strip(), padronizar_texto(cidade)
     tomador = str(tomador).upper().strip()
     
     if "SOUZA CRUZ" in tomador:
-        if uf == 'SP' or cidade == 'DUQUE DE CAXIAS': 
-            return 3
+        if uf == 'SP' or cidade == 'DUQUE DE CAXIAS': return 3
         return 5
         
     if uf == 'SP': return 1
@@ -628,7 +672,6 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
     pdf.set_font("Arial", "", 8); pdf.set_text_color(100, 116, 139) 
     dt_str = data_despacho if isinstance(data_despacho, str) else data_despacho.strftime('%d/%m/%Y')
     
-    # --- INÍCIO DA CORREÇÃO: BUSCAR NOME AMIGÁVEL ---
     nome_amigavel = str(motorista_escolhido).upper()
     try:
         if not DF_AGENTES.empty:
@@ -636,7 +679,6 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
             if not match_nome.empty:
                 nome_amigavel = str(match_nome.iloc[0]['NOME DO AGENTE']).upper()
     except Exception: pass
-    # --- FIM DA CORREÇÃO ---
 
     pdf.cell(0, 4, f"Data do Embarque: {dt_str} | Motorista: {nome_amigavel}", ln=True, align="C")
     pdf.ln(3); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(3)
@@ -666,24 +708,24 @@ def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_list
     return pdf_bytes
 
 # =============================================================================
-# 🧭 NAVEGAÇÃO
+# 🧭 NAVEGAÇÃO E SIDEBAR (MODERNA)
 # =============================================================================
 if 'filtro_kpi_admin' not in st.session_state: st.session_state.filtro_kpi_admin = "TODOS"
 
 with st.sidebar:
-    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", width=160)
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.image("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", use_container_width=True)
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    # 🔥 ALERTA GLOBAL DE CHAMADOS 🔥
     qtd_chamados_abertos = checar_chamados_pendentes(planilha_db)
     if qtd_chamados_abertos > 0:
         st.markdown(f"""
-            <div style="background-color: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px; border-radius: 4px; margin-top: 15px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);">
+            <div style="background-color: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px; border-radius: 4px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);">
                 <p style="color: #991B1B; font-weight: 800; font-size: 13px; margin: 0;">🚨 {qtd_chamados_abertos} Chamado(s) Aberto(s)</p>
                 <p style="color: #7F1D1D; font-size: 11px; margin: 0;">Acesse o menu Atendimento.</p>
             </div>
         """, unsafe_allow_html=True)
-    else:
-        st.divider()
+
     menu = st.radio("Navegação Operacional:", [
         "📈 Dashboard",
         "📊 GRID",
@@ -694,19 +736,31 @@ with st.sidebar:
         "📁 Relatórios", 
         "⚙️ Rotas", 
         "🔬 Triagem", 
-        "🎧 Atendimento",  # <-- ADICIONE ESTA LINHA AQUI
+        "🎧 Atendimento", 
         "📱 WhatsApp"
     ], index=1)
+    
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     if st.button("🚪 Sair do Sistema", type="primary", use_container_width=True): 
-        st.session_state.autenticado = False; st.rerun()
+        st.session_state.autenticado = False
+        st.rerun()
+
 # ✅ AUTO-REFRESH SÓ NA GRID!
 if menu == "📊 GRID":
     st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 if menu != "📈 Dashboard":
-    st.markdown(f"""<div class="header-container"><h2 style="margin:0; font-weight:900; font-size:24px; color:#0F172A;">Central de Controle Operacional</h2><div class='sync-status'>🟢 Online: {datetime.now(FUSO_BR).strftime('%H:%M')}</div></div>""", unsafe_allow_html=True)
+    st.markdown(f"""
+        <div class="header-container">
+            <div>
+                <div class="header-title">Central de Controle Operacional</div>
+            </div>
+            <div class="sync-status">
+                <span class="sync-dot"></span> Online: {datetime.now(FUSO_BR).strftime('%H:%M')}
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
 # =============================================================================
 # 📊 MÓDULO GRID
@@ -715,7 +769,6 @@ if menu == "📊 GRID":
     df_raw = carregar_dados_completos(planilha_db)
     
     # 🔥 AUTO-SYNC SILENCIOSO (A MÁGICA INVISÍVEL) 🔥
-    # Se o App marcou entregue mas a Memória ainda tá velha, ele escreve na planilha sozinho!
     if not df_raw.empty and 'STATUS_DB_ORIGINAL' in df_raw.columns:
         mask_sync = (df_raw['STATUS_DB_ORIGINAL'] != df_raw['STATUS']) & (df_raw['STATUS'].isin(['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO', 'CONFERIDO', 'COLETADO']))
         df_to_sync = df_raw[mask_sync]
@@ -736,51 +789,36 @@ if menu == "📊 GRID":
                 aba_m.clear()
                 aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                 carregar_dados_completos.clear()
-                df_raw = carregar_dados_completos(planilha_db) # Recarrega os dados já atualizados
-            except Exception: pass # Se der erro de internet, ele fica quieto e tenta de novo depois
+                df_raw = carregar_dados_completos(planilha_db)
+            except Exception: pass
 
     if not df_raw.empty:
-        
-        # 🔥 ALERTA GIGANTE DE CHAMADOS DO HELPDESK 🔥
         qtd_chamados_abertos = checar_chamados_pendentes(planilha_db)
         if qtd_chamados_abertos > 0:
             st.error(f"🎧 **HELPDESK:** Existem **{qtd_chamados_abertos} chamado(s)** de clientes aguardando sua resposta na aba de Atendimento!")
 
-        # 🔥 CAIXA DE ENTRADA (INBOX) DO PORTAL DO CLIENTE 🔥
+        # CAIXA DE ENTRADA DO PORTAL DO CLIENTE
         df_aprovacao = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'AGUARDANDO APROVAÇÃO'].copy()
         if not df_aprovacao.empty:
             st.error(f"🚨 **Atenção:** Existem {len(df_aprovacao)} solicitação(ões) de coleta do Portal do Cliente aguardando aprovação!")
             with st.expander("🔔 INBOX: Analisar e Aprovar Coletas", expanded=True):                
-                if 'OBSERVACOES' not in df_aprovacao.columns:
-                    df_aprovacao['OBSERVACOES'] = ""
-                
-                colunas_desejadas = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'OBSERVACOES']
-                colunas_reais = [c for c in colunas_desejadas if c in df_aprovacao.columns]
-                
+                if 'OBSERVACOES' not in df_aprovacao.columns: df_aprovacao['OBSERVACOES'] = ""
+                colunas_reais = [c for c in ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'OBSERVACOES'] if c in df_aprovacao.columns]
                 df_aprovacao_show = df_aprovacao[colunas_reais].copy()
                 df_aprovacao_show.insert(0, "SELECIONAR", False)
-                
-                tabela_aprov = st.data_editor(
-                    df_aprovacao_show, 
-                    hide_index=True, 
-                    disabled=colunas_reais, 
-                    use_container_width=True, 
-                    key="grid_aprovacao_inbox"
-                )
-                
+                tabela_aprov = st.data_editor(df_aprovacao_show, hide_index=True, disabled=colunas_reais, use_container_width=True, key="grid_aprovacao_inbox")
                 sel_aprov = tabela_aprov[tabela_aprov["SELECIONAR"]]
                 
                 if not sel_aprov.empty:
                     c_mot, c_btn1, c_btn2 = st.columns([2, 1, 1])
                     logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-                    mot_aprov = c_mot.selectbox("👤 Atribuir Motorista (Agente):", ["Automático (Por Rota)"] + logins_disp, key="sel_mot_aprov")
+                    mot_aprov = c_mot.selectbox("👤 Atribuir Motorista:", ["Automático (Por Rota)"] + logins_disp, key="sel_mot_aprov")
                     
                     if c_btn1.button("✅ Aprovar e Roteirizar", type="primary", use_container_width=True):
-                        with st.spinner("Aprovando, calculando prazos e enviando notificação..."):
+                        with st.spinner("Processando..."):
                             try:
                                 aba_m = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-                                
                                 pedidos_aprov = sel_aprov['PEDIDO'].astype(str).tolist()
                                 lista_para_app = []
                                 
@@ -788,18 +826,14 @@ if menu == "📊 GRID":
                                     mask = df_nuvem['PEDIDO'] == pid
                                     if mask.any():
                                         l_orig = df_nuvem[mask].iloc[0].copy()
-                                        
-                                        if mot_aprov == "Automático (Por Rota)":
-                                            mot_final = obter_login_agente(l_orig.get('CIDADE',''), l_orig.get('BAIRRO',''), l_orig.get('LABORATORIO',''), l_orig.get('ENDERECO',''), DF_AGENTES)
-                                        else:
-                                            mot_final = mot_aprov
+                                        if mot_aprov == "Automático (Por Rota)": mot_final = obter_login_agente(l_orig.get('CIDADE',''), l_orig.get('BAIRRO',''), l_orig.get('LABORATORIO',''), l_orig.get('ENDERECO',''), DF_AGENTES)
+                                        else: mot_final = mot_aprov
 
                                         prazo_calc = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')), str(l_orig.get('TOMADOR', '')))
                                         data_limite_calc = calcular_data_limite(str(l_orig.get('DATA', hoje_br.strftime("%d/%m/%Y"))), prazo_calc)
                                         
                                         df_nuvem.loc[mask, 'PRAZO_DIAS'] = str(prazo_calc)
                                         df_nuvem.loc[mask, 'DATA_LIMITE'] = str(data_limite_calc)
-                                            
                                         df_nuvem.loc[mask, 'STATUS'] = "PENDENTE"
                                         df_nuvem.loc[mask, 'AGENTE_RAW'] = mot_final
                                         
@@ -810,49 +844,27 @@ if menu == "📊 GRID":
                                         if mot_final:
                                             tel_row = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == mot_final]
                                             if not tel_row.empty:
-                                                tel_motorista = tel_row.iloc[0]['TELEFONE']
-                                                nome_motorista = tel_row.iloc[0]['NOME DO AGENTE']
-                                                
-                                                msg_zap = f"🚨 *NOVA COLETA APROVADA - URGENTE* 🚨\n\n"
-                                                msg_zap += f"Olá, {nome_motorista}!\nUm novo pedido acabou de ser aprovado e adicionado à sua rota.\n\n"
-                                                msg_zap += f"📦 *Pedido:* {pid}\n"
-                                                msg_zap += f"🏢 *Cliente:* {l_orig.get('TOMADOR', '')}\n"
-                                                msg_zap += f"🔬 *Laboratório:* {l_orig.get('LABORATORIO', '')}\n"
-                                                msg_zap += f"📍 *Cidade:* {l_orig.get('CIDADE', '')}\n\n"
-                                                msg_zap += "Por favor, verifique o seu aplicativo para mais detalhes."
-                                                
-                                                enviar_whatsapp_zapi(tel_motorista, msg_zap)
+                                                msg_zap = f"🚨 *NOVA COLETA APROVADA* 🚨\nOlá, {tel_row.iloc[0]['NOME DO AGENTE']}!\nUm novo pedido foi aprovado e adicionado à sua rota.\n📦 *Pedido:* {pid}\n🏢 *Cliente:* {l_orig.get('TOMADOR', '')}\n📍 *Cidade:* {l_orig.get('CIDADE', '')}"
+                                                enviar_whatsapp_zapi(tel_row.iloc[0]['TELEFONE'], msg_zap)
                                         
                                 aba_m.clear()
                                 aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                
-                                if lista_para_app:
-                                    despachar_para_appsheet(lista_para_app)
-                                    
-                                st.success("🎉 Solicitações aprovadas, prazos calculados e motoristas notificados!")
-                                time.sleep(2)
-                                carregar_dados_completos.clear()
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Erro ao aprovar: {e}")
+                                if lista_para_app: despachar_para_appsheet(lista_para_app)
+                                st.success("🎉 Solicitações aprovadas!")
+                                time.sleep(2); carregar_dados_completos.clear(); st.rerun()
+                            except Exception as e: st.error(f"Erro: {e}")
                                 
                     if c_btn2.button("❌ Recusar Solicitação", use_container_width=True):
-                        with st.spinner("Recusando e arquivando..."):
+                        with st.spinner("Recusando..."):
                             try:
                                 aba_m = planilha_db.worksheet("Memoria_Sistema")
                                 df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-                                pedidos_aprov = sel_aprov['PEDIDO'].astype(str).tolist()
-                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(pedidos_aprov), 'STATUS'] = "RECUSADA"
-                                aba_m.clear()
-                                aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                st.success("Solicitações recusadas e arquivadas. O cliente verá no portal.")
-                                time.sleep(2)
-                                carregar_dados_completos.clear()
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Erro ao recusar: {e}")
-        # 🔥 FIM DA CAIXA DE ENTRADA 🔥
-        
+                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(sel_aprov['PEDIDO'].astype(str).tolist()), 'STATUS'] = "RECUSADA"
+                                aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                st.success("Recusadas!"); time.sleep(2); carregar_dados_completos.clear(); st.rerun()
+                            except Exception as e: st.error(f"Erro: {e}")
+
+        # INTELIGÊNCIA DOS DETALHES
         def get_detalhes(row):
             obs_master = str(row.get('OBSERVACOES', '')).strip()
             obs_app = str(row.get('APP_OBS', '')).strip()
@@ -865,10 +877,8 @@ if menu == "📊 GRID":
             
             obs_final_app = obs_app
             if obs_app and contato_app:
-                if obs_app.upper() != contato_app.upper(): 
-                    obs_final_app = f"{obs_app} / {contato_app}"
-            elif contato_app:
-                obs_final_app = contato_app
+                if obs_app.upper() != contato_app.upper(): obs_final_app = f"{obs_app} / {contato_app}"
+            elif contato_app: obs_final_app = contato_app
 
             obs_final = obs_final_app if obs_final_app else obs_master
             
@@ -892,6 +902,7 @@ if menu == "📊 GRID":
         df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
         if 'DATA_LIMITE' in df_raw.columns: df_raw['DATA_LIMITE'] = df_raw['DATA_LIMITE'].fillna("").astype(str)
         
+        # FILTROS DA GRID
         col_f1, col_f2 = st.columns(2)
         f_cli = col_f1.selectbox("🏢 Filtrar por Tomador:", ["Todos"] + CLIENTES_AUTORIZADOS)
         f_data = col_f2.date_input("📅 Período:", value=(hoje_br - timedelta(days=15), hoje_br), format="DD/MM/YYYY")
@@ -900,37 +911,76 @@ if menu == "📊 GRID":
         if f_cli != "Todos": df_f = df_f[df_f['TOMADOR'] == f_cli]
         if isinstance(f_data, tuple) and len(f_data) == 2: df_f = df_f[(df_f['DATA_OBJ'] >= f_data[0]) & (df_f['DATA_OBJ'] <= f_data[1])]
 
-        c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-        def set_kpi(v): st.session_state.filtro_kpi_admin = v
-        c1.button(f"📦 TOTAL\n{len(df_f)}", key="kpi_total", use_container_width=True, on_click=set_kpi, args=("TODOS",))
-        c2.button(f"✅ ENTREGUES\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue')])}", key="kpi_entregue", use_container_width=True, on_click=set_kpi, args=("ENTREGUE",))
-        c3.button(f"⏳ PENDENTES\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Pendente')])}", key="kpi_pend", use_container_width=True, on_click=set_kpi, args=("PENDENTE",))
-        c4.button(f"❌ FRUSTRADAS\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada')])}", key="kpi_frus", use_container_width=True, on_click=set_kpi, args=("FRUSTRADA",))
-        c5.button(f"🚨 ATRASADOS\n{len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO')])}", key="kpi_atra", use_container_width=True, on_click=set_kpi, args=("ATRASADO",))
-        c6.button(f"📅 HOJE\n{len(df_f[df_f['DATA_OBJ'] == hoje_br])}", key="kpi_hoje", use_container_width=True, on_click=set_kpi, args=("HOJE",))
+        # 🔥 OS NOVOS CARDS DE KPI (ESTILO PORTAL DO CLIENTE) 🔥
+        n_vals = {
+            "TODOS": len(df_f),
+            "ENTREGUE": len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', case=False)]),
+            "PENDENTE": len(df_f[df_f['STATUS_DISPLAY'].str.contains('Pendente', case=False)]),
+            "FRUSTRADA": len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', case=False)]),
+            "ATRASADO": len(df_f[df_f['STATUS_DISPLAY'].str.contains('ATRASADO', case=False)]),
+            "HOJE": len(df_f[df_f['DATA_OBJ'] == hoje_br]),
+        }
         
-        # 🔥 NOVO BLOCO: KPI DE CHAMADOS (INTELIGENTE) 🔥
-        qtd_chamados = checar_chamados_pendentes(planilha_db)
+        KPI_META = [
+            ("TODOS", "📦 Total", "kpi_total", n_vals["TODOS"], "#2563eb", "#dbeafe"),
+            ("ENTREGUE", "✅ Entregues", "kpi_entregue", n_vals["ENTREGUE"], "#16a34a", "#dcfce7"),
+            ("PENDENTE", "⏳ Pendentes", "kpi_pend", n_vals["PENDENTE"], "#d97706", "#fef3c7"),
+            ("FRUSTRADA", "❌ Frustradas", "kpi_frus", n_vals["FRUSTRADA"], "#dc2626", "#fee2e2"),
+            ("ATRASADO", "🚨 Atrasados", "kpi_atra", n_vals["ATRASADO"], "#be123c", "#ffe4e6"),
+            ("HOJE", "📅 Hoje", "kpi_hoje", n_vals["HOJE"], "#7c3aed", "#ede9fe")
+        ]
+
+        c_kpis = st.columns(7) 
         
-        # Muda a cor sozinho: Vermelho (Alerta) ou Cinza (Tranquilo)
-        cor_fundo_tkt = "linear-gradient(135deg, #DC2626 0%, #991B1B 100%)" if qtd_chamados > 0 else "linear-gradient(135deg, #94A3B8 0%, #64748B 100%)"
-        
-        st.markdown(f"""
-        <style>
-        div.st-key-kpi_chamados button {{ 
-            border-radius: 8px !important; border: none !important; height: 70px !important; 
-            display: flex !important; flex-direction: column !important; justify-content: center !important; 
-            align-items: center !important; padding: 0px 5px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-            background: {cor_fundo_tkt} !important; 
-        }}
-        div.st-key-kpi_chamados button p {{ 
-            color: white !important; font-weight: 800 !important; font-size: 13px !important; 
-            margin: 0 !important; text-align: center !important; white-space: pre-wrap !important; line-height: 1.3 !important;
-        }}
-        </style>
+        for col, (filtro, label, key, valor, dot_color, bg_color) in zip(c_kpis[:6], KPI_META):
+            is_active = st.session_state.filtro_kpi_admin == filtro
+            borda = f"1px solid {dot_color}" if is_active else f"1px solid {bg_color}"
+            partes = label.split(' ', 1)
+            emoji_card = partes[0]
+            texto_card = partes[1] if len(partes) > 1 else label
+
+            with col:
+                st.markdown(f"""
+                    <div class="kpi-card" style="background-color: {bg_color}; border: {borda};">
+                        <div style="position: absolute; right: -5px; bottom: -15px; font-size: 65px; opacity: 0.25; z-index: 0; line-height: 1; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.1));">{emoji_card}</div>
+                        <div style="position: relative; z-index: 1;">
+                            <div style="font-size: 11px; font-weight: 800; color: {dot_color}; text-transform: uppercase; letter-spacing: 0.5px;">{texto_card}</div>
+                            <div style="font-size: 28px; font-weight: 900; color: #0F172A; margin-top: 2px; line-height: 1;">{valor}</div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                if st.button(label, key=key, use_container_width=True):
+                    st.session_state.filtro_kpi_admin = filtro
+                    st.rerun()
+                    
+        # O 7º Cartão é o Helpdesk
+        with c_kpis[6]:
+            cor_tkt = "#991B1B" if qtd_chamados_abertos > 0 else "#475569"
+            bg_tkt = "#fee2e2" if qtd_chamados_abertos > 0 else "#f1f5f9"
+            borda_tkt = f"1px solid {cor_tkt}" if qtd_chamados_abertos > 0 else f"1px solid {bg_tkt}"
+            st.markdown(f"""
+                <div class="kpi-card" style="background-color: {bg_tkt}; border: {borda_tkt};">
+                    <div style="position: absolute; right: -5px; bottom: -15px; font-size: 65px; opacity: 0.25; z-index: 0; line-height: 1;">🎧</div>
+                    <div style="position: relative; z-index: 1;">
+                        <div style="font-size: 11px; font-weight: 800; color: {cor_tkt}; text-transform: uppercase; letter-spacing: 0.5px;">Chamados</div>
+                        <div style="font-size: 28px; font-weight: 900; color: #0F172A; margin-top: 2px; line-height: 1;">{qtd_chamados_abertos}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("🎧 Chamados", key="btn_chamados_fake", use_container_width=True): pass
+
+        # Ocultando os botões nativos invisíveis que acionam a lógica acima
+        st.markdown("""
+            <style>
+            div.st-key-kpi_total, div.st-key-kpi_entregue, div.st-key-kpi_pend, div.st-key-kpi_frus, div.st-key-kpi_atra, div.st-key-kpi_hoje, div.st-key-btn_chamados_fake {
+                margin-top: -110px !important; position: relative; z-index: 999; opacity: 0 !important;
+            }
+            div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_pend button, div.st-key-kpi_frus button, div.st-key-kpi_atra button, div.st-key-kpi_hoje button, div.st-key-btn_chamados_fake button {
+                height: 105px !important; cursor: pointer !important;
+            }
+            </style>
         """, unsafe_allow_html=True)
-        
-        c7.button(f"🎧 CHAMADOS\n{qtd_chamados}", key="kpi_chamados", use_container_width=True)
+
         st.markdown("<br>", unsafe_allow_html=True)
         busca = st.text_input("🔎 Busca Rápida:", placeholder="Filtrar dados...")
         
