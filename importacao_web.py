@@ -36,14 +36,26 @@ def gerar_saudacao_spintax(nome):
         f"Bom dia, {nome}. Aqui está a ",
         f"Fala {nome}! Passando para deixar a ",
         f"Oi {nome}. A sua ",
-        f"Tudo certo, {nome}? Acabou de sair a "
+        f"Tudo certo, {nome}? Acabou de sair a ",
+        f"Opa {nome}, beleza? Dá uma olhada na ",
+        f"E aí {nome}! Já está liberada a ",
+        f"Salve {nome}! Bora pra cima, segue a ",
+        f"Tudo tranquilo por aí, {nome}? Passando a ",
+        f"Fala grande {nome}! Aqui vai a ",
+        f"Alô {nome}! Passando pra enviar a ",
+        f"Bora rodar, {nome}! Aqui tá a ",
+        f"Oi {nome}, tudo na paz? Confere aí a ",
+        f"{nome}, meu parceiro! Já saiu a ",
+        f"Fala guerreiro! {nome}, segue a "
     ]
+    
+    # 🔥 FECHAMENTOS BLINDADOS (PEDINDO PARA SALVAR O CONTATO E RESPONDER 'OK') 🔥
     fechamentos = [
-        "Por favor, confirme a receção com um 'OK'. Boa rota!",
-        "Qualquer dúvida, chame no Suporte. Bom trabalho!",
-        "Não se esqueça de validar no app. Um abraço!",
-        "Confirme o recebimento assim que possível. Sucesso hoje!",
-        "Dirija com cuidado e boa entrega!"
+        "⚠️ *Aviso Rápido:* Por favor, salve o nosso número nos seus contatos e responda com um 'OK' para confirmar o recebimento desta rota. Boa viagem!",
+        "📌 Para garantir que o sistema não falhe, adicione este número aos seus contatos e me mande um 'OK' confirmando a leitura. Bom trabalho!",
+        "🚨 *Importante:* Salve nosso contato na sua agenda para não perder as próximas atualizações. Me dê um 'OK' para eu saber que a rota chegou bem. Sucesso hoje!",
+        "✅ Ah, um favor: guarde este número na sua lista de contatos e confirme o recebimento com um 'OK'. Dirija com cuidado e boa coleta!",
+        "📱 Para a comunicação ficar perfeita, não esqueça de salvar nosso número nos seus contatos e me confirmar aqui com um 'OK'. Um abraço e boa rota!"
     ]
     
     inicio = random.choice(saudacoes)
