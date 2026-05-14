@@ -195,7 +195,7 @@ CLIENTES_CONFIG = {
         "filtro": "LABEST"
     },
     "DANILO.DUARTE": {
-        "senha": "labest",
+        "senha": "123",
         "logo": "logo_labest.png",
         "filtro": "LABEST"
     },
