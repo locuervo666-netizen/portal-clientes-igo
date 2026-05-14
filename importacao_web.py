@@ -2245,7 +2245,6 @@ elif menu == "📥 Importações":
                 
                 agentes_selecionados = df_editado_oficial['AGENTE_RAW'].dropna().unique()
                 sucessos_of = 0
-                agentes_xls_of = AGENTES_XLS_AUTORIZADOS
                 
                 if len(agentes_selecionados) > 0:
                     progress_bar = st.progress(0)
@@ -2256,42 +2255,67 @@ elif menu == "📥 Importações":
                         df_ag_of = df_editado_oficial[df_editado_oficial['AGENTE_RAW'] == ag]
                         tel = dict_tel.get(str(ag).strip().lower(), "")
                         nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
+                        
+                        # 🔥 A CATRACA E BLINDAGEM AGORA NA IMPORTAÇÃO OFICIAL 🔥
                         ag_login = str(ag).strip().lower()
+                        login_base = ag_login.split('|')[0].split('/')[0].strip()
+                        is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
+                        is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
                         
                         if tel:
                             status_txt.markdown(f"**Enviando rota para:** {nom} ({idx_ag+1}/{len(agentes_selecionados)})...")
                             dt_ref = pd.to_datetime(df_ag_of.iloc[0]['DATA'], format='%d/%m/%Y', errors='coerce').date() if not df_ag_of.empty else hoje_br
                             data_str = dt_ref.strftime('%d/%m/%Y')
                             
-                            msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
+                            saudacao, fechamento = gerar_saudacao_spintax(nom)
+                            sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
+                            sep2 = random.choice(['---', '...', '===', ' '])
+                            bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
+                            lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
+                            
+                            msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
                             tot_qtd = 0
                             for cid, count in df_ag_of['CIDADE'].value_counts().items():
-                                msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}"); tot_qtd += count
-                            msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
+                                msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}"); tot_qtd += count
+                            msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
                             
                             for cid, group in df_ag_of.groupby('CIDADE'):
-                                msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
+                                msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
                                 items = []
                                 for _, row in group.iterrows():
-                                    item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                    item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                     obs = str(row.get('OBSERVACOES', '')).strip()
                                     if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                     items.append(item_str)
-                                msg_parts.append("\n\n      . . . .\n\n".join(items) + "\n")
+                                msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
                                 
+                            msg_parts.append(f"\n{fechamento}")
+                            
+                            INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
+                            TOKEN = "2321563615C4242CB6031504"         
+                            CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S" 
+                            try:
+                                requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                time.sleep(random.uniform(3.0, 5.0))
+                            except: pass
+
                             if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
-                                time.sleep(2.0)
-                                pdf_bytes_of = gerar_pdf_rota_whatsapp(nom, data_str, df_ag_of)
-                                enviar_pdf_zapi(tel, pdf_bytes_of, f"ROTA_IGO_{nom.replace(' ', '_')}_{dt_ref.strftime('%d%m')}.pdf")
+                                time.sleep(random.uniform(2.0, 4.0))
                                 
-                                if ag_login in agentes_xls_of or ag_login.split('|')[0] in agentes_xls_of:
+                                if is_autorizado_pdf:
+                                    try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2); time.sleep(2)
+                                    except: pass
+                                    enviar_pdf_zapi(tel, gerar_pdf_rota_whatsapp(nom, data_str, df_ag_of), f"ROTA_IGO_{nom.replace(' ', '_')}_{dt_ref.strftime('%d%m')}.pdf")
                                     time.sleep(3.0)
-                                    xls_bytes_of = gerar_excel_rota_whatsapp(df_ag_of)
-                                    enviar_excel_zapi(tel, xls_bytes_of, f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{dt_ref.strftime('%d%m')}.xlsx")
+                                    
+                                if is_autorizado_xls:
+                                    try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2); time.sleep(2)
+                                    except: pass
+                                    enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_ag_of), f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{dt_ref.strftime('%d%m')}.xlsx")
+                                    time.sleep(2.0)
                                 
                                 sucessos_of += 1
                                 
-                                # Tenta carimbar na base que foi enviado, se já estiver injetado
                                 try:
                                     aba_m = planilha_db.worksheet("Memoria_Sistema")
                                     df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
@@ -2811,7 +2835,6 @@ elif menu == "📥 Importações Umove":
                     
                     agentes_selecionados = df_editado_sb['AGENTE_RAW'].dropna().unique()
                     sucessos_sb = 0
-                    agentes_xls_sb = AGENTES_XLS_AUTORIZADOS
                     
                     if len(agentes_selecionados) > 0:
                         progress_bar = st.progress(0)
@@ -2822,42 +2845,71 @@ elif menu == "📥 Importações Umove":
                             df_ag_sb = df_editado_sb[df_editado_sb['AGENTE_RAW'] == ag]
                             tel = dict_tel.get(str(ag).strip().lower(), "")
                             nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
+                            
+                            # 🔥 A CATRACA E BLINDAGEM AGORA NO UMOVE 🔥
                             ag_login = str(ag).strip().lower()
+                            login_base = ag_login.split('|')[0].split('/')[0].strip()
+                            is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
+                            is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
                             
                             if tel:
                                 status_txt.markdown(f"**Enviando rota para:** {nom} ({idx_ag+1}/{len(agentes_selecionados)})...")
                                 data_str = hoje_br.strftime('%d/%m/%Y')
-                                msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
+                                
+                                saudacao, fechamento = gerar_saudacao_spintax(nom)
+                                sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
+                                sep2 = random.choice(['---', '...', '===', ' '])
+                                bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
+                                lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
+                                
+                                msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
                                 tot_qtd = 0
                                 for cid, count in df_ag_sb['CIDADE'].value_counts().items():
-                                    msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}"); tot_qtd += count
-                                msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
+                                    msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}"); tot_qtd += count
+                                msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
 
                                 for cid, group in df_ag_sb.groupby('CIDADE'):
-                                    msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
+                                    msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
                                     items = []
                                     for _, row in group.iterrows():
-                                        item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                        item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                         obs = str(row.get('OBSERVACOES', '')).strip()
                                         if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                         items.append(item_str)
-                                    msg_parts.append("\n\n      . . . .\n\n".join(items) + "\n")
-                                    
+                                    msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
+                                
+                                msg_parts.append(f"\n{fechamento}")
+                                
+                                # Simulador de digitação
+                                INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
+                                TOKEN = "2321563615C4242CB6031504"         
+                                CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S" 
+                                try:
+                                    requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                    time.sleep(random.uniform(3.0, 5.0))
+                                except: pass
+                                
                                 if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
-                                    time.sleep(2.0)
-                                    pdf_bytes_sb = gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb)
-                                    enviar_pdf_zapi(tel, pdf_bytes_sb, f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
+                                    time.sleep(random.uniform(2.0, 4.0))
                                     
-                                    if ag_login in agentes_xls_sb or ag_login.split('|')[0] in agentes_xls_sb:
+                                    if is_autorizado_pdf:
+                                        try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2); time.sleep(2)
+                                        except: pass
+                                        enviar_pdf_zapi(tel, gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb), f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
                                         time.sleep(3.0)
+                                        
+                                    if is_autorizado_xls:
+                                        try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2); time.sleep(2)
+                                        except: pass
                                         if ag_login == 'luiz.paulo':
                                             df_para_xls = df_editado_sb[df_editado_sb['UF'] == 'RJ']
                                             nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
                                         else:
                                             df_para_xls = df_ag_sb
                                             nome_arq_xls = f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx"
-                                            
+                                        
                                         enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_para_xls), nome_arq_xls)
+                                        time.sleep(2.0)
                                     
                                     sucessos_sb += 1
                                     
