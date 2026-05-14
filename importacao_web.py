@@ -3598,7 +3598,7 @@ elif menu == "🎧 Atendimento":
     except Exception as e:
         st.error(f"Erro ao conectar com a base de chamados: {e}")
 # =============================================================================
-# 📱 MÓDULO EXTRA: DISPARO WHATSAPP
+# 📱 MÓDULO EXTRA: DISPARO WHATSAPP (COM BLINDAGEM ANTI-SPAM E LOTES DE 5)
 # =============================================================================
 elif menu == "📱 WhatsApp":
     st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📱 Central Tática de Comunicação</h3></div>", unsafe_allow_html=True)
@@ -3607,7 +3607,22 @@ elif menu == "📱 WhatsApp":
     if df_raw.empty:
         st.warning("O banco de dados está vazio.")
         st.stop()
-        
+
+    # 🔥 FUNÇÃO ANTI-SPAM: SIMULA DIGITAÇÃO NO Z-API 🔥
+    def simular_digitacao_zapi(telefone_destino, tempo_segundos):
+        INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
+        TOKEN = "2321563615C4242CB6031504"         
+        CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S" 
+        tel_limpo = re.sub(r'\D', '', str(telefone_destino))
+        if not tel_limpo.startswith('55') and len(tel_limpo) in [10, 11]: tel_limpo = '55' + tel_limpo
+        url = f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence"
+        payload = {"phone": tel_limpo, "presence": "composing"}
+        headers = {"Accept": "application/json", "Content-Type": "application/json", "Client-Token": CLIENT_TOKEN}
+        try:
+            requests.post(url, json=payload, headers=headers)
+            time.sleep(tempo_segundos)
+        except: pass
+
     data_filtro = st.date_input("📅 Cronograma da Data (Filtra apenas Coletas):", value=hoje_br, format="DD/MM/YYYY")
     st.markdown("---")
     
@@ -3619,98 +3634,96 @@ elif menu == "📱 WhatsApp":
     dict_nomes = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
     agentes_xls = AGENTES_XLS_AUTORIZADOS
 
-    # ==========================================
-    # ABA 1: ROTAS DE COLETA
-    # ==========================================
+    # --- ABA 1: ROTAS DE COLETA ---
     with tab_coletas:
         col_esq, col_dir = st.columns([2.5, 1.2])
         df_pendentes = df_dia[df_dia['STATUS'].astype(str).str.upper() == 'PENDENTE'].copy()
         
         with col_esq:
             if df_pendentes.empty: 
-                st.success(f"Nenhum volume PENDENTE aguardando envio na data {data_filtro.strftime('%d/%m/%Y')}.")
+                st.success(f"Nenhum volume PENDENTE na data {data_filtro.strftime('%d/%m/%Y')}.")
             else:
                 agentes_com_rota = [ag for ag in df_pendentes['AGENTE_RAW'].dropna().unique() if str(ag).strip()]
                 agentes_para_enviar = [ag for ag in agentes_com_rota if not df_pendentes[df_pendentes['AGENTE_RAW'] == ag]['ZAP_ENVIADO'].astype(str).apply(lambda x: str(x).startswith('SIM')).all()]
                 
                 if agentes_para_enviar:
-                    st.info(f"🚀 Existem {len(agentes_para_enviar)} motoristas aguardando o envio da rota oficial de coleta.")
-                    if st.button("🚀 DISPARAR ROTAS PARA TODOS AGORA", type="primary", use_container_width=True):
+                    st.info(f"🚀 Restam {len(agentes_para_enviar)} motoristas aguardando envio.")
+                    
+                    # 🔥 FRACIONAMENTO DE LOTE (MÁXIMO 5 POR VEZ PARA EVITAR BLOQUEIOS E TIMEOUTS) 🔥
+                    lote_atual = agentes_para_enviar[:5]
+                    
+                    if st.button(f"🚀 DISPARAR LOTE DE {len(lote_atual)} MOTORISTAS", type="primary", use_container_width=True):
                         pedidos_atualizados = []
                         sucessos = 0
-                        if len(agentes_para_enviar) > 0:
-                            progress_bar = st.progress(0)
-                            status_text = st.empty()
-                            for idx_ag, agente in enumerate(agentes_para_enviar):
-                                mask_agente = (df_pendentes['AGENTE_RAW'] == agente) & (~df_pendentes['ZAP_ENVIADO'].astype(str).apply(lambda x: str(x).startswith('SIM')))
-                                df_agente = df_pendentes[mask_agente]
-                                telefone = dict_telefones.get(str(agente).strip().lower(), "")
-                                nome_amigavel = dict_nomes.get(str(agente).strip().lower(), str(agente).upper())
-                                agente_login = str(agente).strip().lower()
-                                
-                                if telefone:
-                                    status_text.markdown(f"**Enviando para:** {nome_amigavel}...")
-                                    data_str = data_filtro.strftime('%d/%m/%Y')
-                                    
-                                    # --- NOVO: SPINTAX NO DISPARO EM MASSA ---
-                                    saudacao, fechamento = gerar_saudacao_spintax(nome_amigavel)
-                                    msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
-                                    
-                                    tot_qtd = 0
-                                    for cid, count in df_agente['CIDADE'].value_counts().items():
-                                        msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}")
-                                        tot_qtd += count
-                                    msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
-                                    
-                                    for cid, group in df_agente.groupby('CIDADE'):
-                                        msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
-                                        items = []
-                                        for _, row in group.iterrows():
-                                            item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
-                                            obs = str(row.get('OBSERVACOES', '')).strip()
-                                            if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
-                                            items.append(item_str)
-                                        msg_parts.append("\n\n      . . . . .\n\n".join(items) + "\n")
-                                    
-                                    msg_parts.append(f"\n{fechamento}")
-                                        
-                                    if enviar_whatsapp_zapi(telefone, "\n".join(msg_parts)):
-                                        
-                                        # --- NOVO: PAUSA HUMANIZADA MASSA ---
-                                        espera_texto = random.uniform(15.0, 30.0) 
-                                        time.sleep(espera_texto)
-                                        
-                                        # --- NOVO: FILTRO RESTRITO DE PDF ---
-                                        if agente_login in AGENTES_PDF_AUTORIZADOS or agente_login.split('|')[0] in AGENTES_PDF_AUTORIZADOS:
-                                            pdf_bytes = gerar_pdf_rota_whatsapp(nome_amigavel, data_str, df_agente)
-                                            enviar_pdf_zapi(telefone, pdf_bytes, f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.pdf")
-                                            time.sleep(random.uniform(5.0, 10.0)) 
-                                        
-                                        if agente_login in agentes_xls or agente_login.split('|')[0] in agentes_xls:
-                                            espera_anexo = random.uniform(45.0, 75.0)
-                                            time.sleep(espera_anexo)
-                                            enviar_excel_zapi(telefone, gerar_excel_rota_whatsapp(df_agente), f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx")
-                                        
-                                        sucessos += 1
-                                        pedidos_atualizados.extend(df_agente['PEDIDO'].tolist())
-                                
-                                progress_bar.progress((idx_ag + 1) / len(agentes_para_enviar))
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        
+                        for idx_ag, agente in enumerate(lote_atual):
+                            mask_agente = (df_pendentes['AGENTE_RAW'] == agente) & (~df_pendentes['ZAP_ENVIADO'].astype(str).apply(lambda x: str(x).startswith('SIM')))
+                            df_agente = df_pendentes[mask_agente]
+                            telefone = dict_telefones.get(str(agente).strip().lower(), "")
+                            nome_amigavel = dict_nomes.get(str(agente).strip().lower(), str(agente).upper())
+                            agente_login = str(agente).strip().lower()
                             
-                            status_text.markdown("✅ **Processo finalizado!**")
-                            if pedidos_atualizados:
-                                try:
-                                    aba = planilha_db.worksheet("Memoria_Sistema")
-                                    df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                    if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
-                                    df_nuvem.loc[df_nuvem['PEDIDO'].isin(pedidos_atualizados), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
-                                    aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    carregar_dados_completos.clear()
-                                except Exception as e: 
-                                    st.error(f"Erro ao carimbar envio: {e}")
-                            st.success(f"🎉 Disparo em massa concluído! {sucessos} motoristas notificados."); time.sleep(2.5); st.rerun()
-                else: 
-                    st.success("✅ Todos os motoristas desta data já receberam as rotas de coleta.")
-                
+                            if telefone:
+                                status_text.markdown(f"**Enviando para:** {nome_amigavel}...")
+                                data_str = data_filtro.strftime('%d/%m/%Y')
+                                saudacao, fechamento = gerar_saudacao_spintax(nome_amigavel)
+                                
+                                # 🔥 CAOS ESTRUTURAL (SPINTAX NÍVEL 2) 🔥
+                                sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
+                                sep2 = random.choice(['---', '...', '===', ''])
+                                bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
+                                lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
+                                
+                                msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
+                                tot_qtd = 0
+                                for cid, count in df_agente['CIDADE'].value_counts().items():
+                                    msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}")
+                                    tot_qtd += count
+                                msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
+                                
+                                for cid, group in df_agente.groupby('CIDADE'):
+                                    msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
+                                    items = []
+                                    for _, row in group.iterrows():
+                                        item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}"
+                                        items.append(item_str)
+                                    msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
+                                msg_parts.append(f"\n{fechamento}")
+                                
+                                # 1. SIMULA DIGITAÇÃO ANTES DO TEXTO (Humanização)
+                                simular_digitacao_zapi(telefone, random.uniform(4.0, 7.0))
+                                
+                                if enviar_whatsapp_zapi(telefone, "\n".join(msg_parts)):
+                                    # 2. ESPERA HUMANIZADA DEPOIS DE LER O TEXTO
+                                    time.sleep(random.uniform(3.0, 6.0))
+                                    
+                                    # 🔥 OS FILTROS ORIGINAIS DE PDF E EXCEL SÃO INTACTOS 🔥
+                                    if agente_login in AGENTES_PDF_AUTORIZADOS or agente_login.split('|')[0] in AGENTES_PDF_AUTORIZADOS:
+                                        simular_digitacao_zapi(telefone, random.uniform(2.0, 4.0)) # Finge que upou arquivo
+                                        enviar_pdf_zapi(telefone, gerar_pdf_rota_whatsapp(nome_amigavel, data_str, df_agente), f"ROTA_{nome_amigavel}_{data_filtro.strftime('%d%m')}.pdf")
+                                        time.sleep(random.uniform(4.0, 7.0))
+                                        
+                                    if agente_login in agentes_xls or agente_login.split('|')[0] in agentes_xls:
+                                        simular_digitacao_zapi(telefone, random.uniform(2.0, 4.0))
+                                        enviar_excel_zapi(telefone, gerar_excel_rota_whatsapp(df_agente), f"ROTA_{nome_amigavel}.xlsx")
+                                        time.sleep(random.uniform(3.0, 5.0))
+                                        
+                                    sucessos += 1
+                                    pedidos_atualizados.extend(df_agente['PEDIDO'].tolist())
+                            
+                            progress_bar.progress((idx_ag + 1) / len(lote_atual))
+                        
+                        if pedidos_atualizados:
+                            aba = planilha_db.worksheet("Memoria_Sistema")
+                            df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                            df_nuvem.loc[df_nuvem['PEDIDO'].isin(pedidos_atualizados), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
+                            aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                        
+                        status_text.markdown("✅ **Lote finalizado!**")
+                        st.success(f"🎉 Lote de {sucessos} motoristas enviado com segurança anti-spam."); time.sleep(2.5); st.rerun()
+
                 st.markdown("---")
                 for agente in sorted(agentes_com_rota):
                     df_agente = df_pendentes[df_pendentes['AGENTE_RAW'] == agente]
@@ -3724,61 +3737,33 @@ elif menu == "📱 WhatsApp":
                     
                     with st.expander(f"{selo_status} | 👤 {nome_amigavel}{selo_vip} | Coletas: {len(df_agente)}", expanded=not todos_enviados):
                         st.dataframe(df_agente[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True)
-                        if telefone:
-                            data_str = data_filtro.strftime('%d/%m/%Y')
-                            
-                            # --- NOVO: SPINTAX INDIVIDUAL ---
-                            saudacao, fechamento = gerar_saudacao_spintax(nome_amigavel)
-                            msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
-                            
-                            tot_qtd = 0
-                            for cid, count in df_agente['CIDADE'].value_counts().items():
-                                msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}")
-                                tot_qtd += count
-                            msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
-                            
-                            for cid, group in df_agente.groupby('CIDADE'):
-                                msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
-                                items = []
-                                for _, row in group.iterrows():
-                                    item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
-                                    obs = str(row.get('OBSERVACOES', '')).strip()
-                                    if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
-                                    items.append(item_str)
-                                msg_parts.append("\n\n      . . . . .\n\n".join(items) + "\n")
+                        if st.button("🔄 Reenviar Arquivos" if todos_enviados else f"📲 Disparar para {nome_amigavel}", key=f"z_ind_{agente}", type="secondary" if todos_enviados else "primary"):
+                            if telefone:
+                                data_str = data_filtro.strftime('%d/%m/%Y')
+                                saudacao, fechamento = gerar_saudacao_spintax(nome_amigavel)
+                                msg = f"{saudacao}rota de 🗓️ {data_str}\nConsulte o App ou os arquivos abaixo.\n{fechamento}"
                                 
-                            msg_parts.append(f"\n{fechamento}")
-                            
-                            if st.button("🔄 Reenviar Arquivos" if todos_enviados else f"📲 Disparar Rota para {nome_amigavel}", key=f"zap_api_ind_{agente}", type="primary" if not todos_enviados else "secondary"):
-                                with st.spinner("Enviando pacote completo via satélite..."):
-                                    if enviar_whatsapp_zapi(telefone, "\n".join(msg_parts)):
+                                simular_digitacao_zapi(telefone, random.uniform(3.0, 6.0))
+                                if enviar_whatsapp_zapi(telefone, msg):
+                                    time.sleep(random.uniform(2.0, 4.0))
+                                    
+                                    if agente_login in AGENTES_PDF_AUTORIZADOS or agente_login.split('|')[0] in AGENTES_PDF_AUTORIZADOS:
+                                        simular_digitacao_zapi(telefone, random.uniform(2.0, 4.0))
+                                        enviar_pdf_zapi(telefone, gerar_pdf_rota_whatsapp(nome_amigavel, data_str, df_agente), f"ROTA_{data_filtro.strftime('%d%m')}.pdf")
+                                        time.sleep(random.uniform(3.0, 5.0))
                                         
-                                        # --- NOVO: PAUSA HUMANIZADA INDIVIDUAL ---
-                                        espera_texto = random.uniform(8.0, 15.0) 
-                                        time.sleep(espera_texto)
+                                    if agente_login in agentes_xls or agente_login.split('|')[0] in agentes_xls:
+                                        simular_digitacao_zapi(telefone, random.uniform(2.0, 4.0))
+                                        enviar_excel_zapi(telefone, gerar_excel_rota_whatsapp(df_agente), f"ROTA_{nome_amigavel}.xlsx")
                                         
-                                        if agente_login in AGENTES_PDF_AUTORIZADOS or agente_login.split('|')[0] in AGENTES_PDF_AUTORIZADOS:
-                                            pdf_bytes = gerar_pdf_rota_whatsapp(nome_amigavel, data_str, df_agente)
-                                            enviar_pdf_zapi(telefone, pdf_bytes, f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.pdf")
-                                            time.sleep(random.uniform(5.0, 10.0)) 
-                                        
-                                        if agente_login in agentes_xls or agente_login.split('|')[0] in agentes_xls:
-                                            espera_anexo = random.uniform(10.0, 20.0) 
-                                            time.sleep(espera_anexo)
-                                            enviar_excel_zapi(telefone, gerar_excel_rota_whatsapp(df_agente), f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx")
-                                        
-                                        try:
-                                            aba = planilha_db.worksheet("Memoria_Sistema")
-                                            df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                            if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
-                                            df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_agente['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
-                                            aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                            carregar_dados_completos.clear()
-                                        except Exception as e: st.error(f"Erro ao carimbar envio: {e}")
-                                        st.success(f"✅ Rota enviada para {nome_amigavel}!"); time.sleep(1.5); st.rerun()
-                                    else: st.error("🚨 Falha ao enviar o texto principal.")
-                        else: st.error(f"⚠️ Telefone do agente '{agente}' não encontrado.")
-                        
+                                    if not todos_enviados:
+                                        aba = planilha_db.worksheet("Memoria_Sistema")
+                                        df_nu = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                        df_nu.loc[df_nu['PEDIDO'].isin(df_agente['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
+                                        aba.clear(); aba.update("A1", [df_nu.columns.tolist()] + df_nu.fillna("").astype(str).values.tolist())
+                                    st.success("Enviado com sucesso!"); time.sleep(1.5); st.rerun()
+                            else: st.error("Sem telefone.")
+
         with col_dir:
             with st.container(border=True):
                 st.markdown("<h4 style='color:#0F172A; margin-top:0px; font-size:16px;'>⏱️ Log de Disparos</h4>", unsafe_allow_html=True)
@@ -3793,63 +3778,45 @@ elif menu == "📱 WhatsApp":
                     for item in log_list: st.markdown(f"<div style='padding:10px; background-color:#F8FAFC; border-left: 4px solid #10B981; margin-bottom:10px; border-radius:4px;'><b style='color:#334155; font-size:13px;'>👤 {item['agente']}</b><br><span style='color:#64748B; font-size:12px;'>✅ Enviado às {item['hora']}</span></div>", unsafe_allow_html=True)
                 else: st.info("Nenhum disparo registrado.")
 
-    # ==========================================
-    # ABA 2: ROMANEIOS DE ENTREGA
-    # ==========================================
+    # --- ABA 2: ROMANEIOS DE ENTREGA ---
     with tab_entregas:
-        st.markdown("#### 📦 Lotes Despachados na Triagem (Entregas)")
-        st.info("Aqui ficam os materiais bipados na triagem e agrupados por Romaneio. Clique em disparar para enviar o protocolo de entrega.")
-        
+        st.markdown("#### 📦 Lotes Despachados (Entregas)")
         df_entregas = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'EM ROTA DE ENTREGA'].copy()
-        
-        if df_entregas.empty: 
-            st.success("Nenhum romaneio de entrega pendente no momento.")
+        if df_entregas.empty: st.success("Tudo em dia!")
         else:
             romaneios = [r for r in df_entregas['ROMANEIO'].dropna().unique() if str(r).strip() and str(r).upper() != 'NAN']
             for rom in sorted(romaneios, reverse=True):
                 df_rom = df_entregas[df_entregas['ROMANEIO'] == rom].copy()
-                agente_login, tomador_lote = df_rom.iloc[0].get('AGENTE_RAW', ''), df_rom.iloc[0].get('TOMADOR', '')
-                nome_amigavel, telefone = dict_nomes.get(str(agente_login).strip().lower(), str(agente_login).upper()), dict_telefones.get(str(agente_login).strip().lower(), "")
+                ag_login = df_rom.iloc[0].get('AGENTE_RAW', '')
+                nome_amigavel = dict_nomes.get(str(ag_login).strip().lower(), str(ag_login).upper())
+                telefone = dict_telefones.get(str(ag_login).strip().lower(), "")
                 lote_enviado = df_rom['ZAP_ENVIADO'].astype(str).apply(lambda x: str(x).startswith('SIM')).all()
                 
-                with st.expander(f"{'✅ ENVIADO' if lote_enviado else '⏳ AGUARDANDO DISPARO'} | 🔖 Lote: {rom} | 👤 {nome_amigavel} | Volumes: {len(df_rom)}", expanded=not lote_enviado):
+                with st.expander(f"{'✅' if lote_enviado else '⏳'} | 🔖 Lote: {rom} | 👤 {nome_amigavel}", expanded=not lote_enviado):
                     st.dataframe(df_rom[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True)
-                    if telefone:
-                        if st.button(f"🔄 Reenviar Romaneio {rom}" if lote_enviado else f"📲 Disparar Romaneio para {nome_amigavel}", key=f"zap_rom_{rom}", type="secondary" if lote_enviado else "primary", use_container_width=True):
-                            with st.spinner(f"Enviando lote de expedição para {nome_amigavel}..."):
+                    if st.button(f"📲 Disparar Romaneio {rom}", key=f"z_rom_{rom}", use_container_width=True):
+                        if telefone:
+                            saudacao, fechamento = gerar_saudacao_spintax(nome_amigavel)
+                            msg = f"🚚 *ORDEM DE ENTREGA LIBERADA* 🚚\n\n{saudacao}O seu veículo foi finalizado na triagem.\nLote: {rom}\nVolumes: {len(df_rom)}\n\n⚠️ Lembrete: A foto do comprovante legível e a assinatura são obrigatórias na hora da entrega.\n\n{fechamento}"
+                            
+                            simular_digitacao_zapi(telefone, random.uniform(4.0, 7.0))
+                            if enviar_whatsapp_zapi(telefone, msg):
+                                time.sleep(random.uniform(3.0, 5.0))
                                 
-                                msg_base = f"🚚 *ORDEM DE ENTREGA LIBERADA* 🚚\n\nFala, *{nome_amigavel}*. A triagem finalizou o seu veículo e o romaneio está liberado para saída.\n\n🏢 *Destino (Entregar em):* {tomador_lote}\n📦 *Total de Volumes:* {len(df_rom)} pacotes\n🔖 *Lote de Expedição:* {rom}\n\n⚠️ *ATENÇÃO NA ENTREGA:*\nÉ OBRIGATÓRIO pegar a *assinatura de quem recebeu* e anexar a *foto nítida do comprovante* no aplicativo no exato momento da entrega. O processo só fecha com essas duas confirmações."
-                                
-                                # Verifica se o motorista está na lista de PDFs autorizados
-                                recebe_pdf = agente_login in AGENTES_PDF_AUTORIZADOS or agente_login.split('|')[0] in AGENTES_PDF_AUTORIZADOS
-                                
-                                if recebe_pdf:
-                                    msg_base += "\n\nO PDF com o protocolo físico segue no anexo abaixo. Boa rota!"
-                                else:
-                                    msg_base += "\n\nVerifique os detalhes no aplicativo. Boa rota!"
-
-                                if enviar_whatsapp_zapi(telefone, msg_base):
+                                if ag_login in AGENTES_PDF_AUTORIZADOS or ag_login.split('|')[0] in AGENTES_PDF_AUTORIZADOS:
+                                    simular_digitacao_zapi(telefone, random.uniform(2.0, 4.0))
+                                    pdf = gerar_pdf_romaneio(rom, hoje_br, ag_login, df_rom.to_dict('records'))
+                                    enviar_pdf_zapi(telefone, pdf, f"Romaneio_{rom}.pdf")
+                                    time.sleep(2.0)
                                     
-                                    # Pausa humanizada após o texto
-                                    espera_texto = random.uniform(8.0, 15.0) 
-                                    time.sleep(espera_texto)
-                                    
-                                    # Envia o PDF só se tiver autorização
-                                    if recebe_pdf:
-                                        enviar_pdf_zapi(telefone, gerar_pdf_romaneio(rom, hoje_br, agente_login, df_rom.to_dict('records')), f"Romaneio_IGO_{rom}.pdf")
-                                        time.sleep(random.uniform(5.0, 10.0))
-                                        
-                                    try:
-                                        aba = planilha_db.worksheet("Memoria_Sistema")
-                                        df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
-                                        if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
-                                        df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_rom['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
-                                        aba.clear(); aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                        carregar_dados_completos.clear()
-                                    except Exception as e: st.error(f"Erro ao carimbar envio: {e}")
-                                    st.success(f"✅ Romaneio {rom} enviado com sucesso para {nome_amigavel}!"); time.sleep(1.5); st.rerun()
-                                else: st.error("🚨 Falha ao conectar com o WhatsApp do motorista.")
-                    else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
+                                # Carimba base
+                                aba = planilha_db.worksheet("Memoria_Sistema")
+                                df_nu = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
+                                df_nu.loc[df_nu['PEDIDO'].isin(df_rom['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
+                                aba.clear(); aba.update("A1", [df_nu.columns.tolist()] + df_nu.fillna("").astype(str).values.tolist())
+                                st.success("Enviado com sucesso seguro!"); time.sleep(1.5); st.rerun()
+                        else:
+                            st.error(f"⚠️ Telefone não cadastrado para o agente '{ag_login}'.")
 
 # =============================================================================
 # 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN REAL - TV - PROGRESSO + ANÁLISE 30D)
