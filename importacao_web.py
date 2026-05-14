@@ -2736,7 +2736,7 @@ elif menu == "📥 Importações Umove":
                                         if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                         items.append(item_str)
                                     msg_parts.append("\n\n      . . . .\n\n".join(items) + "\n")
-                                    
+                                
                                 if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
                                     time.sleep(2.0)
                                     pdf_bytes_sb = gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb)
@@ -2750,7 +2750,7 @@ elif menu == "📥 Importações Umove":
                                         else:
                                             df_para_xls = df_ag_sb
                                             nome_arq_xls = f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx"
-                                            
+                                        
                                         enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_para_xls), nome_arq_xls)
                                     
                                     sucessos_sb += 1
@@ -3061,7 +3061,7 @@ elif menu == "🔬 Triagem":
                             st.session_state.pdf_avulso_pronto = pdf_manual
                             st.session_state.id_avulso_pronto = id_rom_av
                             st.session_state.triagem_avulsa_lote = []
-                            time.sleep(0.5) # Dá um respiro pro Streamlit atualizar o botão
+                            time.sleep(0.5) 
                             st.rerun()
             else: st.info("Aguardando bipagem de envelopes...")
         
@@ -3671,7 +3671,7 @@ elif menu == "📱 WhatsApp":
                                         except Exception as e: st.error(f"Erro ao carimbar envio: {e}")
                                         st.success(f"✅ Rota enviada para {nome_amigavel}!"); time.sleep(1.5); st.rerun()
                                     else: st.error("🚨 Falha ao enviar o texto principal.")
-                        else: st.error(f"⚠️ Telefone do agente '{agente}' não encontrado.")
+                        else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
                         
         with col_dir:
             with st.container(border=True):
@@ -3743,7 +3743,7 @@ elif menu == "📱 WhatsApp":
                                     except Exception as e: st.error(f"Erro ao carimbar envio: {e}")
                                     st.success(f"✅ Romaneio {rom} enviado com sucesso para {nome_amigavel}!"); time.sleep(1.5); st.rerun()
                                 else: st.error("🚨 Falha ao conectar com o WhatsApp do motorista.")
-                    else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
+                else: st.error(f"⚠️ Telefone não cadastrado para o agente '{agente_login}'.")
 
 # =============================================================================
 # 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN REAL - TV - PROGRESSO + ANÁLISE 30D)
@@ -4141,7 +4141,7 @@ elif menu == "📈 Dashboard":
             manchetes.extend(buscar_alertas_climaticos(cidades_alvo))
             manchetes.extend(buscar_noticias_transito_radar(cidades_alvo)) 
 
-        ticker_text = "      <span style='color: #FFC000; font-weight: 900;'>|</span>      ".join([m for m in manchetes])
+        ticker_text = "      <span style='color: #FFC000; font-weight: 900;'>|</span>      ".join([m for m in manchetes])
 
         st.markdown(f"""
             <div class="ticker-wrap-fixed">
