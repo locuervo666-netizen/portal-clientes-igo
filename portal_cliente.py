@@ -278,7 +278,7 @@ def carregar_dados_nuvem():
                     if 'DATA'         in df_app.columns: cols_to_extract.append('DATA')
                     if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
                     if 'RECEBEDOR'    in df_app.columns: cols_to_extract.append('RECEBEDOR')
-                    if 'HORA_STATUS'  in df_app.columns: cols_to_extract.append('HORA_STATUS') # 🔥 NOVA COLUNA DE HORA
+                    if 'HORA_STATUS'  in df_app.columns: cols_to_extract.append('HORA_STATUS') # 🔥 COLUNA DE HORA
                     
                     col_nome = None
                     for c in ['DETALHES', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
@@ -326,9 +326,8 @@ def carregar_dados_nuvem():
                     df['RECEBEDOR_FINAL'] = df.apply(lambda r: get_app_val(r, 'A_REC'), axis=1)
                     df['OBS_APP_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_OB'), axis=1)
                     df['CONTATO_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_CONTATO'), axis=1)
-                    df['HORA_APP_FINAL']  = df.apply(lambda r: get_app_val(r, 'A_HORA_STATUS'), axis=1) # 🔥 CAPTURA DA HORA
+                    df['HORA_APP_FINAL']  = df.apply(lambda r: get_app_val(r, 'A_HORA_STATUS'), axis=1)
 
-                    # 🔥 FUNÇÃO PARA LIMPAR A HORA E DEIXAR NO FORMATO HH:MM
                     def extrair_hora(hora_str):
                         h = str(hora_str).strip()
                         if not h or h.upper() == 'NAN': return ""
@@ -399,7 +398,7 @@ def carregar_dados_nuvem():
                 st.warning(f"Aviso AppSheet: {e}")
                 df['STATUS_RESOLVIDO'] = df['STATUS']
                 df['DATA_EFETIVA'] = "-"
-                df['HORA_LIMPA'] = "" # 🔥 Tratamento de erro
+                df['HORA_LIMPA'] = "" 
 
             if 'DATA' in df.columns:
                 df['DATA_OBJ'] = pd.to_datetime(
@@ -970,9 +969,10 @@ else:
                     for col in df_final.columns:
                         df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
+                    # 🔥 AQUI ESTÁ A REMOÇÃO DA COLUNA 'HORA_LIMPA' DA EXIBIÇÃO 🔥
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
-                        'DATA_LIMITE', 'DATA_EFETIVA', 'HORA_LIMPA', 'STATUS_DISPLAY',
+                        'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
                         'COMPROVANTE', 'DETALHES'
                     ]
 
@@ -1093,7 +1093,7 @@ else:
                     gb.configure_column("CIDADE_UF", header_name="📍 Cidade / UF")
                     gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
-                    gb.configure_column("HORA_LIMPA", header_name="🕒 Hora Evento", width=100) # 🔥 NOVA COLUNA DE HORA ADICIONADA AQUI
+                    # 🔥 A CONFIGURAÇÃO DE COLUNA "HORA_LIMPA" FOI RETIRADA PARA LIMPAR A TELA 🔥
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=180)
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
                     gb.configure_column("DETALHES", header_name="💬 Atualizações")
@@ -1138,7 +1138,7 @@ else:
                         'UF': 'UF',
                         'DATA_LIMITE': 'Previsão',
                         'DATA_EFETIVA': 'Entrega',
-                        'HORA_LIMPA': 'Hora Status', # 🔥 HORA NO CSV
+                        # 🔥 TAMBÉM RETIREI DO CSV PARA NÃO DAR DUPLA INFORMAÇÃO, JÁ QUE ESTÁ NO STATUS 🔥
                         'STATUS_DISPLAY': 'Status',
                         'DETALHES': 'Atualizações'
                     }
