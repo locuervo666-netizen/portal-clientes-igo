@@ -474,7 +474,6 @@ if 'filtro_kpi' not in st.session_state:
     st.session_state.filtro_kpi = "TODOS"
 
 # ── Helpers de status ──────────────────────────────────
-# 🔥 A CÁPSULA VOLTOU A FICAR LIMPA, SEM HORÁRIOS 🔥
 def get_st(row):
     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
 
@@ -520,7 +519,6 @@ KPI_META = [
     ("HOJE",       "📅 Hoje",         "kpi_hoje"),
 ]
 
-# 🔥 A MAGIA DA ATUALIZAÇÃO INTELIGENTE ACONTECE AQUI 🔥
 def get_detalhes(row):
     obs_master = str(row.get('OBSERVACOES', '')).strip()
     obs_app    = str(row.get('OBS_APP_FINAL', '')).strip()
@@ -532,11 +530,10 @@ def get_detalhes(row):
 
     dt_curta = dt_efetiva
     if len(dt_efetiva) >= 10: 
-        dt_curta = dt_efetiva[:5] # Extrai apenas DD/MM para ficar elegante
+        dt_curta = dt_efetiva[:5] 
 
     str_coleta = f"Coletado às {hora}" if hora else ""
 
-    # SE ENTREGUE: Concatena a Coleta e a Entrega
     if 'ENTREGUE' in status:
         rec_final = recebedor if recebedor else contato if contato else ""
         dt_str = f" em {dt_curta}" if dt_curta and dt_curta != "-" else ""
@@ -547,7 +544,6 @@ def get_detalhes(row):
             return f"{str_coleta} / {texto_entrega}"
         return texto_entrega
 
-    # SE FRUSTRADA: Concatena o Horário da Frustrada com o Motivo
     if 'FRUSTRADA' in status or 'PROBLEMA' in status:
         obs_limpa = re.sub(r'\[COLETA:.*?\]', '', obs_app, flags=re.IGNORECASE).strip()
         if not obs_limpa:
@@ -569,11 +565,9 @@ def get_detalhes(row):
             return f"Ocorrência registrada às {hora}"
         return texto_frustrada if texto_frustrada else "-"
         
-    # SE COLETADO: Mostra apenas a Coleta
     if 'COLETADO' in status or 'ROTA' in status:
         return str_coleta if str_coleta else "-"
 
-    # DEFAULT PENDENTE: Retorna as observações padrões
     obs_final = obs_app if obs_app and obs_app.upper() != 'NAN' else obs_master
     if obs_final.upper() == 'NAN': obs_final = ""
 
@@ -582,14 +576,17 @@ def get_detalhes(row):
         return f"{obs_final} (Informante: {contato})"
     return obs_final if obs_final else f"Informante: {contato}"
 
+# 🔥 NOVA FUNÇÃO DE PRIORIDADE COM RANKING DE 1 A 7 🔥
 def definir_prioridade_portal(status_str):
     s = str(status_str).upper()
-    if 'ATRASADO'  in s: return 1
-    if 'PENDENTE'  in s: return 2
-    if 'COLETADO'  in s: return 3
-    if 'ROTA'      in s: return 4
-    if 'ENTREGUE'  in s: return 5
-    return 6
+    if 'PENDENTE' in s or 'AGUARDANDO' in s: return 1
+    if 'ROTA DE COLETA' in s: return 2
+    if 'COLETADO' in s: return 3
+    if 'FRUSTRADA' in s or 'PROBLEMA' in s or 'RECUSA' in s or 'ATRASADO' in s: return 4
+    if 'CONFERIDO' in s: return 5
+    if 'ROTA DE ENTREGA' in s or 'EM ROTA' in s: return 6
+    if 'ENTREGUE' in s: return 7
+    return 8 # Cancelados ou outros
 
 def tratar_foto(x):
     xs = str(x).strip()
@@ -963,8 +960,15 @@ else:
                     df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
                 if not df_grid.empty:
+                    # 🔥 AQUI ESTÁ A MÁGICA DOS 2 PESOS DE ORDENAÇÃO 🔥
+                    # 1º Acha a prioridade do status.
                     df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(definir_prioridade_portal)
-                    df_grid = df_grid.sort_values(by=['PRIORIDADE', 'DATA_OBJ', 'PEDIDO'], ascending=[True, False, False]).drop(columns=['PRIORIDADE'])
+                    
+                    # 2º Ordena PRIMEIRO pela Data (False = mais recente no topo) e DEPOIS pela Prioridade (True = Pendentes (1) antes de Entregues (7))
+                    df_grid = df_grid.sort_values(
+                        by=['DATA_OBJ', 'PRIORIDADE', 'PEDIDO'], 
+                        ascending=[False, True, False]
+                    ).drop(columns=['PRIORIDADE'])
 
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
