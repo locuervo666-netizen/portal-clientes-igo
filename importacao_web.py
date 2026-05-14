@@ -3470,33 +3470,49 @@ elif menu == "📱 WhatsApp":
                                 agente_login = str(agente).strip().lower()
                                 
                                 if telefone:
-                                    status_text.markdown(f"**Enviando para:** {nome_amigavel}...")
-                                    data_str = data_filtro.strftime('%d/%m/%Y')
-                                    msg_parts = [f"Bom dia, {nome_amigavel}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
-                                    tot_qtd = 0
-                                    for cid, count in df_agente['CIDADE'].value_counts().items():
-                                        msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}")
-                                        tot_qtd += count
-                                    msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
-                                    for cid, group in df_agente.groupby('CIDADE'):
-                                        msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
-                                        items = []
-                                        for _, row in group.iterrows():
-                                            item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
-                                            obs = str(row.get('OBSERVACOES', '')).strip()
-                                            if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
-                                            items.append(item_str)
-                                        msg_parts.append("\n\n      . . . . .\n\n".join(items) + "\n")
-                                        
-                                    if enviar_whatsapp_zapi(telefone, "\n".join(msg_parts)):
-                                        time.sleep(2.0)
-                                        pdf_bytes = gerar_pdf_rota_whatsapp(nome_amigavel, data_str, df_agente)
-                                        enviar_pdf_zapi(telefone, pdf_bytes, f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.pdf")
-                                        if agente_login in agentes_xls or agente_login.split('|')[0] in agentes_xls:
-                                            time.sleep(3.0)
-                                            enviar_excel_zapi(telefone, gerar_excel_rota_whatsapp(df_agente), f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx")
-                                        sucessos += 1
-                                        pedidos_atualizados.extend(df_agente['PEDIDO'].tolist())
+                    status_text.markdown(f"**Enviando para:** {nome_amigavel}...")
+                    data_str = data_filtro.strftime('%d/%m/%Y')
+                    
+                    # --- NOVO: APLICAÇÃO DO SPINTAX ---
+                    saudacao, fechamento = gerar_saudacao_spintax(nome_amigavel)
+                    msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
+                    
+                    tot_qtd = 0
+                    for cid, count in df_agente['CIDADE'].value_counts().items():
+                        msg_parts.append(f"{str(cid).strip().ljust(23)} | {count:02d}")
+                        tot_qtd += count
+                    msg_parts.extend(["-------------------------------", f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", "========================\n"])
+                    for cid, group in df_agente.groupby('CIDADE'):
+                        msg_parts.extend(["------------------------------", f"{str(cid).strip().center(30)}", "------------------------------\n"])
+                        items = []
+                        for _, row in group.iterrows():
+                            item_str = f"> 🔸 PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 LABORATÓRIO: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                            obs = str(row.get('OBSERVACOES', '')).strip()
+                            if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
+                            items.append(item_str)
+                        msg_parts.append("\n\n      . . . . .\n\n".join(items) + "\n")
+                    
+                    # Adiciona a mensagem de fecho humanizada
+                    msg_parts.append(f"\n{fechamento}")
+                        
+                    if enviar_whatsapp_zapi(telefone, "\n".join(msg_parts)):
+                        # --- NOVO: PAUSA HUMANIZADA ANTES DOS ANEXOS ---
+                        espera_texto = random.uniform(15.0, 30.0) 
+                        time.sleep(espera_texto)
+                        
+                        # --- NOVO: FILTRO RESTRITO DE PDF ---
+                        if agente_login in AGENTES_PDF_AUTORIZADOS or agente_login.split('|')[0] in AGENTES_PDF_AUTORIZADOS:
+                            pdf_bytes = gerar_pdf_rota_whatsapp(nome_amigavel, data_str, df_agente)
+                            enviar_pdf_zapi(telefone, pdf_bytes, f"ROTA_IGO_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.pdf")
+                            time.sleep(random.uniform(5.0, 10.0)) 
+                        
+                        if agente_login in agentes_xls or agente_login.split('|')[0] in agentes_xls:
+                            espera_anexo = random.uniform(45.0, 75.0)
+                            time.sleep(espera_anexo)
+                            enviar_excel_zapi(telefone, gerar_excel_rota_whatsapp(df_agente), f"ROTA_ESTRUTURADA_{nome_amigavel.replace(' ', '_')}_{data_filtro.strftime('%d%m')}.xlsx")
+                        
+                        sucessos += 1
+                        pedidos_atualizados.extend(df_agente['PEDIDO'].tolist())
                                 
                                 progress_bar.progress((idx_ag + 1) / len(agentes_para_enviar))
                             
