@@ -602,7 +602,7 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🪟 FUNÇÃO DO POP-UP MEGAZORD (BLINDADO CONTRA MARKDOWN)
+# 🪟 FUNÇÃO DO POP-UP MEGAZORD (BLINDADO)
 # =======================================================
 @st.dialog("📋 Detalhes da Operação", width="large")
 def modal_detalhes_pedido(pedido_data):
@@ -616,7 +616,7 @@ def modal_detalhes_pedido(pedido_data):
     c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
     c_h2.markdown(f"<div style='text-align:center; background:{cor_etiqueta}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px;'>{status}</div>", unsafe_allow_html=True)
     
-    # 2. BARRA DE PROGRESSO (FLAT STRING - SEM QUEBRAS DE LINHA OU ESPAÇOS NO INÍCIO) 🔥
+    # 2. BARRA DE PROGRESSO (FLAT STRING - SEM QUEBRAS DE LINHA) 🔥
     step = 1
     cor_barra = "#3b82f6" 
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "RECUSA"]):
@@ -641,33 +641,13 @@ def modal_detalhes_pedido(pedido_data):
     
     st.divider()
 
-    # 3. INFORMAÇÕES DINÂMICAS E CADEIA DE CUSTÓDIA
+    # 3. INFORMAÇÕES DINÂMICAS 
     c1, c2 = st.columns(2)
     with c1:
         st.markdown(f"**🏢 Unidade:** {pedido_data.get('LABORATORIO', 'N/A')}")
         st.markdown(f"**📈 Confiabilidade do Local:** `{pedido_data.get('SLA_LAB', 'Em mapeamento')}`")
         st.markdown(f"**📍 Endereço:** {pedido_data.get('CIDADE_UF', 'N/A')}")
-        
-        # Cadeia de Custódia 🔥
-        st.markdown("<br><b>🤝 Cadeia de Custódia</b>", unsafe_allow_html=True)
-        contato = str(pedido_data.get('CONTATO_FINAL', '')).strip()
-        recebedor = str(pedido_data.get('RECEBEDOR_FINAL', '')).strip()
-        agente = str(pedido_data.get('AGENTE_NOME', 'Equipe IGO')).strip()
-        
-        # Cadeia de Custódia em FLAT STRING 
-        custodia_html = (
-            f"<div style='font-size:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-top:5px;'>"
-            f"<div style='margin-bottom:4px;'><b>Liberado por:</b> {contato if contato and contato.upper() != 'NAN' else '<i>Não informado</i>'}</div>"
-            f"<div style='color:#94a3b8;font-size:14px;padding-left:5px;'>⬇️</div>"
-            f"<div style='margin-bottom:4px;'><b>Transportado por:</b> {agente}</div>"
-        )
-        if "ENTREGUE" in status or "CONFERIDO" in status:
-            custodia_html += f"<div style='color:#94a3b8;font-size:14px;padding-left:5px;'>⬇️</div><div><b>Recebido por:</b> {recebedor if recebedor and recebedor.upper() != 'NAN' else '<i>Não informado</i>'}</div>"
-        else:
-            custodia_html += f"<div style='color:#94a3b8;font-size:14px;padding-left:5px;'>⬇️</div><div><b>Recebido por:</b> ⏳ <i>Aguardando finalização</i></div>"
-        
-        custodia_html += "</div>"
-        st.markdown(custodia_html, unsafe_allow_html=True)
+        st.markdown(f"**👤 Agente / Condutor:** {pedido_data.get('AGENTE_NOME', 'Equipe IGO')}")
         
     with c2:
         st.markdown("### 🕒 Linha do Tempo")
@@ -941,22 +921,25 @@ else:
         else:
             df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
 
-        # 🔥 MOTOR DE ETA E SLA 🔥
+        # 🔥 MOTOR DE ETA E SLA (CORRIGIDO PARA 100%) 🔥
         df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
         
         lab_stats = {}
         for lab in df_cliente['LABORATORIO'].unique():
             if not lab or pd.isna(lab): continue
             df_lab = df_cliente[df_cliente['LABORATORIO'] == lab]
-            total_coletas = len(df_lab)
-            
-            if total_coletas == 0: continue
             
             sucessos = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)])
             frustradas = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado|Recusa', case=False, na=False)])
             
-            pct_sucesso = round((sucessos / total_coletas) * 100)
-            pct_frustrada = round((frustradas / total_coletas) * 100)
+            total_finalizados = sucessos + frustradas
+            
+            if total_finalizados > 0:
+                pct_sucesso = round((sucessos / total_finalizados) * 100)
+                pct_frustrada = round((frustradas / total_finalizados) * 100)
+            else:
+                pct_sucesso = 0
+                pct_frustrada = 0
             
             df_hora = df_lab[df_lab['HORA_LIMPA'].str.contains(r'^\d{2}:\d{2}$', regex=True, na=False) & df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)]
             eta_str = "Em mapeamento (Pouco histórico)"
@@ -971,7 +954,7 @@ else:
                 eta_str = f"Entre {h_s:02d}:{m_s:02d} e {h_e:02d}:{m_e:02d}"
                 
             lab_stats[lab] = {
-                'SLA': f"🟢 {pct_sucesso}% Sucesso | 🔴 {pct_frustrada}% Frustradas" if total_coletas >= 5 else "Em mapeamento (Poucas coletas)",
+                'SLA': f"🟢 {pct_sucesso}% Sucesso | 🔴 {pct_frustrada}% Frustradas" if total_finalizados >= 5 else "Em mapeamento (Poucas coletas)",
                 'ETA': eta_str
             }
 
@@ -1126,6 +1109,8 @@ else:
 
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
+                    
+                    # 🔥 AQUI ENTRA A COLUNA DA LUPA 🔥
                     df_final['ACAO'] = '🔍 Abrir'
 
                     if 'UF' not in df_final.columns:
@@ -1256,6 +1241,7 @@ else:
                     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
+                    # 🔥 CONFIGURAÇÃO PARA O BOTÃO "FECHAR" FUNCIONAR PERFEITAMENTE 🔥
                     gb.configure_selection(
                         selection_mode="single", 
                         use_checkbox=False, 
@@ -1273,6 +1259,8 @@ else:
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=150)
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
+                    
+                    # Coluna da Lupa no Final!
                     gb.configure_column("ACAO", header_name="💬 Atualizações", width=120, cellStyle={'cursor': 'pointer', 'color': '#3b82f6', 'font-weight': 'bold'})
 
                     gridOptions = gb.build()
@@ -1296,6 +1284,7 @@ else:
                         ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
                     }
 
+                    # Renderiza o Grid e escuta a alteração da seleção
                     ag_response = AgGrid(
                         df_final[colunas_visiveis],
                         gridOptions=gridOptions,
@@ -1307,6 +1296,7 @@ else:
                         update_mode="SELECTION_CHANGED"
                     )
                     
+                    # 🔥 GATILHO DO POP-UP MEGAZORD (COM A TRAVA DE MEMÓRIA) 🔥
                     selected_rows = ag_response.get('selected_rows')
                     if selected_rows is not None and len(selected_rows) > 0:
                         if isinstance(selected_rows, pd.DataFrame):
@@ -1323,6 +1313,7 @@ else:
                     else:
                         st.session_state.linha_clicada = None
 
+                    # Abre o Modal se a flag for verdadeira
                     if st.session_state.modal_aberto and st.session_state.linha_clicada:
                         dados_completos_linha = df_final[df_final['PEDIDO'] == st.session_state.linha_clicada].iloc[0].to_dict()
                         modal_detalhes_pedido(dados_completos_linha)
