@@ -488,7 +488,7 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
     except Exception:
         return False
 
-# ── Session State ──
+# ── Session State (Atualizado com Trava de Memória de Pedido) ──
 if 'logado' not in st.session_state:
     if "token_cli" in st.query_params:
         st.session_state.logado = True
@@ -501,6 +501,9 @@ if 'filtro_kpi' not in st.session_state:
 
 if 'linha_clicada' not in st.session_state:
     st.session_state.linha_clicada = None
+
+if 'pedido_modal' not in st.session_state:
+    st.session_state.pedido_modal = None
 
 if 'modal_aberto' not in st.session_state:
     st.session_state.modal_aberto = False
@@ -629,7 +632,7 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🪟 FUNÇÃO DO POP-UP MEGAZORD (DUPLO MOTORISTA E OTD)
+# 🪟 FUNÇÃO DO POP-UP MEGAZORD (BLINDADO)
 # =======================================================
 @st.dialog("📋 Detalhes da Operação", width="large")
 def modal_detalhes_pedido(pedido_data):
@@ -682,19 +685,19 @@ def modal_detalhes_pedido(pedido_data):
     else:
         endereco_completo = end_cid_uf
 
-    # 🔥 MOTORISTAS DUPLOS (COLETA E ENTREGA) 🔥
+    # 🔥 MOTORISTAS DUPLOS (COLETA E ENTREGA)
     mot_coleta = str(pedido_data.get('MOTORISTA_COLETA', '')).strip()
     mot_entrega = str(pedido_data.get('MOTORISTA_ENTREGA', '')).strip()
     
     if mot_coleta.upper() == 'NAN' or not mot_coleta: mot_coleta = 'Equipe IGO'
-    if mot_entrega.upper() == 'NAN' or not mot_entrega: mot_entrega = mot_coleta # Fallback
+    if mot_entrega.upper() == 'NAN' or not mot_entrega: mot_entrega = mot_coleta 
 
     if any(x in status for x in ["ENTREGUE", "CONFERIDO"]) and mot_coleta != mot_entrega:
         motorista_html = f"<p style='margin:2px 0 12px 0;font-size:13px;font-weight:600;color:#334155;'>📦 Coleta: <span style='color:#3b82f6;'>{mot_coleta}</span><br>✅ Entrega: <span style='color:#3b82f6;'>{mot_entrega}</span></p>"
     else:
         motorista_html = f"<p style='margin:2px 0 12px 0;font-size:14px;font-weight:700;color:#3b82f6;'>🚐 {mot_coleta}</p>"
 
-    # 3. CARDS VISUAIS 
+    # 3. CARDS VISUAIS (FLAT STRING PARA NÃO QUEBRAR O STREAMLIT)
     c1, c2 = st.columns(2)
     
     with c1:
@@ -720,12 +723,15 @@ def modal_detalhes_pedido(pedido_data):
         data_limite = str(pedido_data.get('DATA_LIMITE', '---')).strip()
         if not data_limite or data_limite.upper() == 'NAN': data_limite = "Não definida"
 
-        # 🔥 LÓGICA DE OTD INDIVIDUAL (SELO DE ATRASO OU NO PRAZO) 🔥
         selo_prazo = ""
         if any(x in status for x in ["ENTREGUE", "CONFERIDO"]) and data_limite != "Não definida" and data_efetiva != "---":
             try:
-                dt_ef_obj = datetime.strptime(data_efetiva, '%d/%m/%Y').date()
-                dt_lim_obj = datetime.strptime(data_limite, '%d/%m/%Y').date()
+                # Usa os mesmos tratamentos de regex aqui no backend para garantir que ano com 2 dígitos calcule certo
+                ano_ef = 2000 + int(data_efetiva.split('/')[2]) if len(data_efetiva.split('/')[2]) == 2 else int(data_efetiva.split('/')[2])
+                ano_lim = 2000 + int(data_limite.split('/')[2]) if len(data_limite.split('/')[2]) == 2 else int(data_limite.split('/')[2])
+                dt_ef_obj = datetime(ano_ef, int(data_efetiva.split('/')[1]), int(data_efetiva.split('/')[0])).date()
+                dt_lim_obj = datetime(ano_lim, int(data_limite.split('/')[1]), int(data_limite.split('/')[0])).date()
+                
                 if dt_ef_obj <= dt_lim_obj:
                     selo_prazo = "<span style='background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:5px;'>No Prazo</span>"
                 else:
@@ -885,7 +891,7 @@ else:
             "June": "Junho", "July": "Julho", "August": "Agosto", "September": "Setembro", "October": "Outubro", 
             "November": "Novembro", "December": "Dezembro",
             "Today": "Hoje", "Clear": "Limpar",
-            "Choose options": "Escolha as window...",
+            "Choose options": "Escolha as cidades...",
             "Select all": "Selecionar todas",
             "Clear all": "Limpar tudo",
             "No results": "Nenhuma cidade encontrada"
@@ -1214,6 +1220,7 @@ else:
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
                     
+                    # 🔥 LUPA NO FINAL 🔥
                     df_final['ACAO'] = '🔍 Abrir'
 
                     if 'UF' not in df_final.columns:
@@ -1223,6 +1230,11 @@ else:
                         lambda r: f"{str(r.get('CIDADE','')).strip()}/{str(r.get('UF','')).strip()}" if str(r.get('UF', '')).strip() and str(r.get('UF', '')).upper() != 'NAN' else str(r.get('CIDADE', '')).strip(),
                         axis=1
                     )
+
+                    # 🔥 ENCURTANDO O ANO NAS DATAS DA GRID (Ex: 12/05/2026 -> 12/05/26) 🔥
+                    for col in ['DATA', 'DATA_EFETIVA', 'DATA_LIMITE']:
+                        if col in df_final.columns:
+                            df_final[col] = df_final[col].astype(str).apply(lambda x: re.sub(r'/20(\d{2})(?!\d)', r'/\1', x))
 
                     for col in df_final.columns:
                         df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
@@ -1350,6 +1362,18 @@ else:
                         suppressRowClickSelection=False,
                         suppressRowDeselection=False 
                     )
+                    
+                    # 🔥 INJEÇÃO DE JS PARA DESMARCAR A LINHA SOZINHA (Resolve o bug de re-clicar na mesma linha) 🔥
+                    js_deselect = JsCode("""
+                    function(e) {
+                        if (e.node.isSelected()) {
+                            setTimeout(function() {
+                                e.api.deselectAll();
+                            }, 250);
+                        }
+                    }
+                    """)
+                    gb.configure_grid_options(onRowSelected=js_deselect)
 
                     gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
                     gb.configure_column("DATA", header_name="📅 Data Coleta", width=130)
@@ -1395,6 +1419,7 @@ else:
                         update_mode="SELECTION_CHANGED"
                     )
                     
+                    # 🔥 CONTROLE BLINDADO DE ABERTURA DO MODAL 🔥
                     selected_rows = ag_response.get('selected_rows')
                     if selected_rows is not None and len(selected_rows) > 0:
                         if isinstance(selected_rows, pd.DataFrame):
@@ -1406,13 +1431,14 @@ else:
                         
                         if st.session_state.linha_clicada != pedido_atual:
                             st.session_state.linha_clicada = pedido_atual
+                            st.session_state.pedido_modal = pedido_atual
                             st.session_state.modal_aberto = True
                             st.rerun()
                     else:
                         st.session_state.linha_clicada = None
 
-                    if st.session_state.modal_aberto and st.session_state.linha_clicada:
-                        dados_completos_linha = df_final[df_final['PEDIDO'] == st.session_state.linha_clicada].iloc[0].to_dict()
+                    if st.session_state.modal_aberto and st.session_state.pedido_modal:
+                        dados_completos_linha = df_final[df_final['PEDIDO'] == st.session_state.pedido_modal].iloc[0].to_dict()
                         modal_detalhes_pedido(dados_completos_linha)
 
 
