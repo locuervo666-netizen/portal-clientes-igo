@@ -602,7 +602,7 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🪟 FUNÇÃO DO POP-UP MEGAZORD (BLINDADO)
+# 🪟 FUNÇÃO DO POP-UP MEGAZORD (COM CARDS VISUAIS)
 # =======================================================
 @st.dialog("📋 Detalhes da Operação", width="large")
 def modal_detalhes_pedido(pedido_data):
@@ -614,9 +614,9 @@ def modal_detalhes_pedido(pedido_data):
     # 1. CABEÇALHO
     c_h1, c_h2 = st.columns([3, 1])
     c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
-    c_h2.markdown(f"<div style='text-align:center; background:{cor_etiqueta}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px;'>{status}</div>", unsafe_allow_html=True)
+    c_h2.markdown(f"<div style='text-align:center; background:{cor_etiqueta}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>{status}</div>", unsafe_allow_html=True)
     
-    # 2. BARRA DE PROGRESSO (FLAT STRING - SEM QUEBRAS DE LINHA) 🔥
+    # 2. BARRA DE PROGRESSO (FLAT STRING - BLINDADO) 🔥
     step = 1
     cor_barra = "#3b82f6" 
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "RECUSA"]):
@@ -638,43 +638,66 @@ def modal_detalhes_pedido(pedido_data):
         f"</div>"
     )
     st.markdown(html_barra, unsafe_allow_html=True)
-    
-    st.divider()
 
-    # 3. INFORMAÇÕES DINÂMICAS 
+    # 3. INFORMAÇÕES DINÂMICAS EM CARDS VISUAIS 🔥
     c1, c2 = st.columns(2)
+    
+    agente_nome = str(pedido_data.get('AGENTE_NOME', 'Equipe IGO')).strip()
+    if agente_nome.upper() == 'NAN' or not agente_nome: agente_nome = 'Equipe IGO'
+    
     with c1:
-        st.markdown(f"**🏢 Unidade:** {pedido_data.get('LABORATORIO', 'N/A')}")
-        st.markdown(f"**📈 Confiabilidade do Local:** `{pedido_data.get('SLA_LAB', 'Em mapeamento')}`")
-        st.markdown(f"**📍 Endereço:** {pedido_data.get('CIDADE_UF', 'N/A')}")
-        st.markdown(f"**👤 Agente / Condutor:** {pedido_data.get('AGENTE_NOME', 'Equipe IGO')}")
+        st.markdown(f"""
+        <div style='background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; height: 100%; box-shadow: 0 1px 2px rgba(0,0,0,0.02);'>
+            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>🏢 Unidade de Coleta</p>
+            <p style='margin:2px 0 12px 0; font-size: 15px; font-weight: 700; color: #0f172a;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>
+            
+            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>📍 Endereço</p>
+            <p style='margin:2px 0 12px 0; font-size: 13px; color: #334155;'>{pedido_data.get('CIDADE_UF', 'N/A')}</p>
+            
+            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>👤 Motorista / Responsável</p>
+            <p style='margin:2px 0 12px 0; font-size: 14px; font-weight: 700; color: #3b82f6;'>🚐 {agente_nome}</p>
+            
+            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>📈 Confiabilidade do Local</p>
+            <p style='margin:2px 0 0 0; font-size: 13px; font-weight: 600; color: #334155;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')}</p>
+        </div>
+        """, unsafe_allow_html=True)
         
     with c2:
-        st.markdown("### 🕒 Linha do Tempo")
-        st.markdown(f"**📅 Solicitação:** {pedido_data.get('DATA', '---')}")
-        
         data_efetiva = str(pedido_data.get('DATA_EFETIVA', '---')).replace(" 00:00:00", "").strip()
         hora_limpa = str(pedido_data.get('HORA_LIMPA', '')).strip()
         hora_str = f" às {hora_limpa}" if hora_limpa else ""
         
         data_limite = str(pedido_data.get('DATA_LIMITE', '---')).strip()
         if not data_limite or data_limite.upper() == 'NAN': data_limite = "Não definida"
-        
-        if any(x in status for x in ["ENTREGUE", "CONFERIDO"]):
-            st.markdown(f"**📦 Coleta Realizada:** {pedido_data.get('DATA', '---')}")
-            st.markdown(f"**🏁 Entrega Finalizada:** {data_efetiva}{hora_str}")
-            st.markdown(f"**🎯 Previsão Original (Data Limite):** {data_limite}")
-        elif any(x in status for x in ["COLETADO", "ROTA"]):
-            st.markdown(f"**📦 Coleta Realizada:** {pedido_data.get('DATA', '---')}{hora_str}")
-            st.markdown(f"**🏁 Previsão de Entrega (Data Limite):** {data_limite}")
-        elif any(x in status for x in ["FRUSTRADA", "PROBLEMA"]):
-            st.markdown(f"**❌ Tentativa Registrada:** {data_efetiva}{hora_str}")
-            st.markdown(f"**🎯 Previsão Original (Data Limite):** {data_limite}")
-        else:
-            st.markdown(f"**⏳ Previsão de Coleta (ETA):** `{pedido_data.get('ETA_LAB', 'Em mapeamento')}`")
-            st.markdown(f"**🏁 Previsão de Entrega (Data Limite):** {data_limite}")
 
-    st.markdown("---")
+        # Organizando a Linha do Tempo dentro do Card
+        if any(x in status for x in ["ENTREGUE", "CONFERIDO"]):
+            timeline_html = f"<p style='margin:2px 0 12px 0; font-size: 14px; color: #334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}</b><br>✅ Entrega: <b>{data_efetiva}{hora_str}</b></p>"
+            eta_html = f"<p style='margin:2px 0 0 0; font-size: 13px; color: #334155;'>🎯 Previsão Original: {data_limite}</p>"
+        elif any(x in status for x in ["COLETADO", "ROTA"]):
+            timeline_html = f"<p style='margin:2px 0 12px 0; font-size: 14px; color: #334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_str}</b><br>⏳ Entrega: <i>Em trânsito para o destino...</i></p>"
+            eta_html = f"<p style='margin:2px 0 0 0; font-size: 13px; color: #334155;'>🎯 Previsão Limite: {data_limite}</p>"
+        elif any(x in status for x in ["FRUSTRADA", "PROBLEMA"]):
+            timeline_html = f"<p style='margin:2px 0 12px 0; font-size: 14px; color: #ef4444;'>❌ Tentativa: <b>{data_efetiva}{hora_str}</b></p>"
+            eta_html = f"<p style='margin:2px 0 0 0; font-size: 13px; color: #334155;'>🎯 Previsão Original: {data_limite}</p>"
+        else:
+            timeline_html = f"<p style='margin:2px 0 12px 0; font-size: 14px; color: #334155;'>⏳ Previsão de Coleta: <b>{pedido_data.get('ETA_LAB', 'Em mapeamento')}</b></p>"
+            eta_html = f"<p style='margin:2px 0 0 0; font-size: 13px; color: #334155;'>🎯 Previsão Limite: {data_limite}</p>"
+
+        st.markdown(f"""
+        <div style='background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; height: 100%; box-shadow: 0 1px 2px rgba(0,0,0,0.02);'>
+            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>📅 Solicitação Criada Em</p>
+            <p style='margin:2px 0 12px 0; font-size: 14px; color: #334155;'>{pedido_data.get('DATA', '---')}</p>
+            
+            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>🕒 Status da Operação</p>
+            {timeline_html}
+            
+            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>🏁 Prazo Acordado</p>
+            {eta_html}
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
     # 4. JUSTIFICATIVA E FOTO
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
@@ -921,7 +944,7 @@ else:
         else:
             df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
 
-        # 🔥 MOTOR DE ETA E SLA (CORRIGIDO PARA 100%) 🔥
+        # 🔥 MOTOR DE ETA E SLA (CÁLCULO 100% CORRIGIDO E ISOLADO) 🔥
         df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
         
         lab_stats = {}
@@ -932,6 +955,7 @@ else:
             sucessos = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)])
             frustradas = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado|Recusa', case=False, na=False)])
             
+            # Novo cálculo fechando em 100%
             total_finalizados = sucessos + frustradas
             
             if total_finalizados > 0:
@@ -1110,7 +1134,7 @@ else:
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
                     
-                    # 🔥 AQUI ENTRA A COLUNA DA LUPA 🔥
+                    # 🔥 LUPA NO FINAL 🔥
                     df_final['ACAO'] = '🔍 Abrir'
 
                     if 'UF' not in df_final.columns:
@@ -1241,7 +1265,6 @@ else:
                     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
-                    # 🔥 CONFIGURAÇÃO PARA O BOTÃO "FECHAR" FUNCIONAR PERFEITAMENTE 🔥
                     gb.configure_selection(
                         selection_mode="single", 
                         use_checkbox=False, 
@@ -1259,8 +1282,6 @@ else:
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=150)
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
-                    
-                    # Coluna da Lupa no Final!
                     gb.configure_column("ACAO", header_name="💬 Atualizações", width=120, cellStyle={'cursor': 'pointer', 'color': '#3b82f6', 'font-weight': 'bold'})
 
                     gridOptions = gb.build()
@@ -1284,7 +1305,6 @@ else:
                         ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
                     }
 
-                    # Renderiza o Grid e escuta a alteração da seleção
                     ag_response = AgGrid(
                         df_final[colunas_visiveis],
                         gridOptions=gridOptions,
@@ -1296,7 +1316,6 @@ else:
                         update_mode="SELECTION_CHANGED"
                     )
                     
-                    # 🔥 GATILHO DO POP-UP MEGAZORD (COM A TRAVA DE MEMÓRIA) 🔥
                     selected_rows = ag_response.get('selected_rows')
                     if selected_rows is not None and len(selected_rows) > 0:
                         if isinstance(selected_rows, pd.DataFrame):
@@ -1313,7 +1332,6 @@ else:
                     else:
                         st.session_state.linha_clicada = None
 
-                    # Abre o Modal se a flag for verdadeira
                     if st.session_state.modal_aberto and st.session_state.linha_clicada:
                         dados_completos_linha = df_final[df_final['PEDIDO'] == st.session_state.linha_clicada].iloc[0].to_dict()
                         modal_detalhes_pedido(dados_completos_linha)
