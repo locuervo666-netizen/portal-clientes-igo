@@ -602,7 +602,7 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🪟 FUNÇÃO DO POP-UP MEGAZORD (TOTALMENTE BLINDADO)
+# 🪟 FUNÇÃO DO POP-UP MEGAZORD (BLINDADO E CONCATENADO)
 # =======================================================
 @st.dialog("📋 Detalhes da Operação", width="large")
 def modal_detalhes_pedido(pedido_data):
@@ -639,19 +639,35 @@ def modal_detalhes_pedido(pedido_data):
     )
     st.markdown(html_barra, unsafe_allow_html=True)
 
-    # 3. INFORMAÇÕES DINÂMICAS EM CARDS VISUAIS (BLINDADO) 🔥
-    c1, c2 = st.columns(2)
-    
+    # 🔥 MÁGICA DO ENDEREÇO CONCATENADO 🔥
+    end_rua = str(pedido_data.get('ENDERECO', '')).strip()
+    end_num = str(pedido_data.get('NUMERO', '')).strip()
+    end_bairro = str(pedido_data.get('BAIRRO', '')).strip()
+    end_cid_uf = str(pedido_data.get('CIDADE_UF', 'N/A')).strip()
+
+    partes_end = []
+    if end_rua and end_rua.upper() not in ['NAN', 'NONE', '']: partes_end.append(end_rua)
+    if end_num and end_num.upper() not in ['NAN', 'NONE', '']: partes_end.append(f"nº {end_num}")
+    if end_bairro and end_bairro.upper() not in ['NAN', 'NONE', '']: partes_end.append(end_bairro)
+
+    if partes_end:
+        endereco_completo = ", ".join(partes_end) + f" — {end_cid_uf}"
+    else:
+        endereco_completo = end_cid_uf # Fallback seguro
+
     agente_nome = str(pedido_data.get('AGENTE_NOME', 'Equipe IGO')).strip()
     if agente_nome.upper() == 'NAN' or not agente_nome: agente_nome = 'Equipe IGO'
+
+    # 3. INFORMAÇÕES DINÂMICAS EM CARDS VISUAIS (FLAT STRING) 🔥
+    c1, c2 = st.columns(2)
     
     with c1:
         html_c1 = (
             f"<div style='background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0;height:100%;box-shadow:0 1px 2px rgba(0,0,0,0.02);'>"
             f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>🏢 Unidade de Coleta</p>"
             f"<p style='margin:2px 0 12px 0;font-size:15px;font-weight:700;color:#0f172a;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>"
-            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>📍 Endereço</p>"
-            f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>{pedido_data.get('CIDADE_UF', 'N/A')}</p>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>📍 Endereço Completo</p>"
+            f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>{endereco_completo}</p>"
             f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>👤 Motorista / Responsável</p>"
             f"<p style='margin:2px 0 12px 0;font-size:14px;font-weight:700;color:#3b82f6;'>🚐 {agente_nome}</p>"
             f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>📈 Confiabilidade do Local</p>"
