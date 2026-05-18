@@ -461,7 +461,7 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
     except Exception:
         return False
 
-# ── Session State ──────────────────────────────────────
+# ── Session State (Proteção Adicionada para o Botão Fechar) ──
 if 'logado' not in st.session_state:
     if "token_cli" in st.query_params:
         st.session_state.logado = True
@@ -474,6 +474,9 @@ if 'filtro_kpi' not in st.session_state:
 
 if 'linha_clicada' not in st.session_state:
     st.session_state.linha_clicada = None
+
+if 'modal_aberto' not in st.session_state:
+    st.session_state.modal_aberto = False
 
 # ── Helpers de status ──────────────────────────────────
 def get_st(row):
@@ -666,8 +669,9 @@ def modal_detalhes_pedido(pedido_data):
     else:
         st.markdown("📷 *Aguardando anexo do comprovante de coleta.*")
 
+    # Botão de Fechar 100% Funcional (Atualiza o Estado)
     if st.button("Fechar Detalhes", use_container_width=True):
-        st.session_state.linha_clicada = None
+        st.session_state.modal_aberto = False
         st.rerun()
 
 
@@ -1079,8 +1083,8 @@ else:
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
                     
-                    # 🔥 A COLUNA "AÇÃO" AGORA SUBSTITUI O COMPROVANTE E OS DETALHES NA GRID 🔥
-                    df_final.insert(0, 'ACAO', '🔍 Abrir')
+                    # 🔥 AQUI ENTRA A COLUNA DA LUPA, MAS ELA VAI PARA O FINAL AGORA 🔥
+                    df_final['ACAO'] = '🔍 Abrir'
 
                     if 'UF' not in df_final.columns:
                         df_final['UF'] = ""
@@ -1093,16 +1097,78 @@ else:
                     for col in df_final.columns:
                         df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
-                    # FASE 1 - LIMPEZA: Removemos COMPROVANTE e DETALHES da visualização principal
+                    # FASE 1: Coluna ACAO foi para o final, garantindo a ordem: Pedido -> Dados -> Status -> Anexo -> Lupa
                     colunas_visiveis = [
-                        'ACAO', 'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
-                        'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY'
+                        'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
+                        'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
+                        'COMPROVANTE', 'ACAO'
                     ]
 
                     if st.session_state.cliente == "LOGISTICA.LABEST":
-                        colunas_visiveis.insert(4, 'CNPJ')
+                        colunas_visiveis.insert(3, 'CNPJ')
 
                     colunas_visiveis = [c for c in colunas_visiveis if c in df_final.columns]
+
+                    link_jscode = JsCode("""
+                    class EmojiLinkRenderer {
+                      init(params) {
+                        this.eGui = document.createElement('div');
+                        this.eGui.style.cssText = 'display: flex; justify-content: center; align-items: center; height: 100%;';
+                        
+                        if (params.value && params.value !== '') {
+                          let a = document.createElement('a');
+                          a.href = params.value;
+                          a.target = '_blank';
+                          a.innerHTML = '📷';
+                          a.title = 'Clique para abrir o anexo completo';
+                          a.style.cssText = 'text-decoration: none; font-size: 20px; transition: transform 0.2s; cursor: pointer;';
+                          
+                          let previewContainer = document.createElement('div');
+                          previewContainer.style.cssText = 'position: fixed; display: none; z-index: 99999; pointer-events: none;';
+                          
+                          let preview = document.createElement('img');
+                          preview.src = params.value;
+                          preview.style.cssText = 'max-width: 350px; max-height: 350px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4); border: 3px solid white; display: block;';
+                          
+                          let timeOverlay = document.createElement('div');
+                          let statusText = params.data && params.data.STATUS_DISPLAY ? params.data.STATUS_DISPLAY : '';
+                          timeOverlay.innerHTML = statusText;
+                          timeOverlay.style.cssText = 'position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.9); color: #fff; padding: 5px 12px; border-radius: 99px; font-family: Inter, sans-serif; font-size: 12px; font-weight: bold; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.3);';
+
+                          previewContainer.appendChild(preview);
+                          if (statusText) { previewContainer.appendChild(timeOverlay); }
+                          document.body.appendChild(previewContainer);
+                          
+                          a.onmouseover = (e) => {
+                            a.style.transform = 'scale(1.3)';
+                            previewContainer.style.display = 'block';
+                            previewContainer.style.left = (e.clientX + 20) + 'px';
+                            previewContainer.style.top = (e.clientY + 20) + 'px';
+                          };
+                          
+                          a.onmousemove = (e) => {
+                            previewContainer.style.left = (e.clientX + 20) + 'px';
+                            previewContainer.style.top = (e.clientY + 20) + 'px';
+                          };
+                          
+                          a.onmouseout = () => {
+                            a.style.transform = 'scale(1)';
+                            previewContainer.style.display = 'none';
+                          };
+
+                          this.eGui.appendChild(a);
+                          this.previewElement = previewContainer; 
+                        }
+                      }
+                      getGui() { return this.eGui; }
+                      
+                      destroy() {
+                        if (this.previewElement && this.previewElement.parentNode) {
+                          this.previewElement.parentNode.removeChild(this.previewElement);
+                        }
+                      }
+                    }
+                    """)
 
                     status_jscode = JsCode("""
                     class StatusBadgeRenderer {
@@ -1149,16 +1215,14 @@ else:
                     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
-                    # Tabela clicável!
+                    # 🔥 CONFIGURAÇÃO PARA EVITAR TRAVAMENTO NO BOTÃO "FECHAR" 🔥
                     gb.configure_selection(
                         selection_mode="single", 
                         use_checkbox=False, 
-                        suppressRowClickSelection=False
+                        suppressRowClickSelection=False,
+                        suppressRowDeselection=False  # Permite que o cliente clique de novo na mesma linha e ela reaja!
                     )
 
-                    # A coluna da lupa agora se chama Atualizações
-                    gb.configure_column("ACAO", header_name="💬 Atualizações", width=120, pinned='left', cellStyle={'cursor': 'pointer', 'color': '#3b82f6', 'font-weight': 'bold'})
-                    
                     gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
                     gb.configure_column("DATA", header_name="📅 Data Coleta", width=130)
                     gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta")
@@ -1168,6 +1232,10 @@ else:
                     gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=150)
+                    gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
+                    
+                    # Estilização da Coluna AÇÃO no final
+                    gb.configure_column("ACAO", header_name="💬 Atualizações", width=120, cellStyle={'cursor': 'pointer', 'color': '#3b82f6', 'font-weight': 'bold'})
 
                     gridOptions = gb.build()
 
@@ -1190,7 +1258,7 @@ else:
                         ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
                     }
 
-                    # Renderiza o Grid
+                    # Renderiza o Grid e escuta a alteração da seleção
                     ag_response = AgGrid(
                         df_final[colunas_visiveis],
                         gridOptions=gridOptions,
@@ -1211,12 +1279,18 @@ else:
                             dados_da_linha = selected_rows[0]
                         
                         pedido_atual = dados_da_linha.get('PEDIDO')
-                        # Recuperamos a linha completa (incluindo foto e detalhes invisíveis)
-                        dados_completos_linha = df_final[df_final['PEDIDO'] == pedido_atual].iloc[0].to_dict()
-
+                        
                         if st.session_state.linha_clicada != pedido_atual:
                             st.session_state.linha_clicada = pedido_atual
-                            modal_detalhes_pedido(dados_completos_linha)
+                            st.session_state.modal_aberto = True
+                            st.rerun()
+                    else:
+                        st.session_state.linha_clicada = None
+
+                    # Abre o Modal se a flag for verdadeira
+                    if st.session_state.modal_aberto and st.session_state.linha_clicada:
+                        dados_completos_linha = df_final[df_final['PEDIDO'] == st.session_state.linha_clicada].iloc[0].to_dict()
+                        modal_detalhes_pedido(dados_completos_linha)
 
 
                     # ── EXPORTAÇÃO CSV ────────
