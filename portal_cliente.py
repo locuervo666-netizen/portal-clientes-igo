@@ -32,7 +32,6 @@ st.set_page_config(
 CSS_DASHBOARD = """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
     [data-testid="stAppViewContainer"] {
         transition: background-color 0.3s ease;
         font-family: 'Inter', sans-serif;
@@ -473,6 +472,9 @@ if 'logado' not in st.session_state:
 if 'filtro_kpi' not in st.session_state: 
     st.session_state.filtro_kpi = "TODOS"
 
+if 'linha_clicada' not in st.session_state:
+    st.session_state.linha_clicada = None
+
 # ── Helpers de status ──────────────────────────────────
 def get_st(row):
     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
@@ -516,7 +518,7 @@ KPI_META = [
     ("COLETADO",   "🚐 Coletados",    "kpi_coletado"), 
     ("PENDENTE",   "⏳ Pendentes",    "kpi_pend"),
     ("Aguardando", "🎧 Chamados",     "kpi_aguardando"), 
-    ("HOJE",       "📅 Hoje",         "kpi_hoje"),
+    ("HOJE",      "📅 Hoje",         "kpi_hoje"),
 ]
 
 def get_detalhes(row):
@@ -576,7 +578,6 @@ def get_detalhes(row):
         return f"{obs_final} (Informante: {contato})"
     return obs_final if obs_final else f"Informante: {contato}"
 
-# 🔥 NOVA FUNÇÃO DE PRIORIDADE COM RANKING DE 1 A 7 🔥
 def definir_prioridade_portal(status_str):
     s = str(status_str).upper()
     if 'PENDENTE' in s or 'AGUARDANDO' in s: return 1
@@ -586,7 +587,7 @@ def definir_prioridade_portal(status_str):
     if 'CONFERIDO' in s: return 5
     if 'ROTA DE ENTREGA' in s or 'EM ROTA' in s: return 6
     if 'ENTREGUE' in s: return 7
-    return 8 # Cancelados ou outros
+    return 8 
 
 def tratar_foto(x):
     xs = str(x).strip()
@@ -598,6 +599,65 @@ def tratar_foto(x):
         f"https://www.appsheet.com/template/gettablefileurl"
         f"?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
     )
+
+# =======================================================
+# 🪟 FUNÇÃO DO POP-UP MEGAZORD (FASE 1 e 2)
+# =======================================================
+@st.dialog("📋 Detalhes da Operação", width="large")
+def modal_detalhes_pedido(pedido_data):
+    status = str(pedido_data.get('STATUS_DISPLAY', '')).upper()
+    cor = "#10B981" if "ENTREGUE" in status else "#F59E0B"
+    if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "ATRASADO", "RECUSA"]): cor = "#EF4444"
+    if "COLETADO" in status or "ROTA" in status: cor = "#3B82F6"
+
+    # Cabeçalho
+    c_h1, c_h2 = st.columns([3, 1])
+    c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
+    c_h2.markdown(f"<div style='text-align:center; background:{cor}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px;'>{status}</div>", unsafe_allow_html=True)
+    
+    st.divider()
+
+    # Informações Dinâmicas
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(f"**🏢 Unidade:** {pedido_data.get('LABORATORIO', 'N/A')}")
+        st.markdown(f"**📈 Confiabilidade do Local:** `{pedido_data.get('SLA_LAB', 'Em mapeamento')}`")
+        st.markdown(f"**📍 Endereço:** {pedido_data.get('CIDADE_UF', 'N/A')}")
+    with c2:
+        st.markdown(f"**📅 Solicitação Criada em:** {pedido_data.get('DATA', '---')}")
+        
+        # O Motor Dinâmico de Tempo
+        if any(x in status for x in ["ENTREGUE", "COLETADO"]):
+            st.markdown(f"**✅ Coletado às:** {pedido_data.get('HORA_LIMPA', '---')}  *(Data Efetiva: {pedido_data.get('DATA_EFETIVA', '---')})*")
+        elif any(x in status for x in ["FRUSTRADA", "PROBLEMA"]):
+            st.markdown(f"**❌ Tentativa às:** {pedido_data.get('HORA_LIMPA', '---')}  *(Data Efetiva: {pedido_data.get('DATA_EFETIVA', '---')})*")
+        else:
+            st.markdown(f"**⏳ Previsão de Coleta:** `{pedido_data.get('ETA_LAB', 'Em mapeamento')}`")
+        
+        st.markdown(f"**👤 Agente / Condutor:** {pedido_data.get('AGENTE_NOME', 'Equipe IGO')}")
+
+    st.markdown("---")
+
+    # Justificativa do Motorista
+    if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
+        st.error(f"**⚠️ Motivo da Ocorrência (Justificativa):**\n\n{pedido_data.get('DETALHES', 'Motivo não informado no aplicativo.')}")
+    else:
+        st.info(f"**💬 Atualizações da Base:**\n\n{pedido_data.get('DETALHES', 'Nenhuma observação pendente.')}")
+
+    # Evidência Fotográfica (Primeira Perna)
+    foto = pedido_data.get('COMPROVANTE', '')
+    if foto and str(foto).startswith("http"):
+        st.markdown("#### 📸 Comprovante de Campo (Primeira Perna)")
+        st.image(foto, use_container_width=True)
+    elif any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
+        st.warning("📷 Nenhuma evidência fotográfica foi anexada na justificativa da frustrada.")
+    else:
+        st.markdown("📷 *Aguardando anexo do comprovante de coleta.*")
+
+    if st.button("Fechar Detalhes", use_container_width=True):
+        st.session_state.linha_clicada = None
+        st.rerun()
+
 
 # =======================================================
 # 🔐 3. TELA DE LOGIN (MODELO BLINDADO E CENTRALIZADO)
@@ -821,6 +881,45 @@ else:
         else:
             df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
 
+        # 🔥 FASE 2: MOTOR DE ETA E SLA (Calculado antes de gerar os KPIs e a Grid)
+        df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
+        
+        lab_stats = {}
+        for lab in df_cliente['LABORATORIO'].unique():
+            if not lab or pd.isna(lab): continue
+            df_lab = df_cliente[df_cliente['LABORATORIO'] == lab]
+            total_coletas = len(df_lab)
+            
+            if total_coletas == 0: continue
+            
+            sucessos = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)])
+            frustradas = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado|Recusa', case=False, na=False)])
+            
+            pct_sucesso = round((sucessos / total_coletas) * 100)
+            pct_frustrada = round((frustradas / total_coletas) * 100)
+            
+            # Lógica ETA
+            df_hora = df_lab[df_lab['HORA_LIMPA'].str.contains(r'^\d{2}:\d{2}$', regex=True, na=False) & df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)]
+            eta_str = "Em mapeamento (Pouco histórico)"
+            
+            if len(df_hora) >= 3:
+                mins = df_hora['HORA_LIMPA'].apply(lambda x: int(x.split(':')[0])*60 + int(x.split(':')[1]))
+                med_min = int(mins.median())
+                min_start = max(0, med_min - 15)
+                min_end = min(1440, med_min + 15)
+                h_s, m_s = divmod(min_start, 60)
+                h_e, m_e = divmod(min_end, 60)
+                eta_str = f"Entre {h_s:02d}:{m_s:02d} e {h_e:02d}:{m_e:02d}"
+                
+            lab_stats[lab] = {
+                'SLA': f"🟢 {pct_sucesso}% Sucesso | 🔴 {pct_frustrada}% Frustradas" if total_coletas >= 5 else "Em mapeamento (Poucas coletas)",
+                'ETA': eta_str
+            }
+
+        df_cliente['SLA_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('SLA', 'Em mapeamento'))
+        df_cliente['ETA_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('ETA', 'Em mapeamento'))
+        # ===================================================
+
         tab_grid, tab_solicitar, tab_chamados = st.tabs([
             "📊 Meus Pedidos e Monitoramento",
             "➕ Solicitar Nova Coleta",
@@ -841,8 +940,7 @@ else:
                         placeholder="Escolha as cidades..."
                     )
 
-                df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
-                df_cliente['DETALHES']       = df_cliente.apply(get_detalhes, axis=1)
+                df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
 
                 df_f = df_cliente.copy()
                 
@@ -920,7 +1018,7 @@ else:
 
                 df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
                 if not df_h.empty:
-                    n_fim  = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Recusada|Coletado', case=False)])
+                    n_fim = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Recusada|Coletado', case=False)])
                     n_tot  = len(df_h)
                     pct    = round((n_fim / n_tot) * 100) if n_tot else 0
 
@@ -960,11 +1058,8 @@ else:
                     df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
 
                 if not df_grid.empty:
-                    # 🔥 AQUI ESTÁ A MÁGICA DOS 2 PESOS DE ORDENAÇÃO 🔥
-                    # 1º Acha a prioridade do status.
                     df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(definir_prioridade_portal)
                     
-                    # 2º Ordena PRIMEIRO pela Data (False = mais recente no topo) e DEPOIS pela Prioridade (True = Pendentes (1) antes de Entregues (7))
                     df_grid = df_grid.sort_values(
                         by=['DATA_OBJ', 'PRIORIDADE', 'PEDIDO'], 
                         ascending=[False, True, False]
@@ -984,75 +1079,17 @@ else:
                     for col in df_final.columns:
                         df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
+                    # FASE 1: Coluna de anexo removida da view da grid, forçando o uso do botão de detalhe
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
-                        'COMPROVANTE', 'DETALHES'
+                        'DETALHES'
                     ]
 
                     if st.session_state.cliente == "LOGISTICA.LABEST":
                         colunas_visiveis.insert(3, 'CNPJ')
 
                     colunas_visiveis = [c for c in colunas_visiveis if c in df_final.columns]
-
-                    link_jscode = JsCode("""
-                    class EmojiLinkRenderer {
-                      init(params) {
-                        this.eGui = document.createElement('div');
-                        this.eGui.style.cssText = 'display: flex; justify-content: center; align-items: center; height: 100%;';
-                        if (params.value && params.value !== '') {
-                          let a = document.createElement('a');
-                          a.href = params.value;
-                          a.target = '_blank';
-                          a.innerHTML = '📷';
-                          a.title = 'Clique para abrir o anexo completo';
-                          a.style.cssText = 'text-decoration: none; font-size: 20px; transition: transform 0.2s; cursor: pointer;';
-                          
-                          let previewContainer = document.createElement('div');
-                          previewContainer.style.cssText = 'position: fixed; display: none; z-index: 99999; pointer-events: none;';
-                          
-                          let preview = document.createElement('img');
-                          preview.src = params.value;
-                          preview.style.cssText = 'max-width: 350px; max-height: 350px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4); border: 3px solid white; display: block;';
-                          
-                          let timeOverlay = document.createElement('div');
-                          let statusText = params.data && params.data.STATUS_DISPLAY ? params.data.STATUS_DISPLAY : '';
-                          timeOverlay.innerHTML = statusText;
-                          timeOverlay.style.cssText = 'position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.9); color: #fff; padding: 5px 12px; border-radius: 99px; font-family: Inter, sans-serif; font-size: 12px; font-weight: bold; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.3);';
-
-                          previewContainer.appendChild(preview);
-                          if (statusText) { previewContainer.appendChild(timeOverlay); }
-                          document.body.appendChild(previewContainer);
-                          
-                          a.onmouseover = (e) => {
-                            a.style.transform = 'scale(1.3)';
-                            previewContainer.style.display = 'block';
-                            previewContainer.style.left = (e.clientX + 20) + 'px';
-                            previewContainer.style.top = (e.clientY + 20) + 'px';
-                          };
-                          a.onmousemove = (e) => {
-                            previewContainer.style.left = (e.clientX + 20) + 'px';
-                            previewContainer.style.top = (e.clientY + 20) + 'px';
-                          };
-                          
-                          a.onmouseout = () => {
-                            a.style.transform = 'scale(1)';
-                            previewContainer.style.display = 'none';
-                          };
-
-                          this.eGui.appendChild(a);
-                          this.previewElement = previewContainer; 
-                        }
-                      }
-                      getGui() { return this.eGui; }
-                      
-                      destroy() {
-                        if (this.previewElement && this.previewElement.parentNode) {
-                          this.previewElement.parentNode.removeChild(this.previewElement);
-                        }
-                      }
-                    }
-                    """)
 
                     status_jscode = JsCode("""
                     class StatusBadgeRenderer {
@@ -1099,7 +1136,15 @@ else:
                     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
-                    gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120, pinned='left')
+                    # 🔥 FASE 1: Coluna de Checkbox que servirá de Gatilho e Proteção de Clique 🔥
+                    gb.configure_selection(
+                        selection_mode="single", 
+                        use_checkbox=True, 
+                        header_checkbox=False, 
+                        suppressRowClickSelection=True
+                    )
+
+                    gb.configure_column("PEDIDO", header_name="📦 Pedido", width=140, pinned='left')
                     gb.configure_column("DATA", header_name="📅 Data Coleta", width=130)
                     gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta")
                     if 'CNPJ' in colunas_visiveis:
@@ -1108,7 +1153,6 @@ else:
                     gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=150)
-                    gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
                     gb.configure_column("DETALHES", header_name="💬 Atualizações")
 
                     gridOptions = gb.build()
@@ -1132,15 +1176,35 @@ else:
                         ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
                     }
 
-                    AgGrid(
+                    # Renderiza o Grid e escuta a alteração da seleção
+                    ag_response = AgGrid(
                         df_final[colunas_visiveis],
                         gridOptions=gridOptions,
                         theme="alpine",
                         columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
                         height=550,
                         allow_unsafe_jscode=True,
-                        custom_css=custom_css 
+                        custom_css=custom_css,
+                        update_mode="SELECTION_CHANGED" # A Mágica do gatilho acontece aqui
                     )
+                    
+                    # 🔥 GATILHO DO POP-UP MEGAZORD 🔥
+                    selected_rows = ag_response.get('selected_rows')
+                    if selected_rows is not None and len(selected_rows) > 0:
+                        # Tratamento compatível com versões recentes do Streamlit AgGrid
+                        if isinstance(selected_rows, pd.DataFrame):
+                            dados_da_linha = selected_rows.iloc[0].to_dict()
+                        else:
+                            dados_da_linha = selected_rows[0]
+                        
+                        # Recupera também os dados que ficaram ocultos na GRID (Como Foto, SLA e ETA)
+                        pedido_atual = dados_da_linha.get('PEDIDO')
+                        dados_completos_linha = df_final[df_final['PEDIDO'] == pedido_atual].iloc[0].to_dict()
+
+                        if st.session_state.linha_clicada != pedido_atual:
+                            st.session_state.linha_clicada = pedido_atual
+                            modal_detalhes_pedido(dados_completos_linha)
+
 
                     # ── EXPORTAÇÃO CSV ────────
                     mapa_csv = {
@@ -1178,7 +1242,7 @@ else:
 
                     with holder_exportar:
                         st.download_button(
-                            "📥 Exportar Relatório",
+                             "📥 Exportar Relatório",
                             data=csv,
                             file_name=f"Relatorio_{st.session_state.cliente}.csv",
                             use_container_width=True,
