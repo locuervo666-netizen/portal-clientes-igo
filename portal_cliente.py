@@ -602,7 +602,7 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🪟 FUNÇÃO DO POP-UP MEGAZORD (COM TODAS AS NOVIDADES)
+# 🪟 FUNÇÃO DO POP-UP MEGAZORD (BLINDADO CONTRA MARKDOWN)
 # =======================================================
 @st.dialog("📋 Detalhes da Operação", width="large")
 def modal_detalhes_pedido(pedido_data):
@@ -616,7 +616,7 @@ def modal_detalhes_pedido(pedido_data):
     c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
     c_h2.markdown(f"<div style='text-align:center; background:{cor_etiqueta}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px;'>{status}</div>", unsafe_allow_html=True)
     
-    # 2. BARRA DE PROGRESSO (Efeito Mercado Livre) 🔥
+    # 2. BARRA DE PROGRESSO (FLAT STRING - SEM QUEBRAS DE LINHA OU ESPAÇOS NO INÍCIO) 🔥
     step = 1
     cor_barra = "#3b82f6" 
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "RECUSA"]):
@@ -627,30 +627,16 @@ def modal_detalhes_pedido(pedido_data):
         elif "COLETADO" in status or "ROTA DE ENTREGA" in status or "EM ROTA" in status or "CONFERIDO" in status: step = 3
         elif "ENTREGUE" in status: step = 4; cor_barra = "#10b981" 
 
-    # IMPORTANTE: HTML na margem esquerda para o Streamlit não achar que é bloco de código!
-    html_barra = f"""
-<div style="display: flex; justify-content: space-between; position: relative; margin: 15px 0 35px 0;">
-    <div style="position: absolute; top: 12px; left: 0; right: 0; height: 4px; background: #e2e8f0; z-index: 1;"></div>
-    <div style="position: absolute; top: 12px; left: 0; width: {(step-1)*33.3}%; height: 4px; background: {cor_barra}; z-index: 2; transition: width 0.5s;"></div>
-    
-    <div style="z-index: 3; text-align: center; width: 60px;">
-        <div style="width: 28px; height: 28px; background: {cor_barra if step >= 1 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✓</div>
-        <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 1 else '#64748b'};">Pedido</div>
-    </div>
-    <div style="z-index: 3; text-align: center; width: 60px;">
-        <div style="width: 28px; height: 28px; background: {cor_barra if step >= 2 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">{ '!' if step==2 and cor_barra=='#ef4444' else '🚐'}</div>
-        <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 2 else '#64748b'};">Em Rota</div>
-    </div>
-    <div style="z-index: 3; text-align: center; width: 60px;">
-        <div style="width: 28px; height: 28px; background: {cor_barra if step >= 3 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📦</div>
-        <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 3 else '#64748b'};">Coletado</div>
-    </div>
-    <div style="z-index: 3; text-align: center; width: 60px;">
-        <div style="width: 28px; height: 28px; background: {cor_barra if step >= 4 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✅</div>
-        <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 4 else '#64748b'};">Entregue</div>
-    </div>
-</div>
-"""
+    html_barra = (
+        f"<div style='display:flex;justify-content:space-between;position:relative;margin:15px 0 35px 0;'>"
+        f"<div style='position:absolute;top:12px;left:0;right:0;height:4px;background:#e2e8f0;z-index:1;'></div>"
+        f"<div style='position:absolute;top:12px;left:0;width:{(step-1)*33.3}%;height:4px;background:{cor_barra};z-index:2;transition:width 0.5s;'></div>"
+        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 1 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>✓</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 1 else '#64748b'};'>Pedido</div></div>"
+        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 2 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>{'!' if step==2 and cor_barra=='#ef4444' else '🚐'}</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 2 else '#64748b'};'>Em Rota</div></div>"
+        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 3 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>📦</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 3 else '#64748b'};'>Coletado</div></div>"
+        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 4 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>✅</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 4 else '#64748b'};'>Entregue</div></div>"
+        f"</div>"
+    )
     st.markdown(html_barra, unsafe_allow_html=True)
     
     st.divider()
@@ -668,17 +654,17 @@ def modal_detalhes_pedido(pedido_data):
         recebedor = str(pedido_data.get('RECEBEDOR_FINAL', '')).strip()
         agente = str(pedido_data.get('AGENTE_NOME', 'Equipe IGO')).strip()
         
-        # IMPORTANTE: HTML na margem esquerda!
-        custodia_html = f"""
-<div style='font-size: 12px; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 5px;'>
-    <div style='margin-bottom: 4px;'><b>Liberado por:</b> {contato if contato and contato.upper() != 'NAN' else '<i>Não informado</i>'}</div>
-    <div style='color: #94a3b8; font-size: 14px; padding-left: 5px;'>⬇️</div>
-    <div style='margin-bottom: 4px;'><b>Transportado por:</b> {agente}</div>
-"""
+        # Cadeia de Custódia em FLAT STRING 
+        custodia_html = (
+            f"<div style='font-size:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-top:5px;'>"
+            f"<div style='margin-bottom:4px;'><b>Liberado por:</b> {contato if contato and contato.upper() != 'NAN' else '<i>Não informado</i>'}</div>"
+            f"<div style='color:#94a3b8;font-size:14px;padding-left:5px;'>⬇️</div>"
+            f"<div style='margin-bottom:4px;'><b>Transportado por:</b> {agente}</div>"
+        )
         if "ENTREGUE" in status or "CONFERIDO" in status:
-            custodia_html += f"    <div style='color: #94a3b8; font-size: 14px; padding-left: 5px;'>⬇️</div><div><b>Recebido por:</b> {recebedor if recebedor and recebedor.upper() != 'NAN' else '<i>Não informado</i>'}</div>"
+            custodia_html += f"<div style='color:#94a3b8;font-size:14px;padding-left:5px;'>⬇️</div><div><b>Recebido por:</b> {recebedor if recebedor and recebedor.upper() != 'NAN' else '<i>Não informado</i>'}</div>"
         else:
-            custodia_html += f"    <div style='color: #94a3b8; font-size: 14px; padding-left: 5px;'>⬇️</div><div><b>Recebido por:</b> ⏳ <i>Aguardando finalização</i></div>"
+            custodia_html += f"<div style='color:#94a3b8;font-size:14px;padding-left:5px;'>⬇️</div><div><b>Recebido por:</b> ⏳ <i>Aguardando finalização</i></div>"
         
         custodia_html += "</div>"
         st.markdown(custodia_html, unsafe_allow_html=True)
@@ -687,16 +673,13 @@ def modal_detalhes_pedido(pedido_data):
         st.markdown("### 🕒 Linha do Tempo")
         st.markdown(f"**📅 Solicitação:** {pedido_data.get('DATA', '---')}")
         
-        # Limpeza da data
         data_efetiva = str(pedido_data.get('DATA_EFETIVA', '---')).replace(" 00:00:00", "").strip()
         hora_limpa = str(pedido_data.get('HORA_LIMPA', '')).strip()
         hora_str = f" às {hora_limpa}" if hora_limpa else ""
         
-        # Data Limite (Previsão de Entrega)
         data_limite = str(pedido_data.get('DATA_LIMITE', '---')).strip()
         if not data_limite or data_limite.upper() == 'NAN': data_limite = "Não definida"
         
-        # A Rastreabilidade Inteligente
         if any(x in status for x in ["ENTREGUE", "CONFERIDO"]):
             st.markdown(f"**📦 Coleta Realizada:** {pedido_data.get('DATA', '---')}")
             st.markdown(f"**🏁 Entrega Finalizada:** {data_efetiva}{hora_str}")
@@ -730,7 +713,7 @@ def modal_detalhes_pedido(pedido_data):
     else:
         st.markdown("📷 *Aguardando anexo do comprovante de coleta.*")
 
-    # Botão de Fechar 100% Funcional 
+    # Botão de Fechar 
     if st.button("Fechar Detalhes", use_container_width=True):
         st.session_state.modal_aberto = False
         st.rerun()
@@ -1143,8 +1126,6 @@ else:
 
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
-                    
-                    # 🔥 AQUI ENTRA A COLUNA DA LUPA 🔥
                     df_final['ACAO'] = '🔍 Abrir'
 
                     if 'UF' not in df_final.columns:
@@ -1275,7 +1256,6 @@ else:
                     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
-                    # 🔥 CONFIGURAÇÃO PARA O BOTÃO "FECHAR" FUNCIONAR PERFEITAMENTE 🔥
                     gb.configure_selection(
                         selection_mode="single", 
                         use_checkbox=False, 
@@ -1293,8 +1273,6 @@ else:
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=150)
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
-                    
-                    # Coluna da Lupa no Final!
                     gb.configure_column("ACAO", header_name="💬 Atualizações", width=120, cellStyle={'cursor': 'pointer', 'color': '#3b82f6', 'font-weight': 'bold'})
 
                     gridOptions = gb.build()
@@ -1318,7 +1296,6 @@ else:
                         ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
                     }
 
-                    # Renderiza o Grid e escuta a alteração da seleção
                     ag_response = AgGrid(
                         df_final[colunas_visiveis],
                         gridOptions=gridOptions,
@@ -1330,7 +1307,6 @@ else:
                         update_mode="SELECTION_CHANGED"
                     )
                     
-                    # 🔥 GATILHO DO POP-UP MEGAZORD (COM A TRAVA DE MEMÓRIA) 🔥
                     selected_rows = ag_response.get('selected_rows')
                     if selected_rows is not None and len(selected_rows) > 0:
                         if isinstance(selected_rows, pd.DataFrame):
@@ -1347,7 +1323,6 @@ else:
                     else:
                         st.session_state.linha_clicada = None
 
-                    # Abre o Modal se a flag for verdadeira
                     if st.session_state.modal_aberto and st.session_state.linha_clicada:
                         dados_completos_linha = df_final[df_final['PEDIDO'] == st.session_state.linha_clicada].iloc[0].to_dict()
                         modal_detalhes_pedido(dados_completos_linha)
