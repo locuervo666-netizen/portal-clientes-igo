@@ -602,7 +602,7 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🪟 FUNÇÃO DO POP-UP MEGAZORD (COM CARDS VISUAIS)
+# 🪟 FUNÇÃO DO POP-UP MEGAZORD (TOTALMENTE BLINDADO)
 # =======================================================
 @st.dialog("📋 Detalhes da Operação", width="large")
 def modal_detalhes_pedido(pedido_data):
@@ -616,7 +616,7 @@ def modal_detalhes_pedido(pedido_data):
     c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
     c_h2.markdown(f"<div style='text-align:center; background:{cor_etiqueta}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>{status}</div>", unsafe_allow_html=True)
     
-    # 2. BARRA DE PROGRESSO (FLAT STRING - BLINDADO) 🔥
+    # 2. BARRA DE PROGRESSO (FLAT STRING - SEM QUEBRAS DE LINHA) 🔥
     step = 1
     cor_barra = "#3b82f6" 
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "RECUSA"]):
@@ -639,28 +639,26 @@ def modal_detalhes_pedido(pedido_data):
     )
     st.markdown(html_barra, unsafe_allow_html=True)
 
-    # 3. INFORMAÇÕES DINÂMICAS EM CARDS VISUAIS 🔥
+    # 3. INFORMAÇÕES DINÂMICAS EM CARDS VISUAIS (BLINDADO) 🔥
     c1, c2 = st.columns(2)
     
     agente_nome = str(pedido_data.get('AGENTE_NOME', 'Equipe IGO')).strip()
     if agente_nome.upper() == 'NAN' or not agente_nome: agente_nome = 'Equipe IGO'
     
     with c1:
-        st.markdown(f"""
-        <div style='background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; height: 100%; box-shadow: 0 1px 2px rgba(0,0,0,0.02);'>
-            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>🏢 Unidade de Coleta</p>
-            <p style='margin:2px 0 12px 0; font-size: 15px; font-weight: 700; color: #0f172a;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>
-            
-            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>📍 Endereço</p>
-            <p style='margin:2px 0 12px 0; font-size: 13px; color: #334155;'>{pedido_data.get('CIDADE_UF', 'N/A')}</p>
-            
-            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>👤 Motorista / Responsável</p>
-            <p style='margin:2px 0 12px 0; font-size: 14px; font-weight: 700; color: #3b82f6;'>🚐 {agente_nome}</p>
-            
-            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>📈 Confiabilidade do Local</p>
-            <p style='margin:2px 0 0 0; font-size: 13px; font-weight: 600; color: #334155;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        html_c1 = (
+            f"<div style='background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0;height:100%;box-shadow:0 1px 2px rgba(0,0,0,0.02);'>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>🏢 Unidade de Coleta</p>"
+            f"<p style='margin:2px 0 12px 0;font-size:15px;font-weight:700;color:#0f172a;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>📍 Endereço</p>"
+            f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>{pedido_data.get('CIDADE_UF', 'N/A')}</p>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>👤 Motorista / Responsável</p>"
+            f"<p style='margin:2px 0 12px 0;font-size:14px;font-weight:700;color:#3b82f6;'>🚐 {agente_nome}</p>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>📈 Confiabilidade do Local</p>"
+            f"<p style='margin:2px 0 0 0;font-size:13px;font-weight:600;color:#334155;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')}</p>"
+            f"</div>"
+        )
+        st.markdown(html_c1, unsafe_allow_html=True)
         
     with c2:
         data_efetiva = str(pedido_data.get('DATA_EFETIVA', '---')).replace(" 00:00:00", "").strip()
@@ -670,32 +668,30 @@ def modal_detalhes_pedido(pedido_data):
         data_limite = str(pedido_data.get('DATA_LIMITE', '---')).strip()
         if not data_limite or data_limite.upper() == 'NAN': data_limite = "Não definida"
 
-        # Organizando a Linha do Tempo dentro do Card
         if any(x in status for x in ["ENTREGUE", "CONFERIDO"]):
-            timeline_html = f"<p style='margin:2px 0 12px 0; font-size: 14px; color: #334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}</b><br>✅ Entrega: <b>{data_efetiva}{hora_str}</b></p>"
-            eta_html = f"<p style='margin:2px 0 0 0; font-size: 13px; color: #334155;'>🎯 Previsão Original: {data_limite}</p>"
+            timeline_html = f"<p style='margin:2px 0 12px 0;font-size:14px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}</b><br>✅ Entrega: <b>{data_efetiva}{hora_str}</b></p>"
+            eta_html = f"<p style='margin:2px 0 0 0;font-size:13px;color:#334155;'>🎯 Previsão Original: {data_limite}</p>"
         elif any(x in status for x in ["COLETADO", "ROTA"]):
-            timeline_html = f"<p style='margin:2px 0 12px 0; font-size: 14px; color: #334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_str}</b><br>⏳ Entrega: <i>Em trânsito para o destino...</i></p>"
-            eta_html = f"<p style='margin:2px 0 0 0; font-size: 13px; color: #334155;'>🎯 Previsão Limite: {data_limite}</p>"
+            timeline_html = f"<p style='margin:2px 0 12px 0;font-size:14px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_str}</b><br>⏳ Entrega: <i>Em trânsito para o destino...</i></p>"
+            eta_html = f"<p style='margin:2px 0 0 0;font-size:13px;color:#334155;'>🎯 Previsão Limite: {data_limite}</p>"
         elif any(x in status for x in ["FRUSTRADA", "PROBLEMA"]):
-            timeline_html = f"<p style='margin:2px 0 12px 0; font-size: 14px; color: #ef4444;'>❌ Tentativa: <b>{data_efetiva}{hora_str}</b></p>"
-            eta_html = f"<p style='margin:2px 0 0 0; font-size: 13px; color: #334155;'>🎯 Previsão Original: {data_limite}</p>"
+            timeline_html = f"<p style='margin:2px 0 12px 0;font-size:14px;color:#ef4444;'>❌ Tentativa: <b>{data_efetiva}{hora_str}</b></p>"
+            eta_html = f"<p style='margin:2px 0 0 0;font-size:13px;color:#334155;'>🎯 Previsão Original: {data_limite}</p>"
         else:
-            timeline_html = f"<p style='margin:2px 0 12px 0; font-size: 14px; color: #334155;'>⏳ Previsão de Coleta: <b>{pedido_data.get('ETA_LAB', 'Em mapeamento')}</b></p>"
-            eta_html = f"<p style='margin:2px 0 0 0; font-size: 13px; color: #334155;'>🎯 Previsão Limite: {data_limite}</p>"
+            timeline_html = f"<p style='margin:2px 0 12px 0;font-size:14px;color:#334155;'>⏳ Previsão de Coleta: <b>{pedido_data.get('ETA_LAB', 'Em mapeamento')}</b></p>"
+            eta_html = f"<p style='margin:2px 0 0 0;font-size:13px;color:#334155;'>🎯 Previsão Limite: {data_limite}</p>"
 
-        st.markdown(f"""
-        <div style='background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; height: 100%; box-shadow: 0 1px 2px rgba(0,0,0,0.02);'>
-            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>📅 Solicitação Criada Em</p>
-            <p style='margin:2px 0 12px 0; font-size: 14px; color: #334155;'>{pedido_data.get('DATA', '---')}</p>
-            
-            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>🕒 Status da Operação</p>
-            {timeline_html}
-            
-            <p style='margin:0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;'>🏁 Prazo Acordado</p>
-            {eta_html}
-        </div>
-        """, unsafe_allow_html=True)
+        html_c2 = (
+            f"<div style='background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0;height:100%;box-shadow:0 1px 2px rgba(0,0,0,0.02);'>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>📅 Solicitação Criada Em</p>"
+            f"<p style='margin:2px 0 12px 0;font-size:14px;color:#334155;'>{pedido_data.get('DATA', '---')}</p>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>🕒 Status da Operação</p>"
+            f"{timeline_html}"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>🏁 Prazo Acordado</p>"
+            f"{eta_html}"
+            f"</div>"
+        )
+        st.markdown(html_c2, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
