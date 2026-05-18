@@ -279,6 +279,15 @@ def carregar_dados_nuvem():
                     if 'RECEBEDOR'    in df_app.columns: cols_to_extract.append('RECEBEDOR')
                     if 'HORA_STATUS'  in df_app.columns: cols_to_extract.append('HORA_STATUS')
                     
+                    # Identificar coluna de motorista
+                    col_mot = None
+                    for c in ['MOTORISTA', 'USUARIO', 'AGENTE', 'CONDUTOR', 'NOME_MOTORISTA']:
+                        if c in df_app.columns:
+                            cols_to_extract.append(c)
+                            col_mot = c
+                            break
+
+                    # Identificar coluna de contato
                     col_nome = None
                     for c in ['DETALHES', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
                         if c in df_app.columns:
@@ -300,18 +309,34 @@ def carregar_dados_nuvem():
                         'RECEBEDOR': 'A_REC',
                         'HORA_STATUS': 'A_HORA_STATUS'
                     }
-                    if col_nome:
-                        rename_dict[col_nome] = 'A_CONTATO'
+                    if col_nome: rename_dict[col_nome] = 'A_CONTATO'
+                    if col_mot: rename_dict[col_mot] = 'A_MOTORISTA'
                         
                     df_app_clean.rename(columns=rename_dict, inplace=True)
+
+                    # 🔥 LÓGICA DE MOTORISTA DUPLO (COLETA VS ENTREGA) 🔥
+                    if 'A_MOTORISTA' in df_app_clean.columns:
+                        coleta_mask = df_app_clean['A_ST'].str.contains('COLETADO', case=False, na=False)
+                        entrega_mask = df_app_clean['A_ST'].str.contains('ENTREGUE|CONFERIDO', case=False, na=False)
+                        
+                        mot_coleta_dict = df_app_clean[coleta_mask].set_index('PEDIDO')['A_MOTORISTA'].to_dict()
+                        mot_entrega_dict = df_app_clean[entrega_mask].set_index('PEDIDO')['A_MOTORISTA'].to_dict()
+                    else:
+                        mot_coleta_dict = {}
+                        mot_entrega_dict = {}
 
                     rom_mask = df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)
                     rom_dict = df_app_clean[rom_mask].set_index('PEDIDO').to_dict('index')
 
+                    # Removemos duplicatas após mapear os motoristas específicos
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
 
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
+
+                    # Aplicar motoristas mapeados
+                    df['MOTORISTA_COLETA'] = df['PEDIDO'].map(mot_coleta_dict).fillna(df['A_MOTORISTA'] if 'A_MOTORISTA' in df.columns else '')
+                    df['MOTORISTA_ENTREGA'] = df['PEDIDO'].map(mot_entrega_dict).fillna('')
 
                     def get_app_val(row, col_app):
                         val = str(row.get(col_app, '')).strip()
@@ -398,6 +423,8 @@ def carregar_dados_nuvem():
                 df['STATUS_RESOLVIDO'] = df['STATUS']
                 df['DATA_EFETIVA'] = "-"
                 df['HORA_LIMPA'] = "" 
+                df['MOTORISTA_COLETA'] = ""
+                df['MOTORISTA_ENTREGA'] = ""
 
             if 'DATA' in df.columns:
                 df['DATA_OBJ'] = pd.to_datetime(
@@ -602,7 +629,7 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🪟 FUNÇÃO DO POP-UP MEGAZORD (BLINDADO E CONCATENADO)
+# 🪟 FUNÇÃO DO POP-UP MEGAZORD (DUPLO MOTORISTA E OTD)
 # =======================================================
 @st.dialog("📋 Detalhes da Operação", width="large")
 def modal_detalhes_pedido(pedido_data):
@@ -616,7 +643,7 @@ def modal_detalhes_pedido(pedido_data):
     c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
     c_h2.markdown(f"<div style='text-align:center; background:{cor_etiqueta}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>{status}</div>", unsafe_allow_html=True)
     
-    # 2. BARRA DE PROGRESSO (FLAT STRING - SEM QUEBRAS DE LINHA) 🔥
+    # 2. BARRA DE PROGRESSO (FLAT STRING)
     step = 1
     cor_barra = "#3b82f6" 
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "RECUSA"]):
@@ -639,7 +666,7 @@ def modal_detalhes_pedido(pedido_data):
     )
     st.markdown(html_barra, unsafe_allow_html=True)
 
-    # 🔥 MÁGICA DO ENDEREÇO CONCATENADO 🔥
+    # ENDEREÇO CONCATENADO
     end_rua = str(pedido_data.get('ENDERECO', '')).strip()
     end_num = str(pedido_data.get('NUMERO', '')).strip()
     end_bairro = str(pedido_data.get('BAIRRO', '')).strip()
@@ -653,12 +680,21 @@ def modal_detalhes_pedido(pedido_data):
     if partes_end:
         endereco_completo = ", ".join(partes_end) + f" — {end_cid_uf}"
     else:
-        endereco_completo = end_cid_uf # Fallback seguro
+        endereco_completo = end_cid_uf
 
-    agente_nome = str(pedido_data.get('AGENTE_NOME', 'Equipe IGO')).strip()
-    if agente_nome.upper() == 'NAN' or not agente_nome: agente_nome = 'Equipe IGO'
+    # 🔥 MOTORISTAS DUPLOS (COLETA E ENTREGA) 🔥
+    mot_coleta = str(pedido_data.get('MOTORISTA_COLETA', '')).strip()
+    mot_entrega = str(pedido_data.get('MOTORISTA_ENTREGA', '')).strip()
+    
+    if mot_coleta.upper() == 'NAN' or not mot_coleta: mot_coleta = 'Equipe IGO'
+    if mot_entrega.upper() == 'NAN' or not mot_entrega: mot_entrega = mot_coleta # Fallback
 
-    # 3. INFORMAÇÕES DINÂMICAS EM CARDS VISUAIS (FLAT STRING) 🔥
+    if any(x in status for x in ["ENTREGUE", "CONFERIDO"]) and mot_coleta != mot_entrega:
+        motorista_html = f"<p style='margin:2px 0 12px 0;font-size:13px;font-weight:600;color:#334155;'>📦 Coleta: <span style='color:#3b82f6;'>{mot_coleta}</span><br>✅ Entrega: <span style='color:#3b82f6;'>{mot_entrega}</span></p>"
+    else:
+        motorista_html = f"<p style='margin:2px 0 12px 0;font-size:14px;font-weight:700;color:#3b82f6;'>🚐 {mot_coleta}</p>"
+
+    # 3. CARDS VISUAIS 
     c1, c2 = st.columns(2)
     
     with c1:
@@ -668,10 +704,10 @@ def modal_detalhes_pedido(pedido_data):
             f"<p style='margin:2px 0 12px 0;font-size:15px;font-weight:700;color:#0f172a;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>"
             f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>📍 Endereço Completo</p>"
             f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>{endereco_completo}</p>"
-            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>👤 Motorista / Responsável</p>"
-            f"<p style='margin:2px 0 12px 0;font-size:14px;font-weight:700;color:#3b82f6;'>🚐 {agente_nome}</p>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>👤 Motorista(s) da Operação</p>"
+            f"{motorista_html}"
             f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>📈 Confiabilidade do Local</p>"
-            f"<p style='margin:2px 0 0 0;font-size:13px;font-weight:600;color:#334155;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')}</p>"
+            f"<p style='margin:2px 0 0 0;font-size:13px;font-weight:600;color:#334155;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')} <br> {pedido_data.get('OTD_LAB', '')}</p>"
             f"</div>"
         )
         st.markdown(html_c1, unsafe_allow_html=True)
@@ -684,8 +720,22 @@ def modal_detalhes_pedido(pedido_data):
         data_limite = str(pedido_data.get('DATA_LIMITE', '---')).strip()
         if not data_limite or data_limite.upper() == 'NAN': data_limite = "Não definida"
 
+        # 🔥 LÓGICA DE OTD INDIVIDUAL (SELO DE ATRASO OU NO PRAZO) 🔥
+        selo_prazo = ""
+        if any(x in status for x in ["ENTREGUE", "CONFERIDO"]) and data_limite != "Não definida" and data_efetiva != "---":
+            try:
+                dt_ef_obj = datetime.strptime(data_efetiva, '%d/%m/%Y').date()
+                dt_lim_obj = datetime.strptime(data_limite, '%d/%m/%Y').date()
+                if dt_ef_obj <= dt_lim_obj:
+                    selo_prazo = "<span style='background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:5px;'>No Prazo</span>"
+                else:
+                    dias_atraso = (dt_ef_obj - dt_lim_obj).days
+                    selo_prazo = f"<span style='background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:5px;'>Atrasado {dias_atraso} dia(s)</span>"
+            except:
+                pass
+
         if any(x in status for x in ["ENTREGUE", "CONFERIDO"]):
-            timeline_html = f"<p style='margin:2px 0 12px 0;font-size:14px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}</b><br>✅ Entrega: <b>{data_efetiva}{hora_str}</b></p>"
+            timeline_html = f"<p style='margin:2px 0 12px 0;font-size:14px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}</b><br>✅ Entrega: <b>{data_efetiva}{hora_str}</b> {selo_prazo}</p>"
             eta_html = f"<p style='margin:2px 0 0 0;font-size:13px;color:#334155;'>🎯 Previsão Original: {data_limite}</p>"
         elif any(x in status for x in ["COLETADO", "ROTA"]):
             timeline_html = f"<p style='margin:2px 0 12px 0;font-size:14px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_str}</b><br>⏳ Entrega: <i>Em trânsito para o destino...</i></p>"
@@ -835,7 +885,7 @@ else:
             "June": "Junho", "July": "Julho", "August": "Agosto", "September": "Setembro", "October": "Outubro", 
             "November": "Novembro", "December": "Dezembro",
             "Today": "Hoje", "Clear": "Limpar",
-            "Choose options": "Escolha as cidades...",
+            "Choose options": "Escolha as window...",
             "Select all": "Selecionar todas",
             "Clear all": "Limpar tudo",
             "No results": "Nenhuma cidade encontrada"
@@ -956,7 +1006,7 @@ else:
         else:
             df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
 
-        # 🔥 MOTOR DE ETA E SLA (CÁLCULO 100% CORRIGIDO E ISOLADO) 🔥
+        # 🔥 MOTOR DE ETA E SLA (CÁLCULO 100% E OTD PONTUALIDADE) 🔥
         df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
         
         lab_stats = {}
@@ -967,7 +1017,6 @@ else:
             sucessos = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)])
             frustradas = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado|Recusa', case=False, na=False)])
             
-            # Novo cálculo fechando em 100%
             total_finalizados = sucessos + frustradas
             
             if total_finalizados > 0:
@@ -976,6 +1025,23 @@ else:
             else:
                 pct_sucesso = 0
                 pct_frustrada = 0
+                
+            # CÁLCULO DO OTD (ON-TIME DELIVERY)
+            df_entregues = df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Conferido', case=False, na=False)]
+            total_entregues = len(df_entregues)
+            otd_sucesso = 0
+            
+            if total_entregues > 0:
+                no_prazo = 0
+                for _, row in df_entregues.iterrows():
+                    try:
+                        dt_ef = pd.to_datetime(str(row.get('DATA_EFETIVA','')).replace(" 00:00:00", "").strip(), format='%d/%m/%Y').date()
+                        dt_lim = pd.to_datetime(str(row.get('DATA_LIMITE','')).strip(), format='%d/%m/%Y').date()
+                        if dt_ef <= dt_lim:
+                            no_prazo += 1
+                    except:
+                        pass
+                otd_sucesso = round((no_prazo / total_entregues) * 100)
             
             df_hora = df_lab[df_lab['HORA_LIMPA'].str.contains(r'^\d{2}:\d{2}$', regex=True, na=False) & df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)]
             eta_str = "Em mapeamento (Pouco histórico)"
@@ -991,11 +1057,13 @@ else:
                 
             lab_stats[lab] = {
                 'SLA': f"🟢 {pct_sucesso}% Sucesso | 🔴 {pct_frustrada}% Frustradas" if total_finalizados >= 5 else "Em mapeamento (Poucas coletas)",
-                'ETA': eta_str
+                'ETA': eta_str,
+                'OTD': f"🎯 {otd_sucesso}% Entregues no Prazo" if total_entregues > 0 else "Sem entregas finalizadas"
             }
 
         df_cliente['SLA_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('SLA', 'Em mapeamento'))
         df_cliente['ETA_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('ETA', 'Em mapeamento'))
+        df_cliente['OTD_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('OTD', 'Sem entregas finalizadas'))
         # ===================================================
 
         tab_grid, tab_solicitar, tab_chamados = st.tabs([
@@ -1146,7 +1214,6 @@ else:
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
                     
-                    # 🔥 LUPA NO FINAL 🔥
                     df_final['ACAO'] = '🔍 Abrir'
 
                     if 'UF' not in df_final.columns:
