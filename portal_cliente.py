@@ -211,7 +211,7 @@ CLIENTES_CONFIG = {
 }
 
 # =======================================================
-# 🔗 2. MOTOR DE DADOS E CRUZAMENTO DE AGENTES
+# 🔗 2. MOTOR DE DADOS
 # =======================================================
 @st.cache_resource
 def conectar_banco_seguro():
@@ -298,7 +298,7 @@ def carregar_dados_nuvem():
                     if 'HORA_STATUS'  in df_app.columns: cols_to_extract.append('HORA_STATUS')
                     
                     # Identificar coluna de motorista
-                    col_mot = next((c for c in ['MOTORISTA', 'USUARIO', 'AGENTE', 'CONDUTOR'] if c in df_app.columns), None)
+                    col_mot = next((c for c in ['MOTORISTA', 'USUARIO', 'AGENTE', 'CONDUTOR', 'NOME_MOTORISTA'] if c in df_app.columns), None)
                     if col_mot: cols_to_extract.append(col_mot)
 
                     # Identificar coluna de contato
@@ -324,7 +324,7 @@ def carregar_dados_nuvem():
                         
                     df_app_clean.rename(columns=rename_dict, inplace=True)
 
-                    # 🔥 LÓGICA DE MOTORISTA DUPLO 🔥
+                    # 🔥 LÓGICA DE MOTORISTA DUPLO (COLETA VS ENTREGA) 🔥
                     if 'A_MOTORISTA' in df_app_clean.columns:
                         coleta_mask = df_app_clean['A_ST'].str.contains('COLETADO', case=False, na=False)
                         entrega_mask = df_app_clean['A_ST'].str.contains('ENTREGUE|CONFERIDO', case=False, na=False)
@@ -338,11 +338,13 @@ def carregar_dados_nuvem():
                     rom_mask = df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)
                     rom_dict = df_app_clean[rom_mask].set_index('PEDIDO').to_dict('index')
 
+                    # Removemos duplicatas após mapear os motoristas específicos
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
 
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
 
+                    # Aplicar motoristas mapeados
                     df['MOTORISTA_COLETA_ID'] = df['PEDIDO'].map(mot_coleta_dict).fillna(df['A_MOTORISTA'] if 'A_MOTORISTA' in df.columns else '')
                     df['MOTORISTA_ENTREGA_ID'] = df['PEDIDO'].map(mot_entrega_dict).fillna('')
 
@@ -382,10 +384,16 @@ def carregar_dados_nuvem():
                         f_col = get_app_val(r, 'A_FOTO_COL')
                         f_ent = get_app_val(r, 'A_FOTO_ENT')
                         f_gen = get_app_val(r, 'A_FO')
+                        
+                        if not f_col: f_col = str(r.get('FOTO_COLETA', '')).strip()
+                        if not f_ent: f_ent = str(r.get('FOTO_ENTREGA', '')).strip()
+                        if not f_gen: f_gen = str(r.get('FOTO', '')).strip()
+                        
                         if f_col and f_col.upper() != 'NAN': return f_col
                         if f_ent and f_ent.upper() != 'NAN': return f_ent
                         if f_gen and f_gen.upper() != 'NAN': return f_gen
                         return ""
+
                     df['FOTO_FINAL'] = df.apply(defining_foto_prioritaria, axis=1)
 
                     def get_true_status_portal(row):
@@ -397,6 +405,7 @@ def carregar_dados_nuvem():
                             s_rom = str(rom_dict[rom_id].get('A_ST', '')).strip().upper()
                             if s_rom in ['ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO']:
                                 return s_rom
+
                         if s_db  in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_db
                         if s_app in ['ENTREGUE', 'CANCELADO', 'FRUSTRADA', 'PROBLEMA']: return s_app
                         if s_db  in ['EM ROTA DE ENTREGA', 'CONFERIDO', 'COLETADO']:    return s_db
@@ -410,14 +419,20 @@ def carregar_dados_nuvem():
                         s_final = str(row.get('STATUS_RESOLVIDO', '')).upper()
                         if s_final not in ['ENTREGUE', 'FRUSTRADA']:
                             return "-"
+
                         d_db   = str(row.get('DATA_ENTREGA', '')).strip()
                         rom_id = str(row.get('ROMANEIO', '')).strip()
+
                         if rom_id in rom_dict:
                             d_rom = str(rom_dict[rom_id].get('A_DT_ENTREGA', '')).strip()
-                            if d_rom and d_rom.upper() != 'NAN': return d_rom
+                            if d_rom and d_rom.upper() != 'NAN':
+                                return d_rom
+
                         if 'A_DT_ENTREGA' in row:
                             d_app = str(row.get('A_DT_ENTREGA', '')).strip()
-                            if d_app and d_app.upper() != 'NAN': return d_app
+                            if d_app and d_app.upper() != 'NAN':
+                                return d_app
+
                         return d_db if d_db.upper() != 'NAN' else "-"
 
                     df['DATA_EFETIVA'] = df.apply(get_true_data_entrega_portal, axis=1)
@@ -431,7 +446,9 @@ def carregar_dados_nuvem():
                 df['MOTORISTA_ENTREGA'] = ""
 
             if 'DATA' in df.columns:
-                df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+                df['DATA_OBJ'] = pd.to_datetime(
+                    df['DATA'], format='%d/%m/%Y', errors='coerce'
+                ).dt.date
             
             return df
 
@@ -453,7 +470,9 @@ def carregar_base_locais():
             df = pd.DataFrame(dados[1:], columns=dados[0])
             return df[df['STATUS'].str.upper() == 'ATIVO']
         return pd.DataFrame()
+        
     except Exception as e:
+        st.warning(f"Erro ao carregar locais: {e}")
         return pd.DataFrame()
 
 def obter_proximo_id(df):
@@ -481,13 +500,14 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
         "Content-Type": "application/json",
         "Client-Token": CLIENT_TOKEN
     }
+    
     try:
         requests.post(url, json=payload, headers=headers)
         return True
-    except:
+    except Exception:
         return False
 
-# ── Session State (Atualizado com Trava de Memória Segura) ──
+# ── Session State ──
 if 'logado' not in st.session_state:
     if "token_cli" in st.query_params:
         st.session_state.logado = True
@@ -495,14 +515,22 @@ if 'logado' not in st.session_state:
     else:
         st.session_state.logado = False
 
-if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
-if 'linha_clicada' not in st.session_state: st.session_state.linha_clicada = None
-if 'pedido_modal' not in st.session_state: st.session_state.pedido_modal = None
-if 'modal_aberto' not in st.session_state: st.session_state.modal_aberto = False
+if 'filtro_kpi' not in st.session_state: 
+    st.session_state.filtro_kpi = "TODOS"
+
+if 'linha_clicada' not in st.session_state:
+    st.session_state.linha_clicada = None
+
+if 'pedido_modal' not in st.session_state:
+    st.session_state.pedido_modal = None
+
+if 'modal_aberto' not in st.session_state:
+    st.session_state.modal_aberto = False
 
 # ── Helpers de status ──────────────────────────────────
 def get_st(row):
     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
+
     if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação'
     if 'RECUSA'     in s: return '❌ Solicitação Recusada'
     if 'ENTREGUE'   in s: return '✅ Entregue'
@@ -515,9 +543,91 @@ def get_st(row):
     if 'PROBLEMA'   in s: return '🚨 Problema'
     return '⏳ Pendente'
 
-KPI_DOT_COLOR = { "TODOS": "#2563eb", "ENTREGUE": "#16a34a", "FRUSTRADA": "#dc2626", "COLETADO": "#0ea5e9", "PENDENTE": "#d97706", "Aguardando": "#475569", "HOJE": "#7c3aed" }
-KPI_BG_COLOR = { "TODOS": "#dbeafe", "ENTREGUE": "#dcfce7", "FRUSTRADA": "#fee2e2", "COLETADO": "#e0f2fe", "PENDENTE": "#fef3c7", "Aguardando": "#f1f5f9", "HOJE": "#ede9fe" }
-KPI_META = [("TODOS", "📦 Total", "kpi_total"), ("ENTREGUE", "✅ Entregues", "kpi_entregue"), ("FRUSTRADA", "❌ Frustradas", "kpi_frus"), ("COLETADO", "🚐 Coletados", "kpi_coletado"), ("PENDENTE", "⏳ Pendentes", "kpi_pend"), ("Aguardando", "🎧 Chamados", "kpi_aguardando"), ("HOJE", "📅 Hoje", "kpi_hoje")]
+KPI_DOT_COLOR = {
+    "TODOS":      "#2563eb", 
+    "ENTREGUE":   "#16a34a", 
+    "FRUSTRADA":  "#dc2626", 
+    "COLETADO":   "#0ea5e9", 
+    "PENDENTE":   "#d97706", 
+    "Aguardando": "#475569", 
+    "HOJE":       "#7c3aed", 
+}
+
+KPI_BG_COLOR = {
+    "TODOS":      "#dbeafe", 
+    "ENTREGUE":   "#dcfce7", 
+    "FRUSTRADA":  "#fee2e2", 
+    "COLETADO":   "#e0f2fe", 
+    "PENDENTE":   "#fef3c7", 
+    "Aguardando": "#f1f5f9", 
+    "HOJE":       "#ede9fe", 
+}
+
+KPI_META = [
+    ("TODOS",      "📦 Total",        "kpi_total"),
+    ("ENTREGUE",   "✅ Entregues",    "kpi_entregue"),
+    ("FRUSTRADA",  "❌ Frustradas",   "kpi_frus"),
+    ("COLETADO",   "🚐 Coletados",    "kpi_coletado"), 
+    ("PENDENTE",   "⏳ Pendentes",    "kpi_pend"),
+    ("Aguardando", "🎧 Chamados",     "kpi_aguardando"), 
+    ("HOJE",      "📅 Hoje",         "kpi_hoje"),
+]
+
+# 🔥 A FUNÇÃO QUE HAVIA SIDO CORTADA VOLTOU AQUI 🔥
+def get_detalhes(row):
+    obs_master = str(row.get('OBSERVACOES', '')).strip()
+    obs_app    = str(row.get('OBS_APP_FINAL', '')).strip()
+    contato    = str(row.get('CONTATO_FINAL', '')).strip()
+    recebedor  = str(row.get('RECEBEDOR_FINAL', '')).strip()
+    status     = str(row.get('STATUS_DISPLAY', '')).upper()
+    hora       = str(row.get('HORA_LIMPA', '')).strip()
+    dt_efetiva = str(row.get('DATA_EFETIVA', '')).strip()
+
+    dt_curta = dt_efetiva
+    if len(dt_efetiva) >= 10: 
+        dt_curta = dt_efetiva[:5] 
+
+    str_coleta = f"Coletado às {hora}" if hora else ""
+
+    if 'ENTREGUE' in status:
+        rec_final = recebedor if recebedor else contato if contato else ""
+        dt_str = f" em {dt_curta}" if dt_curta and dt_curta != "-" else ""
+        texto_entrega = f"Entregue para {rec_final}{dt_str}" if rec_final else f"Entregue{dt_str}"
+        if str_coleta:
+            return f"{str_coleta} / {texto_entrega}"
+        return texto_entrega
+
+    if 'FRUSTRADA' in status or 'PROBLEMA' in status:
+        obs_limpa = re.sub(r'\[COLETA:.*?\]', '', obs_app, flags=re.IGNORECASE).strip()
+        if not obs_limpa:
+            obs_limpa = re.sub(r'\[COLETA:.*?\]', '', obs_master, flags=re.IGNORECASE).strip()
+
+        texto_frustrada = ""
+        if obs_limpa and obs_limpa.upper() != 'NAN':
+            texto_frustrada = obs_limpa
+            if contato and contato.upper() != 'NAN':
+                texto_frustrada += f" (Informante: {contato})"
+        elif contato and contato.upper() != 'NAN':
+            texto_frustrada = f"Motivo/Informante: {contato}"
+        else:
+            texto_frustrada = obs_master if obs_master else ""
+
+        if hora:
+            if texto_frustrada and texto_frustrada != "-":
+                return f"Ocorrência às {hora} / {texto_frustrada}"
+            return f"Ocorrência registrada às {hora}"
+        return texto_frustrada if texto_frustrada else "-"
+        
+    if 'COLETADO' in status or 'ROTA' in status:
+        return str_coleta if str_coleta else "-"
+
+    obs_final = obs_app if obs_app and obs_app.upper() != 'NAN' else obs_master
+    if obs_final.upper() == 'NAN': obs_final = ""
+
+    if not obs_final and not contato: return "-"
+    if obs_final and contato and obs_final.upper() != contato.upper():
+        return f"{obs_final} (Informante: {contato})"
+    return obs_final if obs_final else f"Informante: {contato}"
 
 def definir_prioridade_portal(status_str):
     s = str(status_str).upper()
@@ -532,9 +642,14 @@ def definir_prioridade_portal(status_str):
 
 def tratar_foto(x):
     xs = str(x).strip()
-    if not xs or xs.upper() in ['NAN', 'NONE']: return ""
-    if xs.startswith("http"): return xs
-    return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
+    if not xs or xs.upper() in ['NAN', 'NONE']:
+        return ""
+    if xs.startswith("http"):
+        return xs
+    return (
+        f"https://www.appsheet.com/template/gettablefileurl"
+        f"?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
+    )
 
 # =======================================================
 # 🪟 FUNÇÃO DO POP-UP MEGAZORD
@@ -546,10 +661,12 @@ def modal_detalhes_pedido(pedido_data):
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "ATRASADO", "RECUSA"]): cor_etiqueta = "#EF4444"
     if "COLETADO" in status or "ROTA" in status: cor_etiqueta = "#3B82F6"
 
+    # 1. CABEÇALHO
     c_h1, c_h2 = st.columns([3, 1])
     c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
     c_h2.markdown(f"<div style='text-align:center; background:{cor_etiqueta}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>{status}</div>", unsafe_allow_html=True)
     
+    # 2. BARRA DE PROGRESSO (FLAT STRING)
     step = 1
     cor_barra = "#3b82f6" 
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "RECUSA"]):
@@ -917,7 +1034,7 @@ else:
         else:
             df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
 
-        # 🔥 MOTOR DE ETA E SLA 🔥
+        # 🔥 MOTOR DE ETA E SLA (CÁLCULO 100% E OTD PONTUALIDADE) 🔥
         df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
         
         lab_stats = {}
@@ -937,6 +1054,7 @@ else:
                 pct_sucesso = 0
                 pct_frustrada = 0
                 
+            # CÁLCULO DO OTD (ON-TIME DELIVERY)
             df_entregues = df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Conferido', case=False, na=False)]
             total_entregues = len(df_entregues)
             otd_sucesso = 0
@@ -974,6 +1092,9 @@ else:
         df_cliente['SLA_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('SLA', 'Em mapeamento'))
         df_cliente['ETA_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('ETA', 'Em mapeamento'))
         df_cliente['OTD_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('OTD', 'Sem entregas finalizadas'))
+        
+        # 🔥 FUNÇÃO RECONECTADA: GET_DETALHES 🔥
+        df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
 
         tab_grid, tab_solicitar, tab_chamados = st.tabs([
             "📊 Meus Pedidos e Monitoramento",
@@ -994,8 +1115,6 @@ else:
                         sorted(df_cliente['CIDADE'].dropna().unique().tolist()),
                         placeholder="Escolha as cidades..."
                     )
-
-                df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
 
                 df_f = df_cliente.copy()
                 
@@ -1122,6 +1241,8 @@ else:
 
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
+                    
+                    # 🔥 LUPA NO FINAL 🔥
                     df_final['ACAO'] = '🔍 Abrir'
 
                     if 'UF' not in df_final.columns:
@@ -1145,7 +1266,7 @@ else:
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
-                        'COMPROVANTE', 'ACAO'
+                        'COMPROVANTE', 'DETALHES', 'ACAO'
                     ]
 
                     if st.session_state.cliente == "LOGISTICA.LABEST":
@@ -1276,7 +1397,8 @@ else:
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=150)
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
-                    gb.configure_column("ACAO", header_name="💬 Atualizações", width=120, cellStyle={'cursor': 'pointer', 'color': '#3b82f6', 'font-weight': 'bold'})
+                    gb.configure_column("DETALHES", header_name="💬 Atualizações")
+                    gb.configure_column("ACAO", header_name=" ", width=100, cellStyle={'cursor': 'pointer', 'color': '#3b82f6', 'font-weight': 'bold'})
 
                     gridOptions = gb.build()
 
