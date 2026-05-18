@@ -244,7 +244,7 @@ def carregar_dados_nuvem():
         
         planilha = gc.open("DB_IGO_Logistica")
         
-        # 1. Carregar Agentes para mapeamento
+        # 1. Carregar Agentes para mapeamento (Nomes Reais)
         dict_agentes = {}
         try:
             aba_agentes = planilha.worksheet("Agentes")
@@ -253,9 +253,15 @@ def carregar_dados_nuvem():
                 df_ag = pd.DataFrame(dados_agentes[1:], columns=dados_agentes[0])
                 df_ag.columns = [str(c).upper().strip() for c in df_ag.columns]
                 
-                # Identifica colunas dinamicamente
-                id_col = next((c for c in ['ID', 'EMAIL', 'USUARIO', 'LOGIN'] if c in df_ag.columns), df_ag.columns[0])
-                nome_col = next((c for c in ['NOME', 'NOME_AGENTE', 'NOME DO AGENTE'] if c in df_ag.columns), df_ag.columns[1])
+                # Identifica colunas flexíveis de ID e Nome
+                id_col = None
+                nome_col = None
+                for c in df_ag.columns:
+                    if 'NOME' in c: nome_col = c
+                    elif any(x in c for x in ['ID', 'USUARIO', 'EMAIL', 'LOGIN']): id_col = c
+                
+                if not id_col: id_col = df_ag.columns[0]
+                if not nome_col: nome_col = df_ag.columns[1]
                 
                 dict_agentes = dict(zip(df_ag[id_col].astype(str).str.strip().str.lower(), df_ag[nome_col].astype(str).str.strip()))
         except Exception as e:
@@ -297,13 +303,21 @@ def carregar_dados_nuvem():
                     if 'RECEBEDOR'    in df_app.columns: cols_to_extract.append('RECEBEDOR')
                     if 'HORA_STATUS'  in df_app.columns: cols_to_extract.append('HORA_STATUS')
                     
-                    # Identificar coluna de motorista
-                    col_mot = next((c for c in ['MOTORISTA', 'USUARIO', 'AGENTE', 'CONDUTOR', 'NOME_MOTORISTA'] if c in df_app.columns), None)
-                    if col_mot: cols_to_extract.append(col_mot)
+                    # Identificar coluna de motorista (flexível)
+                    col_mot = None
+                    for c in ['MOTORISTA', 'USUARIO', 'EMAIL', 'AGENTE', 'CONDUTOR', 'NOME_MOTORISTA']:
+                        if c in df_app.columns:
+                            col_mot = c
+                            cols_to_extract.append(col_mot)
+                            break
 
                     # Identificar coluna de contato
-                    col_nome = next((c for c in ['DETALHES', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE'] if c in df_app.columns), None)
-                    if col_nome: cols_to_extract.append(col_nome)
+                    col_nome = None
+                    for c in ['DETALHES', 'CONTATO', 'NOME', 'PESSOA', 'INFORMANTE']:
+                        if c in df_app.columns:
+                            col_nome = c
+                            cols_to_extract.append(col_nome)
+                            break
                     
                     cols_to_extract = list(set(cols_to_extract))
                     df_app_clean = df_app[cols_to_extract].copy()
@@ -338,17 +352,15 @@ def carregar_dados_nuvem():
                     rom_mask = df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)
                     rom_dict = df_app_clean[rom_mask].set_index('PEDIDO').to_dict('index')
 
-                    # Removemos duplicatas após mapear os motoristas específicos
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
 
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
 
-                    # Aplicar motoristas mapeados
                     df['MOTORISTA_COLETA_ID'] = df['PEDIDO'].map(mot_coleta_dict).fillna(df['A_MOTORISTA'] if 'A_MOTORISTA' in df.columns else '')
                     df['MOTORISTA_ENTREGA_ID'] = df['PEDIDO'].map(mot_entrega_dict).fillna('')
 
-                    # Tradutor de IDs para Nomes Reais
+                    # Tradutor de IDs para Nomes Reais (Aba Agentes)
                     def traduzir_agente(ag_id):
                         if not ag_id or str(ag_id).upper() == 'NAN': return ""
                         ag_clean = str(ag_id).strip().lower()
@@ -384,10 +396,6 @@ def carregar_dados_nuvem():
                         f_col = get_app_val(r, 'A_FOTO_COL')
                         f_ent = get_app_val(r, 'A_FOTO_ENT')
                         f_gen = get_app_val(r, 'A_FO')
-                        
-                        if not f_col: f_col = str(r.get('FOTO_COLETA', '')).strip()
-                        if not f_ent: f_ent = str(r.get('FOTO_ENTREGA', '')).strip()
-                        if not f_gen: f_gen = str(r.get('FOTO', '')).strip()
                         
                         if f_col and f_col.upper() != 'NAN': return f_col
                         if f_ent and f_ent.upper() != 'NAN': return f_ent
@@ -446,9 +454,7 @@ def carregar_dados_nuvem():
                 df['MOTORISTA_ENTREGA'] = ""
 
             if 'DATA' in df.columns:
-                df['DATA_OBJ'] = pd.to_datetime(
-                    df['DATA'], format='%d/%m/%Y', errors='coerce'
-                ).dt.date
+                df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
             
             return df
 
@@ -470,9 +476,7 @@ def carregar_base_locais():
             df = pd.DataFrame(dados[1:], columns=dados[0])
             return df[df['STATUS'].str.upper() == 'ATIVO']
         return pd.DataFrame()
-        
     except Exception as e:
-        st.warning(f"Erro ao carregar locais: {e}")
         return pd.DataFrame()
 
 def obter_proximo_id(df):
@@ -500,14 +504,13 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
         "Content-Type": "application/json",
         "Client-Token": CLIENT_TOKEN
     }
-    
     try:
         requests.post(url, json=payload, headers=headers)
         return True
-    except Exception:
+    except:
         return False
 
-# ── Session State ──
+# ── Session State (Controle Seguro do Modal) ──
 if 'logado' not in st.session_state:
     if "token_cli" in st.query_params:
         st.session_state.logado = True
@@ -515,22 +518,16 @@ if 'logado' not in st.session_state:
     else:
         st.session_state.logado = False
 
-if 'filtro_kpi' not in st.session_state: 
-    st.session_state.filtro_kpi = "TODOS"
+if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
+if 'linha_clicada' not in st.session_state: st.session_state.linha_clicada = None
+if 'pedido_modal' not in st.session_state: st.session_state.pedido_modal = None
+if 'modal_aberto' not in st.session_state: st.session_state.modal_aberto = False
 
-if 'linha_clicada' not in st.session_state:
-    st.session_state.linha_clicada = None
-
-if 'pedido_modal' not in st.session_state:
-    st.session_state.pedido_modal = None
-
-if 'modal_aberto' not in st.session_state:
-    st.session_state.modal_aberto = False
-
-# ── Helpers de status ──────────────────────────────────
+# =======================================================
+# ⚙️ FUNÇÕES AUXILIARES (AGORA NO LUGAR CERTO!)
+# =======================================================
 def get_st(row):
     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
-
     if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação'
     if 'RECUSA'     in s: return '❌ Solicitação Recusada'
     if 'ENTREGUE'   in s: return '✅ Entregue'
@@ -543,37 +540,6 @@ def get_st(row):
     if 'PROBLEMA'   in s: return '🚨 Problema'
     return '⏳ Pendente'
 
-KPI_DOT_COLOR = {
-    "TODOS":      "#2563eb", 
-    "ENTREGUE":   "#16a34a", 
-    "FRUSTRADA":  "#dc2626", 
-    "COLETADO":   "#0ea5e9", 
-    "PENDENTE":   "#d97706", 
-    "Aguardando": "#475569", 
-    "HOJE":       "#7c3aed", 
-}
-
-KPI_BG_COLOR = {
-    "TODOS":      "#dbeafe", 
-    "ENTREGUE":   "#dcfce7", 
-    "FRUSTRADA":  "#fee2e2", 
-    "COLETADO":   "#e0f2fe", 
-    "PENDENTE":   "#fef3c7", 
-    "Aguardando": "#f1f5f9", 
-    "HOJE":       "#ede9fe", 
-}
-
-KPI_META = [
-    ("TODOS",      "📦 Total",        "kpi_total"),
-    ("ENTREGUE",   "✅ Entregues",    "kpi_entregue"),
-    ("FRUSTRADA",  "❌ Frustradas",   "kpi_frus"),
-    ("COLETADO",   "🚐 Coletados",    "kpi_coletado"), 
-    ("PENDENTE",   "⏳ Pendentes",    "kpi_pend"),
-    ("Aguardando", "🎧 Chamados",     "kpi_aguardando"), 
-    ("HOJE",      "📅 Hoje",         "kpi_hoje"),
-]
-
-# 🔥 A FUNÇÃO QUE HAVIA SIDO CORTADA VOLTOU AQUI 🔥
 def get_detalhes(row):
     obs_master = str(row.get('OBSERVACOES', '')).strip()
     obs_app    = str(row.get('OBS_APP_FINAL', '')).strip()
@@ -642,14 +608,13 @@ def definir_prioridade_portal(status_str):
 
 def tratar_foto(x):
     xs = str(x).strip()
-    if not xs or xs.upper() in ['NAN', 'NONE']:
-        return ""
-    if xs.startswith("http"):
-        return xs
-    return (
-        f"https://www.appsheet.com/template/gettablefileurl"
-        f"?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
-    )
+    if not xs or xs.upper() in ['NAN', 'NONE']: return ""
+    if xs.startswith("http"): return xs
+    return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
+
+KPI_DOT_COLOR = { "TODOS": "#2563eb", "ENTREGUE": "#16a34a", "FRUSTRADA": "#dc2626", "COLETADO": "#0ea5e9", "PENDENTE": "#d97706", "Aguardando": "#475569", "HOJE": "#7c3aed" }
+KPI_BG_COLOR = { "TODOS": "#dbeafe", "ENTREGUE": "#dcfce7", "FRUSTRADA": "#fee2e2", "COLETADO": "#e0f2fe", "PENDENTE": "#fef3c7", "Aguardando": "#f1f5f9", "HOJE": "#ede9fe" }
+KPI_META = [("TODOS", "📦 Total", "kpi_total"), ("ENTREGUE", "✅ Entregues", "kpi_entregue"), ("FRUSTRADA", "❌ Frustradas", "kpi_frus"), ("COLETADO", "🚐 Coletados", "kpi_coletado"), ("PENDENTE", "⏳ Pendentes", "kpi_pend"), ("Aguardando", "🎧 Chamados", "kpi_aguardando"), ("HOJE", "📅 Hoje", "kpi_hoje")]
 
 # =======================================================
 # 🪟 FUNÇÃO DO POP-UP MEGAZORD
@@ -661,12 +626,10 @@ def modal_detalhes_pedido(pedido_data):
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "ATRASADO", "RECUSA"]): cor_etiqueta = "#EF4444"
     if "COLETADO" in status or "ROTA" in status: cor_etiqueta = "#3B82F6"
 
-    # 1. CABEÇALHO
     c_h1, c_h2 = st.columns([3, 1])
     c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
     c_h2.markdown(f"<div style='text-align:center; background:{cor_etiqueta}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>{status}</div>", unsafe_allow_html=True)
     
-    # 2. BARRA DE PROGRESSO (FLAT STRING)
     step = 1
     cor_barra = "#3b82f6" 
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "RECUSA"]):
@@ -689,7 +652,6 @@ def modal_detalhes_pedido(pedido_data):
     )
     st.markdown(html_barra, unsafe_allow_html=True)
 
-    # ENDEREÇO CONCATENADO
     end_rua = str(pedido_data.get('ENDERECO', '')).strip()
     end_num = str(pedido_data.get('NUMERO', '')).strip()
     end_bairro = str(pedido_data.get('BAIRRO', '')).strip()
@@ -702,7 +664,6 @@ def modal_detalhes_pedido(pedido_data):
 
     endereco_completo = ", ".join(partes_end) + f" — {end_cid_uf}" if partes_end else end_cid_uf
 
-    # 🔥 MOTORISTAS DUPLOS 🔥
     mot_coleta = str(pedido_data.get('MOTORISTA_COLETA', '')).strip()
     mot_entrega = str(pedido_data.get('MOTORISTA_ENTREGA', '')).strip()
     if not mot_coleta or mot_coleta.upper() == 'NAN': mot_coleta = 'Equipe IGO'
@@ -713,9 +674,7 @@ def modal_detalhes_pedido(pedido_data):
     else:
         motorista_html = f"<p style='margin:2px 0 12px 0;font-size:14px;font-weight:700;color:#3b82f6;'>🚐 {mot_coleta}</p>"
 
-    # 3. CARDS VISUAIS
     c1, c2 = st.columns(2)
-    
     with c1:
         html_c1 = (
             f"<div style='background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0;height:100%;box-shadow:0 1px 2px rgba(0,0,0,0.02);'>"
@@ -734,7 +693,7 @@ def modal_detalhes_pedido(pedido_data):
     with c2:
         data_efetiva = str(pedido_data.get('DATA_EFETIVA', '---')).replace(" 00:00:00", "").strip()
         
-        # Reconstrói a data se estiver no formato curto da GRID (DD/MM/YY) de volta para o Popup
+        # Reconstrói a data se estiver no formato curto (da GRID) para calcular certo no Popup
         if len(data_efetiva.split('/')) == 3 and len(data_efetiva.split('/')[2]) == 2:
             partes = data_efetiva.split('/')
             data_efetiva = f"{partes[0]}/{partes[1]}/20{partes[2]}"
@@ -791,6 +750,8 @@ def modal_detalhes_pedido(pedido_data):
 
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # 4. JUSTIFICATIVA E FOTO
+    # Usamos o 'DETALHES' gerado pela função que voltou a funcionar!
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
         st.error(f"**⚠️ Motivo da Ocorrência (Justificativa):**\n\n{pedido_data.get('DETALHES', 'Motivo não informado no aplicativo.')}")
     else:
@@ -807,6 +768,7 @@ def modal_detalhes_pedido(pedido_data):
     else:
         st.markdown("📷 *Aguardando anexo do comprovante de coleta.*")
 
+    # Botão de Fechar
     if st.button("Fechar Detalhes", use_container_width=True):
         st.session_state.modal_aberto = False
         st.rerun()
@@ -1093,7 +1055,7 @@ else:
         df_cliente['ETA_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('ETA', 'Em mapeamento'))
         df_cliente['OTD_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('OTD', 'Sem entregas finalizadas'))
         
-        # 🔥 FUNÇÃO RECONECTADA: GET_DETALHES 🔥
+        # 🔥 A FUNÇÃO ESTÁ AQUI NOVAMENTE 🔥
         df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
 
         tab_grid, tab_solicitar, tab_chamados = st.tabs([
@@ -1242,7 +1204,7 @@ else:
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
                     
-                    # 🔥 LUPA NO FINAL 🔥
+                    # 🔥 A LUPA ESTÁ NO FINAL E ÚNICA 🔥
                     df_final['ACAO'] = '🔍 Abrir'
 
                     if 'UF' not in df_final.columns:
@@ -1263,10 +1225,11 @@ else:
                     for col in df_final.columns:
                         df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
+                    # DETALHES RETIRADO DA LISTA VISÍVEL DA GRID (Isso garante que ela fique escondida na tabela e vá apenas para o Pop-up)
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
-                        'COMPROVANTE', 'DETALHES', 'ACAO'
+                        'COMPROVANTE', 'ACAO'
                     ]
 
                     if st.session_state.cliente == "LOGISTICA.LABEST":
@@ -1397,8 +1360,7 @@ else:
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=150)
                     gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
-                    gb.configure_column("DETALHES", header_name="💬 Atualizações")
-                    gb.configure_column("ACAO", header_name=" ", width=100, cellStyle={'cursor': 'pointer', 'color': '#3b82f6', 'font-weight': 'bold'})
+                    gb.configure_column("ACAO", header_name="💬 Atualizações", width=120, cellStyle={'cursor': 'pointer', 'color': '#3b82f6', 'font-weight': 'bold'})
 
                     gridOptions = gb.build()
 
