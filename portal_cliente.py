@@ -28,7 +28,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS do Dashboard (Só será aplicado quando o usuário estiver logado)
+# CSS do Dashboard
 CSS_DASHBOARD = """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -539,9 +539,7 @@ def get_detalhes(row):
     if 'ENTREGUE' in status:
         rec_final = recebedor if recebedor else contato if contato else ""
         dt_str = f" em {dt_curta}" if dt_curta and dt_curta != "-" else ""
-        
         texto_entrega = f"Entregue para {rec_final}{dt_str}" if rec_final else f"Entregue{dt_str}"
-        
         if str_coleta:
             return f"{str_coleta} / {texto_entrega}"
         return texto_entrega
@@ -578,7 +576,6 @@ def get_detalhes(row):
         return f"{obs_final} (Informante: {contato})"
     return obs_final if obs_final else f"Informante: {contato}"
 
-# 🔥 NOVA FUNÇÃO DE PRIORIDADE COM RANKING DE 1 A 7 🔥
 def definir_prioridade_portal(status_str):
     s = str(status_str).upper()
     if 'PENDENTE' in s or 'AGUARDANDO' in s: return 1
@@ -588,7 +585,7 @@ def definir_prioridade_portal(status_str):
     if 'CONFERIDO' in s: return 5
     if 'ROTA DE ENTREGA' in s or 'EM ROTA' in s: return 6
     if 'ENTREGUE' in s: return 7
-    return 8 # Cancelados ou outros
+    return 8 
 
 def tratar_foto(x):
     xs = str(x).strip()
@@ -630,20 +627,22 @@ def modal_detalhes_pedido(pedido_data):
         st.markdown("### 🕒 Linha do Tempo")
         st.markdown(f"**📅 Solicitação:** {pedido_data.get('DATA', '---')}")
         
-        # Limpeza da data (Tirando o 00:00:00 feio)
+        # Limpeza da data
         data_efetiva = str(pedido_data.get('DATA_EFETIVA', '---')).replace(" 00:00:00", "").strip()
         hora_limpa = str(pedido_data.get('HORA_LIMPA', '')).strip()
         hora_str = f" às {hora_limpa}" if hora_limpa else ""
         
-        # A Rastreabilidade Dupla (Coleta e Entrega independentes)
+        # A Rastreabilidade Inteligente (Resolve o conflito de horas do AppSheet)
         if any(x in status for x in ["ENTREGUE", "CONFERIDO"]):
-            st.markdown(f"**📦 Coleta Realizada:** {pedido_data.get('DATA', '---')}{hora_str}")
-            st.markdown(f"**🏁 Entrega Finalizada:** {data_efetiva}")
+            # Como a hora no status Entregue reflete a entrega, deixamos a coleta apenas com a data original
+            st.markdown(f"**📦 Coleta Realizada:** {pedido_data.get('DATA', '---')}")
+            st.markdown(f"**🏁 Entrega Finalizada:** {data_efetiva}{hora_str}")
         elif any(x in status for x in ["COLETADO", "ROTA"]):
+            # Aqui a hora reflete o momento da coleta
             st.markdown(f"**📦 Coleta Realizada:** {pedido_data.get('DATA', '---')}{hora_str}")
             st.markdown(f"**🏁 Entrega Finalizada:** ⏳ *Em trânsito para o destino...*")
         elif any(x in status for x in ["FRUSTRADA", "PROBLEMA"]):
-            st.markdown(f"**❌ Tentativa de Coleta:** {pedido_data.get('DATA', '---')}{hora_str}")
+            st.markdown(f"**❌ Tentativa Registrada:** {data_efetiva}{hora_str}")
         else:
             st.markdown(f"**⏳ Previsão de Coleta (ETA):** `{pedido_data.get('ETA_LAB', 'Em mapeamento')}`")
 
@@ -659,7 +658,7 @@ def modal_detalhes_pedido(pedido_data):
     foto = pedido_data.get('COMPROVANTE', '')
     if foto and str(foto).startswith("http"):
         st.markdown("#### 📸 Comprovante de Campo")
-        f1, f2, f3 = st.columns([1, 2, 1]) # O "2" no meio centraliza e reduz a foto 
+        f1, f2, f3 = st.columns([1, 2, 1]) # O "2" no meio centraliza e reduz a foto
         with f2:
             st.image(foto, use_container_width=True)
     elif any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
@@ -1080,7 +1079,7 @@ else:
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
                     
-                    # 🔥 AQUI ENTRA A COLUNA "AÇÃO" / LUPA (SEM PERDER O COMPROVANTE ORIGINAL) 🔥
+                    # 🔥 A COLUNA "AÇÃO" AGORA SUBSTITUI O COMPROVANTE E OS DETALHES NA GRID 🔥
                     df_final.insert(0, 'ACAO', '🔍 Abrir')
 
                     if 'UF' not in df_final.columns:
@@ -1094,78 +1093,16 @@ else:
                     for col in df_final.columns:
                         df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
+                    # FASE 1 - LIMPEZA: Removemos COMPROVANTE e DETALHES da visualização principal
                     colunas_visiveis = [
                         'ACAO', 'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
-                        'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
-                        'COMPROVANTE', 'DETALHES'
+                        'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY'
                     ]
 
                     if st.session_state.cliente == "LOGISTICA.LABEST":
                         colunas_visiveis.insert(4, 'CNPJ')
 
                     colunas_visiveis = [c for c in colunas_visiveis if c in df_final.columns]
-
-                    # MANTIDO: O SEU EMOJILINKRENDERER INTACTO PARA A COLUNA DE ANEXOS!
-                    link_jscode = JsCode("""
-                    class EmojiLinkRenderer {
-                      init(params) {
-                        this.eGui = document.createElement('div');
-                        this.eGui.style.cssText = 'display: flex; justify-content: center; align-items: center; height: 100%;';
-                        
-                        if (params.value && params.value !== '') {
-                          let a = document.createElement('a');
-                          a.href = params.value;
-                          a.target = '_blank';
-                          a.innerHTML = '📷';
-                          a.title = 'Clique para abrir o anexo completo';
-                          a.style.cssText = 'text-decoration: none; font-size: 20px; transition: transform 0.2s; cursor: pointer;';
-                          
-                          let previewContainer = document.createElement('div');
-                          previewContainer.style.cssText = 'position: fixed; display: none; z-index: 99999; pointer-events: none;';
-                          
-                          let preview = document.createElement('img');
-                          preview.src = params.value;
-                          preview.style.cssText = 'max-width: 350px; max-height: 350px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4); border: 3px solid white; display: block;';
-                          
-                          let timeOverlay = document.createElement('div');
-                          let statusText = params.data && params.data.STATUS_DISPLAY ? params.data.STATUS_DISPLAY : '';
-                          timeOverlay.innerHTML = statusText;
-                          timeOverlay.style.cssText = 'position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.9); color: #fff; padding: 5px 12px; border-radius: 99px; font-family: Inter, sans-serif; font-size: 12px; font-weight: bold; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.3);';
-
-                          previewContainer.appendChild(preview);
-                          if (statusText) { previewContainer.appendChild(timeOverlay); }
-                          document.body.appendChild(previewContainer);
-                          
-                          a.onmouseover = (e) => {
-                            a.style.transform = 'scale(1.3)';
-                            previewContainer.style.display = 'block';
-                            previewContainer.style.left = (e.clientX + 20) + 'px';
-                            previewContainer.style.top = (e.clientY + 20) + 'px';
-                          };
-                          
-                          a.onmousemove = (e) => {
-                            previewContainer.style.left = (e.clientX + 20) + 'px';
-                            previewContainer.style.top = (e.clientY + 20) + 'px';
-                          };
-                          
-                          a.onmouseout = () => {
-                            a.style.transform = 'scale(1)';
-                            previewContainer.style.display = 'none';
-                          };
-
-                          this.eGui.appendChild(a);
-                          this.previewElement = previewContainer; 
-                        }
-                      }
-                      getGui() { return this.eGui; }
-                      
-                      destroy() {
-                        if (this.previewElement && this.previewElement.parentNode) {
-                          this.previewElement.parentNode.removeChild(this.previewElement);
-                        }
-                      }
-                    }
-                    """)
 
                     status_jscode = JsCode("""
                     class StatusBadgeRenderer {
@@ -1212,17 +1149,17 @@ else:
                     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
-                    # 🔥 TIRAMOS O CHECKBOX E LIBERAMOS O CLIQUE INTEIRO NA LINHA 🔥
+                    # Tabela clicável!
                     gb.configure_selection(
                         selection_mode="single", 
                         use_checkbox=False, 
                         suppressRowClickSelection=False
                     )
 
-                    # Estilização da Coluna AÇÃO
-                    gb.configure_column("ACAO", header_name="", width=90, pinned='left', cellStyle={'cursor': 'pointer', 'color': '#3b82f6', 'font-weight': 'bold'})
+                    # A coluna da lupa agora se chama Atualizações
+                    gb.configure_column("ACAO", header_name="💬 Atualizações", width=120, pinned='left', cellStyle={'cursor': 'pointer', 'color': '#3b82f6', 'font-weight': 'bold'})
                     
-                    gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120, pinned='left')
+                    gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
                     gb.configure_column("DATA", header_name="📅 Data Coleta", width=130)
                     gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta")
                     if 'CNPJ' in colunas_visiveis:
@@ -1231,8 +1168,6 @@ else:
                     gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
                     gb.configure_column("DATA_EFETIVA", header_name="🏁 Entrega", width=120)
                     gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=150)
-                    gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=100)
-                    gb.configure_column("DETALHES", header_name="💬 Atualizações")
 
                     gridOptions = gb.build()
 
@@ -1255,7 +1190,7 @@ else:
                         ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
                     }
 
-                    # Renderiza o Grid e escuta a alteração da seleção
+                    # Renderiza o Grid
                     ag_response = AgGrid(
                         df_final[colunas_visiveis],
                         gridOptions=gridOptions,
@@ -1264,10 +1199,10 @@ else:
                         height=550,
                         allow_unsafe_jscode=True,
                         custom_css=custom_css,
-                        update_mode="SELECTION_CHANGED" # A Mágica do gatilho
+                        update_mode="SELECTION_CHANGED"
                     )
                     
-                    # 🔥 GATILHO DO POP-UP MEGAZORD (AO CLICAR NA LINHA) 🔥
+                    # 🔥 GATILHO DO POP-UP MEGAZORD 🔥
                     selected_rows = ag_response.get('selected_rows')
                     if selected_rows is not None and len(selected_rows) > 0:
                         if isinstance(selected_rows, pd.DataFrame):
@@ -1276,7 +1211,7 @@ else:
                             dados_da_linha = selected_rows[0]
                         
                         pedido_atual = dados_da_linha.get('PEDIDO')
-                        # Recuperamos a linha completa (incluindo SLA e ETA)
+                        # Recuperamos a linha completa (incluindo foto e detalhes invisíveis)
                         dados_completos_linha = df_final[df_final['PEDIDO'] == pedido_atual].iloc[0].to_dict()
 
                         if st.session_state.linha_clicada != pedido_atual:
