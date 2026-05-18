@@ -627,29 +627,31 @@ def modal_detalhes_pedido(pedido_data):
         elif "COLETADO" in status or "ROTA DE ENTREGA" in status or "EM ROTA" in status or "CONFERIDO" in status: step = 3
         elif "ENTREGUE" in status: step = 4; cor_barra = "#10b981" 
 
-    st.markdown(f"""
-    <div style="display: flex; justify-content: space-between; position: relative; margin: 15px 0 35px 0;">
-        <div style="position: absolute; top: 12px; left: 0; right: 0; height: 4px; background: #e2e8f0; z-index: 1;"></div>
-        <div style="position: absolute; top: 12px; left: 0; width: {(step-1)*33.3}%; height: 4px; background: {cor_barra}; z-index: 2; transition: width 0.5s;"></div>
-        
-        <div style="z-index: 3; text-align: center; width: 60px;">
-            <div style="width: 28px; height: 28px; background: {cor_barra if step >= 1 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✓</div>
-            <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 1 else '#64748b'};">Pedido</div>
-        </div>
-        <div style="z-index: 3; text-align: center; width: 60px;">
-            <div style="width: 28px; height: 28px; background: {cor_barra if step >= 2 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">{ '!' if step==2 and cor_barra=='#ef4444' else '🚐'}</div>
-            <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 2 else '#64748b'};">Em Rota</div>
-        </div>
-        <div style="z-index: 3; text-align: center; width: 60px;">
-            <div style="width: 28px; height: 28px; background: {cor_barra if step >= 3 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📦</div>
-            <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 3 else '#64748b'};">Coletado</div>
-        </div>
-        <div style="z-index: 3; text-align: center; width: 60px;">
-            <div style="width: 28px; height: 28px; background: {cor_barra if step >= 4 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✅</div>
-            <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 4 else '#64748b'};">Entregue</div>
-        </div>
+    # IMPORTANTE: HTML na margem esquerda para o Streamlit não achar que é bloco de código!
+    html_barra = f"""
+<div style="display: flex; justify-content: space-between; position: relative; margin: 15px 0 35px 0;">
+    <div style="position: absolute; top: 12px; left: 0; right: 0; height: 4px; background: #e2e8f0; z-index: 1;"></div>
+    <div style="position: absolute; top: 12px; left: 0; width: {(step-1)*33.3}%; height: 4px; background: {cor_barra}; z-index: 2; transition: width 0.5s;"></div>
+    
+    <div style="z-index: 3; text-align: center; width: 60px;">
+        <div style="width: 28px; height: 28px; background: {cor_barra if step >= 1 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✓</div>
+        <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 1 else '#64748b'};">Pedido</div>
     </div>
-    """, unsafe_allow_html=True)
+    <div style="z-index: 3; text-align: center; width: 60px;">
+        <div style="width: 28px; height: 28px; background: {cor_barra if step >= 2 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">{ '!' if step==2 and cor_barra=='#ef4444' else '🚐'}</div>
+        <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 2 else '#64748b'};">Em Rota</div>
+    </div>
+    <div style="z-index: 3; text-align: center; width: 60px;">
+        <div style="width: 28px; height: 28px; background: {cor_barra if step >= 3 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📦</div>
+        <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 3 else '#64748b'};">Coletado</div>
+    </div>
+    <div style="z-index: 3; text-align: center; width: 60px;">
+        <div style="width: 28px; height: 28px; background: {cor_barra if step >= 4 else '#e2e8f0'}; color: white; border-radius: 50%; line-height: 28px; margin: 0 auto; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✅</div>
+        <div style="font-size: 11px; margin-top: 5px; font-weight: 600; color: {'#0f172a' if step >= 4 else '#64748b'};">Entregue</div>
+    </div>
+</div>
+"""
+    st.markdown(html_barra, unsafe_allow_html=True)
     
     st.divider()
 
@@ -666,16 +668,17 @@ def modal_detalhes_pedido(pedido_data):
         recebedor = str(pedido_data.get('RECEBEDOR_FINAL', '')).strip()
         agente = str(pedido_data.get('AGENTE_NOME', 'Equipe IGO')).strip()
         
+        # IMPORTANTE: HTML na margem esquerda!
         custodia_html = f"""
-        <div style='font-size: 12px; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 5px;'>
-            <div style='margin-bottom: 4px;'><b>Liberado por:</b> {contato if contato and contato.upper() != 'NAN' else '<i>Não informado</i>'}</div>
-            <div style='color: #94a3b8; font-size: 14px; padding-left: 5px;'>⬇️</div>
-            <div style='margin-bottom: 4px;'><b>Transportado por:</b> {agente}</div>
-        """
+<div style='font-size: 12px; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 5px;'>
+    <div style='margin-bottom: 4px;'><b>Liberado por:</b> {contato if contato and contato.upper() != 'NAN' else '<i>Não informado</i>'}</div>
+    <div style='color: #94a3b8; font-size: 14px; padding-left: 5px;'>⬇️</div>
+    <div style='margin-bottom: 4px;'><b>Transportado por:</b> {agente}</div>
+"""
         if "ENTREGUE" in status or "CONFERIDO" in status:
-            custodia_html += f"<div style='color: #94a3b8; font-size: 14px; padding-left: 5px;'>⬇️</div><div><b>Recebido por:</b> {recebedor if recebedor and recebedor.upper() != 'NAN' else '<i>Não informado</i>'}</div>"
+            custodia_html += f"    <div style='color: #94a3b8; font-size: 14px; padding-left: 5px;'>⬇️</div><div><b>Recebido por:</b> {recebedor if recebedor and recebedor.upper() != 'NAN' else '<i>Não informado</i>'}</div>"
         else:
-            custodia_html += f"<div style='color: #94a3b8; font-size: 14px; padding-left: 5px;'>⬇️</div><div><b>Recebido por:</b> ⏳ <i>Aguardando finalização</i></div>"
+            custodia_html += f"    <div style='color: #94a3b8; font-size: 14px; padding-left: 5px;'>⬇️</div><div><b>Recebido por:</b> ⏳ <i>Aguardando finalização</i></div>"
         
         custodia_html += "</div>"
         st.markdown(custodia_html, unsafe_allow_html=True)
@@ -689,7 +692,7 @@ def modal_detalhes_pedido(pedido_data):
         hora_limpa = str(pedido_data.get('HORA_LIMPA', '')).strip()
         hora_str = f" às {hora_limpa}" if hora_limpa else ""
         
-        # Novo: Data Limite (Previsão de Entrega) 🔥
+        # Data Limite (Previsão de Entrega)
         data_limite = str(pedido_data.get('DATA_LIMITE', '---')).strip()
         if not data_limite or data_limite.upper() == 'NAN': data_limite = "Não definida"
         
@@ -1141,7 +1144,7 @@ else:
                     df_final = df_grid.copy()
                     df_final['COMPROVANTE'] = df_final['FOTO_FINAL'].apply(tratar_foto)
                     
-                    # 🔥 A COLUNA DA LUPA É CRIADA AQUI E VAI PARA O FINAL 🔥
+                    # 🔥 AQUI ENTRA A COLUNA DA LUPA 🔥
                     df_final['ACAO'] = '🔍 Abrir'
 
                     if 'UF' not in df_final.columns:
@@ -1155,7 +1158,6 @@ else:
                     for col in df_final.columns:
                         df_final[col] = df_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
 
-                    # FASE 1: Coluna ACAO no final!
                     colunas_visiveis = [
                         'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
