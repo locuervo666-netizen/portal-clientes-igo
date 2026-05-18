@@ -488,7 +488,7 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
     except Exception:
         return False
 
-# ── Session State (Atualizado com Trava de Memória de Pedido) ──
+# ── Session State (Atualizado com Trava de Memória Segura) ──
 if 'logado' not in st.session_state:
     if "token_cli" in st.query_params:
         st.session_state.logado = True
@@ -632,7 +632,7 @@ def tratar_foto(x):
     )
 
 # =======================================================
-# 🪟 FUNÇÃO DO POP-UP MEGAZORD (BLINDADO)
+# 🪟 FUNÇÃO DO POP-UP MEGAZORD (BLINDADO E CONCATENADO)
 # =======================================================
 @st.dialog("📋 Detalhes da Operação", width="large")
 def modal_detalhes_pedido(pedido_data):
@@ -646,7 +646,7 @@ def modal_detalhes_pedido(pedido_data):
     c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
     c_h2.markdown(f"<div style='text-align:center; background:{cor_etiqueta}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>{status}</div>", unsafe_allow_html=True)
     
-    # 2. BARRA DE PROGRESSO (FLAT STRING)
+    # 2. BARRA DE PROGRESSO (FLAT STRING - SEM QUEBRAS DE LINHA) 🔥
     step = 1
     cor_barra = "#3b82f6" 
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "RECUSA"]):
@@ -685,7 +685,7 @@ def modal_detalhes_pedido(pedido_data):
     else:
         endereco_completo = end_cid_uf
 
-    # 🔥 MOTORISTAS DUPLOS (COLETA E ENTREGA)
+    # 🔥 MOTORISTAS DUPLOS (COLETA E ENTREGA) 🔥
     mot_coleta = str(pedido_data.get('MOTORISTA_COLETA', '')).strip()
     mot_entrega = str(pedido_data.get('MOTORISTA_ENTREGA', '')).strip()
     
@@ -697,7 +697,7 @@ def modal_detalhes_pedido(pedido_data):
     else:
         motorista_html = f"<p style='margin:2px 0 12px 0;font-size:14px;font-weight:700;color:#3b82f6;'>🚐 {mot_coleta}</p>"
 
-    # 3. CARDS VISUAIS (FLAT STRING PARA NÃO QUEBRAR O STREAMLIT)
+    # 3. CARDS VISUAIS (FLAT STRING)
     c1, c2 = st.columns(2)
     
     with c1:
@@ -726,7 +726,7 @@ def modal_detalhes_pedido(pedido_data):
         selo_prazo = ""
         if any(x in status for x in ["ENTREGUE", "CONFERIDO"]) and data_limite != "Não definida" and data_efetiva != "---":
             try:
-                # Usa os mesmos tratamentos de regex aqui no backend para garantir que ano com 2 dígitos calcule certo
+                # Backend que lê até os anos formatados com 2 dígitos sem quebrar!
                 ano_ef = 2000 + int(data_efetiva.split('/')[2]) if len(data_efetiva.split('/')[2]) == 2 else int(data_efetiva.split('/')[2])
                 ano_lim = 2000 + int(data_limite.split('/')[2]) if len(data_limite.split('/')[2]) == 2 else int(data_limite.split('/')[2])
                 dt_ef_obj = datetime(ano_ef, int(data_efetiva.split('/')[1]), int(data_efetiva.split('/')[0])).date()
@@ -784,7 +784,7 @@ def modal_detalhes_pedido(pedido_data):
     else:
         st.markdown("📷 *Aguardando anexo do comprovante de coleta.*")
 
-    # Botão de Fechar 
+    # Botão de Fechar
     if st.button("Fechar Detalhes", use_container_width=True):
         st.session_state.modal_aberto = False
         st.rerun()
@@ -1231,9 +1231,13 @@ else:
                         axis=1
                     )
 
-                    # 🔥 ENCURTANDO O ANO NAS DATAS DA GRID (Ex: 12/05/2026 -> 12/05/26) 🔥
+                    # 🔥 ENCURTANDO O ANO NAS DATAS DA GRID E REMOVENDO HORA DA ENTREGA 🔥
                     for col in ['DATA', 'DATA_EFETIVA', 'DATA_LIMITE']:
                         if col in df_final.columns:
+                            # Se for DATA_EFETIVA, removemos a hora antes de mostrar na Grid
+                            if col == 'DATA_EFETIVA':
+                                df_final[col] = df_final[col].astype(str).apply(lambda x: x.split(' ')[0] if x and str(x).lower() != 'nan' else '')
+                            # Regex que encontra /20XX e transforma em /XX
                             df_final[col] = df_final[col].astype(str).apply(lambda x: re.sub(r'/20(\d{2})(?!\d)', r'/\1', x))
 
                     for col in df_final.columns:
@@ -1362,18 +1366,6 @@ else:
                         suppressRowClickSelection=False,
                         suppressRowDeselection=False 
                     )
-                    
-                    # 🔥 INJEÇÃO DE JS PARA DESMARCAR A LINHA SOZINHA (Resolve o bug de re-clicar na mesma linha) 🔥
-                    js_deselect = JsCode("""
-                    function(e) {
-                        if (e.node.isSelected()) {
-                            setTimeout(function() {
-                                e.api.deselectAll();
-                            }, 250);
-                        }
-                    }
-                    """)
-                    gb.configure_grid_options(onRowSelected=js_deselect)
 
                     gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
                     gb.configure_column("DATA", header_name="📅 Data Coleta", width=130)
@@ -1419,7 +1411,7 @@ else:
                         update_mode="SELECTION_CHANGED"
                     )
                     
-                    # 🔥 CONTROLE BLINDADO DE ABERTURA DO MODAL 🔥
+                    # 🔥 GATILHO DO POP-UP MEGAZORD (COM A TRAVA DE MEMÓRIA SEGURA E NATIVA) 🔥
                     selected_rows = ag_response.get('selected_rows')
                     if selected_rows is not None and len(selected_rows) > 0:
                         if isinstance(selected_rows, pd.DataFrame):
@@ -1429,14 +1421,17 @@ else:
                         
                         pedido_atual = dados_da_linha.get('PEDIDO')
                         
-                        if st.session_state.linha_clicada != pedido_atual:
+                        # Abre o Pop-up se clicar numa linha diferente OU se clicar novamente na mesma após fechar
+                        if st.session_state.pedido_modal != pedido_atual:
                             st.session_state.linha_clicada = pedido_atual
                             st.session_state.pedido_modal = pedido_atual
                             st.session_state.modal_aberto = True
                             st.rerun()
                     else:
-                        st.session_state.linha_clicada = None
+                        # Limpa a memória quando a linha é desselecionada com o segundo clique
+                        st.session_state.pedido_modal = None
 
+                    # Abre o Modal se a flag for verdadeira
                     if st.session_state.modal_aberto and st.session_state.pedido_modal:
                         dados_completos_linha = df_final[df_final['PEDIDO'] == st.session_state.pedido_modal].iloc[0].to_dict()
                         modal_detalhes_pedido(dados_completos_linha)
