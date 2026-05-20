@@ -55,6 +55,12 @@ CSS_DASHBOARD = """
         border-radius: 12px !important;
         padding: 15px !important;
     }
+    [data-testid="stSidebar"] section > div {
+        background-color: #f8fafc !important;
+        border-radius: 12px !important;
+        padding: 14px !important;
+        margin-bottom: 10px !important;
+    }
     [data-testid="stSidebar"] [data-testid="stForm"] input,
     [data-testid="stSidebar"] [data-testid="stForm"] textarea {
         background-color: #ffffff !important;
@@ -173,6 +179,62 @@ CSS_DASHBOARD = """
         background: #f1f5f9;
         border-radius: 99px;
         overflow: hidden;
+    }
+
+    /* ── PROGRESS BLOCK SIDEBAR ── */
+    .progress-block-sidebar {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 2px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 16px;
+        margin: 12px 0;
+        overflow: hidden;
+        position: relative;
+    }
+    .progress-block-sidebar::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        background: linear-gradient(90deg, #22c55e, #86efac);
+        border-radius: 12px;
+        transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        opacity: 0.15;
+        z-index: 1;
+    }
+    .progress-block-sidebar-content {
+        position: relative;
+        z-index: 2;
+    }
+    .progress-title-sidebar {
+        font-size: 13px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .progress-number-sidebar {
+        font-size: 32px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 6px 0;
+    }
+    .progress-bar-fill {
+        height: 6px;
+        border-radius: 99px;
+        transition: width 0.6s ease;
+    }
+    .progress-text-sidebar {
+        font-size: 12px;
+        color: #64748b;
+        font-weight: 500;
+        margin-bottom: 4px;
     }
     </style>
 """
@@ -522,6 +584,10 @@ if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 if 'linha_clicada' not in st.session_state: st.session_state.linha_clicada = None
 if 'pedido_modal' not in st.session_state: st.session_state.pedido_modal = None
 if 'modal_aberto' not in st.session_state: st.session_state.modal_aberto = False
+if 'modal_fechado' not in st.session_state: st.session_state.modal_fechado = False
+if 'modal_renderizado_antes' not in st.session_state: st.session_state.modal_renderizado_antes = False
+if 'modal_foi_renderizado' not in st.session_state: st.session_state.modal_foi_renderizado = False
+if 'ignorar_selecao_grid' not in st.session_state: st.session_state.ignorar_selecao_grid = False
 
 # =======================================================
 # ⚙️ FUNÇÕES AUXILIARES (AGORA NO LUGAR CERTO!)
@@ -771,6 +837,11 @@ def modal_detalhes_pedido(pedido_data):
     # Botão de Fechar
     if st.button("Fechar Detalhes", use_container_width=True):
         st.session_state.modal_aberto = False
+        st.session_state.pedido_modal = None
+        st.session_state.linha_clicada = None
+        st.session_state.modal_fechado = True  # Flag para ignorar a próxima seleção
+        st.session_state.ignorar_selecao_grid = True  # Ignora seleção da grid nos próximos frames
+        st.session_state.grid_key = st.session_state.get('grid_key', 0) + 1 # Força a tabela a piscar e esquecer
         st.rerun()
 
 
@@ -1157,20 +1228,30 @@ else:
                     n_fim = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Recusada|Coletado', case=False)])
                     n_tot  = len(df_h)
                     pct    = round((n_fim / n_tot) * 100) if n_tot else 0
+                else:
+                    n_fim = 0
+                    n_tot = 0
+                    pct = 0
 
-                    st.markdown(f"""
-                        <div class="progress-block">
-                            <div class="progress-header">
-                                <span class="progress-title">🎯 Progresso de Hoje</span>
-                                <span class="progress-pct">{pct}% concluído — {n_fim} de {n_tot} pedidos</span>
-                            </div>
+                if pct >= 80:
+                    bar_color = '#22c55e'
+                elif pct >= 50:
+                    bar_color = '#f59e0b'
+                else:
+                    bar_color = '#ef4444'
+
+                st.sidebar.markdown(f"""
+                    <div class="progress-block-sidebar">
+                        <div class="progress-block-sidebar-content">
+                            <div class="progress-title-sidebar">🎯 Progresso de Hoje</div>
+                            <div class="progress-number-sidebar">{pct}%</div>
+                            <div class="progress-text-sidebar">{n_fim} de {n_tot} pedidos concluídos hoje</div>
                             <div class="progress-bar-bg">
-                                <div style="height:6px;width:{pct}%;background:#22c55e; border-radius:99px;transition:width 0.6s ease;"></div>
+                                <div class="progress-bar-fill" style="width:{pct}%;background:{bar_color};"></div>
                             </div>
                         </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.info("Nenhum pedido despachado para hoje.")
+                    </div>
+                """, unsafe_allow_html=True)
 
                 col_busca, col_export = st.columns([5, 1])
                 with col_busca:
@@ -1227,7 +1308,7 @@ else:
 
                     # DETALHES RETIRADO DA LISTA VISÍVEL DA GRID (Isso garante que ela fique escondida na tabela e vá apenas para o Pop-up)
                     colunas_visiveis = [
-                        'PEDIDO', 'DATA', 'LABORATORIO', 'CIDADE_UF',
+                        'DATA', 'PEDIDO', 'LABORATORIO', 'BAIRRO', 'CIDADE_UF',
                         'DATA_LIMITE', 'DATA_EFETIVA', 'STATUS_DISPLAY',
                         'COMPROVANTE', 'ACAO'
                     ]
@@ -1347,12 +1428,17 @@ else:
                         selection_mode="single", 
                         use_checkbox=False, 
                         suppressRowClickSelection=False,
-                        suppressRowDeselection=False 
+                        suppressRowDeselection=True # Impede bugs
                     )
+
+                    # Chave dinâmica para limpar a grid ao fechar a foto
+                    if 'grid_key' not in st.session_state:
+                        st.session_state.grid_key = 0
 
                     gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
                     gb.configure_column("DATA", header_name="📅 Data Coleta", width=130)
                     gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta")
+                    gb.configure_column("BAIRRO", header_name="🏘️ Bairro")
                     if 'CNPJ' in colunas_visiveis:
                         gb.configure_column("CNPJ", header_name="🏢 CNPJ")
                     gb.configure_column("CIDADE_UF", header_name="📍 Cidade / UF")
@@ -1383,6 +1469,16 @@ else:
                         ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
                     }
 
+                    # 🔒 DETECTA FECHAMENTO DO MODAL POR X OU ESC (ANTES de renderizar a grid)
+                    # Se o modal estava aberto antes, mas agora não deveria ser renderizado, significa que foi fechado por outro meio
+                    if st.session_state.modal_renderizado_antes and not (st.session_state.modal_aberto and st.session_state.pedido_modal):
+                        st.session_state.modal_fechado = True
+                        st.session_state.pedido_modal = None
+                        st.session_state.linha_clicada = None
+                        st.session_state.ignorar_selecao_grid = True  # Ignora a seleção que está na grid
+                        st.session_state.modal_renderizado_antes = False
+                        st.rerun()  # Força rerun para aplicar a flag ANTES de renderizar a grid
+
                     ag_response = AgGrid(
                         df_final[colunas_visiveis],
                         gridOptions=gridOptions,
@@ -1391,13 +1487,22 @@ else:
                         height=550,
                         allow_unsafe_jscode=True,
                         custom_css=custom_css,
-                        update_mode="SELECTION_CHANGED"
+                        update_mode="SELECTION_CHANGED",
+                        key=f"grid_portal_{st.session_state.grid_key}"
                     )
                     
                     # 🔥 CONTROLE BLINDADO DE SELEÇÃO E MODAL 🔥
                     selected_rows = ag_response.get('selected_rows')
                     
-                    if selected_rows is not None and len(selected_rows) > 0:
+                    # Se acabamos de fechar o modal, ignora qualquer seleção anterior na grid
+                    if st.session_state.ignorar_selecao_grid:
+                        st.session_state.ignorar_selecao_grid = False
+                        selected_rows = None  # Força a grid a não ter seleção
+                    
+                    # Se o modal foi fechado recentemente, ignora a seleção anterior e desativa a flag
+                    if st.session_state.modal_fechado:
+                        st.session_state.modal_fechado = False
+                    elif selected_rows is not None and len(selected_rows) > 0:
                         if isinstance(selected_rows, pd.DataFrame):
                             dados_da_linha = selected_rows.iloc[0].to_dict()
                         else:
@@ -1421,6 +1526,7 @@ else:
                     if st.session_state.modal_aberto and st.session_state.pedido_modal:
                         # Sempre buscar na df_final inteira, pois a grid omite dados do dicionário
                         dados_completos_linha = df_final[df_final['PEDIDO'] == st.session_state.pedido_modal].iloc[0].to_dict()
+                        st.session_state.modal_renderizado_antes = True  # Marca que o modal foi renderizado
                         modal_detalhes_pedido(dados_completos_linha)
 
 
