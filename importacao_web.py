@@ -547,6 +547,89 @@ def calc_status_display(row):
             if datetime.strptime(previsao, "%d/%m/%Y").date() < hoje_br: res = f"{res} ⚠️ ATRASADO"
         except: pass
     return res
+# =============================================================================
+# 🪟 FUNÇÃO DO POP-UP DE DETALHES (MEGAZORD CCO)
+# =============================================================================
+@st.dialog("📋 Detalhes da Operação", width="large")
+def modal_detalhes_pedido(pedido_data):
+    status = str(pedido_data.get('STATUS_DISPLAY', '')).upper()
+    cor_etiqueta = "#10B981" if "ENTREGUE" in status else "#F59E0B"
+    if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "ATRASADO", "RECUSA"]): cor_etiqueta = "#EF4444"
+    if "COLETADO" in status or "ROTA" in status: cor_etiqueta = "#3B82F6"
+
+    c_h1, c_h2 = st.columns([3, 1])
+    c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
+    c_h2.markdown(f"<div style='text-align:center; background:{cor_etiqueta}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>{status}</div>", unsafe_allow_html=True)
+    
+    step = 1
+    cor_barra = "#3b82f6" 
+    if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "RECUSA"]):
+        cor_barra = "#ef4444" 
+        if "ROTA DE COLETA" in status or "COLETADO" in status: step = 2
+    else:
+        if "ROTA DE COLETA" in status: step = 2
+        elif "COLETADO" in status or "ROTA DE ENTREGA" in status or "EM ROTA" in status or "CONFERIDO" in status: step = 3
+        elif "ENTREGUE" in status: step = 4; cor_barra = "#10b981" 
+
+    html_barra = (
+        f"<div style='display:flex;justify-content:space-between;position:relative;margin:15px 0 35px 0;'>"
+        f"<div style='position:absolute;top:12px;left:0;right:0;height:4px;background:#e2e8f0;z-index:1;'></div>"
+        f"<div style='position:absolute;top:12px;left:0;width:{(step-1)*33.3}%;height:4px;background:{cor_barra};z-index:2;transition:width 0.5s;'></div>"
+        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 1 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>✓</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 1 else '#64748b'};'>Pedido</div></div>"
+        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 2 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>{'!' if step==2 and cor_barra=='#ef4444' else '🚐'}</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 2 else '#64748b'};'>Em Rota</div></div>"
+        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 3 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>📦</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 3 else '#64748b'};'>Coletado</div></div>"
+        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 4 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>✅</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 4 else '#64748b'};'>Entregue</div></div>"
+        f"</div>"
+    )
+    st.markdown(html_barra, unsafe_allow_html=True)
+
+    endereco_completo = f"{pedido_data.get('ENDERECO', '')}, nº {pedido_data.get('NUMERO', '')}, {pedido_data.get('BAIRRO', '')} — {pedido_data.get('CIDADE', '')}/{pedido_data.get('UF', '')}"
+    agente_nome = str(pedido_data.get('AGENTE_RAW', 'Equipe IGO')).split('|')[0].upper()
+
+    c1, c2 = st.columns(2)
+    with c1:
+        html_c1 = (
+            f"<div style='background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0;height:100%;'>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>🏢 Tomador / Ponto de Coleta</p>"
+            f"<p style='margin:2px 0 12px 0;font-size:15px;font-weight:700;color:#0f172a;'>{pedido_data.get('TOMADOR', '')} <br><span style='font-size:13px; font-weight:500; color:#475569;'>{pedido_data.get('LABORATORIO', 'N/A')}</span></p>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>📍 Endereço Completo</p>"
+            f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>{endereco_completo}</p>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>👤 Motorista da Operação</p>"
+            f"<p style='margin:2px 0 12px 0;font-size:14px;font-weight:700;color:#3b82f6;'>🚐 {agente_nome}</p>"
+            f"</div>"
+        )
+        st.markdown(html_c1, unsafe_allow_html=True)
+        
+    with c2:
+        data_efetiva = str(pedido_data.get('DATA_ENTREGA', '---')).strip()
+        data_limite = str(pedido_data.get('DATA_LIMITE', '---')).strip()
+
+        html_c2 = (
+            f"<div style='background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0;height:100%;'>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>📅 Solicitação Criada Em</p>"
+            f"<p style='margin:2px 0 12px 0;font-size:14px;color:#334155;'>{pedido_data.get('DATA', '---')}</p>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>🕒 Status da Operação</p>"
+            f"<p style='margin:2px 0 12px 0;font-size:14px;color:#334155;'>✅ Baixa Efetiva: <b>{data_efetiva if data_efetiva else 'Pendente'}</b></p>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>🏁 Prazo Acordado</p>"
+            f"<p style='margin:2px 0 0 0;font-size:13px;color:#334155;'>🎯 Previsão Limite: {data_limite}</p>"
+            f"</div>"
+        )
+        st.markdown(html_c2, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.info(f"**💬 Atualizações e Observações do Agente:**\n\n{pedido_data.get('DETALHES', 'Nenhuma observação.')}")
+
+    foto = pedido_data.get('FOTO_URL', '')
+    if foto and str(foto).startswith("http"):
+        st.markdown("#### 📸 Comprovante de Campo")
+        f1, f2, f3 = st.columns([1, 2, 1]) 
+        with f2:
+            st.image(foto, use_container_width=True)
+
+    if st.button("Fechar Detalhes", use_container_width=True):
+        st.session_state.modal_aberto = False
+        st.session_state.pedido_modal = None
+        st.rerun()
 
 def tratar_texto_global(texto):
     if pd.isna(texto): return ""
@@ -1026,7 +1109,9 @@ if menu == "📊 GRID":
         dict_nomes_grid = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows() if str(r.get('LOGIN DO AGENTE', '')).strip()}
         df_grid['AGENTE_NOME'] = df_grid['AGENTE_RAW'].apply(lambda x: dict_nomes_grid.get(str(x).strip().lower(), str(x).upper()) if str(x).strip() else "")
 
-        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'DETALHES', 'AGENTE_NOME', 'AGENTE_RAW']
+        # ADICIONAMOS A COLUNA 'ACAO' AQUI PARA PADRONIZAR COM O PORTAL DO CLIENTE
+        df_grid['ACAO'] = '🔍 Detalhes'
+        colunas_mostrar = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'DATA_LIMITE', 'DATA_ENTREGA', 'COMPROVANTE', 'AGENTE_NOME', 'AGENTE_RAW', 'DETALHES']
         
         df_grid_final = df_grid[[c for c in colunas_mostrar if c in df_grid.columns]].dropna(subset=['PEDIDO'])
             
@@ -1034,13 +1119,20 @@ if menu == "📊 GRID":
         for col in df_grid_final.columns: df_grid_final[col] = df_grid_final[col].astype(str).replace(["nan", "NaN", "None", "none", "<NA>", "NaT"], "")
          
         df_grid_final['COMPROVANTE'] = df_grid_final['COMPROVANTE'].apply(lambda x: x if str(x).startswith("http") else "")
+        
+        # 🔥 VISUAL OTIMIZADO: DATAS CURTAS MANTIDAS 🔥
+        for col in ['DATA', 'DATA_LIMITE', 'DATA_ENTREGA']:
+            if col in df_grid_final.columns:
+                df_grid_final[col] = df_grid_final[col].astype(str).apply(lambda x: x.split(' ')[0] if x and str(x).lower() != 'nan' else '')
+                df_grid_final[col] = df_grid_final[col].astype(str).apply(lambda x: re.sub(r'/20(\d{2})(?!\d)', r'/\1', x))
+        
         df_grid_final = df_grid_final.reset_index(drop=True)
-        # 🔥 Removido o insert("SELECIONAR") pois o AgGrid faz isso nativamente 🔥
 
-        st.markdown(f"<p style='color:#64748B; font-size:13px; margin-bottom: 5px;'>Selecione as caixinhas na tabela para liberar os botões de ação. Passe o mouse na 📷 para abrir a foto original.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#64748B; font-size:13px; margin-bottom: 5px;'>Selecione as caixas na tabela para libertar as ações no topo. Marque a caixa e use o botão 'Ver Detalhes' para abrir o pop-up da linha.</p>", unsafe_allow_html=True)
+        
         box_botoes = st.empty()
+        st.markdown("<br>", unsafe_allow_html=True)
 
-        # 🔥 MAGIA VISUAL: FOTO AO PASSAR O RATO 🔥
         link_jscode = JsCode("""
         class EmojiLinkRenderer {
           init(params) {
@@ -1094,7 +1186,6 @@ if menu == "📊 GRID":
         }
         """)
 
-        # 🔥 MAGIA VISUAL: SELOS DE STATUS 🔥
         status_jscode = JsCode("""
         class StatusBadgeRenderer {
           init(params) {
@@ -1122,22 +1213,23 @@ if menu == "📊 GRID":
         gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
         gb.configure_default_column(resizable=True, filterable=True, sortable=True)
         
-        # Ativa caixas de seleção
-        gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
+        gb.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True, suppressRowClickSelection=True)
         
-        gb.configure_column("DATA", header_name="📅 Data", width=110)
-        gb.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
-        gb.configure_column("TOMADOR", header_name="🏢 Tomador", width=150)
-        gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta", width=250)
-        gb.configure_column("CIDADE", header_name="📍 Cidade", width=150)
-        gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=170)
-        gb.configure_column("AGENTE_NOME", header_name="👤 Motorista", width=150)
+        gb.configure_column("DATA", header_name="📅 Data", width=100)
+        gb.configure_column("PEDIDO", header_name="📦 Pedido", width=100)
+        gb.configure_column("TOMADOR", header_name="🏢 Tomador", width=140)
+        gb.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta", width=220)
+        gb.configure_column("CIDADE", header_name="📍 Cidade", width=140)
+        gb.configure_column("STATUS_DISPLAY", header_name="🚦 Status", cellRenderer=status_jscode, width=160)
+        gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=100)
+        gb.configure_column("DATA_ENTREGA", header_name="🏁 Entrega", width=100)
+        gb.configure_column("COMPROVANTE", header_name="📎 Anexo", cellRenderer=link_jscode, width=90)
+        gb.configure_column("AGENTE_NOME", header_name="👤 Motorista", width=130)
         gb.configure_column("AGENTE_RAW", hide=True) 
-        gb.configure_column("DATA_ENTREGA", header_name="🏁 Entrega", width=120)
-        gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=120)
-        gb.configure_column("COMPROVANTE", header_name="📎 Foto", cellRenderer=link_jscode, width=90)
-        gb.configure_column("DETALHES", header_name="💬 Atualizações / Motivo", width=250)
-
+        
+        # 🔥 COLUNA DE ATUALIZAÇÕES RESTAURADA COM TEXTO ORIGINAL 🔥
+        gb.configure_column("DETALHES", header_name="💬 Atualizações", width=250) 
+        
         gridOptions = gb.build()
 
         custom_css = {
@@ -1160,7 +1252,6 @@ if menu == "📊 GRID":
             update_mode="SELECTION_CHANGED"
         )
 
-        # 🔥 CONVERTE A SELEÇÃO DO AGGRID PARA SEUS BOTÕES 🔥
         sel_list = tabela_renderizada.get('selected_rows', [])
         if sel_list is not None and len(sel_list) > 0:
             linhas_selecionadas = pd.DataFrame(sel_list)
@@ -1170,10 +1261,20 @@ if menu == "📊 GRID":
         p_ids = linhas_selecionadas["PEDIDO"].astype(str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
 
+        # 🔥 PREENCHENDO A BARRA DE AÇÕES NO TOPO DA TELA 🔥
         with box_botoes.container():
-            col_b1, col_b2, col_b3, col_b4, col_b5, col_b6, col_b7 = st.columns(7)
+            col_b0, col_b1, col_b2, col_b3, col_b4, col_b5, col_b6, col_b7 = st.columns(8)
             
-            with col_b1.popover("🛎️ Cobrar Agente", use_container_width=True):
+            with col_b0:
+                # O BOTÃO AGORA ABRE A TELA DIRETAMENTE, SEM USAR A MEMÓRIA DO SISTEMA
+                if st.button("🔍 Ver Detalhes", use_container_width=True, type="primary"):
+                    if not tem_sel or len(p_ids) > 1:
+                        st.warning("Selecione apenas 1 pedido na caixinha para ver os detalhes!")
+                    else:
+                        linha_dict = df_raw[df_raw['PEDIDO'] == p_ids[0]].iloc[0].to_dict()
+                        modal_detalhes_pedido(linha_dict)
+
+            with col_b1.popover("🛎️ Cobrar", use_container_width=True):
                 if not tem_sel: st.warning("Selecione um pedido!")
                 else:
                     with st.form("form_cobrar_grid"):
@@ -1187,12 +1288,12 @@ if menu == "📊 GRID":
                                     tel = tel_row.iloc[0]['TELEFONE']
                                     nome = tel_row.iloc[0]['NOME DO AGENTE']
                                     qtd_ag = len(linhas_selecionadas[linhas_selecionadas['AGENTE_RAW'] == ag])
-                                    msg_ind = f"Olá {nome}, a IGO Logística informa que você possui {qtd_ag} pedidos pendentes na rota de hoje. Lembre-se de dar baixa. Bom trabalho!"
+                                    msg_ind = f"Olá {nome}, a IGO Logística informa que possui {qtd_ag} pedidos pendentes na rota de hoje. Lembre-se de dar baixa. Bom trabalho!"
                                     if enviar_whatsapp_zapi(tel, msg_ind): st.success(f"Enviado para {nome}!")
                                     else: st.error(f"Erro ao enviar para {nome}")
                                 else: st.error(f"Telefone do agente {login_ag} não encontrado.")
 
-            with col_b2.popover("📲 Baixa Manual", use_container_width=True):
+            with col_b2.popover("📲 Baixa", use_container_width=True):
                 if not tem_sel: st.warning("Selecione um pedido!")
                 else:
                     with st.form("form_baixa_manual"):
@@ -1205,13 +1306,12 @@ if menu == "📊 GRID":
                             senha_reversao = st.text_input("🔑 Senha:", type="password")
                         
                         if st.form_submit_button("Confirmar Nova Baixa", type="primary", use_container_width=True):
-                            with st.spinner("Atualizando C.C.O. e limpando o App do Motorista..."):
+                            with st.spinner("A atualizar C.C.O. e a limpar a App do Motorista..."):
                                 status_limpo = status_baixa.split(" ")[0].upper()
                                 if tem_entregue and status_limpo != 'ENTREGUE' and senha_reversao != '123': 
                                     st.error("❌ Senha incorreta!")
                                 else:
                                     try:
-                                        # 1. ATUALIZA A MEMÓRIA OFICIAL (C.C.O)
                                         aba = planilha_db.worksheet("Memoria_Sistema")
                                         df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
                                         for pid in p_ids:
@@ -1226,13 +1326,11 @@ if menu == "📊 GRID":
                                         aba.clear()
                                         aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                         
-                                        # 2. ESPELHA NO APP DO MOTORISTA E FAXINA DUPLICATAS
                                         try:
                                             aba_app = planilha_db.worksheet("App_Tarefas")
                                             dados_app = aba_app.get_all_values()
                                             if len(dados_app) > 1:
                                                 df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
-                                                
                                                 for pid in p_ids:
                                                     mask_app = df_app['PEDIDO'] == pid
                                                     if mask_app.any():
@@ -1240,22 +1338,20 @@ if menu == "📊 GRID":
                                                         if status_limpo == "ENTREGUE" and 'DATA_ENTREGA' in df_app.columns:
                                                             df_app.loc[mask_app, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y %H:%M:%S")
                                                 
-                                                # Remove o "lixo" duplicado que confunde o AppSheet
                                                 if 'PEDIDO' in df_app.columns:
                                                     df_app = df_app.drop_duplicates(subset=['PEDIDO'], keep='last')
                                                     
                                                 aba_app.clear()
                                                 aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
-                                        except Exception as e_app:
-                                            # Se der erro no app, ignora silenciosamente para não travar a baixa do CCO
+                                        except Exception:
                                             pass
                                             
-                                        st.success("🎉 Atualizado no CCO e App sincronizado!")
+                                        st.success("🎉 Atualizado no CCO e App sincronizada!")
                                         time.sleep(1); carregar_dados_completos.clear(); st.rerun()
                                     except Exception as e: 
                                         st.error(f"Erro: {e}")
 
-            with col_b3.popover("🔄 Trocar Agente", use_container_width=True):
+            with col_b3.popover("🔄 Trocar", use_container_width=True):
                 if not tem_sel: st.warning("Selecione um pedido!")
                 else:
                     with st.form("form_troca_motorista"):
@@ -1266,7 +1362,7 @@ if menu == "📊 GRID":
                             novo_mot = st.selectbox("Novo Agente:", logins_disp)
                             nova_data_troca = st.date_input("Nova Data:", format="DD/MM/YYYY", value=hoje_br)
                             if st.form_submit_button("Confirmar Troca", type="primary", use_container_width=True):
-                                with st.spinner("Atualizando rotas e motoristas..."):
+                                with st.spinner("A atualizar rotas e motoristas..."):
                                     try:
                                         aba = planilha_db.worksheet("Memoria_Sistema")
                                         df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
@@ -1276,18 +1372,18 @@ if menu == "📊 GRID":
                                             mask = df_nuvem['PEDIDO'] == pid
                                             if mask.any():
                                                 df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
-                                                # 🔥 CORREÇÃO: A linha que forçava o status "PENDENTE" foi removida. O status original é preservado! 🔥
                                                 df_nuvem.loc[mask, 'ZAP_ENVIADO'] = "" 
                                                 l_app = df_nuvem[mask].iloc[0]
                                                 lista_app_troca.append({'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO',''), 'NUMERO': l_app.get('NUMERO',''), 'BAIRRO': l_app.get('BAIRRO',''), 'CIDADE': l_app.get('CIDADE',''), 'CEP': l_app.get('CEP',''), 'LABORATORIO': l_app.get('LABORATORIO',''), 'TOMADOR': l_app.get('TOMADOR','')})
                                         aba.clear()
                                         aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                         if lista_app_troca: despachar_para_appsheet(lista_app_troca)
-                                        st.success("🎉 Troca realizada preservando o status original!")
+                                        st.success("🎉 Troca realizada preservando o estado original!")
                                         time.sleep(1.5); carregar_dados_completos.clear(); st.rerun()
-                                    except Exception as e: st.error(f"Erro: {e}")
+                                    except Exception as e: 
+                                        st.error(f"Erro: {e}")
 
-            with col_b4.popover("👯 Clonar Pedidos", use_container_width=True):
+            with col_b4.popover("👯 Clonar", use_container_width=True):
                 if not tem_sel: st.warning("Selecione um pedido!")
                 else:
                     with st.form("form_clonar_pedido"):
@@ -1295,14 +1391,13 @@ if menu == "📊 GRID":
                         logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                         clone_mot = st.selectbox("Agente Designado:", ["Manter Original"] + logins_disp)
                         if st.form_submit_button("Confirmar Clone", type="primary"):
-                            with st.spinner("👯 Clonando pedidos e roteirizando..."):
+                            with st.spinner("👯 A clonar pedidos e organizar rotas..."):
                                 try:
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
                                     if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
                                     
                                     prox_id = obter_proximo_id(df_nuvem)
-                                    
                                     clones_app = []
                                     for pid in p_ids:
                                         if pid in df_nuvem['PEDIDO'].values:
@@ -1310,7 +1405,6 @@ if menu == "📊 GRID":
                                             novo_id = str(prox_id); prox_id += 1
                                             l_orig['PEDIDO'] = novo_id; l_orig['DATA'] = clone_data.strftime("%d/%m/%Y")
                                             
-                                            # 🔥 CORREÇÃO AQUI: Agora o clone nasce sem fatura! 🔥
                                             l_orig['STATUS'] = "PENDENTE"; l_orig['DATA_ENTREGA'] = ""; l_orig['FOTO'] = ""; l_orig['ROMANEIO'] = ""; l_orig['ZAP_ENVIADO'] = ""; l_orig['FATURA'] = ""
                                             
                                             if clone_mot != "Manter Original": l_orig['AGENTE_RAW'] = clone_mot
@@ -1324,7 +1418,8 @@ if menu == "📊 GRID":
                                     aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     if clones_app: despachar_para_appsheet(clones_app)
                                     st.success("🎉 Clonado!"); time.sleep(1); carregar_dados_completos.clear(); st.rerun()
-                                except Exception as e: st.error(f"Erro: {e}")
+                                except Exception as e: 
+                                    st.error(f"Erro: {e}")
 
             with col_b5.popover("🗑️ Excluir", use_container_width=True):
                 if not tem_sel: st.warning("Selecione um pedido!")
@@ -1333,7 +1428,7 @@ if menu == "📊 GRID":
                         senha_del = st.text_input("🔑 Senha Master:", type="password")
                         if st.form_submit_button("Confirmar Exclusão"):
                             if senha_del == "123":
-                                with st.spinner("Apagando registros do banco..."):
+                                with st.spinner("A apagar registos da base de dados..."):
                                     try:
                                         aba = planilha_db.worksheet("Memoria_Sistema")
                                         df_nuvem = pd.DataFrame(aba.get_all_values()[1:], columns=aba.get_all_values()[0])
@@ -1348,9 +1443,10 @@ if menu == "📊 GRID":
                                             aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
                                         except Exception: pass 
                                         st.success("🗑️ Apagado!"); time.sleep(1); carregar_dados_completos.clear(); st.rerun()
-                                    except Exception as e: st.error(f"Erro: {e}")
+                                    except Exception as e: 
+                                        st.error(f"Erro: {e}")
 
-            with col_b6.popover("📱 Enviar WhatsApp", use_container_width=True):
+            with col_b6.popover("📱 Zap Rota", use_container_width=True):
                 if not tem_sel: st.warning("Selecione os pedidos na tabela!")
                 else:
                     entregues_mask = linhas_selecionadas['STATUS_DISPLAY'].str.contains('Entregue', case=False, na=False)
@@ -1369,10 +1465,9 @@ if menu == "📊 GRID":
                                 sucessos = 0
                                 agentes_selecionados = df_raw_pendentes['AGENTE_RAW'].dropna().unique()
                                 
-                                # 🔥 NOVO: AVISOS DE ERRO CLAROS (Sem pulos silenciosos) 🔥
                                 sem_agente = df_raw_pendentes[df_raw_pendentes['AGENTE_RAW'].astype(str).str.strip() == ""]
                                 if not sem_agente.empty:
-                                    st.warning(f"⚠️ {len(sem_agente)} pedido(s) selecionado(s) não foram enviados porque estão sem Motorista atrelado. Use o botão 'Trocar Agente' para resolver e tente novamente.")
+                                    st.warning(f"⚠️ {len(sem_agente)} pedido(s) selecionado(s) não foram enviados porque não têm Motorista atribuído.")
                                 
                                 agentes_validos = [ag for ag in agentes_selecionados if str(ag).strip()]
                                 
@@ -1387,12 +1482,14 @@ if menu == "📊 GRID":
                                         ag_login = str(ag).strip().lower()
                                         
                                         if not tel:
-                                            st.error(f"🚨 O motorista '{nom}' não possui um telefone cadastrado válido na aba de Rotas. Envio ignorado.")
+                                            st.error(f"🚨 O motorista '{nom}' não possui um telefone válido registado.")
                                             continue
                                             
-                                        status_text.markdown(f"**Enviando rota para:** {nom} ({idx_ag+1}/{len(agentes_validos)})...")
+                                        status_text.markdown(f"**A enviar rota para:** {nom} ({idx_ag+1}/{len(agentes_validos)})...")
                                         data_str = hoje_br.strftime('%d/%m/%Y')
-                                        msg_parts = [f"Bom dia, {nom}", f"🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
+                                        
+                                        saudacao, fechamento = gerar_saudacao_spintax(nom)
+                                        msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE                  | QTD", "-------------------------------"]
                                         cid_counts = df_ag['CIDADE'].value_counts()
                                         tot_qtd = 0
                                         for cid, count in cid_counts.items():
@@ -1407,16 +1504,25 @@ if menu == "📊 GRID":
                                                 if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                                 items.append(item_str)
                                             msg_parts.append("\n\n      . . . . .\n\n".join(items) + "\n")
+                                        msg_parts.append(f"\n{fechamento}")
                                         msg_final = "\n".join(msg_parts)
                                         
+                                        simular_digitacao_zapi(tel, 3)
                                         if enviar_whatsapp_zapi(tel, msg_final):
                                             time.sleep(2.0)
-                                            pdf_bytes = gerar_pdf_rota_whatsapp(nom, data_str, df_ag)
-                                            enviar_pdf_zapi(tel, pdf_bytes, f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
-                                            if ag_login in ag_xls or ag_login.split('|')[0] in ag_xls:
+                                            
+                                            login_base = ag_login.split('|')[0].split('/')[0].strip()
+                                            if ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS:
+                                                simular_digitacao_zapi(tel, 2)
+                                                pdf_bytes = gerar_pdf_rota_whatsapp(nom, data_str, df_ag)
+                                                enviar_pdf_zapi(tel, pdf_bytes, f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
                                                 time.sleep(3.0)
+                                            if ag_login in ag_xls or login_base in ag_xls:
+                                                simular_digitacao_zapi(tel, 2)
                                                 xls_bytes = gerar_excel_rota_whatsapp(df_ag)
                                                 enviar_excel_zapi(tel, xls_bytes, f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx")
+                                                time.sleep(2.0)
+                                                
                                             sucessos += 1
                                             try:
                                                 aba = planilha_db.worksheet("Memoria_Sistema")
@@ -1426,7 +1532,8 @@ if menu == "📊 GRID":
                                                 df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_ag['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{hora_atual}"
                                                 aba.clear()
                                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                            except Exception as e: st.error(f"Erro ao carimbar envio: {e}")
+                                            except Exception as e: 
+                                                st.error(f"Erro ao registar envio: {e}")
                                             
                                         progress_bar.progress((idx_ag + 1) / len(agentes_validos))
                                     
@@ -1434,9 +1541,10 @@ if menu == "📊 GRID":
                                     if sucessos > 0:
                                         st.success(f"🎉 Disparo concluído para {sucessos} agente(s)!")
                                         time.sleep(3.0); carregar_dados_completos.clear(); st.rerun()
-                                    else: st.error("🚨 Falha ao conectar com o WhatsApp Z-API. Nenhum envio realizado.")
+                                    else: st.error("🚨 Falha ao ligar com o WhatsApp Z-API. Nenhum envio foi realizado.")
 
             col_b7.button("🔄 Atualizar", use_container_width=True, on_click=lambda: [carregar_dados_completos.clear(), st.rerun()])
+
 # =============================================================================
 # 💰 MÓDULO 2: FATURAMENTO MASTER (LENTE DE RAIO-X E ANTI-ERROS)
 # =============================================================================
