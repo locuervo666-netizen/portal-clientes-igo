@@ -597,7 +597,12 @@ def get_st(row):
     if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação'
     if 'RECUSA'     in s: return '❌ Solicitação Recusada'
     if 'ENTREGUE'   in s: return '✅ Entregue'
-    if 'COLETADO'   in s: return '📦 Coletado'
+    if 'COLETADO'   in s:
+        # 🚚 Se foi coletado após 18h, mostrar como "Em Transferência"
+        hora_atual = datetime.now(FUSO_BR).hour
+        if hora_atual >= 18:
+            return '🚚 Transferência'
+        return '📦 Coletado'
     if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
     if 'ROTA'       in s: return '🚚 Em Rota de Entrega'
     if 'CONFERIDO'  in s: return '☑️ Conferido'
@@ -1034,14 +1039,6 @@ else:
 
         holder_exportar = st.empty()
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Sistema</p>", unsafe_allow_html=True)
-        
-        if st.button("🚪 Sair com Segurança", use_container_width=True, type="secondary"):
-            st.session_state.logado = False
-            st.query_params.clear() 
-            st.rerun()
-
     # ── HEADER ─────────────────────────────────────────
     agora_str = datetime.now(FUSO_BR).strftime('%H:%M')
     st.markdown(f"""
@@ -1228,7 +1225,7 @@ else:
 
                 df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
                 if not df_h.empty:
-                    n_fim = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Recusada|Coletado', case=False)])
+                    n_fim = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Recusada|Coletado|Em Transferência', case=False)])
                     n_tot  = len(df_h)
                     pct    = round((n_fim / n_tot) * 100) if n_tot else 0
                 else:
@@ -1255,6 +1252,12 @@ else:
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
+
+                st.sidebar.markdown("<br>", unsafe_allow_html=True)
+                if st.sidebar.button("🚪 Sair com Segurança", use_container_width=True, type="secondary"):
+                    st.session_state.logado = False
+                    st.query_params.clear() 
+                    st.rerun()
 
                 col_busca, col_export = st.columns([5, 1])
                 with col_busca:
