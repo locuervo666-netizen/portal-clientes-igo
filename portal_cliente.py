@@ -601,7 +601,7 @@ def get_st(row):
         # 🚚 Se foi coletado após 18h, mostrar como "Em Transferência"
         hora_atual = datetime.now(FUSO_BR).hour
         if hora_atual >= 18:
-            return '🚚 Transferência'
+            return '🚚 Em Transferência'
         return '📦 Coletado'
     if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
     if 'ROTA'       in s: return '🚚 Em Rota de Entrega'
