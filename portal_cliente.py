@@ -1064,6 +1064,9 @@ else:
     else:
         if conf["filtro"] == "TODOS":
             df_cliente = df_raw.copy()
+        elif conf["filtro"] == "LABEST":
+            # Filtro especial para LABEST: inclui também UNILABOR
+            df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip().isin(["LABEST", "UNILABOR"])].copy()
         else:
             df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
 
