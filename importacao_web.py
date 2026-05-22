@@ -3671,6 +3671,12 @@ elif menu == "🔬 Triagem":
             st.markdown("---")
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
+                # 🔥 FILTRO POR TOMADOR 🔥
+                tomador_filtro_t1 = st.selectbox("🏢 Filtrar por Hub de Destino:", ["Todos"] + sorted(df_fila['TOMADOR'].astype(str).unique().tolist()), key="filtro_tomador_t1")
+                if tomador_filtro_t1 != "Todos":
+                    df_fila = df_fila[df_fila['TOMADOR'] == tomador_filtro_t1]
+                
+                st.markdown(f"**📦 Pedidos COLETADOS** ({len(df_fila)} volume(s))")
                 df_fila = df_fila[['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS']].fillna("").astype(str)
                 c_sel1, c_sel2 = st.columns([1, 4])
                 df_fila.insert(0, "SELECIONAR", c_sel1.checkbox("✅ Selecionar Todos", key="sel_all_val"))
