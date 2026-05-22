@@ -748,6 +748,101 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
         with open(tmp_pdf.name, "rb") as f: pdf_bytes = f.read()
     return pdf_bytes
 
+# 🔥 FUNÇÃO PARA GERAR RELATÓRIO DE DISPARO UMOVE COM RASTREAMENTO 🔥
+def gerar_relatorio_umove_xls(df_disparos, resultados_dict):
+    """
+    Gera relatório XLS com rastreamento de cada disparo WhatsApp no Umove
+    resultados_dict: {'agente': {'total': N, 'sucesso': N, 'pedidos': [...]}}
+    """
+    output = io.BytesIO()
+    
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        workbook = writer.book
+        
+        # Estilos
+        header_fmt = workbook.add_format({'bold': True, 'bg_color': '#0F172A', 'font_color': 'white', 'border': 1, 'align': 'center', 'valign': 'vcenter'})
+        sucesso_fmt = workbook.add_format({'bg_color': '#DCFCE7', 'font_color': '#166534', 'border': 1, 'align': 'center'})
+        falha_fmt = workbook.add_format({'bg_color': '#FEE2E2', 'font_color': '#991B1B', 'border': 1, 'align': 'center'})
+        normal_fmt = workbook.add_format({'border': 1, 'align': 'left', 'valign': 'vcenter'})
+        total_fmt = workbook.add_format({'bold': True, 'bg_color': '#E0E7FF', 'border': 1, 'align': 'center'})
+        
+        # RESUMO GERAL
+        resumo_data = []
+        total_geral_pedidos = 0
+        total_geral_sucesso = 0
+        for agente, dados in resultados_dict.items():
+            resumo_data.append({
+                'AGENTE': agente,
+                'TOTAL_DISPAROS': dados['total'],
+                'SUCESSOS': dados['sucesso'],
+                'FALHAS': dados['total'] - dados['sucesso'],
+                'TAXA_SUCESSO': f"{(dados['sucesso']/dados['total']*100):.1f}%" if dados['total'] > 0 else "0%"
+            })
+            total_geral_pedidos += dados['total']
+            total_geral_sucesso += dados['sucesso']
+        
+        df_resumo = pd.DataFrame(resumo_data)
+        df_resumo.to_excel(writer, sheet_name='RESUMO_DISPAROS', index=False, startrow=0)
+        ws_resumo = writer.sheets['RESUMO_DISPAROS']
+        ws_resumo.set_column('A:A', 25); ws_resumo.set_column('B:B', 15); ws_resumo.set_column('C:C', 12); ws_resumo.set_column('D:D', 12); ws_resumo.set_column('E:E', 15)
+        
+        # Formatar cabeçalho
+        for col_num, col_name in enumerate(df_resumo.columns, 1):
+            ws_resumo.write(0, col_num-1, col_name, header_fmt)
+        
+        # Formatar dados
+        for row_num, row_data in enumerate(resumo_data, 1):
+            ws_resumo.write(row_num, 0, row_data['AGENTE'], normal_fmt)
+            ws_resumo.write(row_num, 1, row_data['TOTAL_DISPAROS'], total_fmt)
+            ws_resumo.write(row_num, 2, row_data['SUCESSOS'], sucesso_fmt)
+            ws_resumo.write(row_num, 3, row_data['FALHAS'], falha_fmt if row_data['FALHAS'] > 0 else sucesso_fmt)
+            ws_resumo.write(row_num, 4, row_data['TAXA_SUCESSO'], total_fmt)
+        
+        # Total geral
+        taxa_geral = f"{(total_geral_sucesso/total_geral_pedidos*100):.1f}%" if total_geral_pedidos > 0 else "0%"
+        linha_total = len(df_resumo) + 1
+        ws_resumo.write(linha_total, 0, 'TOTAL GERAL', total_fmt)
+        ws_resumo.write(linha_total, 1, total_geral_pedidos, total_fmt)
+        ws_resumo.write(linha_total, 2, total_geral_sucesso, sucesso_fmt)
+        ws_resumo.write(linha_total, 3, total_geral_pedidos - total_geral_sucesso, total_fmt)
+        ws_resumo.write(linha_total, 4, taxa_geral, total_fmt)
+        
+        # DETALHES POR AGENTE
+        df_detalhe = df_disparos.copy()
+        cols_det = ['PEDIDO', 'AGENTE_RAW', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'TOMADOR', 'STATUS_ENVIO']
+        for c in cols_det:
+            if c not in df_detalhe.columns: df_detalhe[c] = ""
+        
+        df_detalhe['STATUS_ENVIO'] = df_detalhe['AGENTE_RAW'].apply(lambda x: '✅ ENVIADO' if x in [ag for ag, d in resultados_dict.items() if d['sucesso'] > 0] else '❌ FALHA')
+        
+        df_detalhe[cols_det].to_excel(writer, sheet_name='DETALHES_PEDIDOS', index=False)
+        ws_detalhe = writer.sheets['DETALHES_PEDIDOS']
+        ws_detalhe.set_column('A:A', 12); ws_detalhe.set_column('B:B', 20); ws_detalhe.set_column('C:C', 35); ws_detalhe.set_column('D:D', 30); ws_detalhe.set_column('E:E', 10); ws_detalhe.set_column('F:F', 20); ws_detalhe.set_column('G:G', 15); ws_detalhe.set_column('H:H', 8); ws_detalhe.set_column('I:I', 20); ws_detalhe.set_column('J:J', 15)
+        
+        for col_num, col_name in enumerate(cols_det, 1):
+            ws_detalhe.write(0, col_num-1, col_name, header_fmt)
+        
+        # INFORMAÇÕES DO DISPARO
+        ws_info = workbook.add_worksheet('INFORMACOES')
+        ws_info.set_column('A:B', 25)
+        info_fmt = workbook.add_format({'bold': True, 'bg_color': '#F0F9FF', 'border': 1})
+        info_val_fmt = workbook.add_format({'border': 1})
+        
+        ws_info.write(0, 0, 'DATA DO DISPARO', info_fmt)
+        ws_info.write(0, 1, hoje_br.strftime('%d/%m/%Y %H:%M:%S'), info_val_fmt)
+        ws_info.write(1, 0, 'TOTAL DE AGENTES', info_fmt)
+        ws_info.write(1, 1, len(resultados_dict), info_val_fmt)
+        ws_info.write(2, 0, 'TOTAL DE PEDIDOS', info_fmt)
+        ws_info.write(2, 1, total_geral_pedidos, info_val_fmt)
+        ws_info.write(3, 0, 'SUCESSOS', info_fmt)
+        ws_info.write(3, 1, total_geral_sucesso, info_val_fmt)
+        ws_info.write(4, 0, 'FALHAS', info_fmt)
+        ws_info.write(4, 1, total_geral_pedidos - total_geral_sucesso, info_val_fmt)
+        ws_info.write(5, 0, 'TAXA DE SUCESSO', info_fmt)
+        ws_info.write(5, 1, taxa_geral, info_val_fmt)
+    
+    return output.getvalue()
+
 def gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_lista):
     pdf = FPDF()
     pdf.add_page()
@@ -3250,94 +3345,136 @@ elif menu == "📥 Importações Umove":
                 st.download_button("💾 2. Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{hoje_br.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
 
             with col_cmd3.popover("📲 3. Disparar WhatsApp", use_container_width=True):
-                st.markdown("Isso disparará as rotas de todos os clientes no carrinho para os motoristas.")
-                if st.button("🚀 Confirmar Disparos", use_container_width=True):
+                st.markdown("⚠️ **ATENÇÃO:** Este processo enviará as rotas para TODOS os motoristas. Não pode ser interrompido após iniciado.")
+                
+                # 🔥 INICIALIZAR SESSION STATE PARA RASTREAMENTO 🔥
+                if 'umove_disparo_em_andamento' not in st.session_state: st.session_state.umove_disparo_em_andamento = False
+                if 'umove_resultados_disparo' not in st.session_state: st.session_state.umove_resultados_disparo = {}
+                if 'umove_confirmacao_dupla' not in st.session_state: st.session_state.umove_confirmacao_dupla = False
+                
+                # 🔥 TELA 1: CONFIRMAÇÃO INICIAL 🔥
+                if not st.session_state.umove_confirmacao_dupla:
+                    st.warning("🚨 **Confirmação Obrigatória:** Você tem certeza que deseja disparar agora?")
+                    col_sim, col_nao = st.columns(2)
+                    with col_sim:
+                        if st.button("✅ SIM, DISPARAR AGORA!", key="umove_btn_confirmar", use_container_width=True, type="primary"):
+                            st.session_state.umove_confirmacao_dupla = True
+                            st.rerun()
+                    with col_nao:
+                        if st.button("❌ Cancelar e Voltar", key="umove_btn_cancelar", use_container_width=True):
+                            st.session_state.umove_confirmacao_dupla = False
+                            st.info("Operação cancelada. Você pode revisar os dados e tentar novamente.")
+                
+                # 🔥 TELA 2: EXECUÇÃO COM PROTEÇÃO 🔥
+                else:
                     dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
                     dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
                     
                     agentes_selecionados = df_editado_sb['AGENTE_RAW'].dropna().unique()
+                    st.session_state.umove_resultados_disparo = {}
                     sucessos_sb = 0
                     
                     if len(agentes_selecionados) > 0:
+                        st.markdown("### 🚀 Disparando Rotas... **NÃO FECHE ESTA PÁGINA!**")
                         progress_bar = st.progress(0)
                         status_txt = st.empty()
-                    
-                        for idx_ag, ag in enumerate(agentes_selecionados):
-                            if not str(ag).strip(): continue
-                            df_ag_sb = df_editado_sb[df_editado_sb['AGENTE_RAW'] == ag]
-                            tel = dict_tel.get(str(ag).strip().lower(), "")
-                            nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
-                            
-                            # 🔥 A CATRACA E BLINDAGEM AGORA NO UMOVE 🔥
-                            ag_login = str(ag).strip().lower()
-                            login_base = ag_login.split('|')[0].split('/')[0].strip()
-                            is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
-                            is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
-                            
-                            if tel:
-                                status_txt.markdown(f"**Enviando rota para:** {nom} ({idx_ag+1}/{len(agentes_selecionados)})...")
-                                data_str = hoje_br.strftime('%d/%m/%Y')
-                                
-                                saudacao, fechamento = gerar_saudacao_spintax(nom)
-                                sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
-                                sep2 = random.choice(['---', '...', '===', ' '])
-                                bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
-                                lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
-                                
-                                msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
-                                tot_qtd = 0
-                                for cid, count in df_ag_sb['CIDADE'].value_counts().items():
-                                    msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}"); tot_qtd += count
-                                msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
-
-                                for cid, group in df_ag_sb.groupby('CIDADE'):
-                                    msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
-                                    items = []
-                                    for _, row in group.iterrows():
-                                        item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
-                                        obs = str(row.get('OBSERVACOES', '')).strip()
-                                        if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
-                                        items.append(item_str)
-                                    msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
-                                
-                                msg_parts.append(f"\n{fechamento}")
-                                
-                                # Simulador de digitação
-                                INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
-                                TOKEN = "2321563615C4242CB6031504"         
-                                CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S" 
-                                try:
-                                    requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
-                                    time.sleep(random.uniform(3.0, 5.0))
-                                except: pass
-                                
-                                if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
-                                    time.sleep(random.uniform(2.0, 4.0))
-                                    
-                                    if is_autorizado_pdf:
-                                        try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2); time.sleep(2)
-                                        except: pass
-                                        enviar_pdf_zapi(tel, gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb), f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
-                                        time.sleep(3.0)
-                                        
-                                    if is_autorizado_xls:
-                                        try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2); time.sleep(2)
-                                        except: pass
-                                        if ag_login == 'luiz.paulo':
-                                            df_para_xls = df_editado_sb[df_editado_sb['UF'] == 'RJ']
-                                            nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
-                                        else:
-                                            df_para_xls = df_ag_sb
-                                            nome_arq_xls = f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx"
-                                        
-                                        enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_para_xls), nome_arq_xls)
-                                        time.sleep(2.0)
-                                    
-                                    sucessos_sb += 1
-                                    
-                            progress_bar.progress((idx_ag + 1) / len(agentes_selecionados))
+                        container_log = st.container(border=True)
                         
-                        status_txt.markdown("✅ **Processo finalizado!**")
+                        with container_log:
+                            logs = []
+                            
+                            for idx_ag, ag in enumerate(agentes_selecionados):
+                                if not str(ag).strip(): continue
+                                df_ag_sb = df_editado_sb[df_editado_sb['AGENTE_RAW'] == ag]
+                                tel = dict_tel.get(str(ag).strip().lower(), "")
+                                nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
+                                
+                                # 🔥 A CATRACA E BLINDAGEM AGORA NO UMOVE 🔥
+                                ag_login = str(ag).strip().lower()
+                                login_base = ag_login.split('|')[0].split('/')[0].strip()
+                                is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
+                                is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
+                                
+                                # Rastreamento de resultado para este agente
+                                st.session_state.umove_resultados_disparo[nom] = {
+                                    'total': len(df_ag_sb),
+                                    'sucesso': 0,
+                                    'pedidos': df_ag_sb['PEDIDO'].tolist()
+                                }
+                                
+                                if tel:
+                                    status_txt.markdown(f"**⏳ Enviando rota para:** {nom} ({idx_ag+1}/{len(agentes_selecionados)})...")
+                                    data_str = hoje_br.strftime('%d/%m/%Y')
+                                    
+                                    saudacao, fechamento = gerar_saudacao_spintax(nom)
+                                    sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
+                                    sep2 = random.choice(['---', '...', '===', ' '])
+                                    bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
+                                    lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
+                                    
+                                    msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
+                                    tot_qtd = 0
+                                    for cid, count in df_ag_sb['CIDADE'].value_counts().items():
+                                        msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}"); tot_qtd += count
+                                    msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
+
+                                    for cid, group in df_ag_sb.groupby('CIDADE'):
+                                        msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
+                                        items = []
+                                        for _, row in group.iterrows():
+                                            item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                            obs = str(row.get('OBSERVACOES', '')).strip()
+                                            if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
+                                            items.append(item_str)
+                                        msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
+                                    
+                                    msg_parts.append(f"\n{fechamento}")
+                                    
+                                    # Simulador de digitação
+                                    INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711" 
+                                    TOKEN = "2321563615C4242CB6031504"         
+                                    CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S" 
+                                    try:
+                                        requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                        time.sleep(random.uniform(3.0, 5.0))
+                                    except: pass
+                                    
+                                    resultado_msg = "✅"
+                                    if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
+                                        time.sleep(random.uniform(2.0, 4.0))
+                                        
+                                        if is_autorizado_pdf:
+                                            try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2); time.sleep(2)
+                                            except: pass
+                                            enviar_pdf_zapi(tel, gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb), f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
+                                            time.sleep(3.0)
+                                            
+                                        if is_autorizado_xls:
+                                            try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2); time.sleep(2)
+                                            except: pass
+                                            if ag_login == 'luiz.paulo':
+                                                df_para_xls = df_editado_sb[df_editado_sb['UF'] == 'RJ']
+                                                nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
+                                            else:
+                                                df_para_xls = df_ag_sb
+                                                nome_arq_xls = f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx"
+                                            
+                                            enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_para_xls), nome_arq_xls)
+                                            time.sleep(2.0)
+                                        
+                                        st.session_state.umove_resultados_disparo[nom]['sucesso'] = len(df_ag_sb)
+                                        sucessos_sb += 1
+                                    else:
+                                        resultado_msg = "❌"
+                                        st.session_state.umove_resultados_disparo[nom]['sucesso'] = 0
+                                    
+                                    logs.append(f"{resultado_msg} **{nom}** - {len(df_ag_sb)} pedido(s) - {st.session_state.umove_resultados_disparo[nom]['sucesso']} sucessos")
+                                    st.markdown("\n".join(logs))
+                                    
+                                progress_bar.progress((idx_ag + 1) / len(agentes_selecionados))
+                            
+                            status_txt.markdown("✅ **Processo de Envio Finalizado!**")
+                        
                         if sucessos_sb > 0: 
                             try:
                                 aba_contador = planilha_sandbox.worksheet("Contador")
@@ -3345,10 +3482,38 @@ elif menu == "📥 Importações Umove":
                                 aba_contador.update("A1", [[str(max_id_gerado + 1)]])
                             except: pass
                             
-                            st.success(f"🎉 SUCESSO ABSOLUTO! Disparo concluído para {sucessos_sb} motorista(s)!")
-                            time.sleep(3.5)
-                            st.rerun()
-                        else: st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
+                            # 🔥 GERAR RELATÓRIO XLS COM RESULTADO DOS DISPAROS 🔥
+                            st.success(f"🎉 SUCESSO! Disparo concluído para {sucessos_sb} motorista(s)!")
+                            st.markdown("---")
+                            st.markdown("### 📊 Gerando Relatório de Disparos...")
+                            
+                            xls_relatorio = gerar_relatorio_umove_xls(df_editado_sb, st.session_state.umove_resultados_disparo)
+                            
+                            col_rel1, col_rel2, col_rel3 = st.columns([1, 1, 1])
+                            with col_rel1:
+                                st.download_button(
+                                    "📥 Baixar Relatório XLS",
+                                    data=xls_relatorio,
+                                    file_name=f"RELATORIO_DISPAROS_UMOVE_{hoje_br.strftime('%d%m%y_%H%M%S')}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    use_container_width=True,
+                                    type="primary"
+                                )
+                            
+                            with col_rel2:
+                                if st.button("🔄 Novo Disparo", use_container_width=True):
+                                    st.session_state.umove_confirmacao_dupla = False
+                                    st.session_state.umove_resultados_disparo = {}
+                                    st.rerun()
+                            
+                            with col_rel3:
+                                if st.button("🏠 Voltar ao Carrinho", use_container_width=True):
+                                    st.session_state.umove_confirmacao_dupla = False
+                                    st.session_state.umove_resultados_disparo = {}
+                                    st.rerun()
+                        else: 
+                            st.error("🚨 Nenhum envio realizado. Verifique os agentes e telefones.")
+                            st.session_state.umove_confirmacao_dupla = False
         else:
             st.info("🛒 O carrinho está vazio. Cole uma matriz na Aba 1 para começar ou marque o interruptor dos pedidos fixos.")
 # =============================================================================
@@ -3594,6 +3759,8 @@ elif menu == "🔬 Triagem":
         
         # 2. BIPADOR (O campo principal agora é o Envelope)
         if not st.session_state.pdf_avulso_pronto:
+            container_feedback = st.empty()
+            
             with st.form("form_bip_avulso_manual", clear_on_submit=True):
                 col_bip, col_add = st.columns([4, 1], vertical_alignment="bottom")
                 bip_envelope = col_bip.text_input("🔍 Bipar Código ou Digitar Número do Envelope:")
@@ -3608,25 +3775,58 @@ elif menu == "🔬 Triagem":
                         }
                         st.session_state.triagem_avulsa_lote.append(novo_item_manual)
                         st.rerun()
-                        
-            # 3. LISTA DE CONFERÊNCIA
+            
+            # 🔥 NOTIFICAÇÃO VERDE DE SUCESSO 🔥
             if st.session_state.triagem_avulsa_lote:
-                st.markdown(f"**📦 Envelopes no Lote:** {len(st.session_state.triagem_avulsa_lote)}")
-                df_av_disp = pd.DataFrame(st.session_state.triagem_avulsa_lote)
-                st.dataframe(df_av_disp[['ENVELOPE', 'DATA', 'HORA']], hide_index=True, use_container_width=True)
+                ultimo_envelope = st.session_state.triagem_avulsa_lote[-1]['ENVELOPE']
+                container_feedback.success(f"✅ Envelope **{ultimo_envelope}** adicionado com sucesso! (Total: {len(st.session_state.triagem_avulsa_lote)})")
+                        
+            # 3. LISTA DE CONFERÊNCIA (EXPANDINDO)
+            if st.session_state.triagem_avulsa_lote:
+                st.markdown("---")
+                st.markdown(f"### 📦 Envelopes no Lote: **{len(st.session_state.triagem_avulsa_lote)}**")
                 
+                # 🔥 CONTAINER COM LISTA EXPANDINDO 🔥
+                with st.container(border=True):
+                    df_av_disp = pd.DataFrame(st.session_state.triagem_avulsa_lote)
+                    
+                    # Mostrar em 2 colunas para melhor visualização
+                    col_list1, col_list2 = st.columns([2, 1])
+                    with col_list1:
+                        st.dataframe(
+                            df_av_disp[['ENVELOPE', 'DATA', 'HORA']],
+                            hide_index=True,
+                            use_container_width=True,
+                            column_config={
+                                'ENVELOPE': st.column_config.Column("Nº ENVELOPE", width="medium"),
+                                'DATA': st.column_config.Column("DATA", width="small"),
+                                'HORA': st.column_config.Column("HORA", width="small"),
+                            }
+                        )
+                    
+                    with col_list2:
+                        # Resumo visual
+                        st.metric("Total Adicionado", len(st.session_state.triagem_avulsa_lote))
+                
+                st.markdown("---")
                 c_ctrl1, c_ctrl2, c_ctrl3 = st.columns([1, 1, 2])
                 if c_ctrl1.button("↩️ Desfazer Último", use_container_width=True):
-                    if st.session_state.triagem_avulsa_lote: st.session_state.triagem_avulsa_lote.pop(); st.rerun()
+                    if st.session_state.triagem_avulsa_lote:
+                        removido = st.session_state.triagem_avulsa_lote.pop()
+                        st.warning(f"⚠️ Envelope **{removido['ENVELOPE']}** removido da lista")
+                        st.rerun()
                 if c_ctrl2.button("🗑️ Esvaziar", use_container_width=True):
-                    st.session_state.triagem_avulsa_lote.clear(); st.rerun()
+                    qtd_removida = len(st.session_state.triagem_avulsa_lote)
+                    st.session_state.triagem_avulsa_lote.clear()
+                    st.warning(f"🗑️ {qtd_removida} envelope(s) removido(s)")
+                    st.rerun()
                     
                 if c_ctrl3.button("📄 GERAR PROTOCOLO MANUAL", type="primary", use_container_width=True):
                     # TRAVA: OBRIGA A PREENCHER O HUB DE DESTINO
                     if av_tomador == "Selecione...":
                         st.error("⚠️ Preencha o Hub de Destino no cabeçalho antes de gerar o PDF!")
                     else:
-                        with st.spinner("Registrando e desenhando PDF limpo..."):
+                        with st.spinner("🔄 Registrando e desenhando PDF limpo..."):
                             id_rom_av = f"MAN-{datetime.now().strftime('%d%m%H%M')}"
                             plan_av = obter_planilha_avulsos()
                             if plan_av:
@@ -3641,9 +3841,10 @@ elif menu == "🔬 Triagem":
                             st.session_state.pdf_avulso_pronto = pdf_manual
                             st.session_state.id_avulso_pronto = id_rom_av
                             st.session_state.triagem_avulsa_lote = []
-                            time.sleep(0.5) # Dá um respiro pro Streamlit atualizar o botão
+                            time.sleep(0.5)
                             st.rerun()
-            else: st.info("Aguardando bipagem de envelopes...")
+            else:
+                st.info("🔍 Aguardando bipagem de envelopes... Aponte o scanner ou digite o número do envelope.")
         
         # 4. TELA DE SUCESSO (Renderiza de primeira agora!)
         if st.session_state.pdf_avulso_pronto:
