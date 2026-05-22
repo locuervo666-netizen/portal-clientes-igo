@@ -1857,15 +1857,23 @@ elif menu == "💰 Faturamento":
 
                                             aba_m.clear(); aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                             
-                                            try: aba_h = planilha_financeiro.worksheet("Historico_Faturas")
-                                            except: 
+                                            try:
+                                                aba_h = planilha_financeiro.worksheet("Historico_Faturas")
+                                            except:
                                                 aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 7)
                                                 aba_h.update("A1", [["ID_FATURA", "DATA_EMISSAO", "TOMADOR", "TOTAL_PEDIDOS", "VALOR_TOTAL_R$", "PERIODO", "STATUS_PAGAMENTO"]])
+                                                time.sleep(1)  # Aguarda criação da aba
                                             
                                             d_sel = pd.to_datetime(sel_f['DATA'], format='%d/%m/%Y', errors='coerce').dropna()
                                             periodo_f = f"{d_sel.min().strftime('%d/%m/%Y')} a {d_sel.max().strftime('%d/%m/%Y')}" if not d_sel.empty else "Data Única"
                                             
-                                            aba_h.append_row([id_fat, hoje_br.strftime("%d/%m/%Y"), f_tom, len(sel_f), round(total_f, 2), periodo_f, "⏳ AGUARDANDO"])
+                                            # Preparar dados para salvar (converter para string para evitar problemas de tipo)
+                                            valor_str = f"{total_f:.2f}".replace('.', ',')
+                                            nova_linha = [id_fat, hoje_br.strftime("%d/%m/%Y"), f_tom, str(len(sel_f)), valor_str, periodo_f, "⏳ AGUARDANDO"]
+                                            
+                                            # Salvar na aba com verificação
+                                            aba_h.append_row(nova_linha)
+                                            time.sleep(1)  # Aguarda sincronização
                                             
                                             st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f, obs_fat)
                                             st.session_state.fatura_xls = gerar_excel_memoria(sel_f.drop(columns=['DT_FILTRO', 'SELECIONAR']))
@@ -1882,17 +1890,23 @@ elif menu == "💰 Faturamento":
         try:
             aba_h = planilha_financeiro.worksheet("Historico_Faturas")
             dados_h = aba_h.get_all_values()
-            if len(dados_h) <= 1: st.info("Nenhuma fatura emitida no Livro Caixa.")
+            if len(dados_h) <= 1: 
+                st.info("📭 Nenhuma fatura emitida no Livro Caixa.")
             else:
                 df_h = pd.DataFrame(dados_h[1:], columns=dados_h[0])
                 df_h_disp = df_h.copy()
+                
+                # Formatar valores corretamente
                 if 'VALOR_TOTAL_R$' in df_h_disp.columns:
-                    df_h_disp['VALOR_TOTAL_R$'] = df_h_disp['VALOR_TOTAL_R$'].apply(lambda x: f"R$ {float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                    df_h_disp['VALOR_TOTAL_R$'] = df_h_disp['VALOR_TOTAL_R$'].apply(lambda x: f"R$ {float(str(x).replace(',', '.')):.2f}")
                 
                 c_h1, c_h2 = st.columns(2)
-                f_h_tom = c_h1.selectbox("Filtrar por Cliente:", ["Todos"] + CLIENTES_AUTORIZADOS, key="h_tom")
-                if f_h_tom != "Todos": df_h_disp = df_h_disp[df_h_disp['TOMADOR'] == f_h_tom]
-                st.dataframe(df_h_disp.sort_index(ascending=False), use_container_width=True, hide_index=True)
+                f_h_tom = c_h1.selectbox("Filtrar por Cliente:", ["Todos"] + sorted(df_h['TOMADOR'].unique().tolist()), key="h_tom")
+                if f_h_tom != "Todos": 
+                    df_h_disp = df_h_disp[df_h_disp['TOMADOR'] == f_h_tom]
+                
+                st.markdown(f"**Total de Faturas:** {len(df_h_disp)}")
+                st.dataframe(df_h_disp.sort_values('DATA_EMISSAO', ascending=False), use_container_width=True, hide_index=True)
                 
                 st.markdown("---")
                 col_re1, col_re2 = st.columns(2)
@@ -1900,16 +1914,31 @@ elif menu == "💰 Faturamento":
                     st.markdown("#### 🔄 Gestão de Status e Reemissão")
                     fat_sel = st.selectbox("Escolha uma Fatura:", ["Selecione..."] + df_h['ID_FATURA'].tolist())
                     if fat_sel != "Selecione...":
+                        st.divider()
                         c_op1, c_op2 = st.columns(2)
                         if c_op1.button("✅ Marcar como PAGO", use_container_width=True):
-                            aba_h.update_cell(df_h[df_h['ID_FATURA'] == fat_sel].index[0] + 2, 7, "✅ PAGO"); st.success("Baixa realizada!"); time.sleep(1); st.rerun()
+                            idx_fat = df_h[df_h['ID_FATURA'] == fat_sel].index[0]
+                            aba_h.update_cell(idx_fat + 2, 7, "✅ PAGO")
+                            st.success("✅ Fatura marcada como PAGO!")
+                            time.sleep(1)
+                            st.rerun()
                         
+                        st.markdown("---")
                         df_rec = df_raw[df_raw['FATURA'] == fat_sel].copy()
-                        if not df_rec.empty:
-                            df_p_rec = carregar_tabela_precos(df_rec.iloc[0]['TOMADOR'])
-                            df_rec['VALOR (R$)'] = df_rec.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), str(r['STATUS']).strip().upper(), df_p_rec), axis=1)
-                            total_rec = df_rec['VALOR (R$)'].sum()
-                            st.download_button("📥 Reemitir PDF", data=gerar_pdf_fatura(fat_sel, df_rec.iloc[0]['TOMADOR'], df_rec, total_rec), file_name=f"{fat_sel}_2via.pdf", use_container_width=True)
+                        if df_rec.empty:
+                            st.info("📭 Nenhum pedido encontrado para esta fatura.")
+                        else:
+                            try:
+                                df_p_rec = carregar_tabela_precos(df_rec.iloc[0]['TOMADOR'])
+                                if not df_p_rec.empty:
+                                    df_rec['VALOR (R$)'] = df_rec.apply(lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO',''), r.get('ENDERECO',''), str(r['STATUS']).strip().upper(), df_p_rec), axis=1)
+                                    total_rec = df_rec['VALOR (R$)'].sum()
+                                    st.markdown(f"**Pedidos Encontrados:** {len(df_rec)} | **Total:** R$ {total_rec:,.2f}")
+                                    st.download_button("📥 Reemitir PDF", data=gerar_pdf_fatura(fat_sel, df_rec.iloc[0]['TOMADOR'], df_rec, total_rec), file_name=f"{fat_sel}_2via.pdf", use_container_width=True, type="primary")
+                                else:
+                                    st.warning(f"⚠️ Tabela de preços para {df_rec.iloc[0]['TOMADOR']} não encontrada.")
+                            except Exception as e:
+                                st.error(f"❌ Erro ao gerar PDF: {str(e)}")
                         
                 with col_re2:
                     st.markdown("#### 🚨 Estorno de Segurança")
@@ -1922,11 +1951,87 @@ elif menu == "💰 Faturamento":
                                     aba_m = planilha_db.worksheet("Memoria_Sistema")
                                     df_m_est = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
                                     df_m_est.loc[df_m_est['FATURA'] == fat_sel, 'FATURA'] = ""
-                                    aba_m.clear(); aba_m.update("A1", [df_m_est.columns.tolist()] + df_m_est.fillna("").astype(str).values.tolist())
-                                    aba_h.delete_rows(df_h[df_h['ID_FATURA'] == fat_sel].index[0] + 2)
-                                    st.success("Estorno concluído!"); time.sleep(2); carregar_dados_completos.clear(); st.rerun()
+                                    aba_m.clear()
+                                    aba_m.update("A1", [df_m_est.columns.tolist()] + df_m_est.fillna("").astype(str).values.tolist())
+                                    idx_del = df_h[df_h['ID_FATURA'] == fat_sel].index[0]
+                                    aba_h.delete_rows(idx_del + 2)
+                                    st.success("Estorno concluído!")
+                                    time.sleep(2)
+                                    carregar_dados_completos.clear()
+                                    st.rerun()
                             else: st.error("Senha incorreta!")
-        except Exception: st.warning("Histórico pronto para o próximo faturamento. (Aba sendo criada)")
+        except Exception as e: 
+            st.error(f"⚠️ Erro ao carregar histórico de faturas: {e}")
+
+    # =========================================================================
+    # ABA 3: PEDIDOS FATURADOS (HISTÓRICO COM LOTES)
+    # =========================================================================
+    with tab_faturados:
+        st.markdown("#### 📋 Histórico de Pedidos Faturados")
+        st.markdown("Consulte todos os pedidos que foram inclusos em lotes de faturamento.")
+        
+        try:
+            df_faturados = df_raw[df_raw['FATURA'].astype(str).str.contains('FAT-', na=False)].copy()
+            
+            if df_faturados.empty:
+                st.info("📭 Nenhum pedido faturado até o momento.")
+            else:
+                # Preparando dados para exibição
+                df_faturados['DATA_ENTREGA'] = df_faturados['DATA_ENTREGA'].apply(lambda x: str(x).split(' ')[0] if pd.notna(x) else "")
+                df_faturados['DATA'] = df_faturados['DATA'].apply(lambda x: str(x).split(' ')[0] if pd.notna(x) else "")
+                
+                # Filtros
+                col_f1, col_f2, col_f3 = st.columns(3)
+                
+                f_lote = col_f1.selectbox("Filtrar por Lote (Fatura):", ["Todos"] + sorted(df_faturados['FATURA'].unique().tolist()), key="f_lote")
+                f_tomador = col_f2.selectbox("Filtrar por Tomador:", ["Todos"] + sorted(df_faturados['TOMADOR'].unique().tolist()), key="f_tomador")
+                f_status = col_f3.selectbox("Filtrar por Status:", ["Todos", "ENTREGUE", "FRUSTRADA"], key="f_status")
+                
+                # Aplicar filtros
+                df_filtered = df_faturados.copy()
+                if f_lote != "Todos":
+                    df_filtered = df_filtered[df_filtered['FATURA'] == f_lote]
+                if f_tomador != "Todos":
+                    df_filtered = df_filtered[df_filtered['TOMADOR'] == f_tomador]
+                if f_status != "Todos":
+                    df_filtered = df_filtered[df_filtered['STATUS'].str.upper().str.contains(f_status, na=False)]
+                
+                # Preparar DataFrame para exibição
+                df_display = df_filtered[['PEDIDO', 'FATURA', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'DATA', 'DATA_ENTREGA', 'STATUS']].copy()
+                df_display.rename(columns={
+                    'PEDIDO': '📦 Pedido',
+                    'FATURA': '🗂️ Lote (Fatura)',
+                    'TOMADOR': '🏢 Tomador',
+                    'LABORATORIO': '🏭 Laboratório',
+                    'CIDADE': '🏙️ Cidade',
+                    'DATA': '📅 Coleta',
+                    'DATA_ENTREGA': '✅ Entrega',
+                    'STATUS': '🔄 Status'
+                }, inplace=True)
+                
+                st.markdown(f"**Total de Pedidos Faturados:** {len(df_display)} | **Lotes Únicos:** {df_filtered['FATURA'].nunique()}")
+                st.dataframe(df_display.sort_values('🗂️ Lote (Fatura)', ascending=False), use_container_width=True, hide_index=True)
+                
+                # Resumo por lote
+                st.markdown("---")
+                st.markdown("#### 📊 Resumo por Lote de Faturamento")
+                
+                df_resumo = df_filtered.groupby('FATURA').agg({
+                    'PEDIDO': 'count',
+                    'TOMADOR': 'first',
+                    'DATA': 'first'
+                }).rename(columns={
+                    'PEDIDO': 'Qtd Pedidos',
+                    'TOMADOR': 'Tomador',
+                    'DATA': 'Data Primeiro Pedido'
+                }).reset_index()
+                
+                df_resumo.rename(columns={'FATURA': 'Lote (Fatura)'}, inplace=True)
+                
+                st.dataframe(df_resumo.sort_values('Lote (Fatura)', ascending=False), use_container_width=True, hide_index=True)
+                
+        except Exception as e:
+            st.error(f"⚠️ Erro ao carregar pedidos faturados: {e}")
 
     # =========================================================================
     # FUNÇÃO IBGE (Fica dentro do módulo de Faturamento)
@@ -3867,12 +3972,23 @@ elif menu == "🔬 Triagem":
                 # Lendo a matriz pura do Google Sheets pra evitar que o cabeçalho antigo corte a coluna da hora
                 dados_av = aba_av.get_all_values() 
                 if len(dados_av) > 1:
-                    lotes_man_list = list(set([linha[0] for linha in dados_av[1:] if "MAN-" in str(linha[0])]))
+                    # Criar dicionário com informações dos lotes (número, data e tomador)
+                    lotes_man_dict = {}
+                    for linha in dados_av[1:]:
+                        if "MAN-" in str(linha[0]):
+                            lote_num = linha[0]
+                            data_val = linha[1] if len(linha) > 1 else ""
+                            tomador_val = linha[3] if len(linha) > 3 else ""
+                            # Chave: "MAN-001 - 15/05/2024 - Tomador ABC"
+                            chave = f"{lote_num} - {data_val} - {tomador_val}" if data_val and tomador_val else lote_num
+                            if chave not in lotes_man_dict:
+                                lotes_man_dict[chave] = lote_num
                     
                     c_h1, c_h2 = st.columns([2, 1])
-                    lote_re = c_h1.selectbox("Reimprimir Lote Manual:", ["Selecione..."] + sorted(lotes_man_list, reverse=True))
+                    lote_re = c_h1.selectbox("Reimprimir Lote Manual:", ["Selecione..."] + sorted(lotes_man_dict.keys(), reverse=True))
                     
                     if lote_re != "Selecione...":
+                        lote_re = lotes_man_dict[lote_re]  # Obtém o número real do lote
                         linhas_re = [linha for linha in dados_av[1:] if linha[0] == lote_re]
                         lista_re = []
                         for ln in linhas_re:
