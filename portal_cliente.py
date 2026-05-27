@@ -274,6 +274,7 @@ CLIENTES_CONFIG = {
         "senha": "123",
         "logo": "unilabor.png",
         "filtro": "UNILABOR"
+    }
 }
 
 # =======================================================
