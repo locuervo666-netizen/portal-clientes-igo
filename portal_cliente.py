@@ -272,7 +272,7 @@ CLIENTES_CONFIG = {
     },
     "CLIENTE.UNILABOR": {
         "senha": "123",
-        "logo": "unilabor.png",
+        "logo": "https://drive.google.com/file/d/1EvRnXxfJcY_BL7Ij5iJW0O9GTozqL3dD/view?usp=drive_link",
         "filtro": "UNILABOR"
     }
 }
