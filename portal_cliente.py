@@ -270,7 +270,7 @@ CLIENTES_CONFIG = {
         "logo": "souza cruz.png",
         "filtro": "SOUZA CRUZ"
     },
-    "UNILABOR": {
+    "CLIENTE.UNILABOR": {
         "senha": "123",
         "logo": "unilabor.png",
         "filtro": "UNILABOR"
