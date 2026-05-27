@@ -269,7 +269,11 @@ CLIENTES_CONFIG = {
         "senha": "123",
         "logo": "souza cruz.png",
         "filtro": "SOUZA CRUZ"
-    }
+    },
+    "CLIENTE.UNILABOR": {
+        "senha": "123",
+        "logo": "unilabor.png",
+        "filtro": "UNILABOR"
 }
 
 # =======================================================
