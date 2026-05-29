@@ -68,29 +68,21 @@ def gerar_saudacao_spintax(nome):
     return inicio, fim
 
 
-# =============================================================================
-# 🔗 1. CONFIGURAÇÃO DA PÁGINA E ESTILOS MODERNOS (MÓDULO 1)
-# =============================================================================
-st.set_page_config(
-    page_title="CONTROLE OPERACIONAL",
-    layout="wide",
-    page_icon="🚚",
-    initial_sidebar_state="expanded")
-
 CSS_DASHBOARD = """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+    /* 🔥 FUNDO PRINCIPAL 100% BRANCO 🔥 */
     [data-testid="stAppViewContainer"] {
         transition: background-color 0.3s ease;
         font-family: 'Inter', sans-serif;
-        background-color: #F8FAFC !important;
+        background-color: #FFFFFF !important; 
     }
 
-    /* ── SIDEBAR ── */
+    /* ── SIDEBAR 100% BRANCA ── */
     [data-testid="stSidebar"],
     [data-testid="stSidebar"] > div:first-child {
-        background-color: #ffffff !important;
+        background-color: #FFFFFF !important;
         border-right: 1px solid #e2e8f0 !important;
     }
     [data-testid="stSidebar"] p,
@@ -183,33 +175,55 @@ if not st.session_state.autenticado:
         <style>
         [data-testid="stSidebar"] { display: none; }
         header { display: none !important; }
-        [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important; font-family: 'Inter', sans-serif; }
-        .block-container { display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; min-height: 100vh !important; }
-        [data-testid="stForm"] { background-color: #ffffff !important; padding: 40px !important; border-radius: 20px !important; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.1) !important; border: none !important; }
-        .login-title { text-align: center; font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 25px; }
+        [data-testid="stAppViewContainer"] { 
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important; 
+            font-family: 'Inter', sans-serif; 
+        }
+        
+        /* Empurra o bloco inteiro para baixo na medida certa */
+        .block-container { 
+            padding-top: 15vh !important; 
+            max-width: 100% !important;
+        }
+        
+        /* Deixa o formulário com cara de App */
+        [data-testid="stForm"] { 
+            background-color: #ffffff !important; 
+            padding: 40px !important; 
+            border-radius: 20px !important; 
+            box-shadow: 0 20px 40px -5px rgba(0,0,0,0.1) !important; 
+            border: none !important; 
+        }
+        
+        .login-title { 
+            text-align: center; 
+            font-size: 22px; 
+            font-weight: 900; 
+            color: #0f172a; 
+            margin-top: 15px; 
+            margin-bottom: 25px; 
+        }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+    # Usa colunas nativas para esmagar o formulário perfeitamente no centro
     _, col_login, _ = st.columns([1, 1.2, 1])
+
     with col_login:
         with st.form("form_login", clear_on_submit=False):
+            # Colunas internas para centralizar o logotipo
             col_espaco1, col_logo, col_espaco2 = st.columns([1, 1.5, 1])
             with col_logo:
-                st.image(
-                    'https://i.postimg.cc/x84nnjjq/IGO-LOGO.png',
-                    use_container_width=True)
-            st.markdown(
-                '<div class="login-title">CONTROLE OPERACIONAL</div>',
-                unsafe_allow_html=True)
+                st.image('https://i.postimg.cc/x84nnjjq/IGO-LOGO.png', use_container_width=True)
+                
+            st.markdown('<div class="login-title">CONTROLE OPERACIONAL</div>', unsafe_allow_html=True)
 
             usuario = st.text_input("👤 Usuário").upper().strip()
             senha = st.text_input("🔑 Senha", type="password")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
 
-            if st.form_submit_button(
-                "🚀 ACESSAR SISTEMA",
-                type="primary",
-                    use_container_width=True):
+            if st.form_submit_button("🚀 ACESSAR SISTEMA", type="primary", use_container_width=True):
                 logins_autorizados = {
                     "ROBSON.MELO": "123",
                     "WILLIAM.BERTOLDO": "123"}
