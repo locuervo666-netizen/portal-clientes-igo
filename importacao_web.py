@@ -6585,7 +6585,7 @@ elif menu == "📁 Relatórios":
 # ⚙️ MÓDULO 5: CONFIGURAR ROTAS E AGENTES
 # =============================================================================
 elif menu == "⚙️ Rotas":
-    # Colocando o botão de atualizar solto no topo, ao lado do título!
+    # Botão de atualizar solto no topo, ao lado do título
     col_tit_rotas, col_btn_atualizar = st.columns([5, 1], vertical_alignment="center")
     
     with col_tit_rotas:
@@ -6595,409 +6595,458 @@ elif menu == "⚙️ Rotas":
             
     with col_btn_atualizar:
         if st.button("🔄 Atualizar Dados", use_container_width=True):
-            with st.spinner("Sincronizando..."):
+            with st.spinner("Sincronizando com a nuvem..."):
                 carregar_dados_agentes.clear()
                 carregar_dados_completos.clear()
                 time.sleep(0.5)
                 st.rerun()
 
     tab_agente, tab_rota, tab_busca, tab_tabela, tab_transfer, tab_sistema = st.tabs(
-        ["👤 Cadastrar", "📍 Vincular Rota", "🔎 Buscar Rota", "📋 Gerenciar", "🔄 Transferir", "⚠️ Sistema"])
+        ["👤 Cadastrar Motorista", "📍 Atrelar Rota", "🔎 Explorador", "📋 Gerenciar Perfil", "🔄 Transferência", "⚠️ Admin"])
 
+    # -------------------------------------------------------------------------
+    # ABA 1: CADASTRAR MOTORISTA
+    # -------------------------------------------------------------------------
     with tab_agente:
-        st.info("💡 **Logins Compartilhados:** Para usar o mesmo login no app, mas separar o WhatsApp, use o separador `|`. Ex: `igo.log|edgar` e `igo.log|anderson`. O sistema envia a rota pro telefone de cada um, mas joga apenas `igo.log` no aplicativo.")
-        with st.form("form_novo_agente", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            login_ag = c1.text_input(
-                "ID de Login", placeholder="Ex: carlos.rj")
-            nome_ag = c2.text_input(
-                "Nome Amigável", placeholder="Ex: CARLOS SILVA")
-            tel_ag = st.text_input(
-                "WhatsApp com DDD",
-                placeholder="Ex: 5521999999999")
-
-            if st.form_submit_button("💾 Salvar Novo Agente", type="primary"):
-                if not login_ag or not nome_ag or not tel_ag:
-                    st.error("⚠️ Preencha todos os campos!")
-                else:
-                    df_novo = pd.concat([DF_AGENTES,
-                                         pd.DataFrame([{"ROTA MAPEADA": "SEM ROTA DEFINIDA",
-                                                        "LOGIN DO AGENTE": login_ag.lower().strip(),
-                                                        "NOME DO AGENTE": nome_ag.upper().strip(),
-                                                        "TELEFONE": re.sub(r'\D',
-                                                                           '',
-                                                                           tel_ag)}])],
-                                        ignore_index=True)
-                    try:
-                        planilha_db.worksheet("Agentes").clear()
-                        planilha_db.worksheet("Agentes").update(
-                            "A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
-                        st.success(f"✅ Agente salvo!")
-                        carregar_dados_agentes.clear()
-                    except Exception as e:
-                        st.error(f"Erro: {e}")
-
-    with tab_rota:
-        with st.form("form_nova_rota", clear_on_submit=True):
-            c1, c2, c3 = st.columns(3)
-            cid_rota = c1.text_input("Cidade *", placeholder="Ex: SAO PAULO")
-            bai_rota = c2.text_input("Bairro (Opcional)")
-            rua_rota = c3.text_input("Endereço (Opcional)")
-            agentes_disponiveis = sorted(
-                DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-            ag_selecionado = st.selectbox(
-                "Selecione o Agente:", agentes_disponiveis)
-
-            if st.form_submit_button("📍 Salvar Nova Rota", type="primary"):
-                if not cid_rota or not ag_selecionado:
-                    st.error("⚠️ Cidade e Agente são obrigatórios!")
-                else:
-                    rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(
-                        cid_rota), limpar_nome_local_rota(bai_rota), tratar_texto_global(rua_rota)] if p])
-                    dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE']
-                                          == ag_selecionado].iloc[0]
-                    df_novo = pd.concat([DF_AGENTES,
-                                         pd.DataFrame([{"ROTA MAPEADA": rota_str,
-                                                        "LOGIN DO AGENTE": ag_selecionado,
-                                                        "NOME DO AGENTE": dados_ag['NOME DO AGENTE'],
-                                                        "TELEFONE": dados_ag['TELEFONE']}])],
-                                        ignore_index=True)
-                    try:
-                        planilha_db.worksheet("Agentes").clear()
-                        planilha_db.worksheet("Agentes").update(
-                            "A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
-                        st.success(f"✅ Rota atrelada!")
-                        carregar_dados_agentes.clear()
-                    except Exception as e:
-                        st.error(f"Erro: {e}")
-
-    # NOVA ABA: BUSCA REVERSA DE ROTAS
-    with tab_busca:
-        st.markdown("#### 🔎 Descobrir Motorista por Localidade")
-        st.info(
-            "Digite uma cidade, bairro ou rua para descobrir qual motorista atende a região.")
-        termo_busca = st.text_input(
-            "🔍 Pesquisar Local:",
-            placeholder="Ex: ANGRA DOS REIS")
-
-        if termo_busca:
-            mask_busca = DF_AGENTES['ROTA MAPEADA'].str.contains(
-                padronizar_texto(termo_busca), case=False, na=False)
-            df_result = DF_AGENTES[mask_busca].copy()
-
-            if not df_result.empty:
-                st.success(
-                    f"✅ Encontrado(s) {
-                        len(df_result)} mapeamento(s) para esta região.")
-                st.dataframe(df_result[['ROTA MAPEADA',
-                                        'NOME DO AGENTE',
-                                        'LOGIN DO AGENTE',
-                                        'TELEFONE']],
-                             hide_index=True,
-                             use_container_width=True)
-            else:
-                st.warning(
-                    "⚠️ Nenhum motorista atrelado a este local. Pedidos desta região cairão para roteirização manual.")
-
-    with tab_tabela:
-        if not DF_AGENTES.empty:
-            agente_filtro = st.selectbox(
-                "👤 Selecione o Motorista para gerenciar:", sorted(
-                    DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()))
-            dados_atuais_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE']
-                                         == agente_filtro].iloc[0]
-
-            with st.expander("✏️ Editar Cadastro (Nome / Telefone)"):
-                with st.form(f"form_edit_{agente_filtro}"):
-                    c_edit1, c_edit2 = st.columns(2)
-                    edit_nome = c_edit1.text_input(
-                        "Nome Amigável", value=dados_atuais_ag['NOME DO AGENTE'])
-                    edit_tel = c_edit2.text_input(
-                        "WhatsApp com DDD", value=dados_atuais_ag['TELEFONE'])
-                    if st.form_submit_button(
-                        "💾 Salvar Alterações do Motorista",
-                            type="primary"):
-                        if not edit_nome or not edit_tel:
-                            st.error("Preencha todos os campos!")
-                        else:
-                            df_ag_edit = DF_AGENTES.copy()
-                            mask_edit = df_ag_edit['LOGIN DO AGENTE'] == agente_filtro
-                            df_ag_edit.loc[mask_edit,
-                                           'NOME DO AGENTE'] = edit_nome.upper().strip()
-                            df_ag_edit.loc[mask_edit, 'TELEFONE'] = re.sub(
-                                r'\D', '', edit_tel)
-                            try:
-                                aba_ag = planilha_db.worksheet("Agentes")
-                                aba_ag.clear()
-                                aba_ag.update("A1", [df_ag_edit.columns.tolist(
-                                )] + df_ag_edit.fillna("").astype(str).values.tolist())
-                                st.success(
-                                    "✅ Cadastro atualizado com sucesso!")
-                                time.sleep(1)
-                                carregar_dados_agentes.clear()
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Erro ao editar: {e}")
-
-            # NOVO: EXCLUSÃO DEFINITIVA DO MOTORISTA (AGORA COM SENHA MASTER)
-            with st.expander("🚨 Excluir Motorista Definitivamente"):
-                st.error("⚠️ Atenção: Isso apagará o login do motorista e todas as rotas atreladas a ele. Se ele tiver rotas ativas, use a aba 'Transferir' primeiro.")
-                with st.form(f"form_excluir_agente_{agente_filtro}"):
-                    senha_excluir_ag = st.text_input(
-                        "🔑 Senha Master para Autorizar Exclusão:", type="password")
-                    if st.form_submit_button(
-                            f"🗑️ APAGAR LOGIN '{agente_filtro}'",
-                            type="primary",
-                            use_container_width=True):
-                        if senha_excluir_ag == "123":
-                            with st.spinner("Excluindo registro..."):
-                                df_ag_novo = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] != agente_filtro].copy(
-                                )
-                                try:
-                                    aba_ag = planilha_db.worksheet("Agentes")
-                                    aba_ag.clear()
-                                    # Se apagar todos, recria o cabeçalho vazio
-                                    # para não quebrar a planilha
-                                    if df_ag_novo.empty:
-                                        aba_ag.update(
-                                            "A1", [["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"]])
-                                    else:
-                                        aba_ag.update("A1", [df_ag_novo.columns.tolist(
-                                        )] + df_ag_novo.fillna("").astype(str).values.tolist())
-                                    st.success(
-                                        "Motorista apagado com sucesso!")
-                                    time.sleep(1.5)
-                                    carregar_dados_agentes.clear()
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Erro ao excluir: {e}")
-                        else:
-                            st.error("❌ Senha incorreta.")
-
-            st.markdown("---")
-            st.markdown("#### 📍 Rotas Atreladas ao Motorista")
-            with st.form(f"form_rapido_{agente_filtro}", clear_on_submit=True):
-                ca1, ca2, ca3, ca4 = st.columns([2, 2, 2, 1])
-                r_cid = ca1.text_input("Cidade")
-                r_bai = ca2.text_input("Bairro (Opç)")
-                r_rua = ca3.text_input("Endereço (Opç)")
-                if ca4.form_submit_button(
-                        "➕ Salvar", use_container_width=True):
-                    if not r_cid:
-                        st.error("A Cidade é obrigatória!")
+        st.markdown("#### 👤 Registrar Novo Motorista / Agente")
+        st.info("💡 **Dica de Logins Compartilhados:** Para usar o mesmo login no app, mas separar o WhatsApp, use o separador `|`. Ex: `igo.log|edgar` e `igo.log|anderson`. O sistema envia a rota para o telefone de cada um, mas o app usa apenas `igo.log`.")
+        
+        with st.container(border=True):
+            with st.form("form_novo_agente", clear_on_submit=True):
+                c1, c2, c3 = st.columns([1, 1.5, 1])
+                login_ag = c1.text_input("ID de Login no App *", placeholder="Ex: carlos.rj")
+                nome_ag = c2.text_input("Nome Amigável *", placeholder="Ex: CARLOS SILVA")
+                tel_ag = c3.text_input("WhatsApp (com DDD) *", placeholder="Ex: 5521999999999")
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.form_submit_button("💾 Adicionar Motorista à Equipe", type="primary", use_container_width=True):
+                    if not login_ag or not nome_ag or not tel_ag:
+                        st.error("⚠️ Preencha todos os campos obrigatórios (*).")
                     else:
-                        rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(
-                            r_cid), limpar_nome_local_rota(r_bai), tratar_texto_global(r_rua)] if p])
-                        dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE']
-                                              == agente_filtro].iloc[0]
+                        df_novo = pd.concat([DF_AGENTES,
+                                             pd.DataFrame([{"ROTA MAPEADA": "SEM ROTA DEFINIDA",
+                                                            "LOGIN DO AGENTE": login_ag.lower().strip(),
+                                                            "NOME DO AGENTE": nome_ag.upper().strip(),
+                                                            "TELEFONE": re.sub(r'\D', '', tel_ag)}])],
+                                            ignore_index=True)
+                        try:
+                            planilha_db.worksheet("Agentes").clear()
+                            planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                            st.success(f"✅ Agente **{nome_ag.upper()}** cadastrado com sucesso!")
+                            carregar_dados_agentes.clear()
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao cadastrar: {e}")
+
+    # -------------------------------------------------------------------------
+    # ABA 2: VINCULAR NOVA ROTA GERAL
+    # -------------------------------------------------------------------------
+    with tab_rota:
+        st.markdown("#### 📍 Adicionar Rota a um Motorista")
+        st.markdown("<p style='color: #64748B; font-size: 14px;'>Crie um mapeamento de cidade ou bairro para que o sistema consiga roteirizar pedidos novos automaticamente para este motorista.</p>", unsafe_allow_html=True)
+        
+        with st.container(border=True):
+            with st.form("form_nova_rota", clear_on_submit=True):
+                agentes_disponiveis = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                ag_selecionado = st.selectbox("👤 Selecione o Motorista Destino *", ["Selecione..."] + agentes_disponiveis)
+                
+                st.markdown("##### Detalhes do Local")
+                c1, c2, c3 = st.columns([2, 2, 3])
+                cid_rota = c1.text_input("Cidade *", placeholder="Ex: SAO PAULO")
+                bai_rota = c2.text_input("Bairro (Opcional)")
+                rua_rota = c3.text_input("Endereço / Rua (Opcional)")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.form_submit_button("➕ Salvar Mapeamento de Rota", type="primary", use_container_width=True):
+                    if not cid_rota or ag_selecionado == "Selecione...":
+                        st.error("⚠️ Cidade e Agente são preenchimentos obrigatórios!")
+                    else:
+                        rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(cid_rota), limpar_nome_local_rota(bai_rota), tratar_texto_global(rua_rota)] if p])
+                        dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == ag_selecionado].iloc[0]
+                        
                         df_novo = pd.concat([DF_AGENTES,
                                              pd.DataFrame([{"ROTA MAPEADA": rota_str,
-                                                            "LOGIN DO AGENTE": agente_filtro,
+                                                            "LOGIN DO AGENTE": ag_selecionado,
                                                             "NOME DO AGENTE": dados_ag['NOME DO AGENTE'],
                                                             "TELEFONE": dados_ag['TELEFONE']}])],
                                             ignore_index=True)
                         try:
                             planilha_db.worksheet("Agentes").clear()
-                            planilha_db.worksheet("Agentes").update(
-                                "A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
-                            st.success("Rota adicionada!")
-                            time.sleep(0.5)
+                            planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                            st.success(f"✅ Rota '{rota_str}' atrelada a {dados_ag['NOME DO AGENTE']}!")
                             carregar_dados_agentes.clear()
+                            time.sleep(1)
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao salvar: {e}")
 
-            df_ag_filtrado = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].copy(
-            )
-            if df_ag_filtrado.empty:
-                st.warning("Nenhuma rota atrelada.")
-            else:
-                for idx, row in df_ag_filtrado.iterrows():
-                    col_rota, col_del = st.columns([5, 1])
-                    col_rota.markdown(
-                        f"<div style='padding:10px; background-color:#FFFFFF; border-radius:5px; border: 1px solid #E2E8F0;'><b>📍 {
-                            row['ROTA MAPEADA'].replace(
-                                '---', ' ➔ ')}</b></div>", unsafe_allow_html=True)
-                    if col_del.button(
-                        "🗑️ Remover",
-                        key=f"del_{idx}",
-                            use_container_width=True):
-                        try:
-                            planilha_db.worksheet("Agentes").clear()
-                            planilha_db.worksheet("Agentes").update("A1", [DF_AGENTES.drop(
-                                idx).columns.tolist()] + DF_AGENTES.drop(idx).fillna("").astype(str).values.tolist())
-                            time.sleep(0.5)
-                            carregar_dados_agentes.clear()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao remover: {e}")
-        else:
-            st.warning("Nenhum dado encontrado.")
+    # -------------------------------------------------------------------------
+    # ABA 3: BUSCA REVERSA
+    # -------------------------------------------------------------------------
+    with tab_busca:
+        st.markdown("#### 🔎 Explorador Geográfico de Rotas")
+        st.info("Descubra rapidamente qual motorista é responsável por uma determinada região. Ideal para checar se uma cidade já está coberta pelo sistema.")
+        
+        with st.container(border=True):
+            termo_busca = st.text_input("🌍 Digite o local (Cidade, Bairro ou Rua):", placeholder="Ex: ANGRA DOS REIS")
+            
+            if termo_busca:
+                mask_busca = DF_AGENTES['ROTA MAPEADA'].str.contains(padronizar_texto(termo_busca), case=False, na=False)
+                df_result = DF_AGENTES[mask_busca].copy()
 
-    with tab_transfer:
-        st.markdown("#### 🔄 Transferência em Massa de Rotas")
-        st.info(
-            "Transfira todas as rotas de um motorista que saiu da operação para um novo com um único clique.")
+                if not df_result.empty:
+                    st.success(f"✅ Encontrado(s) **{len(df_result)} mapeamento(s)** para esta pesquisa.")
+                    
+                    # Organizar para mostrar de forma mais limpa
+                    df_result_show = df_result[['ROTA MAPEADA', 'NOME DO AGENTE', 'LOGIN DO AGENTE', 'TELEFONE']].copy()
+                    df_result_show.rename(columns={'ROTA MAPEADA': '📍 Localidade Coberta', 'NOME DO AGENTE': '👤 Motorista', 'LOGIN DO AGENTE': '🔑 Login', 'TELEFONE': '📱 Contato'}, inplace=True)
+                    
+                    st.dataframe(df_result_show, hide_index=True, use_container_width=True)
+                else:
+                    st.warning("⚠️ Nenhum motorista atrelado a este local. Pedidos desta região cairão para roteirização manual ou 'Motorista Automático' não os encontrará.")
+
+    # -------------------------------------------------------------------------
+    # ABA 4: GERENCIAR (O NOVO PERFIL)
+    # -------------------------------------------------------------------------
+    with tab_tabela:
         if not DF_AGENTES.empty:
-            logins_disp = sorted(
-                DF_AGENTES['LOGIN DO AGENTE'].unique().tolist())
-            with st.form("form_transf"):
-                c1, c2 = st.columns(2)
-                de_ag = c1.selectbox(
-                    "De (Motorista Saindo):",
-                    ["Selecione..."] + logins_disp)
-                para_ag = c2.selectbox(
-                    "Para (Motorista Entrando):",
-                    ["Selecione..."] + logins_disp)
+            st.markdown("#### 📋 Gerenciamento de Perfil e Rotas")
+            
+            col_sel, _ = st.columns([1, 2])
+            agente_filtro = col_sel.selectbox(
+                "🔎 Selecione o Motorista:", 
+                sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist())
+            )
+            
+            df_ag_filtrado = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].copy()
+            dados_atuais_ag = df_ag_filtrado.iloc[0]
+            rotas_validas = [r for r in df_ag_filtrado['ROTA MAPEADA'].tolist() if str(r).strip() != "SEM ROTA DEFINIDA"]
+            qtd_rotas = len(rotas_validas)
+            
+            # 🔥 CARD DE PERFIL (Destaque) 🔥
+            st.markdown(f"""
+            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                <div>
+                    <div style="font-size: 11px; color: #64748B; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">ID de Login no Sistema</div>
+                    <div style="font-size: 24px; font-weight: 900; color: #0F172A; margin-bottom: 12px;">👤 {agente_filtro}</div>
+                    <div style="display: flex; gap: 30px;">
+                        <div>
+                            <div style="font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase;">Nome Amigável</div>
+                            <div style="font-size: 15px; font-weight: 600; color: #334155;">{dados_atuais_ag['NOME DO AGENTE']}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase;">WhatsApp</div>
+                            <div style="font-size: 15px; font-weight: 600; color: #334155;">📱 {dados_atuais_ag['TELEFONE']}</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align: center; background: #EEF2FF; padding: 15px 30px; border-radius: 10px; border: 1px solid #C7D2FE;">
+                    <div style="font-size: 12px; color: #4F46E5; font-weight: 800; text-transform: uppercase;">Rotas Ativas</div>
+                    <div style="font-size: 38px; font-weight: 900; color: #4338CA; line-height: 1;">{qtd_rotas}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-                if st.form_submit_button(
-                    "EXECUTAR TRANSFERÊNCIA",
-                    type="primary",
-                        use_container_width=True):
-                    if de_ag == "Selecione..." or para_ag == "Selecione...":
-                        st.error("⚠️ Selecione origem e destino.")
-                    elif de_ag == para_ag:
-                        st.error("⚠️ Origem e destino não podem ser iguais.")
-                    else:
-                        df_rotas = DF_AGENTES.copy()
-                        rotas_origem = df_rotas[df_rotas['LOGIN DO AGENTE'] == de_ag]
+            col_dados, col_rotas = st.columns([1, 1.2], gap="large")
 
-                        if rotas_origem.empty:
-                            st.warning(
-                                f"'{de_ag}' não possui rotas para transferir.")
-                        else:
-                            with st.spinner(f"Transferindo {len(rotas_origem)} rotas..."):
-                                dados_novo = df_rotas[df_rotas['LOGIN DO AGENTE']
-                                                      == para_ag].iloc[0]
-                                df_rotas.loc[df_rotas['LOGIN DO AGENTE'] == de_ag, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [
-                                    para_ag, dados_novo['NOME DO AGENTE'], dados_novo['TELEFONE']]
-                                df_rotas = df_rotas.drop_duplicates(
-                                    subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+            # LADO ESQUERDO: EDIÇÃO, ADICIONAR ROTA E EXCLUSÃO
+            with col_dados:
+                st.markdown("##### ✏️ Editar Informações")
+                with st.container(border=True):
+                    with st.form(f"form_edit_{agente_filtro}"):
+                        edit_nome = st.text_input("Nome Amigável", value=dados_atuais_ag['NOME DO AGENTE'])
+                        edit_tel = st.text_input("WhatsApp com DDD", value=dados_atuais_ag['TELEFONE'])
+                        
+                        if st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True):
+                            if not edit_nome or not edit_tel:
+                                st.error("Preencha todos os campos!")
+                            else:
+                                df_ag_edit = DF_AGENTES.copy()
+                                mask_edit = df_ag_edit['LOGIN DO AGENTE'] == agente_filtro
+                                df_ag_edit.loc[mask_edit, 'NOME DO AGENTE'] = edit_nome.upper().strip()
+                                df_ag_edit.loc[mask_edit, 'TELEFONE'] = re.sub(r'\D', '', edit_tel)
                                 try:
                                     aba_ag = planilha_db.worksheet("Agentes")
                                     aba_ag.clear()
-                                    aba_ag.update(
-                                        "A1", [
-                                            df_rotas.columns.tolist()] + df_rotas.fillna("").astype(str).values.tolist())
-                                    st.success(
-                                        f"🎉 Sucesso! {
-                                            len(rotas_origem)} rotas transferidas para {para_ag}.")
-                                    time.sleep(2)
+                                    aba_ag.update("A1", [df_ag_edit.columns.tolist()] + df_ag_edit.fillna("").astype(str).values.tolist())
+                                    st.success("✅ Cadastro atualizado com sucesso!")
                                     carregar_dados_agentes.clear()
+                                    time.sleep(1)
                                     st.rerun()
                                 except Exception as e:
-                                    st.error(f"Erro na transferência: {e}")
+                                    st.error(f"Erro ao editar: {e}")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                st.markdown("##### 📍 Adicionar Rota ao Perfil")
+                with st.container(border=True):
+                    with st.form(f"form_rapido_{agente_filtro}", clear_on_submit=True):
+                        r_cid = st.text_input("Cidade *", placeholder="Obrigatório")
+                        ca1, ca2 = st.columns(2)
+                        r_bai = ca1.text_input("Bairro (Opç)")
+                        r_rua = ca2.text_input("Endereço (Opç)")
+                        
+                        if st.form_submit_button("➕ Adicionar Rota", use_container_width=True):
+                            if not r_cid:
+                                st.error("A Cidade é obrigatória!")
+                            else:
+                                rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai), tratar_texto_global(r_rua)] if p])
+                                df_novo = pd.concat([DF_AGENTES,
+                                                     pd.DataFrame([{"ROTA MAPEADA": rota_str,
+                                                                    "LOGIN DO AGENTE": agente_filtro,
+                                                                    "NOME DO AGENTE": dados_atuais_ag['NOME DO AGENTE'],
+                                                                    "TELEFONE": dados_atuais_ag['TELEFONE']}])],
+                                                    ignore_index=True)
+                                try:
+                                    planilha_db.worksheet("Agentes").clear()
+                                    planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                                    st.success("Rota adicionada!")
+                                    carregar_dados_agentes.clear()
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro ao salvar: {e}")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                st.markdown("##### 🚨 Zona de Risco")
+                with st.expander("🗑️ Excluir Motorista Definitivamente"):
+                    st.error("⚠️ **Atenção:** Isso apagará o login e todas as rotas atreladas a ele. Transfira as rotas na aba 'Transferência' antes, se necessário.")
+                    with st.form(f"form_excluir_agente_{agente_filtro}"):
+                        senha_excluir_ag = st.text_input("🔑 Senha Master para Exclusão:", type="password")
+                        if st.form_submit_button(f"APAGAR '{agente_filtro}'", type="primary", use_container_width=True):
+                            if senha_excluir_ag == "123":
+                                with st.spinner("Excluindo registro..."):
+                                    df_ag_novo = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] != agente_filtro].copy()
+                                    try:
+                                        aba_ag = planilha_db.worksheet("Agentes")
+                                        aba_ag.clear()
+                                        if df_ag_novo.empty:
+                                            aba_ag.update("A1", [["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"]])
+                                        else:
+                                            aba_ag.update("A1", [df_ag_novo.columns.tolist()] + df_ag_novo.fillna("").astype(str).values.tolist())
+                                        st.success("Motorista apagado com sucesso!")
+                                        carregar_dados_agentes.clear()
+                                        time.sleep(1.5)
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Erro ao excluir: {e}")
+                            else:
+                                st.error("❌ Senha incorreta.")
+
+            # LADO DIREITO: LISTA DEDICADA DE ROTAS
+            with col_rotas:
+                st.markdown(f"##### 🗺️ Tabela de Rotas Atuais ({qtd_rotas})")
+                
+                if qtd_rotas == 0:
+                    st.info("Nenhuma rota válida atrelada a este motorista.")
+                else:
+                    # Container gigante e limpo para visualizar as rotas sem aperto
+                    with st.container(height=650, border=True):
+                        for idx, row in df_ag_filtrado.iterrows():
+                            if str(row['ROTA MAPEADA']).strip() == "SEM ROTA DEFINIDA": 
+                                continue
+                            
+                            col_r, col_del = st.columns([6, 1], vertical_alignment="center")
+                            col_r.markdown(
+                                f"""<div style='padding:12px 15px; background-color:#F8FAFC; border-radius:8px; border: 1px solid #CBD5E1; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: center;'>
+                                    <span style='font-size: 16px; margin-right: 10px;'>📍</span>
+                                    <b style='color:#1E293B; font-size: 13px; letter-spacing: 0.3px;'>{row['ROTA MAPEADA'].replace('---', ' ➔ ')}</b>
+                                </div>""", 
+                                unsafe_allow_html=True
+                            )
+                            if col_del.button("❌", key=f"del_{idx}", help="Remover esta rota", use_container_width=True):
+                                try:
+                                    planilha_db.worksheet("Agentes").clear()
+                                    planilha_db.worksheet("Agentes").update("A1", [DF_AGENTES.drop(idx).columns.tolist()] + DF_AGENTES.drop(idx).fillna("").astype(str).values.tolist())
+                                    carregar_dados_agentes.clear()
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro ao remover: {e}")
+        else:
+            st.warning("Nenhum dado encontrado no banco de agentes.")
+
+    # -------------------------------------------------------------------------
+    # ABA 5: TRANSFERÊNCIA EM MASSA OU PARCIAL
+    # -------------------------------------------------------------------------
+    with tab_transfer:
+        st.markdown("#### 🔄 Transferência Direta de Rotas")
+        st.info("Selecione a origem e o destino. Depois, transfira rotas individuais clicando no botão ao lado de cada uma, ou transfira todas de uma vez.")
+        
+        if not DF_AGENTES.empty:
+            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist())
+            
+            with st.container(border=True):
+                c1, c_arrow, c2 = st.columns([2, 0.5, 2], vertical_alignment="center")
+                de_ag = c1.selectbox("📤 De (Motorista Atual):", ["Selecione..."] + logins_disp)
+                c_arrow.markdown("<h2 style='text-align: center; color: #94A3B8; margin-top: 15px;'>➡️</h2>", unsafe_allow_html=True)
+                para_ag = c2.selectbox("📥 Para (Novo Motorista):", ["Selecione..."] + logins_disp)
+
+                if de_ag != "Selecione...":
+                    df_rotas_origem = DF_AGENTES[(DF_AGENTES['LOGIN DO AGENTE'] == de_ag) & (DF_AGENTES['ROTA MAPEADA'] != "SEM ROTA DEFINIDA")].copy()
+                    
+                    if df_rotas_origem.empty:
+                        st.warning(f"O agente '{de_ag}' não possui rotas válidas para transferir.")
+                    else:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        
+                        col_titulo, col_transf_tudo = st.columns([3, 2], vertical_alignment="center")
+                        col_titulo.markdown(f"##### 📍 Rotas de {de_ag} ({len(df_rotas_origem)})")
+                        
+                        if para_ag != "Selecione..." and de_ag != para_ag:
+                            if col_transf_tudo.button("🚀 TRANSFERIR TODAS AS ROTAS", type="primary", use_container_width=True):
+                                with st.spinner(f"Transferindo todas as rotas para {para_ag}..."):
+                                    df_rotas_full = DF_AGENTES.copy()
+                                    dados_novo = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == para_ag].iloc[0]
+                                    mask_transfer = (df_rotas_full['LOGIN DO AGENTE'] == de_ag) & (df_rotas_full['ROTA MAPEADA'] != "SEM ROTA DEFINIDA")
+                                    df_rotas_full.loc[mask_transfer, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [para_ag, dados_novo['NOME DO AGENTE'], dados_novo['TELEFONE']]
+                                    df_rotas_full = df_rotas_full.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+                                    
+                                    try:
+                                        aba_ag = planilha_db.worksheet("Agentes")
+                                        aba_ag.clear()
+                                        aba_ag.update("A1", [df_rotas_full.columns.tolist()] + df_rotas_full.fillna("").astype(str).values.tolist())
+                                        st.success(f"🎉 Todas as rotas transferidas para {para_ag}.")
+                                        carregar_dados_agentes.clear()
+                                        time.sleep(1)
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Erro na transferência: {e}")
+                        
+                        st.markdown("<hr style='margin-top: 5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+                        
+                        # Interface da lista de rotas com botões individuais
+                        with st.container(height=450, border=False):
+                            for idx, row in df_rotas_origem.iterrows():
+                                rota_nome = row['ROTA MAPEADA']
+                                col_r, col_btn = st.columns([5, 1.5], vertical_alignment="center")
+                                col_r.markdown(
+                                    f"""<div style='padding:12px 15px; background-color:#F8FAFC; border-radius:8px; border: 1px solid #CBD5E1; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: center;'>
+                                        <span style='font-size: 16px; margin-right: 10px;'>📍</span>
+                                        <b style='color:#1E293B; font-size: 13px; letter-spacing: 0.3px;'>{rota_nome.replace('---', ' ➔ ')}</b>
+                                    </div>""", 
+                                    unsafe_allow_html=True
+                                )
+                                
+                                if col_btn.button("🔄 Transferir", key=f"transf_{idx}", use_container_width=True):
+                                    if para_ag == "Selecione...":
+                                        st.error("⚠️ Selecione o motorista de destino acima primeiro.")
+                                    elif de_ag == para_ag:
+                                        st.error("⚠️ A origem e destino não podem ser iguais.")
+                                    else:
+                                        with st.spinner(f"Transferindo rota..."):
+                                            df_rotas_full = DF_AGENTES.copy()
+                                            dados_novo = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == para_ag].iloc[0]
+                                            mask_transfer = (df_rotas_full['LOGIN DO AGENTE'] == de_ag) & (df_rotas_full['ROTA MAPEADA'] == rota_nome)
+                                            df_rotas_full.loc[mask_transfer, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [para_ag, dados_novo['NOME DO AGENTE'], dados_novo['TELEFONE']]
+                                            df_rotas_full = df_rotas_full.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+                                            
+                                            try:
+                                                aba_ag = planilha_db.worksheet("Agentes")
+                                                aba_ag.clear()
+                                                aba_ag.update("A1", [df_rotas_full.columns.tolist()] + df_rotas_full.fillna("").astype(str).values.tolist())
+                                                st.success(f"Rota transferida para {para_ag}!")
+                                                carregar_dados_agentes.clear()
+                                                time.sleep(0.5)
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Erro na transferência: {e}")
         else:
             st.warning("O banco de agentes está vazio.")
 
+    # -------------------------------------------------------------------------
+    # ABA 6: SISTEMA (ADMIN)
+    # -------------------------------------------------------------------------
     with tab_sistema:
-        st.markdown("#### 🧹 Faxina Inteligente & Arquivo Morto")
-        st.info("💡 Move pedidos finalizados com mais de 30 dias para a aba 'ARQUIVO_MORTO'. O CCO fica rápido e a contagem de IDs não se perde.")
-        with st.form("form_limpeza_30_dias"):
-            senha_limpeza = st.text_input(
-                "🔑 Senha de Confirmação (Digite: 123):", type="password")
-            if st.form_submit_button(
-                "🚀 EXECUTAR ARQUIVAMENTO DE 30 DIAS",
-                type="primary",
-                    use_container_width=True):
-                if senha_limpeza == "123":
-                    with st.spinner("Analisando linha do tempo e arquivando histórico antigo..."):
-                        try:
-                            aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            df_m = pd.DataFrame(
-                                aba_m.get_all_values()[
-                                    1:], columns=aba_m.get_all_values()[0])
-                            df_m['DT_TEMP'] = pd.to_datetime(
-                                df_m['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
-                            corte = hoje_br - timedelta(days=30)
-
-                            df_velhos = df_m[df_m['DT_TEMP'] <
-                                             corte].drop(columns=['DT_TEMP'])
-                            df_novos = df_m[df_m['DT_TEMP'] >=
-                                            corte].drop(columns=['DT_TEMP'])
-
-                            if not df_velhos.empty:
+        st.markdown("#### ⚠️ Administração do Sistema")
+        
+        col_sys1, col_sys2 = st.columns(2, gap="large")
+        
+        with col_sys1:
+            with st.container(border=True):
+                st.markdown("<h5 style='color: #D97706; margin-bottom: 0px;'>🧹 Faxina de 30 Dias (Arquivo Morto)</h5>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size: 13px; color: #64748B;'>Move pedidos finalizados com mais de 30 dias para a aba 'ARQUIVO_MORTO'. O CCO fica rápido e a contagem de IDs originais é preservada.</p>", unsafe_allow_html=True)
+                
+                with st.form("form_limpeza_30_dias"):
+                    senha_limpeza = st.text_input("🔑 Senha de Autorização (123):", type="password")
+                    if st.form_submit_button("🚀 EXECUTAR FAXINA", type="primary", use_container_width=True):
+                        if senha_limpeza == "123":
+                            with st.spinner("Analisando linha do tempo e arquivando histórico antigo..."):
                                 try:
-                                    aba_morto = planilha_db.worksheet(
-                                        "ARQUIVO_MORTO")
-                                except BaseException:
-                                    aba_morto = planilha_db.add_worksheet(
-                                        "ARQUIVO_MORTO", 100, 20)
-                                    aba_morto.update(
-                                        "A1", [df_velhos.columns.tolist()])
+                                    aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                    df_m = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                                    df_m['DT_TEMP'] = pd.to_datetime(df_m['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+                                    corte = hoje_br - timedelta(days=30)
 
-                                aba_morto.append_rows(
-                                    df_velhos.fillna("").astype(str).values.tolist())
-                                aba_m.clear()
-                                aba_m.update(
-                                    "A1", [
-                                        df_novos.columns.tolist()] + df_novos.fillna("").astype(str).values.tolist())
+                                    df_velhos = df_m[df_m['DT_TEMP'] < corte].drop(columns=['DT_TEMP'])
+                                    df_novos = df_m[df_m['DT_TEMP'] >= corte].drop(columns=['DT_TEMP'])
 
-                                pedidos_preservados = df_novos['PEDIDO'].astype(
-                                    str).tolist()
+                                    if not df_velhos.empty:
+                                        try:
+                                            aba_morto = planilha_db.worksheet("ARQUIVO_MORTO")
+                                        except BaseException:
+                                            aba_morto = planilha_db.add_worksheet("ARQUIVO_MORTO", 100, 20)
+                                            aba_morto.update("A1", [df_velhos.columns.tolist()])
+
+                                        aba_morto.append_rows(df_velhos.fillna("").astype(str).values.tolist())
+                                        aba_m.clear()
+                                        aba_m.update("A1", [df_novos.columns.tolist()] + df_novos.fillna("").astype(str).values.tolist())
+
+                                        pedidos_preservados = df_novos['PEDIDO'].astype(str).tolist()
+                                        try:
+                                            aba_app = planilha_db.worksheet("App_Tarefas")
+                                            df_app = pd.DataFrame(aba_app.get_all_values()[1:], columns=aba_app.get_all_values()[0])
+                                            if 'PEDIDO' in df_app.columns:
+                                                df_app_novo = df_app[df_app['PEDIDO'].astype(str).isin(pedidos_preservados)]
+                                                aba_app.clear()
+                                                aba_app.update("A1", [df_app_novo.columns.tolist()] + df_app_novo.fillna("").astype(str).values.tolist())
+                                        except BaseException:
+                                            pass
+
+                                        st.success(f"✅ Limpeza concluída! 🗑️ {len(df_velhos)} registros antigos foram movidos para o Arquivo Morto.")
+                                    else:
+                                        st.info("👍 A base já está leve! Não foram encontrados pedidos antigos.")
+                                    
+                                    carregar_dados_completos.clear()
+                                    time.sleep(2.5)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro ao realizar a limpeza: {e}")
+                        else:
+                            if senha_limpeza: st.error("❌ Senha incorreta.")
+
+        with col_sys2:
+            with st.container(border=True):
+                st.markdown("<h5 style='color: #DC2626; margin-bottom: 0px;'>🚨 Reset Total do Banco</h5>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size: 13px; color: #64748B;'>Zera completamente a base de dados (Memoria_Sistema e App_Tarefas), preservando apenas os cabeçalhos. Ação irreversível.</p>", unsafe_allow_html=True)
+                
+                with st.form("form_reset_banco"):
+                    senha_reset = st.text_input("🔑 Senha Master (123):", type="password")
+                    if st.form_submit_button("🗑️ ZERAR TUDO", type="primary", use_container_width=True):
+                        if senha_reset == "123":
+                            with st.spinner("Limpando banco de dados com segurança..."):
                                 try:
-                                    aba_app = planilha_db.worksheet(
-                                        "App_Tarefas")
-                                    df_app = pd.DataFrame(
-                                        aba_app.get_all_values()[
-                                            1:], columns=aba_app.get_all_values()[0])
-                                    if 'PEDIDO' in df_app.columns:
-                                        df_app_novo = df_app[df_app['PEDIDO'].astype(
-                                            str).isin(pedidos_preservados)]
+                                    aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                    cabecalho_m = aba_m.row_values(1)
+                                    aba_m.clear()
+                                    aba_m.update("A1", [cabecalho_m])
+                                    try:
+                                        aba_app = planilha_db.worksheet("App_Tarefas")
+                                        cabecalho_app = aba_app.row_values(1)
                                         aba_app.clear()
-                                        aba_app.update("A1", [df_app_novo.columns.tolist(
-                                        )] + df_app_novo.fillna("").astype(str).values.tolist())
-                                except BaseException:
-                                    pass
-
-                                st.success(
-                                    f"✅ Limpeza concluída! 🗑️ {
-                                        len(df_velhos)} registros antigos foram movidos para o Arquivo Morto.")
-                            else:
-                                st.info(
-                                    "👍 A base já está leve! Não foram encontrados pedidos antigos.")
-                            time.sleep(2.5)
-                            carregar_dados_completos.clear()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao realizar a limpeza: {e}")
-                else:
-                    if senha_limpeza:
-                        st.error("❌ Senha incorreta.")
-
-        st.markdown("---")
-        st.markdown("#### 🚨 Zona de Perigo: Reset Total do Banco")
-        with st.form("form_reset_banco"):
-            senha_reset = st.text_input(
-                "🔑 Senha de Autorização (Digite: 123):", type="password")
-            if st.form_submit_button(
-                "🗑️ ZERAR TUDO (RESET TOTAL)",
-                type="primary",
-                    use_container_width=True):
-                if senha_reset == "123":
-                    with st.spinner("Limpando banco de dados com segurança e preservando cabeçalhos..."):
-                        try:
-                            aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            cabecalho_m = aba_m.row_values(1)
-                            aba_m.clear()
-                            aba_m.update("A1", [cabecalho_m])
-                            try:
-                                aba_app = planilha_db.worksheet("App_Tarefas")
-                                cabecalho_app = aba_app.row_values(1)
-                                aba_app.clear()
-                                aba_app.update("A1", [cabecalho_app])
-                            except Exception:
-                                pass
-                            st.success(
-                                "✅ Banco zerado com sucesso! A base está pronta para a produção.")
-                            time.sleep(2)
-                            carregar_dados_completos.clear()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro Crítico ao limpar o banco: {e}")
-                else:
-                    if senha_reset:
-                        st.error("❌ Senha incorreta.")
+                                        aba_app.update("A1", [cabecalho_app])
+                                    except Exception:
+                                        pass
+                                    st.success("✅ Banco zerado com sucesso! A base está pronta para um novo ciclo de produção.")
+                                    carregar_dados_completos.clear()
+                                    time.sleep(2)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro Crítico ao limpar o banco: {e}")
+                        else:
+                            if senha_reset: st.error("❌ Senha incorreta.")
 # =============================================================================
 # 🎧 MÓDULO NOVO: ATENDIMENTO / HELPDESK
 # =============================================================================
