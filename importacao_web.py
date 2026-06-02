@@ -6615,11 +6615,12 @@ elif menu == "⚙️ Rotas":
                 time.sleep(0.5)
                 st.rerun()
 
-    tab_agente, tab_rota, tab_busca, tab_tabela, tab_transfer, tab_sistema = st.tabs(
-        ["👤 Cadastrar Motorista", "📍 Atrelar Rota", "🔎 Explorador", "📋 Gerenciar Perfil", "🔄 Transferência", "⚠️ Admin"])
+    # 🔄 ABAS REORGANIZADAS: 'Atrelar Rota' removida (agora 100% dentro de Gerenciar Perfil)
+    tab_agente, tab_busca, tab_tabela, tab_sistema = st.tabs(
+        ["👤 Cadastrar Motorista", "🔎 Explorador", "📋 Gerenciar Perfil e Transferências", "⚠️ Admin"])
 
     # -------------------------------------------------------------------------
-    # ABA 1: CADASTRAR MOTORISTA
+    # CADASTRAR MOTORISTA
     # -------------------------------------------------------------------------
     with tab_agente:
         st.markdown("#### 👤 Registrar Novo Motorista / Agente")
@@ -6629,24 +6630,24 @@ elif menu == "⚙️ Rotas":
             with st.form("form_novo_agente", clear_on_submit=True):
                 c1, c2, c3 = st.columns([1, 1.5, 1])
                 login_ag = c1.text_input("ID de Login no App *", placeholder="Ex: carlos.rj")
-                nome_ag = c2.text_input("Nome Amigável *", placeholder="Ex: CARLOS SILVA")
+                name_ag = c2.text_input("Nome Amigável *", placeholder="Ex: CARLOS SILVA")
                 tel_ag = c3.text_input("WhatsApp (com DDD) *", placeholder="Ex: 5521999999999")
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.form_submit_button("💾 Adicionar Motorista à Equipe", type="primary", use_container_width=True):
-                    if not login_ag or not nome_ag or not tel_ag:
+                    if not login_ag or not name_ag or not tel_ag:
                         st.error("⚠️ Preencha todos os campos obrigatórios (*).")
                     else:
                         df_novo = pd.concat([DF_AGENTES,
                                              pd.DataFrame([{"ROTA MAPEADA": "SEM ROTA DEFINIDA",
                                                             "LOGIN DO AGENTE": login_ag.lower().strip(),
-                                                            "NOME DO AGENTE": nome_ag.upper().strip(),
+                                                            "NOME DO AGENTE": name_ag.upper().strip(),
                                                             "TELEFONE": re.sub(r'\D', '', tel_ag)}])],
                                             ignore_index=True)
                         try:
                             planilha_db.worksheet("Agentes").clear()
                             planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
-                            st.success(f"✅ Agente **{nome_ag.upper()}** cadastrado com sucesso!")
+                            st.success(f"Campão! Agente **{name_ag.upper()}** cadastrado com sucesso!")
                             carregar_dados_agentes.clear()
                             time.sleep(1)
                             st.rerun()
@@ -6654,49 +6655,7 @@ elif menu == "⚙️ Rotas":
                             st.error(f"Erro ao cadastrar: {e}")
 
     # -------------------------------------------------------------------------
-    # ABA 2: VINCULAR NOVA ROTA GERAL
-    # -------------------------------------------------------------------------
-    with tab_rota:
-        st.markdown("#### 📍 Adicionar Rota a um Motorista")
-        st.markdown("<p style='color: #64748B; font-size: 14px;'>Crie um mapeamento de cidade ou bairro para que o sistema consiga roteirizar pedidos novos automaticamente para este motorista.</p>", unsafe_allow_html=True)
-        
-        with st.container(border=True):
-            with st.form("form_nova_rota", clear_on_submit=True):
-                agentes_disponiveis = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-                ag_selecionado = st.selectbox("👤 Selecione o Motorista Destino *", ["Selecione..."] + agentes_disponiveis)
-                
-                st.markdown("##### Detalhes do Local")
-                c1, c2, c3 = st.columns([2, 2, 3])
-                cid_rota = c1.text_input("Cidade *", placeholder="Ex: SAO PAULO")
-                bai_rota = c2.text_input("Bairro (Opcional)")
-                rua_rota = c3.text_input("Endereço / Rua (Opcional)")
-
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.form_submit_button("➕ Salvar Mapeamento de Rota", type="primary", use_container_width=True):
-                    if not cid_rota or ag_selecionado == "Selecione...":
-                        st.error("⚠️ Cidade e Agente são preenchimentos obrigatórios!")
-                    else:
-                        rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(cid_rota), limpar_nome_local_rota(bai_rota), tratar_texto_global(rua_rota)] if p])
-                        dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == ag_selecionado].iloc[0]
-                        
-                        df_novo = pd.concat([DF_AGENTES,
-                                             pd.DataFrame([{"ROTA MAPEADA": rota_str,
-                                                            "LOGIN DO AGENTE": ag_selecionado,
-                                                            "NOME DO AGENTE": dados_ag['NOME DO AGENTE'],
-                                                            "TELEFONE": dados_ag['TELEFONE']}])],
-                                            ignore_index=True)
-                        try:
-                            planilha_db.worksheet("Agentes").clear()
-                            planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
-                            st.success(f"✅ Rota '{rota_str}' atrelada a {dados_ag['NOME DO AGENTE']}!")
-                            carregar_dados_agentes.clear()
-                            time.sleep(1)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao salvar: {e}")
-
-    # -------------------------------------------------------------------------
-    # ABA 3: BUSCA REVERSA
+    # EXPLORADOR GEOGRÁFICO
     # -------------------------------------------------------------------------
     with tab_busca:
         st.markdown("#### 🔎 Explorador Geográfico de Rotas")
@@ -6711,26 +6670,31 @@ elif menu == "⚙️ Rotas":
 
                 if not df_result.empty:
                     st.success(f"✅ Encontrado(s) **{len(df_result)} mapeamento(s)** para esta pesquisa.")
-                    
-                    # Organizar para mostrar de forma mais limpa
                     df_result_show = df_result[['ROTA MAPEADA', 'NOME DO AGENTE', 'LOGIN DO AGENTE', 'TELEFONE']].copy()
                     df_result_show.rename(columns={'ROTA MAPEADA': '📍 Localidade Coberta', 'NOME DO AGENTE': '👤 Motorista', 'LOGIN DO AGENTE': '🔑 Login', 'TELEFONE': '📱 Contato'}, inplace=True)
-                    
                     st.dataframe(df_result_show, hide_index=True, use_container_width=True)
                 else:
-                    st.warning("⚠️ Nenhum motorista atrelado a este local. Pedidos desta região cairão para roteirização manual ou 'Motorista Automático' não os encontrará.")
+                    st.warning("⚠️ Nenhum motorista atrelado a este local. Mapeie uma nova rota para cobrir essa região.")
 
     # -------------------------------------------------------------------------
-    # ABA 4: GERENCIAR (O NOVO PERFIL)
+    # 📋 GERENCIAR PERFIL E TRANSFERÊNCIAS (VISUAL PREMIUM E BUSCA INTELIGENTE)
     # -------------------------------------------------------------------------
     with tab_tabela:
         if not DF_AGENTES.empty:
-            st.markdown("#### 📋 Gerenciamento de Perfil e Rotas")
+            st.markdown("#### 📋 Gerenciamento de Perfil, Rotas e Transferências")
+            
+            # 🔥 Dicionário para mostrar "Nome Amigável (Login)" no Selectbox 🔥
+            df_unicos_ag = DF_AGENTES.drop_duplicates('LOGIN DO AGENTE')
+            dict_exibicao_ag = {
+                row['LOGIN DO AGENTE']: f"{row['NOME DO AGENTE']} ({row['LOGIN DO AGENTE']})"
+                for _, row in df_unicos_ag.iterrows()
+            }
             
             col_sel, _ = st.columns([1, 2])
             agente_filtro = col_sel.selectbox(
-                "🔎 Selecione o Motorista:", 
-                sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist())
+                "🔎 Selecione o Motorista em Análise:", 
+                options=sorted(dict_exibicao_ag.keys()),
+                format_func=lambda x: dict_exibicao_ag.get(x, x)
             )
             
             df_ag_filtrado = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == agente_filtro].copy()
@@ -6738,33 +6702,37 @@ elif menu == "⚙️ Rotas":
             rotas_validas = [r for r in df_ag_filtrado['ROTA MAPEADA'].tolist() if str(r).strip() != "SEM ROTA DEFINIDA"]
             qtd_rotas = len(rotas_validas)
             
-            # 🔥 CARD DE PERFIL (Destaque) 🔥
+            # 🔥 HEADER DO PERFIL (VISUAL APP MODERNO) 🔥
             st.markdown(f"""
-            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-                <div>
-                    <div style="font-size: 11px; color: #64748B; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">ID de Login no Sistema</div>
-                    <div style="font-size: 24px; font-weight: 900; color: #0F172A; margin-bottom: 12px;">👤 {agente_filtro}</div>
-                    <div style="display: flex; gap: 30px;">
-                        <div>
-                            <div style="font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase;">Nome Amigável</div>
-                            <div style="font-size: 15px; font-weight: 600; color: #334155;">{dados_atuais_ag['NOME DO AGENTE']}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase;">WhatsApp</div>
-                            <div style="font-size: 15px; font-weight: 600; color: #334155;">📱 {dados_atuais_ag['TELEFONE']}</div>
+            <div style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); width: 75px; height: 75px; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);">
+                        <span style="font-size: 35px; color: white;">🧑‍✈️</span>
+                    </div>
+                    <div>
+                        <div style="font-size: 22px; font-weight: 900; color: #0f172a; margin-bottom: 6px; letter-spacing: -0.5px;">{dados_atuais_ag['NOME DO AGENTE']}</div>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <span style="background: #eff6ff; color: #1d4ed8; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; border: 1px solid #bfdbfe;">
+                                🆔 {agente_filtro}
+                            </span>
+                            <span style="background: #f0fdf4; color: #15803d; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; border: 1px solid #bbf7d0;">
+                                📱 {dados_atuais_ag['TELEFONE']}
+                            </span>
                         </div>
                     </div>
                 </div>
-                <div style="text-align: center; background: #EEF2FF; padding: 15px 30px; border-radius: 10px; border: 1px solid #C7D2FE;">
-                    <div style="font-size: 12px; color: #4F46E5; font-weight: 800; text-transform: uppercase;">Rotas Ativas</div>
-                    <div style="font-size: 38px; font-weight: 900; color: #4338CA; line-height: 1;">{qtd_rotas}</div>
+                <div style="text-align: right; padding-left: 20px; border-left: 2px dashed #e2e8f0;">
+                    <div style="font-size: 11px; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Rotas Ativas</div>
+                    <div style="font-size: 42px; font-weight: 900; color: #3b82f6; line-height: 1;">{qtd_rotas}</div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            col_dados, col_rotas = st.columns([1, 1.2], gap="large")
+            col_dados, col_rotas = st.columns([5, 7], gap="large")
 
-            # LADO ESQUERDO: EDIÇÃO, ADICIONAR ROTA E EXCLUSÃO
+            # ==========================================
+            # LADO ESQUERDO: Edição e Adição de Rota
+            # ==========================================
             with col_dados:
                 st.markdown("##### ✏️ Editar Informações")
                 with st.container(border=True):
@@ -6793,7 +6761,7 @@ elif menu == "⚙️ Rotas":
 
                 st.markdown("<br>", unsafe_allow_html=True)
                 
-                st.markdown("##### 📍 Adicionar Rota ao Perfil")
+                st.markdown("##### 📍 Adicionar Rota Rápida")
                 with st.container(border=True):
                     with st.form(f"form_rapido_{agente_filtro}", clear_on_submit=True):
                         r_cid = st.text_input("Cidade *", placeholder="Obrigatório")
@@ -6825,8 +6793,8 @@ elif menu == "⚙️ Rotas":
                 st.markdown("<br>", unsafe_allow_html=True)
 
                 st.markdown("##### 🚨 Zona de Risco")
-                with st.expander("🗑️ Excluir Motorista Definitivamente"):
-                    st.error("⚠️ **Atenção:** Isso apagará o login e todas as rotas atreladas a ele. Transfira as rotas na aba 'Transferência' antes, se necessário.")
+                with st.expander("Excluir Motorista Definitivamente"):
+                    st.error("⚠️ **Atenção:** Isso apagará o login e todas as rotas atreladas a ele de forma permanente.")
                     with st.form(f"form_excluir_agente_{agente_filtro}"):
                         senha_excluir_ag = st.text_input("🔑 Senha Master para Exclusão:", type="password")
                         if st.form_submit_button(f"APAGAR '{agente_filtro}'", type="primary", use_container_width=True):
@@ -6849,28 +6817,101 @@ elif menu == "⚙️ Rotas":
                             else:
                                 st.error("❌ Senha incorreta.")
 
-            # LADO DIREITO: LISTA DEDICADA DE ROTAS
+            # ==========================================
+            # LADO DIREITO: GRID DE ROTAS ESTILO "CARDS"
+            # ==========================================
             with col_rotas:
-                st.markdown(f"##### 🗺️ Tabela de Rotas Atuais ({qtd_rotas})")
+                col_t_title, col_t_all = st.columns([3, 2], vertical_alignment="center")
+                col_t_title.markdown(f"##### 🗺️ Mapeamento de Rotas")
+                
+                # Lista de destino com formato NOME (login) para a transferência
+                dict_para = dict_exibicao_ag.copy()
+                if agente_filtro in dict_para:
+                    del dict_para[agente_filtro] # Remove o agente atual das opções de destino
+                
+                # Botão Global: Transferir todas
+                if qtd_rotas > 0:
+                    with col_t_all.popover("🚀 Transferir Todas", use_container_width=True):
+                        st.markdown("**Transferir TODAS as rotas deste perfil para:**")
+                        para_todos = st.selectbox(
+                            "Selecione o destino:", 
+                            options=["Selecione..."] + sorted(dict_para.keys()),
+                            format_func=lambda x: dict_para.get(x, x),
+                            key="transf_all_sel"
+                        )
+                        if st.button("Confirmar Envio", key="btn_confirm_all_transf", type="primary", use_container_width=True):
+                            if para_todos != "Selecione...":
+                                with st.spinner(f"Transferindo tudo para {para_todos}..."):
+                                    df_rotas_full = DF_AGENTES.copy()
+                                    dados_novo = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == para_todos].iloc[0]
+                                    mask_transfer = (df_rotas_full['LOGIN DO AGENTE'] == agente_filtro) & (df_rotas_full['ROTA MAPEADA'] != "SEM ROTA DEFINIDA")
+                                    df_rotas_full.loc[mask_transfer, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [para_todos, dados_novo['NOME DO AGENTE'], dados_novo['TELEFONE']]
+                                    df_rotas_full = df_rotas_full.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+                                    try:
+                                        planilha_db.worksheet("Agentes").clear()
+                                        planilha_db.worksheet("Agentes").update("A1", [df_rotas_full.columns.tolist()] + df_rotas_full.fillna("").astype(str).values.tolist())
+                                        st.success(f"🎉 Todas as rotas migradas para {para_todos}!")
+                                        carregar_dados_agentes.clear()
+                                        time.sleep(1)
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Erro na transferência: {e}")
                 
                 if qtd_rotas == 0:
-                    st.info("Nenhuma rota válida atrelada a este motorista.")
+                    st.info("Nenhuma rota cadastrada para este motorista.")
                 else:
-                    # Container gigante e limpo para visualizar as rotas sem aperto
+                    # RESTAURADO o height=650 com a barra de rolagem (Container Scrollável)
                     with st.container(height=650, border=True):
-                        for idx, row in df_ag_filtrado.iterrows():
-                            if str(row['ROTA MAPEADA']).strip() == "SEM ROTA DEFINIDA": 
+                        for idx_ui, (idx, row) in enumerate(df_ag_filtrado.iterrows()):
+                            rota_nome = row['ROTA MAPEADA']
+                            if str(rota_nome).strip() == "SEM ROTA DEFINIDA": 
                                 continue
                             
-                            col_r, col_del = st.columns([6, 1], vertical_alignment="center")
+                            col_r, col_transf, col_del = st.columns([11, 2, 2], vertical_alignment="center")
+                            
                             col_r.markdown(
-                                f"""<div style='padding:12px 15px; background-color:#F8FAFC; border-radius:8px; border: 1px solid #CBD5E1; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: center;'>
-                                    <span style='font-size: 16px; margin-right: 10px;'>📍</span>
-                                    <b style='color:#1E293B; font-size: 13px; letter-spacing: 0.3px;'>{row['ROTA MAPEADA'].replace('---', ' ➔ ')}</b>
+                                f"""<div style='padding: 14px 16px; background: white; border-radius: 10px; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6; margin-bottom: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; align-items: center;'>
+                                    <div style='background: #eff6ff; width: 36px; height: 36px; border-radius: 8px; display: flex; justify-content: center; align-items: center; margin-right: 15px; flex-shrink: 0;'>
+                                        <span style='font-size: 16px;'>📍</span>
+                                    </div>
+                                    <div>
+                                        <div style='font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;'>Destino / Rota</div>
+                                        <div style='color: #1e293b; font-size: 14px; font-weight: 800;'>{rota_nome.replace('---', ' ➔ ')}</div>
+                                    </div>
                                 </div>""", 
                                 unsafe_allow_html=True
                             )
-                            if col_del.button("❌", key=f"del_{idx}", help="Remover esta rota", use_container_width=True):
+                            
+                            # 🔥 A MÁGICA DOS BOTÕES INVISÍVEIS: Usa "Zero-width spaces" (\u200b) para diferenciar IDs sem aparecer texto 🔥
+                            lbl_popover = "🔄" + ("\u200b" * idx_ui)
+                            
+                            with col_transf.popover(lbl_popover, help="Mover apenas esta rota para outro motorista"):
+                                st.markdown(f"**Transferir esta rota para:**")
+                                para_motorista = st.selectbox(
+                                    "Escolha o destino:", 
+                                    options=["Selecione..."] + sorted(dict_para.keys()),
+                                    format_func=lambda x: dict_para.get(x, x),
+                                    key=f"transf_sel_{idx}"
+                                )
+                                if st.button("Confirmar", key=f"btn_confirm_transf_{idx}", type="primary", use_container_width=True):
+                                    if para_motorista != "Selecione...":
+                                        with st.spinner("Movendo rota..."):
+                                            df_rotas_full = DF_AGENTES.copy()
+                                            dados_novo = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == para_motorista].iloc[0]
+                                            mask_transfer = (df_rotas_full['LOGIN DO AGENTE'] == agente_filtro) & (df_rotas_full['ROTA MAPEADA'] == rota_nome)
+                                            df_rotas_full.loc[mask_transfer, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [para_motorista, dados_novo['NOME DO AGENTE'], dados_novo['TELEFONE']]
+                                            df_rotas_full = df_rotas_full.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+                                            try:
+                                                planilha_db.worksheet("Agentes").clear()
+                                                planilha_db.worksheet("Agentes").update("A1", [df_rotas_full.columns.tolist()] + df_rotas_full.fillna("").astype(str).values.tolist())
+                                                carregar_dados_agentes.clear()
+                                                time.sleep(0.5)
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Erro: {e}")
+                            
+                            # ❌ Botão de exclusão
+                            if col_del.button("❌", key=f"del_{idx}", help="Excluir esta rota", use_container_width=True):
                                 try:
                                     planilha_db.worksheet("Agentes").clear()
                                     planilha_db.worksheet("Agentes").update("A1", [DF_AGENTES.drop(idx).columns.tolist()] + DF_AGENTES.drop(idx).fillna("").astype(str).values.tolist())
@@ -6883,99 +6924,10 @@ elif menu == "⚙️ Rotas":
             st.warning("Nenhum dado encontrado no banco de agentes.")
 
     # -------------------------------------------------------------------------
-    # ABA 5: TRANSFERÊNCIA EM MASSA OU PARCIAL
-    # -------------------------------------------------------------------------
-    with tab_transfer:
-        st.markdown("#### 🔄 Transferência Direta de Rotas")
-        st.info("Selecione a origem e o destino. Depois, transfira rotas individuais clicando no botão ao lado de cada uma, ou transfira todas de uma vez.")
-        
-        if not DF_AGENTES.empty:
-            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist())
-            
-            with st.container(border=True):
-                c1, c_arrow, c2 = st.columns([2, 0.5, 2], vertical_alignment="center")
-                de_ag = c1.selectbox("📤 De (Motorista Atual):", ["Selecione..."] + logins_disp)
-                c_arrow.markdown("<h2 style='text-align: center; color: #94A3B8; margin-top: 15px;'>➡️</h2>", unsafe_allow_html=True)
-                para_ag = c2.selectbox("📥 Para (Novo Motorista):", ["Selecione..."] + logins_disp)
-
-                if de_ag != "Selecione...":
-                    df_rotas_origem = DF_AGENTES[(DF_AGENTES['LOGIN DO AGENTE'] == de_ag) & (DF_AGENTES['ROTA MAPEADA'] != "SEM ROTA DEFINIDA")].copy()
-                    
-                    if df_rotas_origem.empty:
-                        st.warning(f"O agente '{de_ag}' não possui rotas válidas para transferir.")
-                    else:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        
-                        col_titulo, col_transf_tudo = st.columns([3, 2], vertical_alignment="center")
-                        col_titulo.markdown(f"##### 📍 Rotas de {de_ag} ({len(df_rotas_origem)})")
-                        
-                        if para_ag != "Selecione..." and de_ag != para_ag:
-                            if col_transf_tudo.button("🚀 TRANSFERIR TODAS AS ROTAS", type="primary", use_container_width=True):
-                                with st.spinner(f"Transferindo todas as rotas para {para_ag}..."):
-                                    df_rotas_full = DF_AGENTES.copy()
-                                    dados_novo = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == para_ag].iloc[0]
-                                    mask_transfer = (df_rotas_full['LOGIN DO AGENTE'] == de_ag) & (df_rotas_full['ROTA MAPEADA'] != "SEM ROTA DEFINIDA")
-                                    df_rotas_full.loc[mask_transfer, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [para_ag, dados_novo['NOME DO AGENTE'], dados_novo['TELEFONE']]
-                                    df_rotas_full = df_rotas_full.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
-                                    
-                                    try:
-                                        aba_ag = planilha_db.worksheet("Agentes")
-                                        aba_ag.clear()
-                                        aba_ag.update("A1", [df_rotas_full.columns.tolist()] + df_rotas_full.fillna("").astype(str).values.tolist())
-                                        st.success(f"🎉 Todas as rotas transferidas para {para_ag}.")
-                                        carregar_dados_agentes.clear()
-                                        time.sleep(1)
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"Erro na transferência: {e}")
-                        
-                        st.markdown("<hr style='margin-top: 5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
-                        
-                        # Interface da lista de rotas com botões individuais
-                        with st.container(height=450, border=False):
-                            for idx, row in df_rotas_origem.iterrows():
-                                rota_nome = row['ROTA MAPEADA']
-                                col_r, col_btn = st.columns([5, 1.5], vertical_alignment="center")
-                                col_r.markdown(
-                                    f"""<div style='padding:12px 15px; background-color:#F8FAFC; border-radius:8px; border: 1px solid #CBD5E1; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: center;'>
-                                        <span style='font-size: 16px; margin-right: 10px;'>📍</span>
-                                        <b style='color:#1E293B; font-size: 13px; letter-spacing: 0.3px;'>{rota_nome.replace('---', ' ➔ ')}</b>
-                                    </div>""", 
-                                    unsafe_allow_html=True
-                                )
-                                
-                                if col_btn.button("🔄 Transferir", key=f"transf_{idx}", use_container_width=True):
-                                    if para_ag == "Selecione...":
-                                        st.error("⚠️ Selecione o motorista de destino acima primeiro.")
-                                    elif de_ag == para_ag:
-                                        st.error("⚠️ A origem e destino não podem ser iguais.")
-                                    else:
-                                        with st.spinner(f"Transferindo rota..."):
-                                            df_rotas_full = DF_AGENTES.copy()
-                                            dados_novo = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == para_ag].iloc[0]
-                                            mask_transfer = (df_rotas_full['LOGIN DO AGENTE'] == de_ag) & (df_rotas_full['ROTA MAPEADA'] == rota_nome)
-                                            df_rotas_full.loc[mask_transfer, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [para_ag, dados_novo['NOME DO AGENTE'], dados_novo['TELEFONE']]
-                                            df_rotas_full = df_rotas_full.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
-                                            
-                                            try:
-                                                aba_ag = planilha_db.worksheet("Agentes")
-                                                aba_ag.clear()
-                                                aba_ag.update("A1", [df_rotas_full.columns.tolist()] + df_rotas_full.fillna("").astype(str).values.tolist())
-                                                st.success(f"Rota transferida para {para_ag}!")
-                                                carregar_dados_agentes.clear()
-                                                time.sleep(0.5)
-                                                st.rerun()
-                                            except Exception as e:
-                                                st.error(f"Erro na transferência: {e}")
-        else:
-            st.warning("O banco de agentes está vazio.")
-
-    # -------------------------------------------------------------------------
-    # ABA 6: SISTEMA (ADMIN)
+    # ADMIN
     # -------------------------------------------------------------------------
     with tab_sistema:
         st.markdown("#### ⚠️ Administração do Sistema")
-        
         col_sys1, col_sys2 = st.columns(2, gap="large")
         
         with col_sys1:
@@ -6998,9 +6950,8 @@ elif menu == "⚙️ Rotas":
                                     df_novos = df_m[df_m['DT_TEMP'] >= corte].drop(columns=['DT_TEMP'])
 
                                     if not df_velhos.empty:
-                                        try:
-                                            aba_morto = planilha_db.worksheet("ARQUIVO_MORTO")
-                                        except BaseException:
+                                        try: aba_morto = planilha_db.worksheet("ARQUIVO_MORTO")
+                                        except:
                                             aba_morto = planilha_db.add_worksheet("ARQUIVO_MORTO", 100, 20)
                                             aba_morto.update("A1", [df_velhos.columns.tolist()])
 
@@ -7016,10 +6967,8 @@ elif menu == "⚙️ Rotas":
                                                 df_app_novo = df_app[df_app['PEDIDO'].astype(str).isin(pedidos_preservados)]
                                                 aba_app.clear()
                                                 aba_app.update("A1", [df_app_novo.columns.tolist()] + df_app_novo.fillna("").astype(str).values.tolist())
-                                        except BaseException:
-                                            pass
-
-                                        st.success(f"✅ Limpeza concluída! 🗑️ {len(df_velhos)} registros antigos foram movidos para o Arquivo Morto.")
+                                        except: pass
+                                        st.success(f"✅ Limpeza concluída! 🗑️ {len(df_velhos)} registros antigos arquivados.")
                                     else:
                                         st.info("👍 A base já está leve! Não foram encontrados pedidos antigos.")
                                     
@@ -7051,9 +7000,8 @@ elif menu == "⚙️ Rotas":
                                         cabecalho_app = aba_app.row_values(1)
                                         aba_app.clear()
                                         aba_app.update("A1", [cabecalho_app])
-                                    except Exception:
-                                        pass
-                                    st.success("✅ Banco zerado com sucesso! A base está pronta para um novo ciclo de produção.")
+                                    except: pass
+                                    st.success("✅ Banco zerado com sucesso! Pronto para nova rodagem.")
                                     carregar_dados_completos.clear()
                                     time.sleep(2)
                                     st.rerun()
