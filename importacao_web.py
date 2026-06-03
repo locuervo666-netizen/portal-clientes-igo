@@ -6492,14 +6492,14 @@ elif menu == "🏷️ Gerador de Etiquetas":
         
         qtd_etiquetas = st.number_input("📦 Quantidade Total de Etiquetas (Rolo):", min_value=2, max_value=2000, value=100, step=2)
         
-        # Nova funcionalidade de ajustes de tamanho!
+        # Funcionalidade de ajustes de tamanho
         with st.expander("📐 Ajuste de Medidas da Etiqueta (Físico)"):
             st.markdown("<p style='font-size: 12px; color: #64748b;'>Altere apenas se trocar o fornecedor/tamanho da bobina de papel.</p>", unsafe_allow_html=True)
             c_med1, c_med2 = st.columns(2)
             larg_mm = c_med1.number_input("Largura (mm):", value=48.5, step=0.5)
             alt_mm = c_med2.number_input("Altura (mm):", value=28.0, step=0.5)
 
-        st.info(f"💡 **Dica:** O ficheiro PDF gerado se adaptará para o tamanho **{larg_mm}x{alt_mm} mm** em 2 colunas. Ajuste as configurações da sua impressora térmica para corresponder.")
+        st.info(f"💡 **Dica:** O arquivo PDF gerado se adaptará para o tamanho **{larg_mm}x{alt_mm} mm** em 2 colunas. Ajuste as configurações da sua impressora térmica para corresponder.")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -6507,7 +6507,7 @@ elif menu == "🏷️ Gerador de Etiquetas":
         c_btn1, c_btn2 = st.columns([1, 1])
         
         if c_btn1.button("🖨️ FABRICAR LOTE", type="primary", use_container_width=True):
-            with st.spinner(f"A gerar {qtd_etiquetas} etiquetas exclusivas..."):
+            with st.spinner(f"Gerando {qtd_etiquetas} etiquetas exclusivas..."):
                 # Manda as medidas dinâmicas para o gerador de PDF
                 pdf_bytes = gerar_pdf_rolo_duplo(qtd_etiquetas, sigla_inteligente, larg_mm, alt_mm)
                 st.success(f"✅ Rolo gerado com sucesso!")
