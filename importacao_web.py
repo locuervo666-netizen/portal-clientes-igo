@@ -1531,19 +1531,12 @@ def criar_imagem_etiqueta_pil(codigo, sigla_tarja):
         logo_img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
         logo_rot = logo_img.rotate(270, expand=True)
         
-        # --- CORREÇÃO AQUI ---
-        # Verificamos se existe o novo formato, senão usamos o antigo
-        if hasattr(Image, 'Resampling'):
-            filtro = Image.Resampling.LANCZOS
-        else:
-            filtro = Image.ANTIALIAS
-            
-        logo_rot.thumbnail((120, 300), filtro)
-        # ---------------------
+        logo_rot.thumbnail((120, 300), resampling_filter)
         
         pos_x_logo = largura - logo_rot.width - 10
         pos_y_logo = int((altura - logo_rot.height) / 2)
         
+        # Fundo branco para garantir que a transparência da logo cole perfeito
         bg_logo = Image.new("RGB", logo_rot.size, (255,255,255))
         bg_logo.paste(logo_rot, (0,0), logo_rot)
         img.paste(bg_logo, (pos_x_logo, pos_y_logo))
