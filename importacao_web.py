@@ -2604,7 +2604,81 @@ elif menu == "💰 Faturamento":
         "<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>💰 Gestão Financeira Master</h3></div>",
         unsafe_allow_html=True)
 
-    # 🔥 NOVA ABA ADICIONADA: Pedidos Faturados 🔥
+    # =========================================================================
+    # ⚙️ RECURSOS VISUAIS GLOBAIS DO AGGRID E FILTROS PREMIUM
+    # =========================================================================
+    st.markdown("""
+        <style>
+        /* Estilização Premium para Inputs (Filtros) */
+        div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div {
+            background-color: #f8fafc !important;
+            border-radius: 8px !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: none !important;
+        }
+        div[data-testid="stDateInput"] > div {
+            background-color: #f8fafc !important;
+            border-radius: 8px !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: none !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    status_jscode_fat = JsCode("""
+    class StatusBadgeRenderer {
+    init(params) {
+        this.eGui = document.createElement('div');
+        this.eGui.style.cssText = 'display: flex; align-items: center; height: 100%;';
+        let badge = document.createElement('span');
+        badge.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; height: 22px;';
+        let text = params.value || '';
+        let status = text.toUpperCase();
+
+        if (status.includes('ENTREGUE') || status.includes('CONFERIDO') || status.includes('PAGO')) { badge.style.backgroundColor = '#dcfce7'; badge.style.color = '#166534'; badge.style.border = '1px solid #bbf7d0'; }
+        else if (status.includes('FRUSTRADA') || status.includes('PROBLEMA') || status.includes('ATRASADO') || status.includes('RECUSA')) { badge.style.backgroundColor = '#fee2e2'; badge.style.color = '#991b1b'; badge.style.border = '1px solid #fecaca'; }
+        else if (status.includes('COLETADO') || status.includes('ROTA')) { badge.style.backgroundColor = '#dbeafe'; badge.style.color = '#1e40af'; badge.style.border = '1px solid #bfdbfe'; }
+        else if (status.includes('PENDENTE') || status.includes('AGUARDANDO')) { badge.style.backgroundColor = '#fef3c7'; badge.style.color = '#b45309'; badge.style.border = '1px solid #fde68a'; }
+        else { badge.style.backgroundColor = '#f1f5f9'; badge.style.color = '#475569'; badge.style.border = '1px solid #e2e8f0'; }
+
+        badge.innerText = text;
+        this.eGui.appendChild(badge);
+    }
+    getGui() { return this.eGui; }
+    }
+    """)
+
+    valor_jscode = JsCode("""
+    class ValorRenderer {
+        init(params) {
+            this.eGui = document.createElement('span');
+            let val = parseFloat(params.value);
+            if (!isNaN(val)) {
+                this.eGui.innerHTML = 'R$ ' + val.toFixed(2).replace('.', ',');
+                this.eGui.style.fontWeight = '700';
+            } else {
+                this.eGui.innerHTML = params.value;
+            }
+        }
+        getGui() { return this.eGui; }
+    }
+    """)
+
+    custom_css_premium = {
+        ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px", "background-color": "#ffffff !important"},
+        ".ag-header": {"background-color": "#f1f5f9 !important", "border-bottom": "2px solid #e2e8f0 !important"},
+        ".ag-header-cell-text": {"color": "#0f172a !important", "font-weight": "700 !important", "font-size": "13px !important"},
+        ".ag-row:hover": {"background-color": "#e2e8f0 !important", "cursor": "pointer", "transition": "background-color 0.2s"},
+        ".ag-row-odd": {"background-color": "#f8fafc !important"},
+        ".ag-row-even": {"background-color": "#ffffff !important"}
+    }
+
+    # =========================================================================
+    # 🧹 LIMPEZA E PADRONIZAÇÃO DE NOMENCLATURAS DOS TOMADORES
+    # =========================================================================
+    CLIENTES_ATUALIZADOS = sorted(list(set([c.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') for c in CLIENTES_AUTORIZADOS])))
+
+    # 🔥 ABAS DE NAVEGAÇÃO 🔥
     tab_faturar, tab_historico, tab_faturados, tab_tarifas = st.tabs(
         ["📈 Novo Lote de Faturamento", "📜 Livro Caixa e Histórico", "✅ Pedidos Faturados", "💲 Tabela de Tarifas"])
 
@@ -2617,15 +2691,7 @@ elif menu == "💰 Faturamento":
         if planilha_financeiro is None:
             return pd.DataFrame()
         try:
-            buscado = tomador.replace(
-                'CAEP',
-                'SYNVIA').replace(
-                'CUNHA',
-                'GRALAB') if tomador in [
-                'CAEP',
-                'CUNHA',
-                'SYNVIA',
-                'GRALAB'] else tomador
+            buscado = tomador.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if tomador in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else tomador
             buscado = buscado.strip().upper()
             todas_abas = planilha_financeiro.worksheets()
             mapa_abas = {aba.title.strip().upper(): aba for aba in todas_abas}
@@ -2637,10 +2703,8 @@ elif menu == "💰 Faturamento":
                     df_p = pd.DataFrame(dados[1:], columns=dados[0])
                     for col in ['VALOR_CHEIO', 'MULT_FRUSTRADA']:
                         if col in df_p.columns:
-                            df_p[col] = df_p[col].astype(str).str.replace(
-                                ',', '.').str.replace('R$', '').str.strip()
-                            df_p[col] = pd.to_numeric(
-                                df_p[col], errors='coerce').fillna(0.0)
+                            df_p[col] = df_p[col].astype(str).str.replace(',', '.').str.replace('R$', '').str.strip()
+                            df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0.0)
                     for col in ['CIDADE', 'BAIRRO', 'ENDERECO']:
                         if col in df_p.columns:
                             df_p[col] = df_p[col].apply(padronizar_texto)
@@ -2652,21 +2716,16 @@ elif menu == "💰 Faturamento":
     def calcular_valor_fatura(cid, bai, end, status, df_p):
         if df_p.empty:
             return 0.0
-        c, b, e = padronizar_texto(cid), padronizar_texto(
-            bai), padronizar_texto(end)
-        match = df_p[(df_p['CIDADE'] == c) & (
-            df_p['BAIRRO'] == b) & (df_p['ENDERECO'] == e)]
+        c, b, e = padronizar_texto(cid), padronizar_texto(bai), padronizar_texto(end)
+        match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == b) & (df_p['ENDERECO'] == e)]
         if match.empty:
-            match = df_p[(df_p['CIDADE'] == c) & (
-                df_p['BAIRRO'] == b) & (df_p['ENDERECO'] == "")]
+            match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == b) & (df_p['ENDERECO'] == "")]
         if match.empty:
-            match = df_p[(df_p['CIDADE'] == c) & (
-                df_p['BAIRRO'] == "") & (df_p['ENDERECO'] == "")]
+            match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == "") & (df_p['ENDERECO'] == "")]
         if not match.empty:
             v_base = float(match.iloc[0]['VALOR_CHEIO'])
             mult = float(match.iloc[0]['MULT_FRUSTRADA'])
-            return v_base if "ENTREGUE" in str(
-                status).upper() else (v_base * mult)
+            return v_base if "ENTREGUE" in str(status).upper() else (v_base * mult)
         return 0.0
 
     def gerar_pdf_fatura(id_fat, tomador, df_cobrados, total, obs_texto=""):
@@ -2676,13 +2735,9 @@ elif menu == "💰 Faturamento":
         pdf.set_line_width(0.3)
         pdf.rect(5, 5, 200, 287)
         try:
-            logo_path = os.path.join(
-                tempfile.gettempdir(), "igo_logo_temp.png")
+            logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
             if not os.path.exists(logo_path):
-                req = urllib.request.Request(
-                    "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png",
-                    headers={
-                        'User-Agent': 'Mozilla/5.0'})
+                req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file:
                     out_file.write(response.read())
             pdf.image(logo_path, x=10, y=8, w=30)
@@ -2691,30 +2746,13 @@ elif menu == "💰 Faturamento":
         pdf.set_y(15)
         pdf.set_font("Arial", "B", 14)
         pdf.set_text_color(15, 23, 42)
-        pdf.cell(
-            0,
-            6,
-            "DEMONSTRATIVO DE FATURAMENTO - IGO LOGISTICA",
-            ln=True,
-            align="C")
+        pdf.cell(0, 6, "DEMONSTRATIVO DE FATURAMENTO - IGO LOGISTICA", ln=True, align="C")
         pdf.set_font("Arial", "B", 10)
         pdf.set_text_color(2, 132, 199)
-        pdf.cell(
-            0,
-            5,
-            f"FATURA: {id_fat} | CLIENTE: {tomador}",
-            ln=True,
-            align="C")
+        pdf.cell(0, 5, f"FATURA: {id_fat} | CLIENTE: {tomador}", ln=True, align="C")
         pdf.set_font("Arial", "", 8)
         pdf.set_text_color(100, 116, 139)
-        pdf.cell(
-            0,
-            4,
-            f"Emissao: {
-                hoje_br.strftime('%d/%m/%Y')} | Volumes: {
-                len(df_cobrados)}",
-            ln=True,
-            align="C")
+        pdf.cell(0, 4, f"Emissao: {hoje_br.strftime('%d/%m/%Y')} | Volumes: {len(df_cobrados)}", ln=True, align="C")
         pdf.ln(3)
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         pdf.ln(3)
@@ -2734,24 +2772,16 @@ elif menu == "💰 Faturamento":
         pdf.set_font("Arial", "", 7)
         for idx, row in df_cobrados.iterrows():
             fill = (idx % 2 == 0)
-            pdf.set_fill_color(
-                241, 245, 249) if fill else pdf.set_fill_color(
-                255, 255, 255)
+            pdf.set_fill_color(241, 245, 249) if fill else pdf.set_fill_color(255, 255, 255)
             d_col = str(row.get('DATA', '')).split(' ')[0]
             d_ent = str(row.get('DATA_ENTREGA', '')).split(' ')[0]
             val_str = f"R$ {row.get('VALOR (R$)', 0):.2f}"
-
-            st_pdf = "ENTREGUE" if "ENTREGUE" in str(
-                row.get('STATUS', '')).upper() else "FRUSTRADA"
+            st_pdf = "ENTREGUE" if "ENTREGUE" in str(row.get('STATUS', '')).upper() else "FRUSTRADA"
 
             pdf.cell(18, 5, str(row.get('PEDIDO', '')), 1, 0, "C", True)
             pdf.cell(18, 5, d_col, 1, 0, "C", True)
             pdf.cell(18, 5, d_ent, 1, 0, "C", True)
-            pdf.cell(
-                64, 5, str(
-                    row.get(
-                        'LABORATORIO', ''))[
-                    :42], 1, 0, "L", True)
+            pdf.cell(64, 5, str(row.get('LABORATORIO', ''))[:42], 1, 0, "L", True)
             pdf.cell(37, 5, str(row.get('CIDADE', ''))[:22], 1, 0, "L", True)
             pdf.cell(20, 5, st_pdf, 1, 0, "C", True)
             pdf.cell(15, 5, val_str, 1, 1, "R", True)
@@ -2772,6 +2802,9 @@ elif menu == "💰 Faturamento":
             with open(tmp.name, "rb") as f:
                 return f.read()
 
+    # =========================================================================
+    # ABA 1: NOVO LOTE DE FATURAMENTO
+    # =========================================================================
     with tab_faturar:
         if st.session_state.fatura_sucesso:
             st.markdown("### 🧾 Resumo do Faturamento")
@@ -2779,67 +2812,38 @@ elif menu == "💰 Faturamento":
 
             with st.container(border=True):
                 st.markdown(
-                    f"<p style='color:#64748B; font-size:12px; margin-bottom:0px;'>Nº DO DOCUMENTO</p><h4 style='margin-top:0px; color:#0F172A;'>{
-                        st.session_state.get(
-                            'fatura_id',
-                            'FAT-000')}</h4>",
+                    f"<p style='color:#64748B; font-size:12px; margin-bottom:0px;'>Nº DO DOCUMENTO</p><h4 style='margin-top:0px; color:#0F172A;'>{st.session_state.get('fatura_id', 'FAT-000')}</h4>",
                     unsafe_allow_html=True)
                 st.divider()
                 col_s1, col_s2, col_s3 = st.columns(3)
-                col_s1.metric(
-                    "🏢 Cliente (Tomador)",
-                    st.session_state.get(
-                        'fatura_tomador',
-                        '-'))
-                col_s2.metric(
-                    "📦 Volumes Faturados",
-                    st.session_state.get(
-                        'fatura_qtd',
-                        0))
-                col_s3.metric(
-                    "💰 Total do Lote", f"R$ {
-                        st.session_state.get(
-                            'fatura_total', 0):,.2f}")
+                col_s1.metric("🏢 Cliente (Tomador)", st.session_state.get('fatura_tomador', '-'))
+                col_s2.metric("📦 Volumes Faturados", st.session_state.get('fatura_qtd', 0))
+                col_s3.metric("💰 Total do Lote", f"R$ {st.session_state.get('fatura_total', 0):,.2f}")
 
             st.markdown("<br>", unsafe_allow_html=True)
             c_b1, c_b2, c_b3 = st.columns(3)
             c_b1.download_button(
                 "📥 Baixar Fatura (PDF)",
                 data=st.session_state.fatura_pdf,
-                file_name=f"{
-                    st.session_state.get(
-                        'fatura_id',
-                        'Fatura')}.pdf",
+                file_name=f"{st.session_state.get('fatura_id', 'Fatura')}.pdf",
                 use_container_width=True,
                 type="primary")
             c_b2.download_button(
                 "📥 Baixar Relatório (Excel)",
                 data=st.session_state.fatura_xls,
-                file_name=f"{
-                    st.session_state.get(
-                        'fatura_id',
-                        'Relatorio')}.xlsx",
+                file_name=f"{st.session_state.get('fatura_id', 'Relatorio')}.xlsx",
                 use_container_width=True)
-            if c_b3.button(
-                "🔄 Voltar / Novo Faturamento",
-                    use_container_width=True):
+            if c_b3.button("🔄 Voltar / Novo Faturamento", use_container_width=True):
                 st.session_state.fatura_sucesso = False
                 st.rerun()
 
         else:
             with st.container(border=True):
                 c1, c2 = st.columns([1, 1])
-                f_tom = c1.selectbox(
-                    "🏢 Selecionar Tomador:",
-                    CLIENTES_AUTORIZADOS,
-                    key="fat_tom_sel")
+                f_tom = c1.selectbox("🏢 Selecionar Tomador:", CLIENTES_ATUALIZADOS, key="fat_tom_sel")
                 f_per = c2.date_input(
                     "📅 Período de Entrega:",
-                    value=(
-                        hoje_br -
-                        timedelta(
-                            days=30),
-                        hoje_br),
+                    value=(hoje_br - timedelta(days=30), hoje_br),
                     format="DD/MM/YYYY",
                     key="fat_per_sel")
 
@@ -2847,116 +2851,98 @@ elif menu == "💰 Faturamento":
                     st.warning("O banco de dados está vazio.")
                 else:
                     if 'STATUS_DISPLAY' not in df_raw.columns:
-                        df_raw['STATUS_DISPLAY'] = df_raw.apply(
-                            calc_status_display, axis=1)
+                        df_raw['STATUS_DISPLAY'] = df_raw.apply(calc_status_display, axis=1)
 
-                    df_raw['TOMADOR_CLEAN'] = df_raw['TOMADOR'].astype(
-                        str).str.strip().str.upper()
+                    df_raw['TOMADOR_CLEAN'] = df_raw['TOMADOR'].astype(str).str.strip().str.upper()
                     mask_status = df_raw['STATUS_DISPLAY'].str.contains(
-                        'Entregue|Frustrada',
-                        case=False,
-                        na=False) | df_raw['STATUS'].str.upper().str.contains(
-                        'ENTREGUE|FRUSTRADA',
-                        na=False)
-                    mask_tomador = (
-                        df_raw['TOMADOR_CLEAN'] == f_tom.upper()) | (
-                        df_raw['TOMADOR_CLEAN'].str.contains(
-                            f_tom.upper(), na=False))
+                        'Entregue|Frustrada', case=False, na=False) | df_raw['STATUS'].str.upper().str.contains(
+                        'ENTREGUE|FRUSTRADA', na=False)
+                    mask_tomador = (df_raw['TOMADOR_CLEAN'] == f_tom.upper()) | (df_raw['TOMADOR_CLEAN'].str.contains(f_tom.upper(), na=False))
 
                     if 'FATURA' not in df_raw.columns:
                         df_raw['FATURA'] = ""
-                    mask_fatura = ~df_raw['FATURA'].astype(
-                        str).str.upper().str.contains('FAT-', na=False)
+                    mask_fatura = ~df_raw['FATURA'].astype(str).str.upper().str.contains('FAT-', na=False)
 
-                    df_todas_pendentes = df_raw[mask_tomador &
-                                                mask_status & mask_fatura].copy()
+                    df_todas_pendentes = df_raw[mask_tomador & mask_status & mask_fatura].copy()
 
                     if df_todas_pendentes.empty:
-                        st.success(
-                            f"✅ O sistema vasculhou todo o banco de dados e não achou NENHUM pedido 'Entregue' para {f_tom} que já não tenha sido faturado.")
+                        st.success(f"✅ O sistema vasculhou todo o banco de dados e não achou NENHUM pedido 'Entregue' para {f_tom} que já não tenha sido faturado.")
                     else:
                         def extrair_data_real(row):
-                            d_ent = str(
-                                row.get(
-                                    'DATA_ENTREGA',
-                                    '')).split(' ')[0]
+                            d_ent = str(row.get('DATA_ENTREGA', '')).split(' ')[0]
                             try:
-                                return pd.to_datetime(
-                                    d_ent, format='%d/%m/%Y').date()
+                                return pd.to_datetime(d_ent, format='%d/%m/%Y').date()
                             except BaseException:
-                                try:
-                                    return pd.to_datetime(d_ent).date()
+                                try: return pd.to_datetime(d_ent).date()
                                 except BaseException:
-                                    return pd.to_datetime(
-                                        row.get(
-                                            'DATA',
-                                            hoje_br.strftime('%d/%m/%Y')),
-                                        format='%d/%m/%Y',
-                                        errors='coerce').date()
+                                    return pd.to_datetime(row.get('DATA', hoje_br.strftime('%d/%m/%Y')), format='%d/%m/%Y', errors='coerce').date()
 
-                        df_todas_pendentes['DT_FILTRO'] = df_todas_pendentes.apply(
-                            extrair_data_real, axis=1)
-                        df_todas_pendentes['DT_FILTRO'] = df_todas_pendentes['DT_FILTRO'].fillna(
-                            hoje_br)
+                        df_todas_pendentes['DT_FILTRO'] = df_todas_pendentes.apply(extrair_data_real, axis=1)
+                        df_todas_pendentes['DT_FILTRO'] = df_todas_pendentes['DT_FILTRO'].fillna(hoje_br)
 
-                        if isinstance(
-                                f_per, (tuple, list)) and len(f_per) == 2:
-                            mask_data = (
-                                df_todas_pendentes['DT_FILTRO'] >= f_per[0]) & (
-                                df_todas_pendentes['DT_FILTRO'] <= f_per[1])
+                        if isinstance(f_per, (tuple, list)) and len(f_per) == 2:
+                            mask_data = (df_todas_pendentes['DT_FILTRO'] >= f_per[0]) & (df_todas_pendentes['DT_FILTRO'] <= f_per[1])
                             df_fin = df_todas_pendentes[mask_data].copy()
                         else:
                             df_fin = df_todas_pendentes.copy()
 
                         if df_fin.empty:
-                            datas_escondidas = sorted(
-                                [d.strftime('%d/%m/%Y') for d in df_todas_pendentes['DT_FILTRO'].unique()])
-                            st.warning(
-                                f"⚠️ Achei {
-                                    len(df_todas_pendentes)} pedido(s) Entregues da {f_tom}! MAS eles não estão aparecendo porque a data de entrega deles foi em: {
-                                    ', '.join(datas_escondidas)}. Ajuste o calendário acima para cobrir essas datas.")
+                            datas_escondidas = sorted([d.strftime('%d/%m/%Y') for d in df_todas_pendentes['DT_FILTRO'].unique()])
+                            st.warning(f"⚠️ Achei {len(df_todas_pendentes)} pedido(s) Entregues da {f_tom}! MAS eles não estão aparecendo porque a data de entrega deles foi em: {', '.join(datas_escondidas)}. Ajuste o calendário acima para cobrir essas datas.")
                         else:
                             df_p = carregar_tabela_precos(f_tom)
                             if df_p.empty:
-                                st.error(
-                                    f"⚠️ Aba de preços '{f_tom}' vazia ou não encontrada na planilha do financeiro.")
+                                st.error(f"⚠️ Aba de preços '{f_tom}' vazia ou não encontrada na planilha do financeiro.")
                             else:
                                 df_fin['VALOR (R$)'] = df_fin.apply(
-                                    lambda r: calcular_valor_fatura(
-                                        r['CIDADE'], r.get(
-                                            'BAIRRO', ''), r.get(
-                                            'ENDERECO', ''), r['STATUS_DISPLAY'], df_p), axis=1)
-                                df_show = df_fin[['DT_FILTRO',
-                                                  'DATA',
-                                                  'DATA_ENTREGA',
-                                                  'PEDIDO',
-                                                  'LABORATORIO',
-                                                  'CIDADE',
-                                                  'STATUS_DISPLAY',
-                                                  'VALOR (R$)']].copy()
-                                df_show.rename(
-                                    columns={
-                                        'STATUS_DISPLAY': 'STATUS'},
-                                    inplace=True)
-                                df_show['DATA_ENTREGA'] = df_show['DATA_ENTREGA'].apply(
-                                    lambda x: str(x).split(' ')[0])
+                                    lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO', ''), r.get('ENDERECO', ''), r['STATUS_DISPLAY'], df_p), axis=1)
+                                
+                                df_show = df_fin[['DT_FILTRO', 'DATA', 'DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'VALOR (R$)']].copy()
+                                df_show.rename(columns={'STATUS_DISPLAY': 'STATUS'}, inplace=True)
+                                df_show['DATA_ENTREGA'] = df_show['DATA_ENTREGA'].apply(lambda x: str(x).split(' ')[0])
 
-                                sel_all_fat = st.checkbox(
-                                    "✅ Selecionar / Deselecionar Todos", value=True, key="sel_all_faturamento")
-                                df_show.insert(0, "SELECIONAR", sel_all_fat)
+                                st.markdown("💡 **Dica:** Utilize a caixa de seleção no próprio cabeçalho da primeira coluna da tabela para marcar ou desmarcar todos os pedidos de uma vez.")
+                                
+                                # ==========================================
+                                # 🚀 GRID AGGRID STREAMLIT THEME (NOVO LOTE)
+                                # ==========================================
+                                df_grid_fat = df_show.drop(columns=['DT_FILTRO']).copy()
+                                
+                                gb_fat = GridOptionsBuilder.from_dataframe(df_grid_fat)
+                                gb_fat.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
+                                gb_fat.configure_default_column(resizable=True, filterable=True, sortable=True)
+                                
+                                gb_fat.configure_column("DATA", header_name="📅 Coleta", width=110)
+                                gb_fat.configure_column("DATA_ENTREGA", header_name="🏁 Entrega", width=110)
+                                gb_fat.configure_column("PEDIDO", header_name="📦 Pedido", width=110)
+                                gb_fat.configure_column("LABORATORIO", header_name="🔬 Ponto de Coleta", width=250)
+                                gb_fat.configure_column("CIDADE", header_name="📍 Cidade", width=150)
+                                gb_fat.configure_column("STATUS", header_name="🚦 Status", cellRenderer=status_jscode_fat, width=160)
+                                gb_fat.configure_column("VALOR (R$)", header_name="💰 Valor", cellRenderer=valor_jscode, width=120)
 
-                                edit = st.data_editor(
-                                    df_show,
-                                    column_config={
-                                        "DT_FILTRO": None,
-                                        "DATA": "COLETA",
-                                        "DATA_ENTREGA": "ENTREGA"},
-                                    hide_index=True,
-                                    use_container_width=True,
-                                    disabled=[
-                                        c for c in df_show.columns if c != "SELECIONAR"])
-                                sel_f = edit[edit["SELECIONAR"]]
-                                total_f = sel_f['VALOR (R$)'].sum()
+                                gridOptions_fat = gb_fat.build()
+
+                                tabela_fat = AgGrid(
+                                    df_grid_fat,
+                                    gridOptions=gridOptions_fat,
+                                    theme="streamlit", # HERDA O VISUAL NATIVO DO STREAMLIT
+                                    columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+                                    height=400,
+                                    allow_unsafe_jscode=True,
+                                    update_mode="SELECTION_CHANGED",
+                                    key="grid_faturamento"
+                                )
+
+                                sel_list_fat = tabela_fat.get('selected_rows', [])
+                                if sel_list_fat is not None and len(sel_list_fat) > 0:
+                                    sel_f = pd.DataFrame(sel_list_fat)
+                                    sel_f['VALOR (R$)'] = pd.to_numeric(sel_f['VALOR (R$)'], errors='coerce')
+                                    if '_selectedRowNodeInfo' in sel_f.columns:
+                                        sel_f = sel_f.drop(columns=['_selectedRowNodeInfo'])
+                                else:
+                                    sel_f = pd.DataFrame(columns=df_show.columns)
+                                    
+                                total_f = sel_f['VALOR (R$)'].sum() if not sel_f.empty else 0.0
                                 qtd_f = len(sel_f)
 
                                 st.markdown("---")
@@ -2979,90 +2965,55 @@ elif menu == "💰 Faturamento":
                                     "📝 Observação Customizada (Opcional - Sai no rodapé do PDF):",
                                     placeholder="Ex: Dados bancários para depósito...")
 
-                                if st.button(
-                                    "⚙️ GERAR FATURA AGORA",
-                                    type="primary",
-                                        use_container_width=True):
+                                if st.button("⚙️ GERAR FATURA AGORA", type="primary", use_container_width=True):
                                     if sel_f.empty:
-                                        st.warning(
-                                            "Selecione os pedidos para faturar!")
+                                        st.warning("Selecione os pedidos na tabela para faturar!")
                                     else:
                                         with st.spinner("Registrando fatura no Livro Caixa e consolidando baixas..."):
                                             id_fat = f"FAT-{f_tom[:3]}-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
+                                            aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                            df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
 
-                                            aba_m = planilha_db.worksheet(
-                                                "Memoria_Sistema")
-                                            df_nuvem = pd.DataFrame(
-                                                aba_m.get_all_values()[
-                                                    1:], columns=aba_m.get_all_values()[0])
-
-                                            pedidos_faturados = sel_f['PEDIDO'].astype(
-                                                str).tolist()
+                                            pedidos_faturados = sel_f['PEDIDO'].astype(str).tolist()
                                             for pid in pedidos_faturados:
                                                 mask = df_nuvem['PEDIDO'] == pid
                                                 if mask.any():
-                                                    df_nuvem.loc[mask,
-                                                                 'FATURA'] = id_fat
-                                                    st_grid = sel_f[sel_f['PEDIDO']
-                                                                    == pid].iloc[0]['STATUS']
-                                                    df_nuvem.loc[mask, 'STATUS'] = "ENTREGUE" if "ENTREGUE" in st_grid.upper(
-                                                    ) else "FRUSTRADA"
+                                                    df_nuvem.loc[mask, 'FATURA'] = id_fat
+                                                    st_grid = sel_f[sel_f['PEDIDO'] == pid].iloc[0]['STATUS']
+                                                    df_nuvem.loc[mask, 'STATUS'] = "ENTREGUE" if "ENTREGUE" in st_grid.upper() else "FRUSTRADA"
 
                                             aba_m.clear()
-                                            aba_m.update(
-                                                "A1", [
-                                                    df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                            aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
 
-                                            try:
-                                                aba_h = planilha_financeiro.worksheet(
-                                                    "Historico_Faturas")
+                                            try: aba_h = planilha_financeiro.worksheet("Historico_Faturas")
                                             except BaseException:
-                                                aba_h = planilha_financeiro.add_worksheet(
-                                                    "Historico_Faturas", 100, 7)
-                                                aba_h.update("A1",
-                                                             [["ID_FATURA",
-                                                               "DATA_EMISSAO",
-                                                               "TOMADOR",
-                                                               "TOTAL_PEDIDOS",
-                                                               "VALOR_TOTAL_R$",
-                                                               "PERIODO",
-                                                               "STATUS_PAGAMENTO"]])
-                                                # Aguarda criação da aba
-                                                time.sleep(1)
-
-                                            d_sel = pd.to_datetime(
-                                                sel_f['DATA'], format='%d/%m/%Y', errors='coerce').dropna()
-                                            periodo_f = f"{
-                                                d_sel.min().strftime('%d/%m/%Y')} a {
-                                                d_sel.max().strftime('%d/%m/%Y')}" if not d_sel.empty else "Data Única"
-
-                                            # Preparar dados para salvar
-                                            # (converter para string para
-                                            # evitar problemas de tipo)
-                                            valor_str = f"{total_f:.2f}".replace(
-                                                '.', ',')
-                                            nova_linha = [id_fat, hoje_br.strftime(
-                                                "%d/%m/%Y"), f_tom, str(len(sel_f)), valor_str, periodo_f, "⏳ AGUARDANDO"]
-
-                                            # Salvar na aba com verificação
-                                            aba_h.append_row(nova_linha)
-                                            # Aguarda sincronização
+                                                aba_h = planilha_financeiro.add_worksheet("Historico_Faturas", 100, 7)
+                                                aba_h.update("A1", [["ID_FATURA", "DATA_EMISSAO", "TOMADOR", "TOTAL_PEDIDOS", "VALOR_TOTAL_R$", "PERIODO", "STATUS_PAGAMENTO"]])
                                             time.sleep(1)
 
-                                            st.session_state.fatura_pdf = gerar_pdf_fatura(
-                                                id_fat, f_tom, sel_f, total_f, obs_fat)
-                                            st.session_state.fatura_xls = gerar_excel_memoria(
-                                                sel_f.drop(columns=['DT_FILTRO', 'SELECIONAR']))
+                                            d_sel = pd.to_datetime(sel_f['DATA'], format='%d/%m/%Y', errors='coerce').dropna()
+                                            periodo_f = f"{d_sel.min().strftime('%d/%m/%Y')} a {d_sel.max().strftime('%d/%m/%Y')}" if not d_sel.empty else "Data Única"
+
+                                            valor_str = f"{total_f:.2f}".replace('.', ',')
+                                            nova_linha = [id_fat, hoje_br.strftime("%d/%m/%Y"), f_tom, str(len(sel_f)), valor_str, periodo_f, "⏳ AGUARDANDO"]
+
+                                            aba_h.append_row(nova_linha)
+                                            time.sleep(1)
+
+                                            st.session_state.fatura_pdf = gerar_pdf_fatura(id_fat, f_tom, sel_f, total_f, obs_fat)
+                                            st.session_state.fatura_xls = gerar_excel_memoria(sel_f.drop(columns=['DT_FILTRO', 'SELECIONAR'], errors='ignore'))
                                             st.session_state.fatura_id = id_fat
                                             st.session_state.fatura_tomador = f_tom
-                                            st.session_state.fatura_qtd = len(
-                                                sel_f)
+                                            st.session_state.fatura_qtd = len(sel_f)
                                             st.session_state.fatura_total = total_f
 
                                             carregar_dados_completos.clear()
                                             st.session_state.fatura_sucesso = True
                                             st.rerun()
 
+    # =========================================================================
+    # ABA 2: LIVRO CAIXA E HISTÓRICO
+    # =========================================================================
     with tab_historico:
         st.markdown("#### 📖 Livro Caixa Eletrônico")
         try:
@@ -3074,45 +3025,51 @@ elif menu == "💰 Faturamento":
                 df_h = pd.DataFrame(dados_h[1:], columns=dados_h[0])
                 df_h_disp = df_h.copy()
 
-                # Formatar valores corretamente
                 if 'VALOR_TOTAL_R$' in df_h_disp.columns:
-                    df_h_disp['VALOR_TOTAL_R$'] = df_h_disp['VALOR_TOTAL_R$'].apply(
-                        lambda x: f"R$ {float(str(x).replace(',', '.')):.2f}")
+                    df_h_disp['VALOR_TOTAL_R$'] = df_h_disp['VALOR_TOTAL_R$'].apply(lambda x: f"R$ {float(str(x).replace(',', '.')):.2f}")
 
                 c_h1, c_h2 = st.columns(2)
-                f_h_tom = c_h1.selectbox(
-                    "Filtrar por Cliente:",
-                    ["Todos"] +
-                    sorted(
-                        df_h['TOMADOR'].unique().tolist()),
-                    key="h_tom")
+                f_h_tom = c_h1.selectbox("Filtrar por Cliente:", ["Todos"] + CLIENTES_ATUALIZADOS, key="h_tom")
                 if f_h_tom != "Todos":
                     df_h_disp = df_h_disp[df_h_disp['TOMADOR'] == f_h_tom]
 
                 st.markdown(f"**Total de Faturas:** {len(df_h_disp)}")
-                st.dataframe(
-                    df_h_disp.sort_values(
-                        'DATA_EMISSAO',
-                        ascending=False),
-                    use_container_width=True,
-                    hide_index=True)
+                
+                # ==========================================
+                # 🚀 GRID AGGRID STREAMLIT THEME (LIVRO CAIXA)
+                # ==========================================
+                df_h_disp = df_h_disp.sort_values('DATA_EMISSAO', ascending=False)
+                
+                gb_h = GridOptionsBuilder.from_dataframe(df_h_disp)
+                gb_h.configure_default_column(resizable=True, filterable=True, sortable=True)
+                gb_h.configure_column("ID_FATURA", header_name="🗂️ Fatura", width=130)
+                gb_h.configure_column("DATA_EMISSAO", header_name="📅 Emissão", width=120)
+                gb_h.configure_column("TOMADOR", header_name="🏢 Tomador", width=180)
+                gb_h.configure_column("TOTAL_PEDIDOS", header_name="📦 Volumes", width=110)
+                gb_h.configure_column("VALOR_TOTAL_R$", header_name="💰 Valor", width=130)
+                gb_h.configure_column("PERIODO", header_name="📆 Período", width=180)
+                gb_h.configure_column("STATUS_PAGAMENTO", header_name="🚦 Status Pagamento", cellRenderer=status_jscode_fat, width=170)
+                
+                gridOptions_h = gb_h.build()
+                AgGrid(
+                    df_h_disp,
+                    gridOptions=gridOptions_h,
+                    theme="streamlit",
+                    columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+                    height=300,
+                    allow_unsafe_jscode=True,
+                    key="grid_livro_caixa"
+                )
 
                 st.markdown("---")
                 col_re1, col_re2 = st.columns(2)
                 with col_re1:
                     st.markdown("#### 🔄 Gestão de Status e Reemissão")
-                    fat_sel = st.selectbox(
-                        "Escolha uma Fatura:",
-                        ["Selecione..."] +
-                        df_h['ID_FATURA'].tolist())
+                    fat_sel = st.selectbox("Escolha uma Fatura:", ["Selecione..."] + df_h['ID_FATURA'].tolist())
                     if fat_sel != "Selecione...":
                         st.divider()
-                        c_op1, c_op2 = st.columns(2)
-                        if c_op1.button(
-                            "✅ Marcar como PAGO",
-                                use_container_width=True):
-                            idx_fat = df_h[df_h['ID_FATURA']
-                                           == fat_sel].index[0]
+                        if st.button("✅ Marcar como PAGO", use_container_width=True):
+                            idx_fat = df_h[df_h['ID_FATURA'] == fat_sel].index[0]
                             aba_h.update_cell(idx_fat + 2, 7, "✅ PAGO")
                             st.success("✅ Fatura marcada como PAGO!")
                             time.sleep(1)
@@ -3121,65 +3078,40 @@ elif menu == "💰 Faturamento":
                         st.markdown("---")
                         df_rec = df_raw[df_raw['FATURA'] == fat_sel].copy()
                         if df_rec.empty:
-                            st.info(
-                                "📭 Nenhum pedido encontrado para esta fatura.")
+                            st.info("📭 Nenhum pedido encontrado para esta fatura.")
                         else:
                             try:
-                                df_p_rec = carregar_tabela_precos(
-                                    df_rec.iloc[0]['TOMADOR'])
+                                df_p_rec = carregar_tabela_precos(df_rec.iloc[0]['TOMADOR'])
                                 if not df_p_rec.empty:
                                     df_rec['VALOR (R$)'] = df_rec.apply(
-                                        lambda r: calcular_valor_fatura(
-                                            r['CIDADE'], r.get(
-                                                'BAIRRO', ''), r.get(
-                                                'ENDERECO', ''), str(
-                                                r['STATUS']).strip().upper(), df_p_rec), axis=1)
+                                        lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO', ''), r.get('ENDERECO', ''), str(r['STATUS']).strip().upper(), df_p_rec), axis=1)
                                     total_rec = df_rec['VALOR (R$)'].sum()
-                                    st.markdown(
-                                        f"**Pedidos Encontrados:** {len(df_rec)} | **Total:** R$ {total_rec:,.2f}")
+                                    st.markdown(f"**Pedidos Encontrados:** {len(df_rec)} | **Total:** R$ {total_rec:,.2f}")
                                     st.download_button(
                                         "📥 Reemitir PDF",
-                                        data=gerar_pdf_fatura(
-                                            fat_sel,
-                                            df_rec.iloc[0]['TOMADOR'],
-                                            df_rec,
-                                            total_rec),
+                                        data=gerar_pdf_fatura(fat_sel, df_rec.iloc[0]['TOMADOR'], df_rec, total_rec),
                                         file_name=f"{fat_sel}_2via.pdf",
                                         use_container_width=True,
                                         type="primary")
                                 else:
-                                    st.warning(
-                                        f"⚠️ Tabela de preços para {
-                                            df_rec.iloc[0]['TOMADOR']} não encontrada.")
+                                    st.warning(f"⚠️ Tabela de preços para {df_rec.iloc[0]['TOMADOR']} não encontrada.")
                             except Exception as e:
                                 st.error(f"❌ Erro ao gerar PDF: {str(e)}")
 
                 with col_re2:
                     st.markdown("#### 🚨 Estorno de Segurança")
-                    st.warning(
-                        "O Estorno apaga a fatura do histórico e libera os pedidos para cobrança novamente.")
+                    st.warning("O Estorno apaga a fatura do histórico e libera os pedidos para cobrança novamente.")
                     if fat_sel != "Selecione...":
-                        senha_estorno = st.text_input(
-                            "🔑 Senha Master para Estornar:", type="password", key="sen_est")
-                        if st.button(
-                            "❌ EXECUTAR ESTORNO",
-                            type="primary",
-                                use_container_width=True):
+                        senha_estorno = st.text_input("🔑 Senha Master para Estornar:", type="password", key="sen_est")
+                        if st.button("❌ EXECUTAR ESTORNO", type="primary", use_container_width=True):
                             if senha_estorno == "123":
                                 with st.spinner("Limpando carimbos e histórico..."):
-                                    aba_m = planilha_db.worksheet(
-                                        "Memoria_Sistema")
-                                    df_m_est = pd.DataFrame(
-                                        aba_m.get_all_values()[
-                                            1:], columns=aba_m.get_all_values()[0])
-                                    df_m_est.loc[df_m_est['FATURA']
-                                                 == fat_sel, 'FATURA'] = ""
+                                    aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                    df_m_est = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                                    df_m_est.loc[df_m_est['FATURA'] == fat_sel, 'FATURA'] = ""
                                     aba_m.clear()
-                                    aba_m.update(
-                                        "A1", [
-                                            df_m_est.columns.tolist()] + df_m_est.fillna("").astype(str).values.tolist())
-                                    idx_del = df_h[df_h['ID_FATURA']
-                                                   == fat_sel].index[0]
+                                    aba_m.update("A1", [df_m_est.columns.tolist()] + df_m_est.fillna("").astype(str).values.tolist())
+                                    idx_del = df_h[df_h['ID_FATURA'] == fat_sel].index[0]
                                     aba_h.delete_rows(idx_del + 2)
                                     st.success("Estorno concluído!")
                                     time.sleep(2)
@@ -3195,84 +3127,57 @@ elif menu == "💰 Faturamento":
     # =========================================================================
     with tab_faturados:
         st.markdown("#### 📋 Histórico de Pedidos Faturados")
-        st.markdown(
-            "Consulte todos os pedidos que foram inclusos em lotes de faturamento.")
+        st.markdown("Consulte todos os pedidos que foram inclusos em lotes de faturamento.")
 
         try:
-            df_faturados = df_raw[df_raw['FATURA'].astype(
-                str).str.contains('FAT-', na=False)].copy()
+            df_faturados = df_raw[df_raw['FATURA'].astype(str).str.contains('FAT-', na=False)].copy()
 
             if df_faturados.empty:
                 st.info("📭 Nenhum pedido faturado até o momento.")
             else:
-                # Preparando dados para exibição
-                df_faturados['DATA_ENTREGA'] = df_faturados['DATA_ENTREGA'].apply(
-                    lambda x: str(x).split(' ')[0] if pd.notna(x) else "")
-                df_faturados['DATA'] = df_faturados['DATA'].apply(
-                    lambda x: str(x).split(' ')[0] if pd.notna(x) else "")
+                df_faturados['DATA_ENTREGA'] = df_faturados['DATA_ENTREGA'].apply(lambda x: str(x).split(' ')[0] if pd.notna(x) else "")
+                df_faturados['DATA'] = df_faturados['DATA'].apply(lambda x: str(x).split(' ')[0] if pd.notna(x) else "")
 
-                # Filtros
                 col_f1, col_f2, col_f3 = st.columns(3)
+                f_lote = col_f1.selectbox("Filtrar por Lote (Fatura):", ["Todos"] + sorted(df_faturados['FATURA'].unique().tolist()), key="f_lote")
+                f_tomador = col_f2.selectbox("Filtrar por Tomador:", ["Todos"] + CLIENTES_ATUALIZADOS, key="f_tomador")
+                f_status = col_f3.selectbox("Filtrar por Status:", ["Todos", "ENTREGUE", "FRUSTRADA"], key="f_status")
 
-                f_lote = col_f1.selectbox(
-                    "Filtrar por Lote (Fatura):",
-                    ["Todos"] +
-                    sorted(
-                        df_faturados['FATURA'].unique().tolist()),
-                    key="f_lote")
-                f_tomador = col_f2.selectbox(
-                    "Filtrar por Tomador:",
-                    ["Todos"] +
-                    sorted(
-                        df_faturados['TOMADOR'].unique().tolist()),
-                    key="f_tomador")
-                f_status = col_f3.selectbox(
-                    "Filtrar por Status:", [
-                        "Todos", "ENTREGUE", "FRUSTRADA"], key="f_status")
-
-                # Aplicar filtros
                 df_filtered = df_faturados.copy()
-                if f_lote != "Todos":
-                    df_filtered = df_filtered[df_filtered['FATURA'] == f_lote]
-                if f_tomador != "Todos":
-                    df_filtered = df_filtered[df_filtered['TOMADOR']
-                                              == f_tomador]
-                if f_status != "Todos":
-                    df_filtered = df_filtered[df_filtered['STATUS'].str.upper(
-                    ).str.contains(f_status, na=False)]
+                if f_lote != "Todos": df_filtered = df_filtered[df_filtered['FATURA'] == f_lote]
+                if f_tomador != "Todos": df_filtered = df_filtered[df_filtered['TOMADOR'] == f_tomador]
+                if f_status != "Todos": df_filtered = df_filtered[df_filtered['STATUS'].str.upper().str.contains(f_status, na=False)]
 
-                # Preparar DataFrame para exibição
-                df_display = df_filtered[['PEDIDO',
-                                          'FATURA',
-                                          'TOMADOR',
-                                          'LABORATORIO',
-                                          'CIDADE',
-                                          'DATA',
-                                          'DATA_ENTREGA',
-                                          'STATUS']].copy()
-                df_display.rename(columns={
-                    'PEDIDO': '📦 Pedido',
-                    'FATURA': '🗂️ Lote (Fatura)',
-                    'TOMADOR': '🏢 Tomador',
-                    'LABORATORIO': '🏭 Laboratório',
-                    'CIDADE': '🏙️ Cidade',
-                    'DATA': '📅 Coleta',
-                    'DATA_ENTREGA': '✅ Entrega',
-                    'STATUS': '🔄 Status'
-                }, inplace=True)
+                df_display = df_filtered[['PEDIDO', 'FATURA', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'DATA', 'DATA_ENTREGA', 'STATUS']].copy()
 
-                st.markdown(
-                    f"**Total de Pedidos Faturados:** {
-                        len(df_display)} | **Lotes Únicos:** {
-                        df_filtered['FATURA'].nunique()}")
-                st.dataframe(
-                    df_display.sort_values(
-                        '🗂️ Lote (Fatura)',
-                        ascending=False),
-                    use_container_width=True,
-                    hide_index=True)
+                st.markdown(f"**Total de Pedidos Faturados:** {len(df_display)} | **Lotes Únicos:** {df_filtered['FATURA'].nunique()}")
+                
+                # ==========================================
+                # 🚀 GRID AGGRID STREAMLIT THEME (PEDIDOS FATURADOS)
+                # ==========================================
+                df_display = df_display.sort_values('FATURA', ascending=False)
+                gb_f = GridOptionsBuilder.from_dataframe(df_display)
+                gb_f.configure_default_column(resizable=True, filterable=True, sortable=True)
+                gb_f.configure_column("PEDIDO", header_name="📦 Pedido", width=110)
+                gb_f.configure_column("FATURA", header_name="🗂️ Lote (Fatura)", width=160)
+                gb_f.configure_column("TOMADOR", header_name="🏢 Tomador", width=160)
+                gb_f.configure_column("LABORATORIO", header_name="🏭 Laboratório", width=250)
+                gb_f.configure_column("CIDADE", header_name="🏙️ Cidade", width=150)
+                gb_f.configure_column("DATA", header_name="📅 Coleta", width=100)
+                gb_f.configure_column("DATA_ENTREGA", header_name="✅ Entrega", width=100)
+                gb_f.configure_column("STATUS", header_name="🔄 Status", cellRenderer=status_jscode_fat, width=150)
+                
+                gridOptions_f = gb_f.build()
+                AgGrid(
+                    df_display,
+                    gridOptions=gridOptions_f,
+                    theme="streamlit",
+                    columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+                    height=350,
+                    allow_unsafe_jscode=True,
+                    key="grid_pedidos_faturados"
+                )
 
-                # Resumo por lote
                 st.markdown("---")
                 st.markdown("#### 📊 Resumo por Lote de Faturamento")
 
@@ -3280,23 +3185,27 @@ elif menu == "💰 Faturamento":
                     'PEDIDO': 'count',
                     'TOMADOR': 'first',
                     'DATA': 'first'
-                }).rename(columns={
-                    'PEDIDO': 'Qtd Pedidos',
-                    'TOMADOR': 'Tomador',
-                    'DATA': 'Data Primeiro Pedido'
-                }).reset_index()
+                }).rename(columns={'PEDIDO': 'Qtd Pedidos', 'TOMADOR': 'Tomador', 'DATA': 'Data Primeiro Pedido'}).reset_index()
 
-                df_resumo.rename(
-                    columns={
-                        'FATURA': 'Lote (Fatura)'},
-                    inplace=True)
-
-                st.dataframe(
-                    df_resumo.sort_values(
-                        'Lote (Fatura)',
-                        ascending=False),
-                    use_container_width=True,
-                    hide_index=True)
+                df_resumo.rename(columns={'FATURA': 'Lote (Fatura)'}, inplace=True)
+                df_resumo = df_resumo.sort_values('Lote (Fatura)', ascending=False)
+                
+                gb_r = GridOptionsBuilder.from_dataframe(df_resumo)
+                gb_r.configure_default_column(resizable=True, filterable=True, sortable=True)
+                gb_r.configure_column("Lote (Fatura)", header_name="🗂️ Lote", width=200)
+                gb_r.configure_column("Tomador", header_name="🏢 Tomador", width=250)
+                gb_r.configure_column("Qtd Pedidos", header_name="📦 Qtd", width=120)
+                gb_r.configure_column("Data Primeiro Pedido", header_name="📅 Início", width=150)
+                
+                gridOptions_r = gb_r.build()
+                AgGrid(
+                    df_resumo,
+                    gridOptions=gridOptions_r,
+                    theme="streamlit",
+                    columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+                    height=250,
+                    key="grid_resumo_faturas"
+                )
 
         except Exception as e:
             st.error(f"⚠️ Erro ao carregar pedidos faturados: {e}")
@@ -3304,7 +3213,6 @@ elif menu == "💰 Faturamento":
     # =========================================================================
     # FUNÇÃO IBGE (Fica dentro do módulo de Faturamento)
     # =========================================================================
-    # Guarda na memória por 24h para ficar super rápido
     @st.cache_data(ttl=86400)
     def obter_cidades_por_uf(uf):
         if not uf:
@@ -3319,15 +3227,14 @@ elif menu == "💰 Faturamento":
             pass
         return []
 
-    # 🔥 NOVA ABA 4: GESTÃO DE TARIFAS (COM API DO IBGE E CASCATA) 🔥
+    # 🔥 NOVA ABA 4: GESTÃO DE TARIFAS 🔥
     with tab_tarifas:
         st.markdown("#### 💲 Gestão de Tarifas e Preços")
         st.info("Cadastre ou atualize os valores cobrados por rota para cada cliente. Os dados são salvos e aplicados diretamente no banco financeiro.")
 
-        # Seleção do Tomador para ver/editar tarifas
         t_cliente = st.selectbox(
             "Selecione o Cliente (Tomador) para gerenciar:",
-            ["Selecione..."] + CLIENTES_AUTORIZADOS,
+            ["Selecione..."] + CLIENTES_ATUALIZADOS,
             key="sel_tomador_tarifa")
 
         if t_cliente != "Selecione...":
@@ -3336,148 +3243,63 @@ elif menu == "💰 Faturamento":
             with st.container(border=True):
                 st.markdown(f"**➕ Cadastrar Nova Tarifa para {t_cliente}**")
 
-                # 1. A UF FICA DE FORA DO FORMULÁRIO PARA ATUALIZAR A TELA NA
-                # HORA
-                lista_ufs = [
-                    "",
-                    "AC",
-                    "AL",
-                    "AP",
-                    "AM",
-                    "BA",
-                    "CE",
-                    "DF",
-                    "ES",
-                    "GO",
-                    "MA",
-                    "MT",
-                    "MS",
-                    "MG",
-                    "PA",
-                    "PB",
-                    "PR",
-                    "PE",
-                    "PI",
-                    "RJ",
-                    "RN",
-                    "RS",
-                    "RO",
-                    "RR",
-                    "SC",
-                    "SP",
-                    "SE",
-                    "TO"]
+                lista_ufs = ["", "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
                 col_uf, col_espaco = st.columns([1, 3])
-                t_uf = col_uf.selectbox(
-                    "1º Passo: Selecione a UF *",
-                    lista_ufs,
-                    key="tarifa_uf_dinamica")
+                t_uf = col_uf.selectbox("1º Passo: Selecione a UF *", lista_ufs, key="tarifa_uf_dinamica")
 
-                # 2. O FORMULÁRIO COMEÇA AQUI EMBAIXO
                 with st.form("form_nova_tarifa", clear_on_submit=True):
                     col_t1, col_t2 = st.columns([2, 2])
 
-                    # Carrega as cidades baseado na UF que ele escolheu lá em
-                    # cima
                     if t_uf:
                         lista_cidades = obter_cidades_por_uf(t_uf)
-                        opcoes_cid = ["Selecione..."] + lista_cidades + \
-                            ["✍️ OUTRA (DIGITAR MANUALMENTE)"]
-                        t_cid_box = col_t1.selectbox(
-                            "2º Passo: Cidade *", opcoes_cid)
-
-                        # Campo de emergência caso o IBGE não tenha a cidade ou
-                        # a pessoa queira digitar
-                        t_cid_manual = col_t1.text_input(
-                            "Se escolheu 'Outra', digite a cidade aqui:") if t_cid_box == "✍️ OUTRA (DIGITAR MANUALMENTE)" else ""
+                        opcoes_cid = ["Selecione..."] + lista_cidades + ["✍️ OUTRA (DIGITAR MANUALMENTE)"]
+                        t_cid_box = col_t1.selectbox("2º Passo: Cidade *", opcoes_cid)
+                        t_cid_manual = col_t1.text_input("Se escolheu 'Outra', digite a cidade aqui:") if t_cid_box == "✍️ OUTRA (DIGITAR MANUALMENTE)" else ""
                     else:
-                        col_t1.info(
-                            "👆 Selecione a UF acima para carregar as cidades.")
+                        col_t1.info("👆 Selecione a UF acima para carregar as cidades.")
                         t_cid_box = "Selecione..."
                         t_cid_manual = ""
 
-                    t_bai = col_t2.text_input(
-                        "Bairro (Opcional)",
-                        placeholder="Deixe em branco para tarifa geral da cidade")
+                    t_bai = col_t2.text_input("Bairro (Opcional)", placeholder="Deixe em branco para tarifa geral da cidade")
 
                     col_t3, col_t4 = st.columns(2)
-                    t_rua = col_t3.text_input(
-                        "Endereço/Rua (Opcional)",
-                        placeholder="Ex: AV PAULISTA")
-                    t_cep = col_t4.text_input(
-                        "CEP (Opcional)", placeholder="Apenas números")
+                    t_rua = col_t3.text_input("Endereço/Rua (Opcional)", placeholder="Ex: AV PAULISTA")
+                    t_cep = col_t4.text_input("CEP (Opcional)", placeholder="Apenas números")
 
                     col_t5, col_t6 = st.columns(2)
-                    t_valor = col_t5.number_input(
-                        "Valor da Entrega (R$) *", min_value=0.0, step=0.5, format="%.2f")
-                    t_multa = col_t6.number_input(
-                        "Multiplicador p/ Frustrada *",
-                        min_value=0.0,
-                        max_value=1.0,
-                        value=0.5,
-                        step=0.1,
-                        help="Ex: 0.5 cobra 50% do valor caso seja frustrada.")
+                    t_valor = col_t5.number_input("Valor da Entrega (R$) *", min_value=0.0, step=0.5, format="%.2f")
+                    t_multa = col_t6.number_input("Multiplicador p/ Frustrada *", min_value=0.0, max_value=1.0, value=0.5, step=0.1, help="Ex: 0.5 cobra 50% do valor caso seja frustrada.")
 
-                    submit_tarifa = st.form_submit_button(
-                        "💾 Salvar Tarifa no Banco", type="primary", use_container_width=True)
+                    submit_tarifa = st.form_submit_button("💾 Cadastrar Nova Tarifa no Banco", type="primary", use_container_width=True)
 
                     if submit_tarifa:
-                        # Define qual campo de cidade vai ser salvo
                         t_cid_final = t_cid_manual if t_cid_box == "✍️ OUTRA (DIGITAR MANUALMENTE)" else t_cid_box
 
                         if not t_uf or t_cid_final in ["Selecione...", ""]:
-                            st.error(
-                                "⚠️ O preenchimento da UF e da Cidade são obrigatórios!")
+                            st.error("⚠️ O preenchimento da UF e da Cidade são obrigatórios!")
                         elif t_valor <= 0:
-                            st.error(
-                                "⚠️ O Valor da entrega deve ser maior que zero!")
+                            st.error("⚠️ O Valor da entrega deve ser maior que zero!")
                         else:
                             with st.spinner("Registrando tarifa e alinhando colunas no banco financeiro..."):
                                 try:
-                                    buscado = t_cliente.replace(
-                                        'CAEP', 'SYNVIA').replace(
-                                        'CUNHA', 'GRALAB') if t_cliente in [
-                                        'CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else t_cliente
+                                    buscado = t_cliente.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if t_cliente in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else t_cliente
                                     buscado = buscado.strip().upper()
 
-                                    try:
-                                        aba_cli = planilha_financeiro.worksheet(
-                                            buscado)
+                                    try: aba_cli = planilha_financeiro.worksheet(buscado)
                                     except BaseException:
-                                        aba_cli = planilha_financeiro.add_worksheet(
-                                            title=buscado, rows="100", cols="10")
-                                        aba_cli.update("A1",
-                                                       [["CIDADE",
-                                                         "BAIRRO",
-                                                         "ENDERECO",
-                                                         "CEP",
-                                                         "VALOR_CHEIO",
-                                                         "MULT_FRUSTRADA",
-                                                         "UF"]])
+                                        aba_cli = planilha_financeiro.add_worksheet(title=buscado, rows="100", cols="10")
+                                        aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]])
 
                                     cabecalhos_atuais = aba_cli.row_values(1)
                                     if not cabecalhos_atuais:
-                                        cabecalhos_atuais = [
-                                            "CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]
-                                        aba_cli.update(
-                                            "A1", [cabecalhos_atuais])
+                                        cabecalhos_atuais = ["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]
+                                        aba_cli.update("A1", [cabecalhos_atuais])
 
                                     dicionario_nova_tarifa = {
-                                        "CIDADE": padronizar_texto(t_cid_final),
-                                        "BAIRRO": padronizar_texto(t_bai),
-                                        "ENDERECO": padronizar_texto(t_rua),
-                                        "CEP": re.sub(
-                                            r'\D',
-                                            '',
-                                            t_cep),
-                                        "VALOR_CHEIO": f"{
-                                            t_valor:.2f}".replace(
-                                            ".",
-                                            ","),
-                                        "MULT_FRUSTRADA": f"{
-                                            t_multa:.2f}".replace(
-                                            ".",
-                                            ","),
+                                        "CIDADE": padronizar_texto(t_cid_final), "BAIRRO": padronizar_texto(t_bai),
+                                        "ENDERECO": padronizar_texto(t_rua), "CEP": re.sub(r'\D', '', t_cep),
+                                        "VALOR_CHEIO": f"{t_valor:.2f}".replace(".", ","),
+                                        "MULT_FRUSTRADA": f"{t_multa:.2f}".replace(".", ","),
                                         "UF": t_uf}
 
                                     precisa_atualizar_cab = False
@@ -3487,80 +3309,117 @@ elif menu == "💰 Faturamento":
                                             precisa_atualizar_cab = True
 
                                     if precisa_atualizar_cab:
-                                        aba_cli.update(
-                                            "A1", [cabecalhos_atuais])
+                                        aba_cli.update("A1", [cabecalhos_atuais])
 
-                                    nova_linha_ordenada = [
-                                        dicionario_nova_tarifa.get(
-                                            col, "") for col in cabecalhos_atuais]
-
+                                    nova_linha_ordenada = [dicionario_nova_tarifa.get(col, "") for col in cabecalhos_atuais]
                                     aba_cli.append_row(nova_linha_ordenada)
                                     carregar_tabela_precos.clear()
 
-                                    st.success(
-                                        f"✅ Tarifa de R$ {
-                                            t_valor:.2f} para {
-                                            padronizar_texto(t_cid_final)} - {t_uf} cadastrada na coluna certa!")
+                                    st.success(f"✅ Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid_final)} - {t_uf} cadastrada!")
                                     time.sleep(1.5)
                                     st.rerun()
                                 except Exception as e:
-                                    st.error(
-                                        f"Erro Crítico ao salvar tarifa: {e}")
+                                    st.error(f"Erro Crítico ao salvar tarifa: {e}")
 
-            # --- TABELA INTERATIVA (PERMITE DELETAR E EDITAR DIRETO NA TELA) ---
+            # --- TABELA INTERATIVA DE TARIFAS ---
             st.markdown("---")
-            st.markdown(
-                f"#### 🔎 Gerenciar Tabela de Preços Atual ({t_cliente})")
-            st.info("💡 Para **EXCLUIR** uma tarifa, selecione a caixa à esquerda da linha e aperte 'Delete' ou 'Backspace'. Para **EDITAR**, dê dois cliques na célula.")
+            st.markdown(f"#### 🔎 Gerenciar Tabela de Preços Atual ({t_cliente})")
+            st.info("💡 **DICAS DE USO:** \n\n"
+                    "1️⃣ **Para EDITAR um valor:** Clique duas vezes em cima do número que deseja mudar.\n\n"
+                    "2️⃣ **Para EXCLUIR tarifas:** Marque a caixa no canto esquerdo da linha e use o botão cinza 'Excluir Selecionadas'.\n\n"
+                    "⚠️ *Não se esqueça de clicar em 'Salvar Edições' após digitar novos valores!*")
 
             if not df_precos_atuais.empty:
-                df_precos_edit = st.data_editor(
+                # ==========================================
+                # 🚀 GRID AGGRID STREAMLIT THEME (TABELA DE TARIFAS)
+                # ==========================================
+                gb_tar = GridOptionsBuilder.from_dataframe(df_precos_atuais)
+                gb_tar.configure_default_column(editable=True, resizable=True, filterable=True, sortable=True)
+                gb_tar.configure_selection('multiple', use_checkbox=True, header_checkbox=True)
+                
+                # Formatando as colunas pra não ficarem feias
+                gb_tar.configure_column("VALOR_CHEIO", header_name="💰 Valor (R$)", type=["numericColumn", "numberColumnFilter"])
+                gb_tar.configure_column("MULT_FRUSTRADA", header_name="✖️ Mult. Frustrada", type=["numericColumn"])
+                gb_tar.configure_column("CIDADE", header_name="📍 Cidade")
+                gb_tar.configure_column("BAIRRO", header_name="🏘️ Bairro")
+                gb_tar.configure_column("ENDERECO", header_name="🛣️ Endereço")
+                gb_tar.configure_column("CEP", header_name="📮 CEP")
+                gb_tar.configure_column("UF", header_name="🗺️ UF")
+                
+                gridOptions_tar = gb_tar.build()
+
+                tabela_tarifas = AgGrid(
                     df_precos_atuais,
-                    num_rows="dynamic",
-                    use_container_width=True,
-                    hide_index=True,
+                    gridOptions=gridOptions_tar,
+                    theme="streamlit", 
+                    columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+                    height=400,
+                    update_mode="MODEL_CHANGED",
                     key=f"editor_tarifas_{t_cliente}"
                 )
+                
+                df_precos_edit = pd.DataFrame(tabela_tarifas['data'])
+                selecionados_del = tabela_tarifas['selected_rows']
 
-                if st.button(
-                    "💾 Salvar Alterações na Tabela",
-                    type="primary",
-                        use_container_width=True):
+                col_btn_save, col_btn_del = st.columns(2)
+
+                if col_btn_save.button("💾 Salvar Edições de Valores (Células)", type="primary", use_container_width=True):
                     with st.spinner("Atualizando tabela de preços no Google Sheets..."):
                         try:
-                            buscado = t_cliente.replace(
-                                'CAEP', 'SYNVIA').replace(
-                                'CUNHA', 'GRALAB') if t_cliente in [
-                                'CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else t_cliente
+                            # Limpa artefatos do AgGrid e preserva as colunas normais
+                            cols_to_keep = [c for c in df_precos_edit.columns if not c.startswith('_')]
+                            df_final_save = df_precos_edit[cols_to_keep]
+
+                            buscado = t_cliente.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if t_cliente in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else t_cliente
                             buscado = buscado.strip().upper()
                             aba_cli = planilha_financeiro.worksheet(buscado)
 
                             aba_cli.clear()
-
-                            if not df_precos_edit.empty:
-                                aba_cli.update("A1", [df_precos_edit.columns.tolist(
-                                )] + df_precos_edit.fillna("").astype(str).values.tolist())
+                            if not df_final_save.empty:
+                                aba_cli.update("A1", [df_final_save.columns.tolist()] + df_final_save.fillna("").astype(str).values.tolist())
                             else:
-                                aba_cli.update("A1",
-                                               [["CIDADE",
-                                                 "BAIRRO",
-                                                 "ENDERECO",
-                                                 "CEP",
-                                                 "VALOR_CHEIO",
-                                                 "MULT_FRUSTRADA",
-                                                 "UF"]])
+                                aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]])
 
                             carregar_tabela_precos.clear()
-                            st.success(
-                                "✅ Tabela atualizada e salva com sucesso!")
+                            st.success("✅ Edições salvas com sucesso!")
                             time.sleep(1.5)
                             st.rerun()
-
                         except Exception as e:
                             st.error(f"Erro ao atualizar tabela: {e}")
+
+                if col_btn_del.button("🗑️ Excluir Tarifas Selecionadas", use_container_width=True):
+                    if not selecionados_del:
+                        st.warning("⚠️ Selecione a caixa à esquerda de pelo menos uma tarifa para excluí-la.")
+                    else:
+                        with st.spinner("Excluindo linhas..."):
+                            try:
+                                # Captura os indices reais selecionados
+                                indices_to_drop = [int(row['_selectedRowNodeInfo']['nodeRowIndex']) for row in selecionados_del if '_selectedRowNodeInfo' in row]
+                                df_final_save = df_precos_edit.drop(index=indices_to_drop)
+                                
+                                # Limpa colunas ocultas
+                                cols_to_keep = [c for c in df_final_save.columns if not c.startswith('_')]
+                                df_final_save = df_final_save[cols_to_keep]
+
+                                buscado = t_cliente.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if t_cliente in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else t_cliente
+                                buscado = buscado.strip().upper()
+                                aba_cli = planilha_financeiro.worksheet(buscado)
+
+                                aba_cli.clear()
+                                if not df_final_save.empty:
+                                    aba_cli.update("A1", [df_final_save.columns.tolist()] + df_final_save.fillna("").astype(str).values.tolist())
+                                else:
+                                    aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]])
+
+                                carregar_tabela_precos.clear()
+                                st.success(f"✅ {len(indices_to_drop)} tarifa(s) excluída(s) com sucesso!")
+                                time.sleep(1.5)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao excluir as tarifas: {e}")
+
             else:
-                st.warning(
-                    "Nenhuma tarifa cadastrada no banco de dados para este cliente ainda.")
+                st.warning("Nenhuma tarifa cadastrada no banco de dados para este cliente ainda.")
 # =============================================================================
 # 📝 MÓDULO EXTRA: NOVO PEDIDO MANUAL
 # =============================================================================
@@ -5794,29 +5653,91 @@ elif menu == "🔬 Triagem":
         unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
 
+    # =========================================================================
+    # ⚙️ RECURSOS VISUAIS GLOBAIS, TOASTS E COMPONENTES UI
+    # =========================================================================
+    if 'ui_toast' in st.session_state:
+        st.toast(st.session_state.ui_toast['msg'], icon=st.session_state.ui_toast['icon'])
+        del st.session_state.ui_toast
+
+    def exibir_empty_state(icone, titulo, subtitulo):
+        html = (
+            f'<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 50px 20px; text-align: center; background-color: #f8fafc; border-radius: 12px; border: 2px dashed #cbd5e1; margin-top: 10px; margin-bottom: 20px;">'
+            f'<div style="font-size: 50px; margin-bottom: 12px; opacity: 0.9;">{icone}</div>'
+            f'<h4 style="color: #0f172a; margin-bottom: 6px; font-weight: 800;">{titulo}</h4>'
+            f'<p style="color: #64748b; font-size: 14px; max-width: 450px; margin: 0;">{subtitulo}</p>'
+            f'</div>'
+        )
+        st.markdown(html, unsafe_allow_html=True)
+
+    def renderizar_kpis(lista_kpis):
+        html = '<div style="display: flex; gap: 15px; margin-bottom: 20px; margin-top: 10px;">'
+        for val, lbl, c1, c2 in lista_kpis:
+            html += f'<div style="flex: 1; background: linear-gradient(135deg, {c1} 0%, {c2} 100%); border-radius: 10px; height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);">'
+            html += f'<p style="color: rgba(255,255,255,0.9); font-weight: 800; font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">{lbl}</p>'
+            html += f'<p style="color: white; font-weight: 900; font-size: 26px; margin: 2px 0 0 0; line-height: 1;">{val}</p>'
+            html += '</div>'
+        html += '</div>'
+        st.markdown(html, unsafe_allow_html=True)
+
+    st.markdown(
+        '<style>'
+        'div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div { background-color: #f8fafc !important; border-radius: 8px !important; border: 1px solid #e2e8f0 !important; box-shadow: none !important; }'
+        'div[data-testid="stDateInput"] > div { background-color: #f8fafc !important; border-radius: 8px !important; border: 1px solid #e2e8f0 !important; box-shadow: none !important; }'
+        '</style>', 
+        unsafe_allow_html=True
+    )
+
+    custom_css_premium = {
+        ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px", "background-color": "#ffffff !important", "border": "1px solid #e2e8f0"},
+        ".ag-header": {"background-color": "#f1f5f9 !important", "border-bottom": "2px solid #e2e8f0 !important"},
+        ".ag-header-cell-text": {"color": "#0f172a !important", "font-weight": "700 !important", "font-size": "13px !important"},
+        ".ag-row:hover": {"background-color": "#e2e8f0 !important", "cursor": "pointer", "transition": "background-color 0.2s"},
+        ".ag-row-odd": {"background-color": "#f8fafc !important"},
+        ".ag-row-even": {"background-color": "#ffffff !important"}
+    }
+
+    status_jscode_tri = JsCode("""
+    class StatusBadgeRenderer {
+    init(params) {
+        this.eGui = document.createElement('div');
+        this.eGui.style.cssText = 'display: flex; align-items: center; height: 100%;';
+        let badge = document.createElement('span');
+        badge.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; height: 22px;';
+        let text = params.value || '';
+        let status = text.toUpperCase();
+
+        if (status.includes('ENTREGUE') || status.includes('CONFERIDO')) { badge.style.backgroundColor = '#dcfce7'; badge.style.color = '#166534'; badge.style.border = '1px solid #bbf7d0'; }
+        else if (status.includes('FRUSTRADA') || status.includes('PROBLEMA') || status.includes('CANCELADO')) { badge.style.backgroundColor = '#fee2e2'; badge.style.color = '#991b1b'; badge.style.border = '1px solid #fecaca'; }
+        else if (status.includes('COLETADO') || status.includes('EM ROTA DE ENTREGA') || status.includes('ROTA')) { badge.style.backgroundColor = '#dbeafe'; badge.style.color = '#1e40af'; badge.style.border = '1px solid #bfdbfe'; }
+        else if (status.includes('PENDENTE') || status.includes('AGUARDANDO')) { badge.style.backgroundColor = '#fef3c7'; badge.style.color = '#b45309'; badge.style.border = '1px solid #fde68a'; }
+        else { badge.style.backgroundColor = '#f1f5f9'; badge.style.color = '#475569'; badge.style.border = '1px solid #e2e8f0'; }
+
+        badge.innerText = text;
+        this.eGui.appendChild(badge);
+    }
+    getGui() { return this.eGui; }
+    }
+    """)
+
+    CLIENTES_ATUALIZADOS = sorted(list(set([c.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') for c in CLIENTES_AUTORIZADOS])))
+
     # --- CONEXÃO COM O COFRE DE AVULSOS ---
     @st.cache_resource
     def obter_planilha_avulsos():
-        scopes = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"]
+        scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         try:
             import json
             from google.oauth2.credentials import Credentials
             token_str = os.environ.get("google_token_json")
             if not token_str:
-                try:
-                    token_str = st.secrets.get("google_token_json")
-                except BaseException:
-                    pass
-            if not token_str:
-                return None
+                try: token_str = st.secrets.get("google_token_json")
+                except BaseException: pass
+            if not token_str: return None
             token_info = json.loads(token_str)
-            creds = Credentials.from_authorized_user_info(
-                token_info, scopes=scopes)
+            creds = Credentials.from_authorized_user_info(token_info, scopes=scopes)
             gc = gspread.authorize(creds)
-            return gc.open_by_key(
-                "1puECAowymzkiwAObEt4KPeAYiBeIOKtCsSLOIklZJgk")
+            return gc.open_by_key("1puECAowymzkiwAObEt4KPeAYiBeIOKtCsSLOIklZJgk")
         except BaseException:
             return None
 
@@ -5828,47 +5749,30 @@ elif menu == "🔬 Triagem":
         pdf.set_line_width(0.3)
         pdf.rect(5, 5, 200, 287)
         try:
-            logo_path = os.path.join(
-                tempfile.gettempdir(), "igo_logo_temp.png")
+            logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
             if not os.path.exists(logo_path):
-                req = urllib.request.Request(
-                    "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png",
-                    headers={
-                        'User-Agent': 'Mozilla/5.0'})
+                req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file:
                     out_file.write(response.read())
             pdf.image(logo_path, x=10, y=8, w=30)
-        except BaseException:
-            pass
+        except BaseException: pass
 
         pdf.set_y(15)
         pdf.set_font("Arial", "B", 14)
         pdf.set_text_color(15, 23, 42)
-        pdf.cell(
-            0,
-            6,
-            "PROTOCOLO DE TRIAGEM MANUAL DE ENVELOPES",
-            ln=True,
-            align="C")
+        pdf.cell(0, 6, "PROTOCOLO DE TRIAGEM MANUAL DE ENVELOPES", ln=True, align="C")
         pdf.set_font("Arial", "B", 10)
         pdf.set_text_color(2, 132, 199)
         pdf.cell(0, 5, f"LOTE: {id_lote}", ln=True, align="C")
         pdf.set_font("Arial", "", 8)
         pdf.set_text_color(100, 116, 139)
 
-        dt_s = data_str if isinstance(
-            data_str, str) else data_str.strftime('%d/%m/%Y')
-        pdf.cell(
-            0,
-            4,
-            f"Data da Triagem: {dt_s} | Hub de Destino: {tomador}",
-            ln=True,
-            align="C")
+        dt_s = data_str if isinstance(data_str, str) else data_str.strftime('%d/%m/%Y')
+        pdf.cell(0, 4, f"Data da Triagem: {dt_s} | Hub de Destino: {tomador}", ln=True, align="C")
         pdf.ln(3)
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         pdf.ln(3)
 
-        # CABEÇALHO DA TABELA
         pdf.set_fill_color(15, 23, 42)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Arial", "B", 8)
@@ -5877,16 +5781,12 @@ elif menu == "🔬 Triagem":
         pdf.cell(40, 6, "DATA DA BIPAGEM", 1, 0, "C", True)
         pdf.cell(40, 6, "HORA DA BIPAGEM", 1, 1, "C", True)
 
-        # LINHAS DA TABELA
         pdf.set_text_color(51, 65, 85)
         pdf.set_font("Arial", "", 8)
 
         for idx, item in enumerate(lista_itens, 1):
             fill = (idx % 2 == 0)
-            pdf.set_fill_color(
-                241, 245, 249) if fill else pdf.set_fill_color(
-                255, 255, 255)
-
+            pdf.set_fill_color(241, 245, 249) if fill else pdf.set_fill_color(255, 255, 255)
             env = str(item.get('ENVELOPE', ''))
             dt_bip = str(item.get('DATA', ''))
             hr_bip = str(item.get('HORA', ''))
@@ -5899,13 +5799,7 @@ elif menu == "🔬 Triagem":
         pdf.ln(6)
         pdf.set_font("Arial", "B", 8)
         pdf.set_text_color(15, 23, 42)
-        pdf.cell(
-            0,
-            5,
-            f"TOTAL DE ENVELOPES CONFERIDOS: {
-                len(lista_itens)}",
-            ln=True,
-            align="R")
+        pdf.cell(0, 5, f"TOTAL DE ENVELOPES CONFERIDOS: {len(lista_itens)}", ln=True, align="R")
         pdf.set_y(-25)
         pdf.line(55, pdf.get_y(), 155, pdf.get_y())
         pdf.set_font("Arial", "B", 7)
@@ -5918,44 +5812,40 @@ elif menu == "🔬 Triagem":
         return pdf_bytes
 
     # --- CONTROLES DE MEMÓRIA ---
-    if 'triagem_avulsa_lote' not in st.session_state:
-        st.session_state.triagem_avulsa_lote = []
-    if 'pdf_avulso_pronto' not in st.session_state:
-        st.session_state.pdf_avulso_pronto = None
-    if 'id_avulso_pronto' not in st.session_state:
-        st.session_state.id_avulso_pronto = None
-    if 'log_triagem' not in st.session_state:
-        st.session_state.log_triagem = []
+    if 'triagem_avulsa_lote' not in st.session_state: st.session_state.triagem_avulsa_lote = []
+    if 'pdf_avulso_pronto' not in st.session_state: st.session_state.pdf_avulso_pronto = None
+    if 'id_avulso_pronto' not in st.session_state: st.session_state.id_avulso_pronto = None
+    if 'log_triagem' not in st.session_state: st.session_state.log_triagem = []
+    if 'romaneio_sucesso' not in st.session_state: st.session_state.romaneio_sucesso = False
 
     t1, t2, t3, t4 = st.tabs(["📦 1. Validação Manual & Bipar", "🚚 2. Gerar Documento de Romaneio",
                              "🕒 3. Histórico de Varredura", "📝 4. Triagem Manual (Envelopes)"])
 
+    # =========================================================================
+    # ABA 1: VALIDAÇÃO MANUAL E BIPAR
+    # =========================================================================
     with t1:
         if df_raw.empty:
-            st.warning("O banco de dados oficial está vazio.")
+            exibir_empty_state("📭", "Banco Vazio", "Aguardando sincronização de dados operacionais da nuvem.")
         else:
-            st.info(
-                "💡 A auditoria de triagem oficial aceita apenas materiais **COLETADOS** pelo aplicativo.")
+            st.info("💡 A auditoria de triagem oficial aceita apenas materiais **COLETADOS** pelo aplicativo do motorista.")
+            
             col_bip_esq, col_bip_dir = st.columns([1.5, 1])
             with col_bip_esq:
                 with st.form("form_bip", clear_on_submit=True):
                     col_bip, col_btn = st.columns([3, 1])
-                    bip_input = col_bip.text_input(
-                        "🔍 Bipar QR Code de Validação / Pedido:")
-                    if col_btn.form_submit_button(
-                            "Auditar", use_container_width=True) and bip_input:
+                    bip_input = col_bip.text_input("🔍 Bipar QR Code de Validação / Pedido:")
+                    if col_btn.form_submit_button("Auditar", use_container_width=True) and bip_input:
                         termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
-                        ped_limpo = df_raw['PEDIDO'].astype(str).str.upper().apply(
-                            lambda x: re.sub(r'[^A-Z0-9]', '', str(x)))
+                        ped_limpo = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', str(x)))
                         mask = (ped_limpo == termo)
                         if 'QR_CODE' in df_raw.columns:
-                            qr_limpo = df_raw['QR_CODE'].astype(str).str.upper().apply(
-                                lambda x: re.sub(r'[^A-Z0-9]', '', str(x)))
+                            qr_limpo = df_raw['QR_CODE'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', str(x)))
                             mask = mask | (qr_limpo == termo)
+                        
                         if mask.any():
                             idx = df_raw[mask].index[-1]
-                            if str(df_raw.at[idx, 'STATUS']
-                                   ).strip().upper() == 'COLETADO':
+                            if str(df_raw.at[idx, 'STATUS']).strip().upper() == 'COLETADO':
                                 try:
                                     aba = planilha_db.worksheet("Memoria_Sistema")
                                     pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
@@ -5966,11 +5856,9 @@ elif menu == "🔬 Triagem":
                                         cell = aba.find(pedido_alvo, in_column=col_pedido)
                                         if cell:
                                             aba.update_cell(cell.row, col_status, 'CONFERIDO')
-                                            st.session_state.log_triagem.insert(0, {'PEDIDO': str(df_raw.at[idx, 'PEDIDO']), 'TOMADOR': str(df_raw.at[idx, 'TOMADOR']), 'LABORATORIO': str(
-                                                df_raw.at[idx, 'LABORATORIO']), 'CIDADE': str(df_raw.at[idx, 'CIDADE']), 'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S')})
-                                            st.success(
-                                                f"✅ Pedido {str(df_raw.at[idx, 'PEDIDO'])} VALIDADO!")
-                                            time.sleep(1.0)
+                                            st.session_state.log_triagem.insert(0, {'PEDIDO': str(df_raw.at[idx, 'PEDIDO']), 'TOMADOR': str(df_raw.at[idx, 'TOMADOR']), 'LABORATORIO': str(df_raw.at[idx, 'LABORATORIO']), 'CIDADE': str(df_raw.at[idx, 'CIDADE']), 'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S')})
+                                            st.session_state.ui_toast = {'msg': f"Pedido {pedido_alvo} VALIDADO!", 'icon': "✅"}
+                                            time.sleep(0.5)
                                             carregar_dados_completos.clear()
                                             st.rerun()
                                         else:
@@ -5980,463 +5868,404 @@ elif menu == "🔬 Triagem":
                                 except Exception as e:
                                     st.error(f"Erro: {e}")
                             else:
-                                st.error(
-                                    "❌ Volume não está com status COLETADO.")
+                                st.error("❌ Volume não está com status COLETADO.")
                         else:
                             st.error("❌ Assinatura ou Pedido não reconhecido.")
+            
             with col_bip_dir:
-                st.markdown(
-                    "<div style='border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; background-color: #F8FAFC; height: 130px; overflow-y: auto;'>",
-                    unsafe_allow_html=True)
-                st.markdown(
-                    "<p style='margin-bottom: 5px; font-weight: bold; color: #0F172A; font-size: 14px;'>⏱️ Últimos Bips:</p>",
-                    unsafe_allow_html=True)
+                st.markdown("<div style='border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; background-color: #F8FAFC; height: 130px; overflow-y: auto;'>", unsafe_allow_html=True)
+                st.markdown("<p style='margin-bottom: 5px; font-weight: bold; color: #0F172A; font-size: 14px;'>⏱️ Últimos Bips (Sessão):</p>", unsafe_allow_html=True)
                 if st.session_state.log_triagem:
                     for item in st.session_state.log_triagem[:5]:
                         st.markdown(
-                            f"<div style='font-size: 11px; color: #334155; margin-bottom: 3px;'>🟢 <b>{
-                                item['PEDIDO']}</b> - {
-                                item['LABORATORIO']} <br><span style='color: #64748B; padding-left: 15px;'>{
-                                item['TOMADOR']} | {
-                                item['CIDADE']} ({
-                                item['HORA']})</span></div>",
+                            f"<div style='font-size: 11px; color: #334155; margin-bottom: 3px;'>🟢 <b>{item['PEDIDO']}</b> - {item['LABORATORIO']} <br><span style='color: #64748B; padding-left: 15px;'>{item['TOMADOR']} | {item['CIDADE']} ({item['HORA']})</span></div>",
                             unsafe_allow_html=True)
                 else:
-                    st.markdown(
-                        "<p style='font-size: 12px; color: #94A3B8;'>Nenhum volume bipado ainda.</p>",
-                        unsafe_allow_html=True)
+                    st.markdown("<p style='font-size: 12px; color: #94A3B8;'>Nenhum volume bipado ainda.</p>", unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
+
             st.markdown("---")
-            df_fila = df_raw[df_raw['STATUS'].astype(
-                str).str.upper() == 'COLETADO'].copy()
+            df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
-                # 🔥 FILTRO POR TOMADOR 🔥
-                tomador_filtro_t1 = st.selectbox(
-                    "🏢 Filtrar por Hub de Destino:",
-                    ["Todos"] +
-                    sorted(
-                        df_fila['TOMADOR'].astype(str).unique().tolist()),
-                    key="filtro_tomador_t1")
+                with st.expander("🔎 Filtrar Fila de Triagem", expanded=False):
+                    tomador_filtro_t1 = st.selectbox("🏢 Filtrar por Hub de Destino:", ["Todos"] + sorted(df_fila['TOMADOR'].astype(str).unique().tolist()), key="filtro_tomador_t1")
                 if tomador_filtro_t1 != "Todos":
                     df_fila = df_fila[df_fila['TOMADOR'] == tomador_filtro_t1]
 
-                st.markdown(
-                    f"**📦 Pedidos COLETADOS** ({len(df_fila)} volume(s))")
-                df_fila = df_fila[['DATA',
-                                   'PEDIDO',
-                                   'TOMADOR',
-                                   'LABORATORIO',
-                                   'CIDADE',
-                                   'STATUS']].fillna("").astype(str)
-                c_sel1, c_sel2 = st.columns([1, 4])
-                df_fila.insert(
-                    0, "SELECIONAR", c_sel1.checkbox(
-                        "✅ Selecionar Todos", key="sel_all_val"))
-                tabela_fila = st.data_editor(
-                    df_fila,
-                    hide_index=True,
-                    disabled=[
-                        c for c in df_fila.columns if c != "SELECIONAR"],
-                    use_container_width=True)
-                if st.button(
-                    "✅ Enviar Selecionados para Despacho",
-                        type="primary"):
-                    selecionados_manuais = tabela_fila[tabela_fila["SELECIONAR"]]
-                    if selecionados_manuais.empty:
-                        st.warning("⚠️ Marque os pedidos primeiro!")
+                renderizar_kpis([
+                    (len(df_fila), "📦 Volumes Aguardando Bipagem", "#1E293B", "#334155"),
+                    (len(st.session_state.log_triagem), "✅ Bipados Nesta Sessão", "#059669", "#10B981")
+                ])
+
+                # Preparando as colunas blindadas para evitar erros de render
+                colunas_validas = [c for c in ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS'] if c in df_fila.columns]
+                df_fila_show = df_fila[colunas_validas].fillna("").astype(str).copy()
+                
+                gb_fila = GridOptionsBuilder.from_dataframe(df_fila_show)
+                gb_fila.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
+                gb_fila.configure_default_column(resizable=True, filterable=True, sortable=True)
+                
+                if "DATA" in df_fila_show.columns: gb_fila.configure_column("DATA", header_name="📅 Coleta", width=110)
+                if "PEDIDO" in df_fila_show.columns: gb_fila.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
+                if "TOMADOR" in df_fila_show.columns: gb_fila.configure_column("TOMADOR", header_name="🏢 Hub Destino", width=160)
+                if "LABORATORIO" in df_fila_show.columns: gb_fila.configure_column("LABORATORIO", header_name="🏭 Ponto de Coleta", width=250)
+                if "CIDADE" in df_fila_show.columns: gb_fila.configure_column("CIDADE", header_name="📍 Cidade", width=150)
+                if "STATUS" in df_fila_show.columns: gb_fila.configure_column("STATUS", header_name="🚦 Status", cellRenderer=status_jscode_tri, width=150)
+                
+                st.markdown("<p style='font-size: 13px; color: #64748b; margin-bottom: 5px;'>Selecione volumes avulsos caso precise forçar a conferência sem o leitor de código de barras.</p>", unsafe_allow_html=True)
+                
+                grid_fila = AgGrid(
+                    df_fila_show, 
+                    gridOptions=gb_fila.build(), 
+                    theme="alpine", 
+                    columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS, 
+                    height=350, 
+                    allow_unsafe_jscode=True, 
+                    custom_css=custom_css_premium,
+                    key="grid_triagem_fila")
+
+                sel_fila_raw = grid_fila.get('selected_rows', [])
+                if isinstance(sel_fila_raw, pd.DataFrame):
+                    df_sel_fila = sel_fila_raw
+                elif isinstance(sel_fila_raw, list) and len(sel_fila_raw) > 0:
+                    df_sel_fila = pd.DataFrame(sel_fila_raw)
+                else:
+                    df_sel_fila = pd.DataFrame(columns=df_fila_show.columns)
+                
+                if st.button("✅ Enviar Selecionados para Despacho (Forçar Validação)", type="primary"):
+                    if df_sel_fila.empty:
+                        st.toast("Marque os pedidos na tabela primeiro!", icon="⚠️")
                     else:
-                        with st.spinner("Conferindo lote..."):
-                            p_ids = selecionados_manuais['PEDIDO'].astype(
-                                str).tolist()
+                        with st.spinner("Conferindo lote em massa..."):
+                            p_ids = df_sel_fila['PEDIDO'].astype(str).tolist()
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_nuvem = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_nuvem[1:], columns=dados_nuvem[0])
-                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(
-                                    p_ids), 'STATUS'] = 'CONFERIDO'
-                                aba.update(
-                                    "A1", [
-                                        df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                st.success(
-                                    f"🎉 {len(p_ids)} volumes liberados!")
-                                time.sleep(1.5)
+                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'STATUS'] = 'CONFERIDO'
+                                aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                st.session_state.ui_toast = {'msg': f"{len(p_ids)} volumes liberados!", 'icon': "🎉"}
+                                time.sleep(1.0)
                                 carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Erro: {e}")
             else:
-                st.info("O salão está vazio.")
+                exibir_empty_state("🧹", "Salão Limpo", "Não há nenhum volume com status COLETADO aguardando conferência.")
 
+    # =========================================================================
+    # ABA 2: GERAR DOCUMENTO DE ROMANEIO
+    # =========================================================================
     with t2:
-        if df_raw.empty:
-            st.warning("O banco de dados oficial está vazio.")
+        if st.session_state.romaneio_sucesso:
+            st.markdown("#### 🚚 Romaneio de Expedição Finalizado")
+            st.success(f"🎉 O Lote de Embarque {st.session_state.romaneio_id} foi selado e registrado com sucesso!")
+            
+            c_b1, c_b2 = st.columns(2)
+            c_b1.download_button(
+                label="📥 BAIXAR PROTOCOLO DE ROMANEIO (PDF)",
+                data=st.session_state.romaneio_pdf,
+                file_name=f"Romaneio_IGO_{st.session_state.romaneio_id}.pdf",
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True
+            )
+            if c_b2.button("🔄 Voltar / Novo Despacho", use_container_width=True):
+                st.session_state.romaneio_sucesso = False
+                st.rerun()
         else:
-            df_conf = df_raw[df_raw['STATUS'].astype(
-                str).str.upper() == 'CONFERIDO'].copy()
-            if not df_conf.empty:
-                tomador_filtro = st.columns([1, 2])[0].selectbox("🏢 Hub de Destino (Filtro):", [
-                    "Todos"] + sorted(df_conf['TOMADOR'].astype(str).unique().tolist()))
-                if tomador_filtro != "Todos":
-                    df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
-                df_conf_show = df_conf[['DATA',
-                                        'PEDIDO',
-                                        'TOMADOR',
-                                        'LABORATORIO',
-                                        'CIDADE',
-                                        'UF']].fillna("").astype(str)
-                df_conf_show.insert(0, "SELECIONAR", st.columns(
-                    [1, 4])[0].checkbox("✅ Selecionar Todos", key="sel_all_exp"))
-                tabela_sel_exp = st.data_editor(
-                    df_conf_show,
-                    hide_index=True,
-                    disabled=[
-                        c for c in df_conf_show.columns if c != "SELECIONAR"],
-                    use_container_width=True)
-                selecionados = tabela_sel_exp[tabela_sel_exp["SELECIONAR"]]
-                st.markdown("---")
-                c_mot, c_data, c_btn = st.columns([2, 1, 2])
-                motorista_escolhido = c_mot.selectbox("👤 Motorista:", ["Selecione..."] + (sorted(
-                    DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []))
-                data_despacho = c_data.date_input(
-                    "📅 Data de Embarque:", format="DD/MM/YYYY", value=hoje_br)
-                if c_btn.button(
-                        f"🚚 Despachar Lote ({
-                            len(selecionados)} volumes)",
-                        type="primary",
-                        use_container_width=True):
-                    if selecionados.empty or motorista_escolhido == "Selecione...":
-                        st.warning(
-                            "⚠️ Selecione os pacotes e informe o motorista.")
-                    else:
-                        sel_lista = selecionados.to_dict('records')
-                        tomadores_unicos = list(
-                            set([str(r.get('TOMADOR', '')).strip() for r in sel_lista]))
-                        if len(tomadores_unicos) > 1:
-                            st.error(
-                                f"🚨 VIOLAÇÃO DE ROTA: Destinos diferentes selecionados.")
-                        else:
-                            with st.spinner("Selando romaneio..."):
-                                id_romaneio = f"ROM-{
-                                    datetime.now().strftime('%d%m')}-{
-                                    random.randint(
-                                        100, 999)}"
-                                p_ids = [str(r['PEDIDO']) for r in sel_lista]
-                                try:
-                                    aba = planilha_db.worksheet("Memoria_Sistema")
-                                    dados_nuvem = aba.get_all_values()
-                                    if len(dados_nuvem) > 1:
-                                        df_nuvem = pd.DataFrame(dados_nuvem[1:], columns=dados_nuvem[0])
-                                        df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), ['STATUS', 'ROMANEIO', 'AGENTE_RAW']] = [
-                                            'EM ROTA DE ENTREGA', id_romaneio, motorista_escolhido]
-                                        aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    despachar_para_appsheet(
-                                        [
-                                            {
-                                                'PEDIDO': id_romaneio,
-                                                'MOTORISTA': motorista_escolhido,
-                                                'ENDERECO': "Lote Hub",
-                                                'NUMERO': f"{
-                                                    len(p_ids)} V",
-                                                'BAIRRO': tomadores_unicos[0],
-                                                'CIDADE': sel_lista[0].get(
-                                                    'CIDADE',
-                                                    ''),
-                                                'CEP': "---",
-                                                'LABORATORIO': f"Lote {
-                                                    len(sel_lista)}",
-                                                'TOMADOR': tomadores_unicos[0],
-                                                'ROMANEIO': id_romaneio}])
-                                    pdf_bytes = gerar_pdf_romaneio(
-                                        id_romaneio, data_despacho, motorista_escolhido, sel_lista)
-                                    carregar_dados_completos.clear()
-                                    st.success(f"🎉 Lote {id_romaneio} gerado!")
-                                    st.download_button(
-                                        label="📥 BAIXAR PROTOCOLO",
-                                        data=pdf_bytes,
-                                        file_name=f"Romaneio_IGO_{id_romaneio}.pdf",
-                                        mime="application/pdf",
-                                        type="primary")
-                                except Exception as e:
-                                    st.error(f"Erro: {e}")
+            if df_raw.empty:
+                exibir_empty_state("📭", "Banco Vazio", "Aguardando dados...")
             else:
-                st.info("O salão está vazio.")
+                df_conf = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
+                if not df_conf.empty:
+                    with st.expander("🔎 Filtrar Hub de Despacho", expanded=False):
+                        tomador_filtro = st.selectbox("🏢 Hub de Destino (Filtro):", ["Todos"] + sorted(df_conf['TOMADOR'].astype(str).unique().tolist()), key="filtro_tomador_t2")
+                    
+                    if tomador_filtro != "Todos":
+                        df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
 
+                    renderizar_kpis([
+                        (len(df_conf), "📦 Volumes Prontos p/ Embarque", "#0ea5e9", "#06b6d4"),
+                        (df_conf['TOMADOR'].nunique(), "🏢 Hubs com Carga", "#6366f1", "#8b5cf6")
+                    ])
+
+                    colunas_validas_conf = [c for c in ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF'] if c in df_conf.columns]
+                    df_conf_show = df_conf[colunas_validas_conf].fillna("").astype(str).copy()
+                    
+                    gb_conf = GridOptionsBuilder.from_dataframe(df_conf_show)
+                    gb_conf.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
+                    gb_conf.configure_default_column(resizable=True, filterable=True, sortable=True)
+                    
+                    if "DATA" in df_conf_show.columns: gb_conf.configure_column("DATA", header_name="📅 Coleta", width=110)
+                    if "PEDIDO" in df_conf_show.columns: gb_conf.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
+                    if "TOMADOR" in df_conf_show.columns: gb_conf.configure_column("TOMADOR", header_name="🏢 Hub Destino", width=160)
+                    if "LABORATORIO" in df_conf_show.columns: gb_conf.configure_column("LABORATORIO", header_name="🏭 Laboratório", width=250)
+                    if "CIDADE" in df_conf_show.columns: gb_conf.configure_column("CIDADE", header_name="📍 Cidade", width=150)
+                    if "UF" in df_conf_show.columns: gb_conf.configure_column("UF", header_name="🗺️ UF", width=90)
+
+                    st.markdown("<p style='font-size: 13px; color: #64748b; margin-bottom: 5px;'>Selecione os pacotes na tabela para formar o lote do motorista.</p>", unsafe_allow_html=True)
+                    grid_conf = AgGrid(
+                        df_conf_show, 
+                        gridOptions=gb_conf.build(), 
+                        theme="alpine", 
+                        columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS, 
+                        height=350,
+                        custom_css=custom_css_premium, 
+                        key="grid_triagem_conf")
+
+                    sel_conf_raw = grid_conf.get('selected_rows', [])
+                    if isinstance(sel_conf_raw, pd.DataFrame):
+                        df_sel_conf = sel_conf_raw
+                    elif isinstance(sel_conf_raw, list) and len(sel_conf_raw) > 0:
+                        df_sel_conf = pd.DataFrame(sel_conf_raw)
+                    else:
+                        df_sel_conf = pd.DataFrame(columns=df_conf_show.columns)
+
+                    st.markdown("---")
+                    st.markdown("#### 🚚 Controle de Despacho e Embarque")
+                    c_mot, c_data, c_btn = st.columns([2, 1, 2])
+                    motorista_escolhido = c_mot.selectbox("👤 Atribuir Motorista:", ["Selecione..."] + (sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []))
+                    data_despacho = c_data.date_input("📅 Data de Embarque:", format="DD/MM/YYYY", value=hoje_br)
+
+                    qtd_selecionados = len(df_sel_conf)
+
+                    if c_btn.button(f"🚀 Selar Lote e Despachar ({qtd_selecionados} volumes)", type="primary", use_container_width=True):
+                        if df_sel_conf.empty or motorista_escolhido == "Selecione...":
+                            st.toast("Selecione os pacotes na tabela e informe o motorista.", icon="⚠️")
+                        else:
+                            p_ids_sel = df_sel_conf['PEDIDO'].astype(str).tolist()
+                            sel_lista_full = df_conf[df_conf['PEDIDO'].isin(p_ids_sel)].to_dict('records')
+                            
+                            tomadores_unicos = list(set([str(r.get('TOMADOR', '')).strip() for r in sel_lista_full]))
+                            if len(tomadores_unicos) > 1:
+                                st.error("🚨 VIOLAÇÃO DE ROTA: Você selecionou pacotes com Destinos (Hubs) diferentes. O sistema impede a mistura de cargas.")
+                            else:
+                                with st.spinner("Selando romaneio e gerando documentação..."):
+                                    id_romaneio = f"ROM-{datetime.now().strftime('%d%m')}-{random.randint(100, 999)}"
+                                    try:
+                                        aba = planilha_db.worksheet("Memoria_Sistema")
+                                        dados_nuvem = aba.get_all_values()
+                                        if len(dados_nuvem) > 1:
+                                            df_nuvem = pd.DataFrame(dados_nuvem[1:], columns=dados_nuvem[0])
+                                            df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids_sel), ['STATUS', 'ROMANEIO', 'AGENTE_RAW']] = ['EM ROTA DE ENTREGA', id_romaneio, motorista_escolhido]
+                                            aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                        
+                                        despachar_para_appsheet([{
+                                            'PEDIDO': id_romaneio, 'MOTORISTA': motorista_escolhido,
+                                            'ENDERECO': "Lote Hub", 'NUMERO': f"{len(p_ids_sel)} V",
+                                            'BAIRRO': tomadores_unicos[0], 'CIDADE': sel_lista_full[0].get('CIDADE', ''),
+                                            'CEP': "---", 'LABORATORIO': f"Lote {len(sel_lista_full)}",
+                                            'TOMADOR': tomadores_unicos[0], 'ROMANEIO': id_romaneio
+                                        }])
+                                        
+                                        pdf_bytes = gerar_pdf_romaneio(id_romaneio, data_despacho, motorista_escolhido, sel_lista_full)
+                                        
+                                        carregar_dados_completos.clear()
+                                        st.session_state.romaneio_pdf = pdf_bytes
+                                        st.session_state.romaneio_id = id_romaneio
+                                        st.session_state.romaneio_sucesso = True
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Erro ao selar romaneio: {e}")
+                else:
+                    exibir_empty_state("🚛", "Nada para Despachar", "Todos os volumes do galpão já foram despachados ou não há itens conferidos na fila.")
+
+    # =========================================================================
+    # ABA 3: HISTÓRICO DE VARREDURA
+    # =========================================================================
     with t3:
         if df_raw.empty:
-            st.warning("O banco de dados oficial está vazio.")
+            exibir_empty_state("📭", "Banco Vazio", "Aguardando geração de dados.")
         else:
-            df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper().isin(
-                ['CONFERIDO', 'EM ROTA DE ENTREGA', 'ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO'])].copy()
+            df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper().isin(['CONFERIDO', 'EM ROTA DE ENTREGA', 'ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO'])].copy()
             if not df_hist.empty:
-                st.markdown("#### 🖨️ Reimpressão de Romaneio")
-                romaneios_disponiveis = [r for r in df_hist['ROMANEIO'].unique() if str(
-                    r).strip() and str(r).upper() != 'NAN']
-                if romaneios_disponiveis:
-                    col_re_1, col_re_2 = st.columns([2, 1])
-                    rom_sel = col_re_1.selectbox(
-                        "Selecione o Lote:",
-                        ["Selecione..."] +
-                        sorted(
-                            romaneios_disponiveis,
-                            reverse=True))
-                    if rom_sel != "Selecione...":
-                        df_rom = df_hist[df_hist['ROMANEIO'] == rom_sel].copy()
-                        pdf_reprint = gerar_pdf_romaneio(
-                            rom_sel, hoje_br, df_rom.iloc[0].get(
-                                'AGENTE_RAW', '---'), df_rom.to_dict('records'))
-                        col_re_2.markdown(
-                            "<div style='margin-top: 28px;'></div>",
-                            unsafe_allow_html=True)
-                        col_re_2.download_button(
-                            "📥 REIMPRIMIR",
-                            pdf_reprint,
-                            file_name=f"Reprint_{rom_sel}.pdf",
-                            mime="application/pdf",
-                            type="primary",
-                            use_container_width=True)
-                st.markdown("---")
-                st.dataframe(
-                    df_hist.sort_values(
-                        by=[
-                            'DATA_OBJ',
-                            'PEDIDO'],
-                        ascending=[
-                            False,
-                            False])[
-                        [
-                            'DATA',
-                            'PEDIDO',
-                            'TOMADOR',
-                            'LABORATORIO',
-                            'CIDADE',
-                            'STATUS',
-                            'AGENTE_RAW',
-                            'ROMANEIO']],
-                    hide_index=True,
-                    use_container_width=True)
-            else:
-                st.warning("Arquivo histórico em branco.")
+                renderizar_kpis([
+                    (df_hist['ROMANEIO'].nunique(), "📄 Romaneios Emitidos", "#1E293B", "#334155"),
+                    (len(df_hist), "📦 Volumes Processados", "#059669", "#10B981")
+                ])
 
-    # 🔥 ABA 4: TRIAGEM MANUAL (AVULSA) - 100% REESTRUTURADA PARA ENVELOPES 🔥
+                with st.expander("🖨️ Reimpressão de Romaneios Específicos", expanded=False):
+                    romaneios_disponiveis = [r for r in df_hist['ROMANEIO'].unique() if str(r).strip() and str(r).upper() != 'NAN']
+                    if romaneios_disponiveis:
+                        col_re_1, col_re_2 = st.columns([2, 1])
+                        rom_sel = col_re_1.selectbox("Selecione o Lote (Romaneio):", ["Selecione..."] + sorted(romaneios_disponiveis, reverse=True))
+                        if rom_sel != "Selecione...":
+                            df_rom = df_hist[df_hist['ROMANEIO'] == rom_sel].copy()
+                            pdf_reprint = gerar_pdf_romaneio(rom_sel, hoje_br, df_rom.iloc[0].get('AGENTE_RAW', '---'), df_rom.to_dict('records'))
+                            col_re_2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                            col_re_2.download_button("📥 REIMPRIMIR PDF", pdf_reprint, file_name=f"Reprint_{rom_sel}.pdf", mime="application/pdf", type="primary", use_container_width=True)
+
+                st.markdown("#### 📜 Trilha de Auditoria (Últimos Volumes)")
+                
+                colunas_validas_hist = [c for c in ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO'] if c in df_hist.columns]
+                df_hist_show = df_hist[colunas_validas_hist].copy()
+                
+                if 'DATA' in df_hist_show.columns and 'PEDIDO' in df_hist_show.columns:
+                    df_hist_show = df_hist_show.sort_values(by=['DATA', 'PEDIDO'], ascending=[False, False])
+                
+                gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
+                gb_hist.configure_default_column(resizable=True, filterable=True, sortable=True)
+                
+                if "DATA" in df_hist_show.columns: gb_hist.configure_column("DATA", header_name="📅 Coleta", width=110)
+                if "PEDIDO" in df_hist_show.columns: gb_hist.configure_column("PEDIDO", header_name="📦 Pedido", width=120)
+                if "TOMADOR" in df_hist_show.columns: gb_hist.configure_column("TOMADOR", header_name="🏢 Hub", width=140)
+                if "LABORATORIO" in df_hist_show.columns: gb_hist.configure_column("LABORATORIO", header_name="🏭 Laboratório", width=200)
+                if "CIDADE" in df_hist_show.columns: gb_hist.configure_column("CIDADE", header_name="📍 Cidade", width=150)
+                if "STATUS" in df_hist_show.columns: gb_hist.configure_column("STATUS", header_name="🚦 Status", cellRenderer=status_jscode_tri, width=150)
+                if "AGENTE_RAW" in df_hist_show.columns: gb_hist.configure_column("AGENTE_RAW", header_name="👤 Agente", width=120)
+                if "ROMANEIO" in df_hist_show.columns: gb_hist.configure_column("ROMANEIO", header_name="🔖 Romaneio", width=130)
+
+                AgGrid(
+                    df_hist_show, 
+                    gridOptions=gb_hist.build(), 
+                    theme="alpine", 
+                    columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS, 
+                    height=450, 
+                    allow_unsafe_jscode=True, 
+                    custom_css=custom_css_premium,
+                    key="grid_historico_triagem")
+            else:
+                exibir_empty_state("📭", "Sem Histórico", "Nenhum histórico de varredura ou romaneio gerado.")
+
+    # =========================================================================
+    # ABA 4: TRIAGEM MANUAL (ENVELOPES AVULSOS)
+    # =========================================================================
     with t4:
         st.markdown("#### 📝 Triagem Manual de Contingência (Envelopes)")
+        st.info("Utilize esta aba para bipar envelopes e amostras que **não** estão cadastradas no sistema digital, gerando um protocolo isolado de recebimento no Hub.")
 
-        # 1. CABEÇALHO SIMPLIFICADO (Só Hub e Data)
         with st.container(border=True):
             c1, c2 = st.columns([2, 1])
-            av_tomador = c1.selectbox(
-                "🏢 Hub de Destino:",
-                ["Selecione..."] +
-                CLIENTES_AUTORIZADOS,
-                key="av_hub_man")
-            av_data = c2.date_input(
-                "📅 Data da Triagem:",
-                value=hoje_br,
-                format="DD/MM/YYYY",
-                key="av_dt_man")
+            av_tomador = c1.selectbox("🏢 Hub de Destino:", ["Selecione..."] + CLIENTES_ATUALIZADOS, key="av_hub_man")
+            av_data = c2.date_input("📅 Data da Triagem:", value=hoje_br, format="DD/MM/YYYY", key="av_dt_man")
 
-        st.markdown("---")
-
-        # 2. BIPADOR (O campo principal agora é o Envelope)
         if not st.session_state.pdf_avulso_pronto:
-            container_feedback = st.empty()
-
+            st.markdown("---")
             with st.form("form_bip_avulso_manual", clear_on_submit=True):
-                col_bip, col_add = st.columns(
-                    [4, 1], vertical_alignment="bottom")
-                bip_envelope = col_bip.text_input(
-                    "🔍 Bipar Código ou Digitar Número do Envelope:")
+                col_bip, col_add = st.columns([4, 1], vertical_alignment="bottom")
+                bip_envelope = col_bip.text_input("🔍 Bipar Código ou Digitar Número do Envelope:")
 
-                if col_add.form_submit_button(
-                        "➕ Adicionar", use_container_width=True):
+                if col_add.form_submit_button("➕ Adicionar", use_container_width=True):
                     if bip_envelope.strip():
                         novo_item_manual = {
                             'ENVELOPE': bip_envelope.strip(),
                             'DATA': av_data.strftime("%d/%m/%Y"),
                             'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S'),
-                            'TOMADOR': av_tomador if av_tomador != "Selecione..." else ""}
-                        st.session_state.triagem_avulsa_lote.append(
-                            novo_item_manual)
+                            'TOMADOR': av_tomador if av_tomador != "Selecione..." else ""
+                        }
+                        st.session_state.triagem_avulsa_lote.append(novo_item_manual)
+                        st.session_state.ui_toast = {'msg': f"Envelope {bip_envelope.strip()} adicionado!", 'icon': "✅"}
                         st.rerun()
 
-            # 🔥 NOTIFICAÇÃO VERDE DE SUCESSO 🔥
             if st.session_state.triagem_avulsa_lote:
-                ultimo_envelope = st.session_state.triagem_avulsa_lote[-1]['ENVELOPE']
-                container_feedback.success(
-                    f"✅ Envelope **{ultimo_envelope}** adicionado com sucesso! (Total: {len(st.session_state.triagem_avulsa_lote)})")
-
-            # 3. LISTA DE CONFERÊNCIA (EXPANDINDO)
-            if st.session_state.triagem_avulsa_lote:
-                st.markdown("---")
-                st.markdown(
-                    f"### 📦 Envelopes no Lote: **{len(st.session_state.triagem_avulsa_lote)}**")
-
-                # 🔥 CONTAINER COM LISTA EXPANDINDO 🔥
+                st.markdown(f"### 📦 Envelopes na Cesta: **{len(st.session_state.triagem_avulsa_lote)}**")
+                
                 with st.container(border=True):
-                    df_av_disp = pd.DataFrame(
-                        st.session_state.triagem_avulsa_lote)
-
-                    # Mostrar em 2 colunas para melhor visualização
+                    df_av_disp = pd.DataFrame(st.session_state.triagem_avulsa_lote)
                     col_list1, col_list2 = st.columns([2, 1])
+                    
                     with col_list1:
-                        st.dataframe(
-                            df_av_disp[['ENVELOPE', 'DATA', 'HORA']],
-                            hide_index=True,
-                            use_container_width=True,
-                            column_config={
-                                'ENVELOPE': st.column_config.Column("Nº ENVELOPE", width="medium"),
-                                'DATA': st.column_config.Column("DATA", width="small"),
-                                'HORA': st.column_config.Column("HORA", width="small"),
-                            }
-                        )
+                        gb_av = GridOptionsBuilder.from_dataframe(df_av_disp[['ENVELOPE', 'DATA', 'HORA']])
+                        gb_av.configure_default_column(resizable=True)
+                        gb_av.configure_column("ENVELOPE", header_name="✉️ Nº Envelope")
+                        gb_av.configure_column("DATA", header_name="📅 Data")
+                        gb_av.configure_column("HORA", header_name="⏱️ Hora")
+                        
+                        AgGrid(
+                            df_av_disp[['ENVELOPE', 'DATA', 'HORA']], 
+                            gridOptions=gb_av.build(), 
+                            theme="alpine", 
+                            height=250,
+                            custom_css=custom_css_premium)
 
                     with col_list2:
-                        # Resumo visual
-                        st.metric(
-                            "Total Adicionado", len(
-                                st.session_state.triagem_avulsa_lote))
+                        renderizar_kpis([(len(st.session_state.triagem_avulsa_lote), "Total Escaneado", "#1E293B", "#334155")])
+                        c_ctrl1, c_ctrl2 = st.columns(2)
+                        if c_ctrl1.button("↩️ Desfazer", use_container_width=True):
+                            if st.session_state.triagem_avulsa_lote:
+                                removido = st.session_state.triagem_avulsa_lote.pop()
+                                st.session_state.ui_toast = {'msg': f"Removido: {removido['ENVELOPE']}", 'icon': "⚠️"}
+                                st.rerun()
+                        if c_ctrl2.button("🗑️ Limpar", use_container_width=True):
+                            st.session_state.triagem_avulsa_lote.clear()
+                            st.session_state.ui_toast = {'msg': "Cesta esvaziada", 'icon': "🗑️"}
+                            st.rerun()
 
-                st.markdown("---")
-                c_ctrl1, c_ctrl2, c_ctrl3 = st.columns([1, 1, 2])
-                if c_ctrl1.button(
-                    "↩️ Desfazer Último",
-                        use_container_width=True):
-                    if st.session_state.triagem_avulsa_lote:
-                        removido = st.session_state.triagem_avulsa_lote.pop()
-                        st.warning(
-                            f"⚠️ Envelope **{removido['ENVELOPE']}** removido da lista")
-                        st.rerun()
-                if c_ctrl2.button("🗑️ Esvaziar", use_container_width=True):
-                    qtd_removida = len(st.session_state.triagem_avulsa_lote)
-                    st.session_state.triagem_avulsa_lote.clear()
-                    st.warning(f"🗑️ {qtd_removida} envelope(s) removido(s)")
-                    st.rerun()
-
-                if c_ctrl3.button(
-                    "📄 GERAR PROTOCOLO MANUAL",
-                    type="primary",
-                        use_container_width=True):
-                    # TRAVA: OBRIGA A PREENCHER O HUB DE DESTINO
+                if st.button("📄 SELAR E GERAR PROTOCOLO MANUAL", type="primary", use_container_width=True):
                     if av_tomador == "Selecione...":
-                        st.error(
-                            "⚠️ Preencha o Hub de Destino no cabeçalho antes de gerar o PDF!")
+                        st.toast("Preencha o Hub de Destino no cabeçalho antes de gerar o PDF!", icon="⚠️")
                     else:
-                        with st.spinner("🔄 Registrando e desenhando PDF limpo..."):
+                        with st.spinner("Registrando e desenhando PDF..."):
                             id_rom_av = f"MAN-{datetime.now().strftime('%d%m%H%M')}"
                             plan_av = obter_planilha_avulsos()
                             if plan_av:
                                 try:
                                     aba_av = plan_av.sheet1
-                                    linhas_bkp = [
-                                        [
-                                            id_rom_av,
-                                            i['DATA'],
-                                            "TRIAGEM MANUAL",
-                                            i.get(
-                                                'TOMADOR',
-                                                ''),
-                                            "",
-                                            "",
-                                            i['ENVELOPE'],
-                                            i['HORA']] for i in st.session_state.triagem_avulsa_lote]
-                                    aba_av.append_rows(
-                                        linhas_bkp, value_input_option='USER_ENTERED')
+                                    linhas_bkp = [[id_rom_av, i['DATA'], "TRIAGEM MANUAL", i.get('TOMADOR', ''), "", "", i['ENVELOPE'], i['HORA']] for i in st.session_state.triagem_avulsa_lote]
+                                    aba_av.append_rows(linhas_bkp, value_input_option='USER_ENTERED')
                                 except BaseException:
-                                    pass
+                                    st.warning("⚠️ Não foi possível salvar o histórico na nuvem neste momento, mas o PDF será gerado.")
 
-                            pdf_manual = gerar_pdf_triagem_manual(
-                                id_rom_av, av_data, av_tomador, st.session_state.triagem_avulsa_lote)
-
+                            pdf_manual = gerar_pdf_triagem_manual(id_rom_av, av_data, av_tomador, st.session_state.triagem_avulsa_lote)
                             st.session_state.pdf_avulso_pronto = pdf_manual
                             st.session_state.id_avulso_pronto = id_rom_av
                             st.session_state.triagem_avulsa_lote = []
-                            time.sleep(0.5)
                             st.rerun()
             else:
-                st.info(
-                    "🔍 Aguardando bipagem de envelopes... Aponte o scanner ou digite o número do envelope.")
+                exibir_empty_state("🔍", "Cesta de Bipagem Vazia", "Aponte o scanner de código de barras ou digite o número do envelope acima para começar.")
 
-        # 4. TELA DE SUCESSO (Renderiza de primeira agora!)
+        # TELA DE SUCESSO DO PROTOCOLO MANUAL
         if st.session_state.pdf_avulso_pronto:
-            st.success(
-                f"✅ Protocolo Manual {
-                    st.session_state.id_avulso_pronto} pronto!")
-            st.download_button(
-                "📥 BAIXAR PROTOCOLO (ENVELOPES)",
+            st.success(f"✅ Protocolo Manual {st.session_state.id_avulso_pronto} pronto para impressão!")
+            c_m1, c_m2 = st.columns(2)
+            c_m1.download_button(
+                "📥 BAIXAR PROTOCOLO",
                 st.session_state.pdf_avulso_pronto,
-                file_name=f"Triagem_Manual_{
-                    st.session_state.id_avulso_pronto}.pdf",
+                file_name=f"Triagem_Manual_{st.session_state.id_avulso_pronto}.pdf",
                 mime="application/pdf",
                 type="primary",
                 use_container_width=True)
-            if st.button("Nova Triagem"):
+            if c_m2.button("🔄 Nova Triagem de Envelopes", use_container_width=True):
                 st.session_state.pdf_avulso_pronto = None
                 st.rerun()
 
-        # 5. HISTÓRICO DE MANUAIS (BLINDADO PARA LER A HORA CORRETAMENTE)
         st.markdown("---")
-        plan_av = obter_planilha_avulsos()
-        if plan_av:
-            try:
-                aba_av = plan_av.sheet1
-                # Lendo a matriz pura do Google Sheets pra evitar que o
-                # cabeçalho antigo corte a coluna da hora
-                dados_av = aba_av.get_all_values()
-                if len(dados_av) > 1:
-                    # Criar dicionário com informações dos lotes (número, data
-                    # e tomador)
-                    lotes_man_dict = {}
-                    for linha in dados_av[1:]:
-                        if "MAN-" in str(linha[0]):
-                            lote_num = linha[0]
-                            data_val = linha[1] if len(linha) > 1 else ""
-                            tomador_val = linha[3] if len(linha) > 3 else ""
-                            # Chave: "MAN-001 - 15/05/2024 - Tomador ABC"
-                            chave = f"{lote_num} - {data_val} - {tomador_val}" if data_val and tomador_val else lote_num
-                            if chave not in lotes_man_dict:
-                                lotes_man_dict[chave] = lote_num
+        with st.expander("🗄️ Histórico de Lotes Manuais (Cofre)", expanded=False):
+            plan_av = obter_planilha_avulsos()
+            if plan_av:
+                try:
+                    aba_av = plan_av.sheet1
+                    dados_av = aba_av.get_all_values()
+                    if len(dados_av) > 1:
+                        lotes_man_dict = {}
+                        for linha in dados_av[1:]:
+                            if "MAN-" in str(linha[0]):
+                                lote_num = linha[0]
+                                data_val = linha[1] if len(linha) > 1 else ""
+                                tomador_val = linha[3] if len(linha) > 3 else ""
+                                chave = f"{lote_num} - {data_val} - {tomador_val}" if data_val and tomador_val else lote_num
+                                if chave not in lotes_man_dict:
+                                    lotes_man_dict[chave] = lote_num
 
-                    c_h1, c_h2 = st.columns([2, 1])
-                    lote_re = c_h1.selectbox(
-                        "Reimprimir Lote Manual:",
-                        ["Selecione..."] +
-                        sorted(
-                            lotes_man_dict.keys(),
-                            reverse=True))
+                        c_h1, c_h2 = st.columns([2, 1], vertical_alignment="bottom")
+                        lote_re = c_h1.selectbox("Reimprimir Lote Manual:", ["Selecione..."] + sorted(lotes_man_dict.keys(), reverse=True))
 
-                    if lote_re != "Selecione...":
-                        # Obtém o número real do lote
-                        lote_re = lotes_man_dict[lote_re]
-                        linhas_re = [linha for linha in dados_av[1:]
-                                     if linha[0] == lote_re]
-                        lista_re = []
-                        for ln in linhas_re:
-                            # Puxando as posições exatas (Índice 6 = Envelope,
-                            # Índice 7 = Hora)
-                            env_val = ln[6] if len(ln) > 6 else ""
-                            hora_val = ln[7] if len(ln) > 7 else ""
-                            data_val = ln[1] if len(ln) > 1 else ""
-                            tomador_val = ln[3] if len(ln) > 3 else ""
-                            lista_re.append(
-                                {'ENVELOPE': env_val, 'DATA': data_val, 'HORA': hora_val, 'TOMADOR': tomador_val})
+                        if lote_re != "Selecione...":
+                            lote_re_id = lotes_man_dict[lote_re]
+                            linhas_re = [linha for linha in dados_av[1:] if linha[0] == lote_re_id]
+                            lista_re = []
+                            for ln in linhas_re:
+                                env_val = ln[6] if len(ln) > 6 else ""
+                                hora_val = ln[7] if len(ln) > 7 else ""
+                                data_val = ln[1] if len(ln) > 1 else ""
+                                tomador_val = ln[3] if len(ln) > 3 else ""
+                                lista_re.append({'ENVELOPE': env_val, 'DATA': data_val, 'HORA': hora_val, 'TOMADOR': tomador_val})
 
-                        pdf_rep_man = gerar_pdf_triagem_manual(
-                            lote_re, lista_re[0].get(
-                                'DATA', ''), lista_re[0].get(
-                                'TOMADOR', ''), lista_re)
-
-                        c_h2.markdown(
-                            "<div style='margin-top: 28px;'></div>",
-                            unsafe_allow_html=True)
-                        c_h2.download_button(
-                            "📥 REIMPRIMIR",
-                            pdf_rep_man,
-                            file_name=f"Reprint_{lote_re}.pdf",
-                            mime="application/pdf",
-                            type="primary",
-                            use_container_width=True)
-            except Exception as e:
-                st.warning(f"Erro ao ler histórico: {e}")
+                            pdf_rep_man = gerar_pdf_triagem_manual(lote_re_id, lista_re[0].get('DATA', ''), lista_re[0].get('TOMADOR', ''), lista_re)
+                            c_h2.download_button("📥 REIMPRIMIR", pdf_rep_man, file_name=f"Reprint_{lote_re_id}.pdf", mime="application/pdf", type="primary", use_container_width=True)
+                except Exception as e:
+                    st.warning("⚠️ Não foi possível carregar o histórico no momento.")
 
 # =============================================================================
 # 📁 MÓDULO 4: EXPORTAR RELATÓRIOS (NOVO E INTELIGENTE)
