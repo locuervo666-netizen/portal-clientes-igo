@@ -1523,8 +1523,8 @@ def gerar_sigla_regiao(nome_agente, df_agentes):
     # Preenche com "X" caso a cidade tenha só 2 letras (ex: Itu)
     return sigla.ljust(3, 'X').upper()
 
-def criar_imagem_etiqueta_pil(codigo, sigla_tarja):
-    """Desenha a imagem da etiqueta com proporções exatas (573x331 px a 300 DPI)"""
+def criar_imagem_etiqueta_pil(codigo, sigla_tarja, tam_qr=290, tam_fonte=75, mostrar_logo=True):
+    """Desenha a imagem da etiqueta dinamicamente baseada nos parâmetros do estúdio"""
     largura, altura = 573, 331
     img = Image.new('RGB', (largura, altura), 'white')
     draw = ImageDraw.Draw(img)
@@ -1532,36 +1532,27 @@ def criar_imagem_etiqueta_pil(codigo, sigla_tarja):
     # 1. Desenhar a Tarja Preta na Esquerda (largura aprox 110px)
     draw.rectangle([0, 0, 110, altura], fill="black")
     
-    # Múltiplas fontes para garantir que o servidor ache uma e não use a minúscula
+    # Múltiplas fontes para garantir o carregamento correto no deploy
     fontes_possiveis = [
-        "arialbd.ttf",             # Windows
-        "DejaVuSans-Bold.ttf",     # Linux (Streamlit Cloud padrão)
-        "LiberationSans-Bold.ttf", # Linux
-        "FreeSansBold.ttf",        # Linux
-        "Arial Bold.ttf"           # Mac
+        "arialbd.ttf", "DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf", "FreeSansBold.ttf", "Arial Bold.ttf"
     ]
     
     font_tarja = None
-    tamanho_fonte = 75 # Tamanho ideal para 3 letras
-    
     for fonte in fontes_possiveis:
         try:
-            font_tarja = ImageFont.truetype(fonte, tamanho_fonte)
+            font_tarja = ImageFont.truetype(fonte, tam_fonte)
             break
         except IOError:
             continue
             
     if font_tarja is None:
-        try:
-            font_tarja = ImageFont.load_default(size=tamanho_fonte)
-        except:
-            font_tarja = ImageFont.load_default()
+        try: font_tarja = ImageFont.load_default(size=tam_fonte)
+        except: font_tarja = ImageFont.load_default()
             
     # 2. Texto da Tarja
     img_txt_tarja = Image.new('RGBA', (altura, 110), (0,0,0,0))
     draw_tarja = ImageDraw.Draw(img_txt_tarja)
     
-    # Centralizar o texto na tarja preta
     try:
         bbox = draw_tarja.textbbox((0, 0), sigla_tarja, font=font_tarja)
         tw = bbox[2] - bbox[0]
@@ -1575,75 +1566,63 @@ def criar_imagem_etiqueta_pil(codigo, sigla_tarja):
     img_txt_tarja_rot = img_txt_tarja.rotate(270, expand=True) 
     img.paste(img_txt_tarja_rot, (0, 0), img_txt_tarja_rot)
     
-    # 3. Gerar QR Code (Sem borda extra, maximizado no centro)
+    # 3. Gerar QR Code Dinâmico
     qr = qrcode.QRCode(version=1, box_size=10, border=0)
     qr.add_data(codigo)
     qr.make(fit=True)
     img_qr = qr.make_image(fill_color="black", back_color="white")
     
-    # Pega o atributo correto de Resampling dependendo da versão do Pillow
     resampling_filter = getattr(Image, 'Resampling', Image).LANCZOS
+    img_qr = img_qr.resize((tam_qr, tam_qr), resampling_filter)
     
-    tamanho_qr = 290
-    img_qr = img_qr.resize((tamanho_qr, tamanho_qr), resampling_filter)
-    
-    # Posicionar o QR Code (Centralizado no espaço em branco que sobrou)
-    pos_x_qr = 110 + int(( (largura - 110 - 130) - tamanho_qr ) / 2)
-    pos_y_qr = int((altura - tamanho_qr) / 2)
+    # Posicionar o QR Code dinamicamente
+    pos_x_qr = 110 + int(( (largura - 110 - (130 if mostrar_logo else 0)) - tam_qr ) / 2)
+    pos_y_qr = int((altura - tam_qr) / 2)
     img.paste(img_qr, (pos_x_qr, pos_y_qr))
     
-    # 4. Colar a Logo Oficial Colorida (Lendo de baixo para cima = 270 graus)
-    logo_bytes = obter_logo_etiqueta_pil()
-    if logo_bytes:
-        logo_img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
-        logo_rot = logo_img.rotate(270, expand=True)
-        
-        if hasattr(Image, 'Resampling'):
-            filtro = Image.Resampling.LANCZOS
-        else:
-            filtro = Image.ANTIALIAS
+    # 4. Colar a Logo Oficial Colorida (Se ativada)
+    if mostrar_logo:
+        logo_bytes = obter_logo_etiqueta_pil()
+        if logo_bytes:
+            logo_img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
+            logo_rot = logo_img.rotate(270, expand=True)
             
-        logo_rot.thumbnail((120, 300), filtro)
-        
-        pos_x_logo = largura - logo_rot.width - 10
-        pos_y_logo = int((altura - logo_rot.height) / 2)
-        
-        bg_logo = Image.new("RGB", logo_rot.size, (255,255,255))
-        bg_logo.paste(logo_rot, (0,0), logo_rot)
-        img.paste(bg_logo, (pos_x_logo, pos_y_logo))
+            filtro = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.ANTIALIAS
+            logo_rot.thumbnail((120, 300), filtro)
+            
+            pos_x_logo = largura - logo_rot.width - 10
+            pos_y_logo = int((altura - logo_rot.height) / 2)
+            
+            bg_logo = Image.new("RGB", logo_rot.size, (255,255,255))
+            bg_logo.paste(logo_rot, (0,0), logo_rot)
+            img.paste(bg_logo, (pos_x_logo, pos_y_logo))
     
     # Salvar num arquivo temporário
     temp_path = os.path.join(tempfile.gettempdir(), f"etiq_{codigo}.png")
     img.save(temp_path, dpi=(300, 300))
     return temp_path
 
-def gerar_pdf_rolo_duplo(quantidade, sigla_final, larg_mm=48.5, alt_mm=28.0):
-    """Gera o PDF com base nas medidas digitadas no sistema, mantendo a proporção."""
-    
-    # Calcula o tamanho do papel baseando-se nas etiquetas + margens (2 colunas)
-    largura_pagina = (larg_mm * 2) + 8 # MargemEsq(2) + Etiqueta1 + Meio(4) + Etiqueta2 + MargemDir(2)
-    altura_pagina = alt_mm + 3 # Altura da etiqueta + margem top/bottom
+
+def gerar_pdf_rolo_duplo_premium(lista_codigos, sigla_final, larg_mm, alt_mm, tam_qr, tam_fonte, mostrar_logo):
+    """Gera o PDF consumindo uma lista exata de códigos gerados previamente na Grid"""
+    largura_pagina = (larg_mm * 2) + 8 
+    altura_pagina = alt_mm + 3 
     
     pdf = FPDF(orientation='L', unit='mm', format=(altura_pagina, largura_pagina))
     pdf.set_auto_page_break(auto=False)
     pdf.set_margins(0, 0, 0)
         
-    if quantidade % 2 != 0:
-        quantidade += 1
-        
-    for i in range(0, quantidade, 2):
+    for i in range(0, len(lista_codigos), 2):
         pdf.add_page()
         
-        cod1 = gerar_codigo_unico_etiqueta()
-        cod2 = gerar_codigo_unico_etiqueta()
-        
-        # A imagem é sempre gerada em alta resolução, o que muda é o tamanho que ela é espremida no PDF
-        img1 = criar_imagem_etiqueta_pil(cod1, sigla_final)
-        img2 = criar_imagem_etiqueta_pil(cod2, sigla_final)
-        
-        # Cola no PDF usando as medidas personalizadas
+        cod1 = lista_codigos[i]
+        img1 = criar_imagem_etiqueta_pil(cod1, sigla_final, tam_qr, tam_fonte, mostrar_logo)
         pdf.image(img1, x=2, y=1.5, w=larg_mm, h=alt_mm)
-        pdf.image(img2, x=2 + larg_mm + 4, y=1.5, w=larg_mm, h=alt_mm)
+        
+        if i + 1 < len(lista_codigos):
+            cod2 = lista_codigos[i+1]
+            img2 = criar_imagem_etiqueta_pil(cod2, sigla_final, tam_qr, tam_fonte, mostrar_logo)
+            pdf.image(img2, x=2 + larg_mm + 4, y=1.5, w=larg_mm, h=alt_mm)
         
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
         pdf.output(tmp_pdf.name)
@@ -6465,73 +6444,157 @@ elif menu == "🔬 Triagem":
                 except Exception as e:
                     st.warning("⚠️ Não foi possível carregar o histórico no momento.")
 # =============================================================================
-# 🏷️ MÓDULO: GERADOR DE ETIQUETAS E ROLOS
+# 🏷️ MÓDULO: GERADOR DE ETIQUETAS (ESTÚDIO PREMIUM & AGGRID)
 # =============================================================================
 elif menu == "🏷️ Gerador de Etiquetas":
-    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🏷️ Fábrica de Etiquetas Térmicas</h3></div>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #64748B; font-size: 14px;'>Geração de rolos de etiquetas (Padrão 2 carreiras) com UUIDs aleatórios para bipagem na rua.</p>", unsafe_allow_html=True)
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🏷️ Estúdio de Etiquetas Térmicas</h3></div>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #64748B; font-size: 14px;'>Geração e rastreabilidade de rolos em papel contínuo com design em tempo real.</p>", unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Divide a tela: 55% para o formulário, 45% para o preview
+    # ---------------------------------------------------------
+    # LAYOUT SUPERIOR: CONTROLES VS PREVIEW
+    # ---------------------------------------------------------
     col_form, col_preview = st.columns([1.2, 1], gap="large")
     
     with col_form:
-        st.markdown("#### ⚙️ Configurações do Rolo")
+        tab_setup, tab_design = st.tabs(["⚙️ Setup de Impressão", "🎨 Estúdio de Layout"])
         
-        if not DF_AGENTES.empty:
-            lista_agentes = sorted(DF_AGENTES['NOME DO AGENTE'].unique().tolist())
-            agente_selecionado = st.selectbox("👤 Agente/Prestador (Tarja Regional):", ["GERAL/SEM AGENTE"] + lista_agentes)
-        else:
-            agente_selecionado = "GERAL/SEM AGENTE"
-            st.selectbox("👤 Agente/Prestador:", ["GERAL/SEM AGENTE"], disabled=True)
-        
-        # Puxa a sigla na hora para mostrar na UI e no Preview
-        sigla_inteligente = gerar_sigla_regiao(agente_selecionado, DF_AGENTES)
-        st.caption(f"📍 **Sigla Regional Calculada:** `{sigla_inteligente}`")
-        
-        qtd_etiquetas = st.number_input("📦 Quantidade Total de Etiquetas (Rolo):", min_value=2, max_value=2000, value=100, step=2)
-        
-        # Funcionalidade de ajustes de tamanho
-        with st.expander("📐 Ajuste de Medidas da Etiqueta (Físico)"):
-            st.markdown("<p style='font-size: 12px; color: #64748b;'>Altere apenas se trocar o fornecedor/tamanho da bobina de papel.</p>", unsafe_allow_html=True)
+        with tab_setup:
+            if not DF_AGENTES.empty:
+                lista_agentes = sorted(DF_AGENTES['NOME DO AGENTE'].unique().tolist())
+                agente_selecionado = st.selectbox("👤 Agente/Prestador (Região):", ["GERAL/SEM AGENTE"] + lista_agentes)
+            else:
+                agente_selecionado = "GERAL/SEM AGENTE"
+                st.selectbox("👤 Agente/Prestador:", ["GERAL/SEM AGENTE"], disabled=True)
+            
+            sigla_inteligente = gerar_sigla_regiao(agente_selecionado, DF_AGENTES)
+            st.caption(f"📍 **Tarja Calculada:** `{sigla_inteligente}`")
+            
+            qtd_etiquetas = st.number_input("📦 Quantidade Total do Rolo:", min_value=2, max_value=5000, value=100, step=2)
+            
             c_med1, c_med2 = st.columns(2)
-            larg_mm = c_med1.number_input("Largura (mm):", value=48.5, step=0.5)
-            alt_mm = c_med2.number_input("Altura (mm):", value=28.0, step=0.5)
+            larg_mm = c_med1.number_input("Largura do Papel (mm):", value=48.5, step=0.5)
+            alt_mm = c_med2.number_input("Altura do Papel (mm):", value=28.0, step=0.5)
+            
+        with tab_design:
+            st.markdown("<p style='font-size: 13px; color: #64748b;'>Ajuste os elementos visuais. O layout reage em tempo real na tela ao lado.</p>", unsafe_allow_html=True)
+            tam_qr = st.slider("Tamanho do QR Code", min_value=150, max_value=320, value=290, step=5)
+            tam_fonte = st.slider("Tamanho da Fonte (Sigla)", min_value=30, max_value=120, value=75, step=1)
+            mostrar_logo = st.toggle("Exibir Logotipo IGO", value=True)
+            st.info("💡 **Design Responsivo:** Diminuir o QR Code pode ajudar a leitura caso a impressora esteja borrando.")
 
-        st.info(f"💡 **Dica:** O arquivo PDF gerado se adaptará para o tamanho **{larg_mm}x{alt_mm} mm** em 2 colunas. Ajuste as configurações da sua impressora térmica para corresponder.")
-        
+        # Lógica de controle de estado para manter os UUIDs atrelados à quantidade!
+        # Colocamos isso ANTES do botão para o PDF poder ler a lista correta
+        if 'lote_atual_uuid' not in st.session_state or st.session_state.get('lote_qtd_atual') != qtd_etiquetas:
+            st.session_state.lote_atual_uuid = [gerar_codigo_unico_etiqueta() for _ in range(qtd_etiquetas)]
+            st.session_state.lote_qtd_atual = qtd_etiquetas
+
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # Botões mais curtos e alinhados lado a lado
-        c_btn1, c_btn2 = st.columns([1, 1])
+        # Botões mais discretos (sem o vermelho alarmante) e lado a lado sob o setup
+        c_btn1, c_btn2 = st.columns(2)
         
-        if c_btn1.button("🖨️ FABRICAR LOTE", type="primary", use_container_width=True):
-            with st.spinner(f"Gerando {qtd_etiquetas} etiquetas exclusivas..."):
-                # Manda as medidas dinâmicas para o gerador de PDF
-                pdf_bytes = gerar_pdf_rolo_duplo(qtd_etiquetas, sigla_inteligente, larg_mm, alt_mm)
-                st.success(f"✅ Rolo gerado com sucesso!")
+        # Removido o type="primary" para ficar com a cor padrão/neutra
+        if c_btn1.button("⚙️ GERAR LOTE", use_container_width=True): 
+            with st.spinner("Processando layout vetorial..."):
+                pdf_bytes = gerar_pdf_rolo_duplo_premium(
+                    lista_codigos=st.session_state.lote_atual_uuid,
+                    sigla_final=sigla_inteligente,
+                    larg_mm=larg_mm,
+                    alt_mm=alt_mm,
+                    tam_qr=tam_qr,
+                    tam_fonte=tam_fonte,
+                    mostrar_logo=mostrar_logo
+                )
+                st.success(f"✅ Lote finalizado!")
                 
+                # Botão de download aparece imediatamente ao lado
                 c_btn2.download_button(
                     label="📥 BAIXAR (.PDF)",
                     data=pdf_bytes,
-                    file_name=f"Lote_Etiquetas_{sigla_inteligente}_{datetime.now().strftime('%d%m%y_%H%M')}.pdf",
+                    file_name=f"Lote_{qtd_etiquetas}x_{sigla_inteligente}_{datetime.now().strftime('%d%m%y_%H%M')}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
-                    type="primary"
+                    type="primary" # Aqui usamos o primary porque é a ação de sucesso!
                 )
 
     with col_preview:
         st.markdown("#### 👀 Preview em Tempo Real")
-        st.markdown("<p style='font-size: 13px; color: #64748b;'>Visualização da etiqueta gerada (o layout em alta resolução se adapta às medidas).</p>", unsafe_allow_html=True)
         
-        # Gera uma imagem de exemplo usando a sua própria função em background
-        codigo_exemplo = "IGO-PREV12"
-        img_preview_path = criar_imagem_etiqueta_pil(codigo_exemplo, sigla_inteligente)
+        # Gera o preview com base nas métricas dos sliders
+        img_preview_path = criar_imagem_etiqueta_pil(
+            codigo="IGO-PREV12", 
+            sigla_tarja=sigla_inteligente, 
+            tam_qr=tam_qr, 
+            tam_fonte=tam_fonte, 
+            mostrar_logo=mostrar_logo
+        )
         
-        # Correção do erro do quadrado cinza (usando container nativo do Streamlit)
         with st.container(border=True):
-            st.image(img_preview_path, caption=f"Tamanho Físico de Saída: {larg_mm} x {alt_mm} mm", use_container_width=True)
+            st.image(img_preview_path, caption=f"Saída Física: {larg_mm} x {alt_mm} mm", use_container_width=True)
+
+    # ---------------------------------------------------------
+    # LAYOUT INFERIOR: DATA GRID (AGGRID)
+    # ---------------------------------------------------------
+    st.markdown("---")
+    
+    # Criamos as colunas e colocamos um botão para forçar o sorteio de novos códigos!
+    col_grid_title, col_btn_renovar = st.columns([3, 1], vertical_alignment="bottom")
+    col_grid_title.markdown("### 📊 Rastreabilidade do Lote")
+    col_grid_title.markdown("<p style='color: #64748B; font-size: 13px;'>Estes são os códigos exclusivos que compõem o lote atual.</p>", unsafe_allow_html=True)
+    
+    if col_btn_renovar.button("🔄 Sortear Novos Códigos", use_container_width=True):
+        st.session_state.lote_atual_uuid = [gerar_codigo_unico_etiqueta() for _ in range(qtd_etiquetas)]
+        st.session_state.lote_qtd_atual = qtd_etiquetas
+        st.session_state.agente_lote_atual = agente_selecionado
+        st.rerun()
+
+    # Lógica de controle de estado inteligente: Renova se mudar a quantidade, se não tiver código ou se mudar o agente
+    if ('lote_atual_uuid' not in st.session_state or 
+        st.session_state.get('lote_qtd_atual') != qtd_etiquetas or 
+        st.session_state.get('agente_lote_atual') != agente_selecionado):
+        
+        st.session_state.lote_atual_uuid = [gerar_codigo_unico_etiqueta() for _ in range(qtd_etiquetas)]
+        st.session_state.lote_qtd_atual = qtd_etiquetas
+        st.session_state.agente_lote_atual = agente_selecionado
+
+    # Monta o DataFrame com os dados atuais
+    df_lote = pd.DataFrame({
+        "Nº": range(1, qtd_etiquetas + 1),
+        "CÓDIGO (UUID)": st.session_state.lote_atual_uuid,
+        "TARJA REGIONAL": [sigla_inteligente] * qtd_etiquetas,
+        "STATUS": ["A IMPRIMIR 🖨️"] * qtd_etiquetas
+    })
+
+    # Dicionário CSS local para o AgGrid
+    custom_css_etiquetas = {
+        ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px", "background-color": "#ffffff !important", "border": "1px solid #e2e8f0"},
+        ".ag-header": {"background-color": "#f1f5f9 !important", "border-bottom": "2px solid #e2e8f0 !important"},
+        ".ag-header-cell-text": {"color": "#0f172a !important", "font-weight": "700 !important", "font-size": "13px !important"},
+        ".ag-row:hover": {"background-color": "#e2e8f0 !important", "cursor": "pointer", "transition": "background-color 0.2s"},
+        ".ag-row-odd": {"background-color": "#f8fafc !important"},
+        ".ag-row-even": {"background-color": "#ffffff !important"}
+    }
+
+    # Renderiza a AgGrid
+    gb_lote = GridOptionsBuilder.from_dataframe(df_lote)
+    gb_lote.configure_default_column(resizable=True, filterable=True, sortable=True)
+    gb_lote.configure_column("Nº", width=80)
+    gb_lote.configure_column("CÓDIGO (UUID)", width=150, cellStyle={'fontWeight': 'bold', 'color': '#0F172A'})
+    gb_lote.configure_column("TARJA REGIONAL", width=130)
+    
+    grid_options_lote = gb_lote.build()
+    
+    AgGrid(
+        df_lote,
+        gridOptions=grid_options_lote,
+        theme="alpine",
+        height=300,
+        custom_css=custom_css_etiquetas,
+        columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+        key="grid_lote_etiquetas"
+    )
 # =============================================================================
 # 📁 MÓDULO 4: EXPORTAR RELATÓRIOS (NOVO E INTELIGENTE)
 # =============================================================================
