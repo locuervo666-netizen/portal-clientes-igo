@@ -19,6 +19,11 @@ import base64
 import difflib
 from streamlit_autorefresh import st_autorefresh
 from fpdf import FPDF
+# 🚀 NOVAS BIBLIOTECAS PARA A TABELA MODERNA
+from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
+import qrcode
+from PIL import Image, ImageDraw, ImageFont
+import string
 
 # 🚀 NOVAS BIBLIOTECAS PARA A TABELA MODERNA
 from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
@@ -1453,7 +1458,132 @@ def gerar_pdf_romaneio(
         with open(tmp_pdf.name, "rb") as f:
             pdf_bytes = f.read()
     return pdf_bytes
+# =============================================================================
+# 🏷️ FUNÇÕES DO GERADOR DE ETIQUETAS (PADRÃO LABELJOY: 4.85x2.80cm)
+# =============================================================================
+@st.cache_data(ttl=3600)
+def obter_logo_etiqueta_pil():
+    """Baixa a logo colorida oficial da IGO para usar na etiqueta"""
+    try:
+        req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            return response.read()
+    except:
+        return None
 
+def gerar_codigo_unico_etiqueta():
+    """Gera um código único aleatório (Ex: IGO-A8X92B)"""
+    caracteres = string.ascii_uppercase + string.digits
+    codigo = ''.join(random.choices(caracteres, k=6))
+    return f"IGO-{codigo}"
+
+def criar_imagem_etiqueta_pil(codigo, sigla_tarja):
+    """Desenha a imagem da etiqueta com proporções exatas (573x331 px a 300 DPI)"""
+    largura, altura = 573, 331
+    img = Image.new('RGB', (largura, altura), 'white')
+    draw = ImageDraw.Draw(img)
+    
+    # 1. Desenhar a Tarja Preta na Esquerda (largura aprox 110px)
+    draw.rectangle([0, 0, 110, altura], fill="black")
+    
+    # Configurar Fontes
+    try:
+        font_tarja = ImageFont.truetype("arialbd.ttf", 85)
+    except IOError:
+        font_tarja = ImageFont.load_default()
+        
+    # 2. Texto da Tarja (Ex: "SP" - Lendo de baixo para cima = 90 graus)
+    img_txt_tarja = Image.new('RGBA', (altura, 110), (0,0,0,0))
+    draw_tarja = ImageDraw.Draw(img_txt_tarja)
+    
+    # Centralizar o texto na tarja preta
+    try:
+        bbox = draw_tarja.textbbox((0, 0), sigla_tarja, font=font_tarja)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+    except:
+        tw, th = 100, 40
+        
+    draw_tarja.text(((altura - tw)/2, (110 - th)/2 - 15), sigla_tarja, font=font_tarja, fill="white")
+    img_txt_tarja_rot = img_txt_tarja.rotate(90, expand=True) # 90 graus para ler de baixo para cima
+    img.paste(img_txt_tarja_rot, (0, 0), img_txt_tarja_rot)
+    
+    # 3. Gerar QR Code (Sem borda extra, maximizado no centro)
+    qr = qrcode.QRCode(version=1, box_size=10, border=0)
+    qr.add_data(codigo)
+    qr.make(fit=True)
+    img_qr = qr.make_image(fill_color="black", back_color="white")
+    
+    # Pega o atributo correto de Resampling dependendo da versão do Pillow
+    resampling_filter = getattr(Image, 'Resampling', Image).LANCZOS
+    
+    tamanho_qr = 290
+    img_qr = img_qr.resize((tamanho_qr, tamanho_qr), resampling_filter)
+    
+    # Posicionar o QR Code (Centralizado no espaço em branco que sobrou)
+    pos_x_qr = 110 + int(( (largura - 110 - 130) - tamanho_qr ) / 2)
+    pos_y_qr = int((altura - tamanho_qr) / 2)
+    img.paste(img_qr, (pos_x_qr, pos_y_qr))
+    
+    # 4. Colar a Logo Oficial Colorida (Lendo de cima para baixo = 270 graus)
+    logo_bytes = obter_logo_etiqueta_pil()
+    if logo_bytes:
+        logo_img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
+        logo_rot = logo_img.rotate(270, expand=True)
+        
+        logo_rot.thumbnail((120, 300), resampling_filter)
+        
+        pos_x_logo = largura - logo_rot.width - 10
+        pos_y_logo = int((altura - logo_rot.height) / 2)
+        
+        # Fundo branco para garantir que a transparência da logo cole perfeito
+        bg_logo = Image.new("RGB", logo_rot.size, (255,255,255))
+        bg_logo.paste(logo_rot, (0,0), logo_rot)
+        img.paste(bg_logo, (pos_x_logo, pos_y_logo))
+    
+    # Salvar num arquivo temporário
+    temp_path = os.path.join(tempfile.gettempdir(), f"etiq_{codigo}.png")
+    img.save(temp_path, dpi=(300, 300))
+    return temp_path
+
+def gerar_pdf_rolo_duplo(quantidade, agente_selecionado):
+    """Gera o PDF EXATO: Página Paisagem 103x31mm, Etiquetas 48.5x28mm"""
+    
+    # A MÁGICA: Passamos L (Landscape), mas o format como 31x103. 
+    # O FPDF inverte sozinho e cria a página exata de 103 (Largura) x 31 (Altura)
+    pdf = FPDF(orientation='L', unit='mm', format=(31, 103))
+    pdf.set_auto_page_break(auto=False)
+    pdf.set_margins(0, 0, 0)
+    
+    # Se escolher agente, pega as 2 primeiras letras. Senão, crava "SP".
+    if agente_selecionado and agente_selecionado != "GERAL/SEM AGENTE":
+        sigla = str(agente_selecionado)[:2].upper()
+    else:
+        sigla = "SP"
+        
+    if quantidade % 2 != 0:
+        quantidade += 1
+        
+    for i in range(0, quantidade, 2):
+        # Agora o add_page fica vazio e não dá mais erro!
+        pdf.add_page()
+        
+        cod1 = gerar_codigo_unico_etiqueta()
+        cod2 = gerar_codigo_unico_etiqueta()
+        
+        img1 = criar_imagem_etiqueta_pil(cod1, sigla)
+        img2 = criar_imagem_etiqueta_pil(cod2, sigla)
+        
+        # Etiqueta 1 na Esquerda / Etiqueta 2 na Direita
+        pdf.image(img1, x=2, y=1.5, w=48.5, h=28)
+        pdf.image(img2, x=52.5, y=1.5, w=48.5, h=28)
+        
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+        pdf.output(tmp_pdf.name)
+        with open(tmp_pdf.name, "rb") as f:
+            pdf_bytes = f.read()
+            
+    return pdf_bytes
 
 # =============================================================================
 # 🧭 NAVEGAÇÃO E SIDEBAR (MODERNA)
@@ -1484,6 +1614,7 @@ with st.sidebar:
         "📥 Importações",
         "📥 Importações Umove",
         "📝 Pedido Manual",
+        "🏷️ Gerador de Etiquetas", # <--- COLE ESTA LINHA AQUI
         "📁 Relatórios",
         "⚙️ Rotas",
         "🔬 Triagem",
@@ -6266,7 +6397,47 @@ elif menu == "🔬 Triagem":
                             c_h2.download_button("📥 REIMPRIMIR", pdf_rep_man, file_name=f"Reprint_{lote_re_id}.pdf", mime="application/pdf", type="primary", use_container_width=True)
                 except Exception as e:
                     st.warning("⚠️ Não foi possível carregar o histórico no momento.")
-
+# =============================================================================
+# 🏷️ MÓDULO: GERADOR DE ETIQUETAS E ROLOS
+# =============================================================================
+elif menu == "🏷️ Gerador de Etiquetas":
+    st.markdown("<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🏷️ Fábrica de Etiquetas Térmicas</h3></div>", unsafe_allow_html=True)
+    st.write("Geração de rolos de etiquetas (Padrão 2 carreiras - 100x30mm) com UUIDs aleatórios para bipagem na rua.")
+    
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Agora ele busca direto na sua base de agentes carregada do banco
+            if not DF_AGENTES.empty:
+                # Pega os nomes únicos da coluna 'NOME DO AGENTE'
+                lista_agentes = sorted(DF_AGENTES['NOME DO AGENTE'].unique().tolist())
+                agente_selecionado = st.selectbox("Agente/Prestador (Tarja Lateral):", ["GERAL/SEM AGENTE"] + lista_agentes)
+            else:
+                agente_selecionado = "GERAL/SEM AGENTE"
+                st.selectbox("Agente/Prestador (Tarja Lateral):", ["GERAL/SEM AGENTE"], disabled=True)
+            
+        with col2:
+            qtd_etiquetas = st.number_input("Quantidade Total de Etiquetas (Rolo):", min_value=2, max_value=2000, value=100, step=2)
+            
+        st.info("💡 Dica: O ficheiro PDF gerado já sairá configurado para papel contínuo 100x30mm (2 colunas). Certifique-se de configurar a sua impressora térmica para este tamanho exato sem margens.")
+        
+        if st.button("🖨️ FABRICAR LOTE DE ETIQUETAS", type="primary", use_container_width=True):
+            with st.spinner(f"A gerar imagens de {qtd_etiquetas} etiquetas e a renderizar o ficheiro PDF..."):
+                
+                pdf_bytes = gerar_pdf_rolo_duplo(qtd_etiquetas, agente_selecionado)
+                sigla = str(agente_selecionado)[:3].upper() if agente_selecionado != "GERAL/SEM AGENTE" else "IGO"
+                
+                st.success(f"✅ Rolo com {qtd_etiquetas} etiquetas gerado com sucesso!")
+                
+                st.download_button(
+                    label="📥 BAIXAR ARQUIVO DE IMPRESSÃO (.PDF)",
+                    data=pdf_bytes,
+                    file_name=f"Lote_Etiquetas_{sigla}_{datetime.now().strftime('%d%m%y_%H%M')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    type="primary"
+                )
 # =============================================================================
 # 📁 MÓDULO 4: EXPORTAR RELATÓRIOS (NOVO E INTELIGENTE)
 # =============================================================================
