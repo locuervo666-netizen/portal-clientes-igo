@@ -9,3 +9,5 @@ xlsxwriter
 requests
 google-auth
 plotly
+qrcode
+Pillow
