@@ -1523,20 +1523,20 @@ def gerar_sigla_regiao(nome_agente, df_agentes):
     # Preenche com "X" caso a cidade tenha só 2 letras (ex: Itu)
     return sigla.ljust(3, 'X').upper()
 
-def criar_imagem_etiqueta_pil(codigo, sigla_tarja, tam_qr=290, tam_fonte=75, mostrar_logo=True):
-    """Desenha a imagem da etiqueta dinamicamente baseada nos parâmetros do estúdio"""
+def criar_imagem_etiqueta_pil(codigo, sigla_tarja, tam_qr=290, tam_fonte=75, mostrar_logo=True, 
+                              largura_tarja=110, tam_logo=120,
+                              off_x_tarja=0, off_y_tarja=0, off_x_txt=0, off_y_txt=0, 
+                              off_x_qr=0, off_y_qr=0, off_x_logo=0, off_y_logo=0):
+    """Desenha a imagem da etiqueta com liberdade total de movimento (Eixos X e Y)"""
     largura, altura = 573, 331
     img = Image.new('RGB', (largura, altura), 'white')
     draw = ImageDraw.Draw(img)
     
-    # 1. Desenhar a Tarja Preta na Esquerda (largura aprox 110px)
-    draw.rectangle([0, 0, 110, altura], fill="black")
+    # 1. Desenhar a Tarja Preta (Com controle de posição)
+    # Aumentamos a altura da tarja base para que, se você movê-la no Y, não fique buracos brancos
+    draw.rectangle([off_x_tarja, -100 + off_y_tarja, off_x_tarja + largura_tarja, altura + 100 + off_y_tarja], fill="black")
     
-    # Múltiplas fontes para garantir o carregamento correto no deploy
-    fontes_possiveis = [
-        "arialbd.ttf", "DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf", "FreeSansBold.ttf", "Arial Bold.ttf"
-    ]
-    
+    fontes_possiveis = ["arialbd.ttf", "DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf", "FreeSansBold.ttf", "Arial Bold.ttf"]
     font_tarja = None
     for fonte in fontes_possiveis:
         try:
@@ -1549,8 +1549,8 @@ def criar_imagem_etiqueta_pil(codigo, sigla_tarja, tam_qr=290, tam_fonte=75, mos
         try: font_tarja = ImageFont.load_default(size=tam_fonte)
         except: font_tarja = ImageFont.load_default()
             
-    # 2. Texto da Tarja
-    img_txt_tarja = Image.new('RGBA', (altura, 110), (0,0,0,0))
+    # 2. Texto da Tarja (Independente da Tarja)
+    img_txt_tarja = Image.new('RGBA', (altura, largura_tarja), (0,0,0,0))
     draw_tarja = ImageDraw.Draw(img_txt_tarja)
     
     try:
@@ -1560,13 +1560,33 @@ def criar_imagem_etiqueta_pil(codigo, sigla_tarja, tam_qr=290, tam_fonte=75, mos
     except:
         tw, th = 100, 40
         
-    draw_tarja.text(((altura - tw)/2, (110 - th)/2 - 15), sigla_tarja, font=font_tarja, fill="white")
-    
-    # Rotação de 270 graus para ler na mesma direção da logo
+    draw_tarja.text(((altura - tw)/2, (largura_tarja - th)/2 - 15), sigla_tarja, font=font_tarja, fill="white")
     img_txt_tarja_rot = img_txt_tarja.rotate(270, expand=True) 
-    img.paste(img_txt_tarja_rot, (0, 0), img_txt_tarja_rot)
     
-    # 3. Gerar QR Code Dinâmico
+    # Posição final do texto com Offset
+    img.paste(img_txt_tarja_rot, (off_x_tarja + off_x_txt, off_y_txt), img_txt_tarja_rot)
+    
+    # 3. Colar a Logo Oficial Colorida
+    logo_w_real = 0
+    if mostrar_logo:
+        logo_bytes = obter_logo_etiqueta_pil()
+        if logo_bytes:
+            logo_img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
+            logo_rot = logo_img.rotate(270, expand=True)
+            
+            filtro = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.ANTIALIAS
+            logo_rot.thumbnail((tam_logo, 300), filtro)
+            
+            logo_w_real = logo_rot.width + 10 
+            # Centro matemático + offset do usuário
+            pos_x_logo = largura - logo_rot.width - 10 + off_x_logo
+            pos_y_logo = int((altura - logo_rot.height) / 2) + off_y_logo
+            
+            bg_logo = Image.new("RGB", logo_rot.size, (255,255,255))
+            bg_logo.paste(logo_rot, (0,0), logo_rot)
+            img.paste(bg_logo, (pos_x_logo, pos_y_logo))
+
+    # 4. Gerar e Posicionar QR Code Dinâmico
     qr = qrcode.QRCode(version=1, box_size=10, border=0)
     qr.add_data(codigo)
     qr.make(fit=True)
@@ -1575,59 +1595,36 @@ def criar_imagem_etiqueta_pil(codigo, sigla_tarja, tam_qr=290, tam_fonte=75, mos
     resampling_filter = getattr(Image, 'Resampling', Image).LANCZOS
     img_qr = img_qr.resize((tam_qr, tam_qr), resampling_filter)
     
-    # Posicionar o QR Code dinamicamente
-    pos_x_qr = 110 + int(( (largura - 110 - (130 if mostrar_logo else 0)) - tam_qr ) / 2)
-    pos_y_qr = int((altura - tam_qr) / 2)
+    # Centro matemático livre + offset do usuário
+    espaco_livre_x = largura - largura_tarja - logo_w_real
+    pos_x_qr = largura_tarja + int((espaco_livre_x - tam_qr) / 2) + off_x_qr
+    pos_y_qr = int((altura - tam_qr) / 2) + off_y_qr
+    
     img.paste(img_qr, (pos_x_qr, pos_y_qr))
     
-    # 4. Colar a Logo Oficial Colorida (Se ativada)
-    if mostrar_logo:
-        logo_bytes = obter_logo_etiqueta_pil()
-        if logo_bytes:
-            logo_img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
-            logo_rot = logo_img.rotate(270, expand=True)
-            
-            filtro = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.ANTIALIAS
-            logo_rot.thumbnail((120, 300), filtro)
-            
-            pos_x_logo = largura - logo_rot.width - 10
-            pos_y_logo = int((altura - logo_rot.height) / 2)
-            
-            bg_logo = Image.new("RGB", logo_rot.size, (255,255,255))
-            bg_logo.paste(logo_rot, (0,0), logo_rot)
-            img.paste(bg_logo, (pos_x_logo, pos_y_logo))
-    
-    # Salvar num arquivo temporário
     temp_path = os.path.join(tempfile.gettempdir(), f"etiq_{codigo}.png")
     img.save(temp_path, dpi=(300, 300))
     return temp_path
 
 
-def gerar_pdf_rolo_duplo_premium(lista_codigos, sigla_final, larg_pagina, alt_pagina, larg_etiq, alt_etiq, margem_esq, gap_central, tam_qr, tam_fonte, mostrar_logo):
-    """Gera o PDF com canvas exato da página para não gerar distorção na impressora térmica"""
-    
-    # Forçamos 'P' (Portrait) passando a largura maior primeiro. 
-    # Isso evita o bug do FPDF tentar inverter as dimensões sozinho.
+def gerar_pdf_rolo_duplo_premium(lista_codigos, sigla_final, larg_pagina, alt_pagina, larg_etiq, alt_etiq, margem_esq, gap_central, tam_qr, tam_fonte, mostrar_logo, largura_tarja, tam_logo, off_x_tarja, off_y_tarja, off_x_txt, off_y_txt, off_x_qr, off_y_qr, off_x_logo, off_y_logo):
     pdf = FPDF(orientation='P', unit='mm', format=(larg_pagina, alt_pagina))
     pdf.set_auto_page_break(auto=False)
     pdf.set_margins(0, 0, 0)
         
-    # Calcula a margem do topo automaticamente para centralizar na altura
     margem_topo = (alt_pagina - alt_etiq) / 2.0
-    
-    # Posição de início da Etiqueta 2
     pos_x2 = margem_esq + larg_etiq + gap_central
 
     for i in range(0, len(lista_codigos), 2):
         pdf.add_page()
         
         cod1 = lista_codigos[i]
-        img1 = criar_imagem_etiqueta_pil(cod1, sigla_final, tam_qr, tam_fonte, mostrar_logo)
+        img1 = criar_imagem_etiqueta_pil(cod1, sigla_final, tam_qr, tam_fonte, mostrar_logo, largura_tarja, tam_logo, off_x_tarja, off_y_tarja, off_x_txt, off_y_txt, off_x_qr, off_y_qr, off_x_logo, off_y_logo)
         pdf.image(img1, x=margem_esq, y=margem_topo, w=larg_etiq, h=alt_etiq)
         
         if i + 1 < len(lista_codigos):
             cod2 = lista_codigos[i+1]
-            img2 = criar_imagem_etiqueta_pil(cod2, sigla_final, tam_qr, tam_fonte, mostrar_logo)
+            img2 = criar_imagem_etiqueta_pil(cod2, sigla_final, tam_qr, tam_fonte, mostrar_logo, largura_tarja, tam_logo, off_x_tarja, off_y_tarja, off_x_txt, off_y_txt, off_x_qr, off_y_qr, off_x_logo, off_y_logo)
             pdf.image(img2, x=pos_x2, y=margem_topo, w=larg_etiq, h=alt_etiq)
         
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
@@ -6461,7 +6458,7 @@ elif menu == "🏷️ Gerador de Etiquetas":
     col_form, col_preview = st.columns([1.2, 1], gap="large")
     
     with col_form:
-        tab_setup, tab_design = st.tabs(["⚙️ Setup & Calibragem", "🎨 Estúdio de Layout"])
+        tab_setup, tab_design = st.tabs(["⚙️ Setup & Calibragem", "🎮 Estúdio Tetris (X/Y)"])
         
         with tab_setup:
             if not DF_AGENTES.empty:
@@ -6476,11 +6473,11 @@ elif menu == "🏷️ Gerador de Etiquetas":
             
             qtd_etiquetas = st.number_input("📦 Quantidade Total do Rolo:", min_value=2, max_value=5000, value=100, step=2)
             
-            st.markdown("##### 📏 Calibragem Fina da Impressora")
-            st.info("Ajuste as medidas abaixo, gere o PDF e teste. A tela NÃO vai sumir ao clicar em baixar.")
+            st.markdown("##### 📏 Calibragem da Impressora")
+            st.info("Ajuste as medidas abaixo para casar com a etiqueta física.")
             
             c_med1, c_med2 = st.columns(2)
-            larg_pagina = c_med1.number_input("Largura TOTAL do Papel (mm):", value=103.0, step=0.5, help="Largura de ponta a ponta da fita")
+            larg_pagina = c_med1.number_input("Largura TOTAL Papel (mm):", value=103.0, step=0.5)
             alt_pagina = c_med2.number_input("Altura do Papel (mm):", value=31.0, step=0.5)
             
             c_med3, c_med4, c_med5, c_med6 = st.columns(4)
@@ -6490,10 +6487,30 @@ elif menu == "🏷️ Gerador de Etiquetas":
             gap_central = c_med6.number_input("Espaço Meio:", value=2.0, step=0.1)
             
         with tab_design:
-            st.markdown("<p style='font-size: 13px; color: #64748b;'>Ajuste os elementos visuais. O layout reage em tempo real na tela ao lado.</p>", unsafe_allow_html=True)
-            tam_qr = st.slider("Tamanho do QR Code", min_value=150, max_value=320, value=290, step=5)
-            tam_fonte = st.slider("Tamanho da Fonte (Sigla)", min_value=30, max_value=120, value=75, step=1)
-            mostrar_logo = st.toggle("Exibir Logotipo IGO", value=True)
+            st.markdown("<p style='font-size: 13px; color: #64748b;'>Movimente os blocos como peças de montar. Eixo X = Lados. Eixo Y = Cima/Baixo.</p>", unsafe_allow_html=True)
+            
+            with st.expander("🔳 Ajustes do QR Code", expanded=True):
+                tam_qr = st.slider("Tamanho do QR", min_value=150, max_value=320, value=290, step=5)
+                c_qr1, c_qr2 = st.columns(2)
+                off_x_qr = c_qr1.slider("Eixo X (Lados)", min_value=-150, max_value=150, value=0, step=2, key="qr_x")
+                off_y_qr = c_qr2.slider("Eixo Y (Cima/Baixo)", min_value=-100, max_value=100, value=0, step=2, key="qr_y")
+
+            with st.expander("⬛ Tarja Preta e Texto"):
+                c_tj1, c_tj2 = st.columns(2)
+                largura_tarja = c_tj1.slider("Largura Tarja", 50, 220, 110, 5)
+                off_x_tarja = c_tj2.slider("Mover Tarja Inteira (X)", -50, 100, 0, 2)
+                
+                c_tx1, c_tx2 = st.columns(2)
+                tam_fonte = c_tx1.slider("Tamanho da Fonte", 30, 120, 75, 1)
+                off_y_txt = c_tx2.slider("Mover só o Texto (Y)", -150, 150, 0, 2)
+                off_x_txt = st.slider("Mover só o Texto (X)", -50, 50, 0, 2)
+
+            with st.expander("🏢 Logotipo"):
+                mostrar_logo = st.toggle("Exibir Logotipo IGO", value=True)
+                tam_logo = st.slider("Tamanho Logo", 50, 250, 120, 5)
+                c_lg1, c_lg2 = st.columns(2)
+                off_x_logo = c_lg1.slider("Mover Logo (X)", -150, 100, 0, 2)
+                off_y_logo = c_lg2.slider("Mover Logo (Y)", -100, 100, 0, 2)
 
         # Atualização inteligente de UUIDs
         if 'lote_atual_uuid' not in st.session_state or st.session_state.get('lote_qtd_atual') != qtd_etiquetas:
@@ -6502,30 +6519,30 @@ elif menu == "🏷️ Gerador de Etiquetas":
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- TRAVA DE MEMÓRIA DO PDF PARA A TELA NÃO SUMIR ---
+        # --- TRAVA DE MEMÓRIA DO PDF ---
         if 'pdf_etiquetas_cache' not in st.session_state:
             st.session_state.pdf_etiquetas_cache = None
             st.session_state.pdf_etiquetas_nome = ""
 
         c_btn1, c_btn2 = st.columns(2)
         
-        if c_btn1.button("⚙️ PROCESSAR E RENDERIZAR LOTE", use_container_width=True): 
+        if c_btn1.button("⚙️ PROCESSAR LOTE", use_container_width=True): 
             with st.spinner("Processando layout vetorial..."):
                 st.session_state.pdf_etiquetas_cache = gerar_pdf_rolo_duplo_premium(
                     lista_codigos=st.session_state.lote_atual_uuid,
                     sigla_final=sigla_inteligente,
-                    larg_pagina=larg_pagina,
-                    alt_pagina=alt_pagina,
-                    larg_etiq=larg_etiq,
-                    alt_etiq=alt_etiq,
-                    margem_esq=margem_esq,
-                    gap_central=gap_central,
-                    tam_qr=tam_qr,
-                    tam_fonte=tam_fonte,
-                    mostrar_logo=mostrar_logo
+                    larg_pagina=larg_pagina, alt_pagina=alt_pagina,
+                    larg_etiq=larg_etiq, alt_etiq=alt_etiq,
+                    margem_esq=margem_esq, gap_central=gap_central,
+                    tam_qr=tam_qr, tam_fonte=tam_fonte, mostrar_logo=mostrar_logo,
+                    largura_tarja=largura_tarja, tam_logo=tam_logo,
+                    off_x_tarja=off_x_tarja, off_y_tarja=0, # Y da tarja fica fixo pra não gerar buraco
+                    off_x_txt=off_x_txt, off_y_txt=off_y_txt,
+                    off_x_qr=off_x_qr, off_y_qr=off_y_qr,
+                    off_x_logo=off_x_logo, off_y_logo=off_y_logo
                 )
                 st.session_state.pdf_etiquetas_nome = f"Lote_{qtd_etiquetas}x_{sigla_inteligente}_{datetime.now().strftime('%H%M%S')}.pdf"
-                st.rerun() # Força a tela a carregar o botão de download sem quebrar
+                st.rerun()
 
         if st.session_state.pdf_etiquetas_cache is not None:
             c_btn2.download_button(
@@ -6536,16 +6553,18 @@ elif menu == "🏷️ Gerador de Etiquetas":
                 use_container_width=True,
                 type="primary"
             )
-            c_btn2.success("✅ Arquivo pronto!")
 
     with col_preview:
         st.markdown("#### 👀 Preview em Tempo Real")
         img_preview_path = criar_imagem_etiqueta_pil(
             codigo="IGO-PREV12", 
             sigla_tarja=sigla_inteligente, 
-            tam_qr=tam_qr, 
-            tam_fonte=tam_fonte, 
-            mostrar_logo=mostrar_logo
+            tam_qr=tam_qr, tam_fonte=tam_fonte, mostrar_logo=mostrar_logo,
+            largura_tarja=largura_tarja, tam_logo=tam_logo,
+            off_x_tarja=off_x_tarja, off_y_tarja=0,
+            off_x_txt=off_x_txt, off_y_txt=off_y_txt,
+            off_x_qr=off_x_qr, off_y_qr=off_y_qr,
+            off_x_logo=off_x_logo, off_y_logo=off_y_logo
         )
         with st.container(border=True):
             st.image(img_preview_path, caption=f"Saída Física de cada Etiqueta: {larg_etiq} x {alt_etiq} mm", use_container_width=True)
