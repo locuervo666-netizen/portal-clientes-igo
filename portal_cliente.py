@@ -1272,7 +1272,7 @@ else:
                 df_f['DT_LIMITE_OBJ'] = pd.to_datetime(df_f['DATA_LIMITE'], format='%d/%m/%Y', errors='coerce').dt.date
 
                 mask_atrasado = (
-                    (~df_f['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Aguardando|Recusada', case=False, na=False)) &
+                    (~df_f['STATUS_DISPLAY'].str.contains('Entregue|Insucesso|Cancelado|Aguardando|Recusado|Ocorrência', case=False, na=False)) &
                     (df_f['DT_LIMITE_OBJ'] < hoje_br) &
                     (df_f['DT_LIMITE_OBJ'].notnull())
                 )
