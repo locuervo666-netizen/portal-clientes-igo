@@ -41,8 +41,18 @@ AGENTES_XLS_AUTORIZADOS = [
 AGENTES_PDF_AUTORIZADOS = ['veloz.express', 'francisco.gru', 'adilson.lima']
 
 
-def gerar_saudacao_spintax(nome):
-    saudacoes = [
+def gerar_saudacao_spintax(nome, uf=""):
+    """
+    🔥 GERADOR DE SAUDAÇÕES INTELIGENTE COM REGIONALIZAÇÃO POR ESTADO
+    Oferece mensagens personalizadas, variadas e motivacionais por região
+    
+    Args:
+        nome: Nome do agente/motorista
+        uf: Estado (UF) para mensagens regionalizadas (opcional)
+    """
+    
+    # 🔥 SAUDAÇÕES GENÉRICAS (FUNCIONAM EM QUALQUER REGIÃO)
+    saudacoes_genericas = [
         f"Olá {nome}, tudo bem? Segue a ",
         f"Bom dia, {nome}. Aqui está a ",
         f"Fala {nome}! Passando para deixar a ",
@@ -57,18 +67,122 @@ def gerar_saudacao_spintax(nome):
         f"Bora rodar, {nome}! Aqui tá a ",
         f"Oi {nome}, tudo na paz? Confere aí a ",
         f"{nome}, meu parceiro! Já saiu a ",
-        f"Fala guerreiro! {nome}, segue a "
+        f"Fala guerreiro! {nome}, segue a ",
+        f"Opa {nome}! Força na labuta, aqui vai a ",
+        f"Tamo junto, {nome}! Segue a rota de ",
+        f"Força {nome}! Partiu rodar essa ",
+        f"Valeu {nome}, agora é com você. Bora nessa ",
+        f"{nome}, bomba! Tá saindo agora a ",
     ]
-
+    
+    # 🔥 SAUDAÇÕES REGIONALIZADAS POR ESTADO
+    saudacoes_sp = [
+        f"Ô {nome}! Tá rolando rota aí em SP, segue a ",
+        f"E lá vem mais, {nome}. Aqui tá liberada a ",
+        f"Bora lá, {nome}! São Paulo chama, segue a ",
+        f"Ó o trem, {nome}! A rota de SP tá pronta. Confere aí a ",
+        f"{nome}, toma lá sua rota de SP! Aqui vai a ",
+    ]
+    
+    saudacoes_rj = [
+        f"Abraço {nome}! A rota do RJ tá saindo agora. Segue a ",
+        f"Pô {nome}, beleza? Rio de Janeiro chama, aqui vai a ",
+        f"Meu brother {nome}! Tá liberada sua rota carioca. Confere aí a ",
+        f"Fala {nome} do Rio! Partiu essa rota, vamo que vamo. Segue a ",
+        f"{nome}, meu parceiro carioca! Bora rodar essa. Aqui tá a ",
+    ]
+    
+    saudacoes_mg = [
+        f"E lá vai, {nome}! Minas Gerais com tudo, segue a ",
+        f"Tamo junto, {nome}! Minas tá bombando, aqui vai a ",
+        f"Bora lá, {nome}. A rota mineira chegou! Confere aí a ",
+        f"Fala {nome}, guerreiro de MG! Essa aqui é sua. Segue a ",
+        f"{nome}, mineiro de lei! Partiu essa rota agora. Aqui tá a ",
+    ]
+    
+    saudacoes_ba = [
+        f"Salve {nome}! Bahia tá chamando, bora nessa. Segue a ",
+        f"Lá no malvado, {nome}! A rota baiana tá pronta. Aqui vai a ",
+        f"E aí meu nordestino {nome}? Bora explorar essa rota. Confere aí a ",
+        f"{nome}, partiu Bahia! Força nessa labuta. Segue a ",
+        f"Ô jóia, {nome}! Mais uma rota baiana pra você mandar bem. Aqui tá a ",
+    ]
+    
+    saudacoes_rs = [
+        f"Opa {nome}, gaúcho! Bora rodar aí no Rio Grande. Segue a ",
+        f"E lá pro Sul, {nome}! A rota tá quente. Aqui vai a ",
+        f"Fala guerreiro do RS! {nome}, essa rota é sua. Confere aí a ",
+        f"{nome}, tá rolando mais uma no Sul. Bora bombar. Segue a ",
+        f"Ó o tremendo, {nome}! Sua rota gaúcha tá saindo. Aqui tá a ",
+    ]
+    
+    saudacoes_sc = [
+        f"{nome}, parceiro de Santa Catarina! A rota tá liberada. Segue a ",
+        f"Salve {nome}! Santa Catarina tá pedindo, bora lá. Aqui vai a ",
+        f"E aqui pro Sul, {nome}! Essa rota catarinense é show. Confere aí a ",
+        f"Fala {nome} de SC! Partiu mais essa. Segue a ",
+        f"Opa {nome}, tamo junto! Sua rota tá saindo. Aqui tá a ",
+    ]
+    
+    saudacoes_pr = [
+        f"Ô {nome}! Paraná chama, bora nessa rota agora. Segue a ",
+        f"Fala paranaense! {nome}, sua rota tá pronta. Aqui vai a ",
+        f"E lá vem mais, {nome}! Paraná tá bombando. Confere aí a ",
+        f"{nome}, tamo junto! Rota de PR saindo agora. Segue a ",
+        f"Bora lá {nome}! Sua labuta em PR tá aqui. Aqui tá a ",
+    ]
+    
+    saudacoes_go = [
+        f"Opa {nome}! Goiás tá ligado em você. Aqui vai a ",
+        f"Salve {nome} do Centro-Oeste! A rota saiu. Segue a ",
+        f"E lá em Goiás, {nome}! Bora rodar essa. Confere aí a ",
+        f"Fala {nome}! Sua rota goiana tá pronta. Aqui vai a ",
+        f"{nome}, parceiro! Goiás chama, vamo que vamo. Segue a ",
+    ]
+    
+    saudacoes_df = [
+        f"{nome}, brasiliense! Sua rota no DF tá saindo. Segue a ",
+        f"Fala {nome}! Aqui em Brasília pulsando. Aqui vai a ",
+        f"E lá tá, {nome}! Sua rota de DF bombando. Confere aí a ",
+        f"Opa {nome}, capital do país chamando! Bora nessa. Segue a ",
+        f"Salve {nome}! DF com tudo, aqui tá sua rota. Aqui tá a ",
+    ]
+    
+    # Mapear UF para saudações regionalizadas
+    dict_saudacoes_uf = {
+        'SP': saudacoes_sp,
+        'RJ': saudacoes_rj,
+        'MG': saudacoes_mg,
+        'BA': saudacoes_ba,
+        'RS': saudacoes_rs,
+        'SC': saudacoes_sc,
+        'PR': saudacoes_pr,
+        'GO': saudacoes_go,
+        'DF': saudacoes_df,
+    }
+    
+    # Selecionar saudação: regional se UF disponível, senão genérica
+    uf_upper = str(uf).upper().strip() if uf else ""
+    if uf_upper in dict_saudacoes_uf:
+        saudacoes_escolhidas = dict_saudacoes_uf[uf_upper]
+    else:
+        saudacoes_escolhidas = saudacoes_genericas
+    
     # 🔥 FECHAMENTOS BLINDADOS (PEDINDO PARA SALVAR O CONTATO E RESPONDER 'OK') 🔥
     fechamentos = [
         "⚠️ *Aviso Rápido:* Por favor, salve o nosso número nos seus contatos e responda com um 'OK' para confirmar o recebimento desta rota. Boa viagem!",
         "📌 Para garantir que o sistema não falhe, adicione este número aos seus contatos e me mande um 'OK' confirmando a leitura. Bom trabalho!",
         "🚨 *Importante:* Salve nosso contato na sua agenda para não perder as próximas atualizações. Me dê um 'OK' para eu saber que a rota chegou bem. Sucesso hoje!",
         "✅ Ah, um favor: guarde este número na sua lista de contatos e confirme o recebimento com um 'OK'. Dirija com cuidado e boa coleta!",
-        "📱 Para a comunicação ficar perfeita, não esqueça de salvar nosso número nos seus contatos e me confirmar aqui com um 'OK'. Um abraço e boa rota!"]
+        "📱 Para a comunicação ficar perfeita, não esqueça de salvar nosso número nos seus contatos e me confirmar aqui com um 'OK'. Um abraço e boa rota!",
+        "💪 Tá tudo pronto! Salva nosso contato aí e manda um 'OK' rapidinho confirmando que recebeu a rota. Confiança em você!",
+        "🎯 Última coisa: guarda nosso número e confirma com 'OK' quando receber. Muito obrigado e sucesso na sua rota!",
+        "🚀 Só mais um detalhe: salva nosso contato e manda aquele 'OK' pra gente saber que tá tudo certo. Bora rodar!",
+        "☑️ Pra tudo rodar perfeitamente, adiciona nosso número aos contatos e confirma com 'OK'. Força aí!",
+        "📲 Fechando: salva o contato IGO e responde com um simples 'OK'. Muito obrigado e que a rota seja sucesso!",
+    ]
 
-    inicio = random.choice(saudacoes)
+    inicio = random.choice(saudacoes_escolhidas)
     fim = random.choice(fechamentos)
     return inicio, fim
 
@@ -2647,8 +2761,15 @@ if menu == "📊 GRID":
                                             f"**A enviar rota para:** {nom} ({idx_ag + 1}/{len(agentes_validos)})...")
                                         data_str = hoje_br.strftime('%d/%m/%Y')
 
+                                        # 🔥 Extrai UF para personalização regional
+                                        uf_agente = ""
+                                        if 'UF' in df_ag.columns:
+                                            ufs_unicos = df_ag['UF'].dropna().unique()
+                                            if len(ufs_unicos) > 0:
+                                                uf_agente = str(ufs_unicos[0]).upper().strip()
+                                        
                                         saudacao, fechamento = gerar_saudacao_spintax(
-                                            nom)
+                                            nom, uf_agente)
                                         msg_parts = [
                                             f"{saudacao}rota de 🗓️ {data_str}\n",
                                             "RESUMO DA ROTA:\n",
@@ -4404,8 +4525,15 @@ elif menu == "📥 Importações":
                                     errors='coerce').date() if not df_ag_of.empty else hoje_br
                                 data_str = dt_ref.strftime('%d/%m/%Y')
 
+                                # 🔥 Extrai UF para personalização regional
+                                uf_agente_of = ""
+                                if 'UF' in df_ag_of.columns:
+                                    ufs_unicos_of = df_ag_of['UF'].dropna().unique()
+                                    if len(ufs_unicos_of) > 0:
+                                        uf_agente_of = str(ufs_unicos_of[0]).upper().strip()
+                                
                                 saudacao, fechamento = gerar_saudacao_spintax(
-                                    nom)
+                                    nom, uf_agente_of)
                                 sep1 = random.choice(
                                     [
                                         '-------------------------------',
@@ -5644,7 +5772,14 @@ elif menu == "📥 Importações Umove":
                         else:
                             data_str = hoje_br.strftime('%d/%m/%Y')
 
-                        saudacao, fechamento = gerar_saudacao_spintax(nom)
+                        # 🔥 Extrai UF para personalização regional
+                        uf_agente_sb = ""
+                        if 'UF' in df_ag_sb.columns:
+                            ufs_unicos_sb = df_ag_sb['UF'].dropna().unique()
+                            if len(ufs_unicos_sb) > 0:
+                                uf_agente_sb = str(ufs_unicos_sb[0]).upper().strip()
+                        
+                        saudacao, fechamento = gerar_saudacao_spintax(nom, uf_agente_sb)
                         
                         sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
                         sep2 = random.choice(['---', '...', '===', ' '])
@@ -6022,30 +6157,33 @@ elif menu == "🔬 Triagem":
                             idx = df_raw[mask].index[-1]
                             if str(df_raw.at[idx, 'STATUS']).strip().upper() == 'COLETADO':
                                 try:
-                                    aba = planilha_db.worksheet("Memoria_Sistema")
-                                    pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
-                                    headers = aba.row_values(1)
-                                    if 'PEDIDO' in headers and 'STATUS' in headers:
-                                        col_pedido = headers.index('PEDIDO') + 1
-                                        col_status = headers.index('STATUS') + 1
-                                        cell = aba.find(pedido_alvo, in_column=col_pedido)
-                                        if cell:
-                                            aba.update_cell(cell.row, col_status, 'CONFERIDO')
-                                            st.session_state.log_triagem.insert(0, {'PEDIDO': str(df_raw.at[idx, 'PEDIDO']), 'TOMADOR': str(df_raw.at[idx, 'TOMADOR']), 'LABORATORIO': str(df_raw.at[idx, 'LABORATORIO']), 'CIDADE': str(df_raw.at[idx, 'CIDADE']), 'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S')})
-                                            st.session_state.ui_toast = {'msg': f"Pedido {pedido_alvo} VALIDADO!", 'icon': "✅"}
-                                            time.sleep(0.5)
-                                            carregar_dados_completos.clear()
-                                            st.rerun()
+                                    # 🔥 PROTEÇÃO CONTRA TIMEOUT: Mostra spinner e aguarda sincronização com Google Sheets
+                                    with st.spinner("⏳ Sincronizando com a nuvem (Google Sheets)..."):
+                                        aba = planilha_db.worksheet("Memoria_Sistema")
+                                        pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
+                                        headers = aba.row_values(1)
+                                        if 'PEDIDO' in headers and 'STATUS' in headers:
+                                            col_pedido = headers.index('PEDIDO') + 1
+                                            col_status = headers.index('STATUS') + 1
+                                            cell = aba.find(pedido_alvo, in_column=col_pedido)
+                                            if cell:
+                                                aba.update_cell(cell.row, col_status, 'CONFERIDO')
+                                                # 🔥 DELAY AUMENTADO: 1.5s para evitar throttling do Google Sheets em bipagens rápidas
+                                                time.sleep(1.5)
+                                                st.session_state.log_triagem.insert(0, {'PEDIDO': str(df_raw.at[idx, 'PEDIDO']), 'TOMADOR': str(df_raw.at[idx, 'TOMADOR']), 'LABORATORIO': str(df_raw.at[idx, 'LABORATORIO']), 'CIDADE': str(df_raw.at[idx, 'CIDADE']), 'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S')})
+                                                st.session_state.ui_toast = {'msg': f"Pedido {pedido_alvo} VALIDADO! ✅", 'icon': "✅"}
+                                                carregar_dados_completos.clear()
+                                                st.rerun()
+                                            else:
+                                                st.error("❌ Pedido não encontrado na nuvem. Verifique a digitação.")
                                         else:
-                                            st.error("❌ Pedido não encontrado na nuvem.")
-                                    else:
-                                        st.error("❌ Colunas PEDIDO ou STATUS não encontradas.")
+                                            st.error("❌ Colunas PEDIDO ou STATUS não encontradas na planilha.")
                                 except Exception as e:
-                                    st.error(f"Erro: {e}")
+                                    st.error(f"⚠️ Erro de sincronização com a nuvem: {str(e)[:80]}. Aguarde alguns segundos e tente novamente.")
                             else:
-                                st.error("❌ Volume não está com status COLETADO.")
+                                st.error("❌ Volume não está com status COLETADO. Verifique se foi coletado no app.")
                         else:
-                            st.error("❌ Assinatura ou Pedido não reconhecido.")
+                            st.error("❌ Assinatura ou Pedido não reconhecido. Verifique o QR Code.")
             
             with col_bip_dir:
                 st.markdown("<div style='border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; background-color: #F8FAFC; height: 130px; overflow-y: auto;'>", unsafe_allow_html=True)
@@ -7053,13 +7191,29 @@ elif menu == "⚙️ Rotas":
                                 with st.spinner(f"Transferindo tudo para {para_todos}..."):
                                     df_rotas_full = DF_AGENTES.copy()
                                     dados_novo = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == para_todos].iloc[0]
+                                    dados_agente_original = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
+                                    
+                                    # Transferir todas as rotas (exceto "SEM ROTA DEFINIDA")
                                     mask_transfer = (df_rotas_full['LOGIN DO AGENTE'] == agente_filtro) & (df_rotas_full['ROTA MAPEADA'] != "SEM ROTA DEFINIDA")
                                     df_rotas_full.loc[mask_transfer, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [para_todos, dados_novo['NOME DO AGENTE'], dados_novo['TELEFONE']]
                                     df_rotas_full = df_rotas_full.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+                                    
+                                    # 🔥 GARANTIA: Mantém o agente original com "SEM ROTA DEFINIDA" para não sumir do cadastro
+                                    if not any((df_rotas_full['LOGIN DO AGENTE'] == agente_filtro) & (df_rotas_full['ROTA MAPEADA'] == "SEM ROTA DEFINIDA")):
+                                        df_rotas_full = pd.concat([
+                                            df_rotas_full,
+                                            pd.DataFrame([{
+                                                "ROTA MAPEADA": "SEM ROTA DEFINIDA",
+                                                "LOGIN DO AGENTE": agente_filtro,
+                                                "NOME DO AGENTE": dados_agente_original['NOME DO AGENTE'],
+                                                "TELEFONE": dados_agente_original['TELEFONE']
+                                            }])
+                                        ], ignore_index=True)
+                                    
                                     try:
                                         planilha_db.worksheet("Agentes").clear()
                                         planilha_db.worksheet("Agentes").update("A1", [df_rotas_full.columns.tolist()] + df_rotas_full.fillna("").astype(str).values.tolist())
-                                        st.success(f"🎉 Todas as rotas migradas para {para_todos}!")
+                                        st.success(f"🎉 Todas as rotas migradas para {para_todos}! O cadastro de **{dados_agente_original['NOME DO AGENTE']}** permanece ativo e disponível para novas rotas.")
                                         carregar_dados_agentes.clear()
                                         time.sleep(1)
                                         st.rerun()
@@ -7107,9 +7261,26 @@ elif menu == "⚙️ Rotas":
                                         with st.spinner("Movendo rota..."):
                                             df_rotas_full = DF_AGENTES.copy()
                                             dados_novo = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == para_motorista].iloc[0]
+                                            dados_agente_original = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
+                                            
+                                            # Transferir esta rota específica
                                             mask_transfer = (df_rotas_full['LOGIN DO AGENTE'] == agente_filtro) & (df_rotas_full['ROTA MAPEADA'] == rota_nome)
                                             df_rotas_full.loc[mask_transfer, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [para_motorista, dados_novo['NOME DO AGENTE'], dados_novo['TELEFONE']]
                                             df_rotas_full = df_rotas_full.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+                                            
+                                            # 🔥 GARANTIA: Se o agente ficou sem rotas reais, adiciona "SEM ROTA DEFINIDA"
+                                            rotas_reais_agente = df_rotas_full[(df_rotas_full['LOGIN DO AGENTE'] == agente_filtro) & (df_rotas_full['ROTA MAPEADA'] != "SEM ROTA DEFINIDA")]
+                                            if rotas_reais_agente.empty and not any((df_rotas_full['LOGIN DO AGENTE'] == agente_filtro) & (df_rotas_full['ROTA MAPEADA'] == "SEM ROTA DEFINIDA")):
+                                                df_rotas_full = pd.concat([
+                                                    df_rotas_full,
+                                                    pd.DataFrame([{
+                                                        "ROTA MAPEADA": "SEM ROTA DEFINIDA",
+                                                        "LOGIN DO AGENTE": agente_filtro,
+                                                        "NOME DO AGENTE": dados_agente_original['NOME DO AGENTE'],
+                                                        "TELEFONE": dados_agente_original['TELEFONE']
+                                                    }])
+                                                ], ignore_index=True)
+                                            
                                             try:
                                                 planilha_db.worksheet("Agentes").clear()
                                                 planilha_db.worksheet("Agentes").update("A1", [df_rotas_full.columns.tolist()] + df_rotas_full.fillna("").astype(str).values.tolist())
@@ -7453,8 +7624,16 @@ elif menu == "📱 WhatsApp":
                             if telefone:
                                 status_text.markdown(
                                     f"**Processando:** {nome_amigavel}...")
+                                
+                                # 🔥 Extrai UF para personalização regional
+                                uf_agente_wpp = ""
+                                if 'UF' in df_agente.columns:
+                                    ufs_unicos_wpp = df_agente['UF'].dropna().unique()
+                                    if len(ufs_unicos_wpp) > 0:
+                                        uf_agente_wpp = str(ufs_unicos_wpp[0]).upper().strip()
+                                
                                 saudacao, fechamento = gerar_saudacao_spintax(
-                                    nome_amigavel)
+                                    nome_amigavel, uf_agente_wpp)
 
                                 # TEXTO COMPLETO PARA TODOS (CONTINGÊNCIA) COM
                                 # SPINTAX
@@ -7595,8 +7774,16 @@ elif menu == "📱 WhatsApp":
                                 st.error("Sem telefone.")
                             else:
                                 is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
+                                
+                                # 🔥 Extrai UF para personalização regional
+                                uf_agente_individual = ""
+                                if 'UF' in df_agente.columns:
+                                    ufs_unicos_individual = df_agente['UF'].dropna().unique()
+                                    if len(ufs_unicos_individual) > 0:
+                                        uf_agente_individual = str(ufs_unicos_individual[0]).upper().strip()
+                                
                                 saudacao, fechamento = gerar_saudacao_spintax(
-                                    nome_ag)
+                                    nome_ag, uf_agente_individual)
 
                                 sep1 = random.choice(
                                     [
@@ -7763,8 +7950,15 @@ elif menu == "📱 WhatsApp":
                                 '|')[0].split('/')[0].strip()
                             is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
 
+                            # 🔥 Extrai UF para personalização regional
+                            uf_agente_romaneio = ""
+                            if 'UF' in df_rom.columns:
+                                ufs_unicos_romaneio = df_rom['UF'].dropna().unique()
+                                if len(ufs_unicos_romaneio) > 0:
+                                    uf_agente_romaneio = str(ufs_unicos_romaneio[0]).upper().strip()
+                            
                             saudacao, fechamento = gerar_saudacao_spintax(
-                                nome_amigavel)
+                                nome_amigavel, uf_agente_romaneio)
 
                             # MENSAGEM AJUSTADA: FOCO EM COLETA E REGRAS DE
                             # FRUSTRADA
