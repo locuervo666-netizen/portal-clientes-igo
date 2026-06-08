@@ -269,11 +269,6 @@ CLIENTES_CONFIG = {
         "senha": "123",
         "logo": "souza cruz.png",
         "filtro": "SOUZA CRUZ"
-    },
-    "CLIENTE.UNILABOR": {
-        "senha": "123",
-        "logo": "https://i.postimg.cc/FKVkJbj7/Unilabor-1024x860.jpg",
-        "filtro": "UNILABOR"
     }
 }
 
@@ -599,8 +594,8 @@ if 'ignorar_selecao_grid' not in st.session_state: st.session_state.ignorar_sele
 # =======================================================
 def get_st(row):
     s = str(row.get('STATUS_RESOLVIDO', row.get('STATUS', ''))).strip().upper()
-    if 'AGUARDANDO' in s: return '🔒 Aguardando Aprovação'
-    if 'RECUSA'     in s: return '❌ Solicitação Recusada'
+    if 'AGUARDANDO' in s: return '🔒 Aguardando Confirmação'
+    if 'RECUSA'     in s: return '❌ Recusado'
     if 'ENTREGUE'   in s: return '✅ Entregue'
     if 'COLETADO'   in s:
         # 🚚 Se foi coletado após 18h, mostrar como "Em Transferência"
@@ -608,12 +603,12 @@ def get_st(row):
         if hora_atual >= 18:
             return '🚚 Em Transferência'
         return '📦 Coletado'
-    if 'ROTA DE COLETA' in s: return '🚐 Rota de Coleta'
-    if 'ROTA'       in s: return '🚚 Em Rota de Entrega'
-    if 'CONFERIDO'  in s: return '☑️ Conferido'
-    if 'FRUSTRADA'  in s: return '⚠️ Frustrada'
+    if 'ROTA DE COLETA' in s: return '🚐 Indo Coletar'
+    if 'ROTA'       in s: return '🚚 Saiu para Entrega'
+    if 'CONFERIDO'  in s: return '☑️ Recebido na Base'
+    if 'FRUSTRADA'  in s: return '⚠️ Insucesso'
     if 'CANCELADO'  in s: return '🚫 Cancelado'
-    if 'PROBLEMA'   in s: return '🚨 Problema'
+    if 'PROBLEMA'   in s: return '🚨 Ocorrência'
     return '⏳ Pendente'
 
 def get_detalhes(row):
@@ -690,7 +685,7 @@ def tratar_foto(x):
 
 KPI_DOT_COLOR = { "TODOS": "#2563eb", "ENTREGUE": "#16a34a", "FRUSTRADA": "#dc2626", "COLETADO": "#0ea5e9", "PENDENTE": "#d97706", "Aguardando": "#475569", "HOJE": "#7c3aed" }
 KPI_BG_COLOR = { "TODOS": "#dbeafe", "ENTREGUE": "#dcfce7", "FRUSTRADA": "#fee2e2", "COLETADO": "#e0f2fe", "PENDENTE": "#fef3c7", "Aguardando": "#f1f5f9", "HOJE": "#ede9fe" }
-KPI_META = [("TODOS", "📦 Total", "kpi_total"), ("ENTREGUE", "✅ Entregues", "kpi_entregue"), ("FRUSTRADA", "❌ Frustradas", "kpi_frus"), ("COLETADO", "🚐 Coletados", "kpi_coletado"), ("PENDENTE", "⏳ Pendentes", "kpi_pend"), ("Aguardando", "🎧 Chamados", "kpi_aguardando"), ("HOJE", "📅 Hoje", "kpi_hoje")]
+KPI_META = [("TODOS", "📦 Total", "kpi_total"), ("ENTREGUE", "✅ Entregues", "kpi_entregue"), ("FRUSTRADA", "❌ Insucessos", "kpi_frus"), ("COLETADO", "🚐 Coletados", "kpi_coletado"), ("PENDENTE", "⏳ Pendentes", "kpi_pend"), ("Aguardando", "🎧 Chamados", "kpi_aguardando"), ("HOJE", "📅 Hoje", "kpi_hoje")]
 
 # =======================================================
 # 🪟 FUNÇÃO DO POP-UP MEGAZORD
@@ -808,7 +803,7 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
         # Container com borda cinza
         with st.container(border=True):
             # 🏢 Tomador
-            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>🏢 Unidade de Coleta (Tomador)</p>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>🏢 Cliente (Embarcador)</p>", unsafe_allow_html=True)
             st.markdown(f"<p style='font-size:14px; font-weight:700; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin:2px 0 12px 0;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>", unsafe_allow_html=True)
             
             # 📍 Endereço
@@ -816,19 +811,19 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
             st.markdown(f"<p style='font-size:13px; color:#1e293b; margin:2px 0 12px 0; font-weight:500;'>{endereco_completo}</p>", unsafe_allow_html=True)
             
             # 📅 Datas
-            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>📅 Datas de Operação</p>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>📅 Datas da Corrida</p>", unsafe_allow_html=True)
             st.markdown(timeline_html, unsafe_allow_html=True)
             
             # 🎯 Prazo
-            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>🎯 Prazo Acordado</p>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>🎯 SLA Acordado</p>", unsafe_allow_html=True)
             st.markdown(f"<p style='font-size:13px; color:#1e293b; margin:2px 0 12px 0;'>📌 Previsão: <b style='color:#2563eb;'>{data_limite}</b></p>", unsafe_allow_html=True)
             
             # 👤 Motorista
-            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>👤 Motorista(s) da Operação</p>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>👤 Motorista (Entregador)</p>", unsafe_allow_html=True)
             st.markdown(motorista_html, unsafe_allow_html=True)
             
             # 📈 Confiabilidade
-            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>📈 Confiabilidade do Local</p>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>📈 Nível de Serviço (Local)</p>", unsafe_allow_html=True)
             st.markdown(f"<p style='font-size:13px; color:#1e293b; margin:2px 0 0 0; font-weight:500;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')} <br> {pedido_data.get('OTD_LAB', '')}</p>", unsafe_allow_html=True)
             
             # 📊 HISTÓRICO DO PONTO DE COLETA
@@ -918,24 +913,24 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
         foto = pedido_data.get('COMPROVANTE', '')
         
         if foto and str(foto).startswith("http"):
-            st.markdown(f"<div style='background:#f8fafc; padding:16px; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 2px rgba(0,0,0,0.02);'><p style='font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0 0 12px 0;'>📸 Comprovante de Campo</p></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='background:#f8fafc; padding:16px; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 2px rgba(0,0,0,0.02);'><p style='font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0 0 12px 0;'>📸 Canhoto da Entrega</p></div>", unsafe_allow_html=True)
             st.image(foto, use_container_width=True)
             
             # 🔽 BOTÃO DE DOWNLOAD
             # Extrair nome do arquivo da URL ou usar um padrão
             try:
-                nome_arquivo = foto.split('/')[-1] if '/' in foto else f"comprovante_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                nome_arquivo = foto.split('/')[-1] if '/' in foto else f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
                 # Se não tiver extensão, adiciona
                 if '.' not in nome_arquivo:
                     nome_arquivo = f"{nome_arquivo}.jpg"
             except:
-                nome_arquivo = f"comprovante_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                nome_arquivo = f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
             
             try:
                 response = requests.get(foto, timeout=5)
                 if response.status_code == 200:
                     st.download_button(
-                        label="⬇️ Baixar Comprovante",
+                        label="⬇️ Baixar Canhoto",
                         data=response.content,
                         file_name=nome_arquivo,
                         mime="image/jpeg",
@@ -945,9 +940,9 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
                 st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
                 
         elif any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
-            st.warning("📷 Nenhuma evidência fotográfica foi anexada na justificativa da frustrada.")
+            st.warning("📷 Nenhuma foto da ocorrência foi anexada na justificativa.")
         else:
-            st.info("📷 **Aguardando anexo do comprovante de coleta.**")
+            st.info("📷 **Aguardando anexo do canhoto da operação.**")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1033,7 +1028,7 @@ if not st.session_state.logado:
                 st.image(LOGO_IGO, use_container_width=True)
                 
             st.markdown('<div class="login-title">Acesse sua conta</div>', unsafe_allow_html=True)
-            st.markdown('<div class="login-subtitle">Portal de Monitoramento Logístico</div>', unsafe_allow_html=True)
+            st.markdown('<div class="login-subtitle">Portal de Painel de Rastreio</div>', unsafe_allow_html=True)
             
             u = st.text_input("👤 Usuário", placeholder="Digite seu usuário").upper().strip()
             s = st.text_input("🔒 Senha", type="password", placeholder="••••••••••••")
@@ -1144,9 +1139,12 @@ else:
                                 )
                                 if pedido_chamado:
                                     texto_final += f"📦 *Pedido:* {pedido_chamado}\n"
-                                texto_final += f"💬 *Mensagem:* {msg_chamado}\n\n⏳ _Acesse o C.C.O. para responder._"
+                                texto_final += f"💬 *Mensagem:* {msg_chamado}\n\n⏳ _Acesse o Torre de Controle para responder._"
                                 
-                                enviar_whatsapp_zapi_cliente("5511947996371", texto_final)
+                                # 🔥 Notifica os números especificados para acompanhamento dos chamados
+                                numeros_notificacao_chamados = ["5511997163954", "5511984911231"]
+                                for numero in numeros_notificacao_chamados:
+                                    enviar_whatsapp_zapi_cliente(numero, texto_final)
                                 st.success(f"✅ Ticket {tkt_id} aberto com sucesso! Acompanhe na aba 'Meus Chamados'.")
                             except Exception as e:
                                 st.error(f"Erro ao criar ticket: {e}")
@@ -1158,7 +1156,7 @@ else:
     st.markdown(f"""
         <div class="header-container">
             <div>
-                <div class="header-title">Monitoramento Logístico</div>
+                <div class="header-title">Painel de Rastreio</div>
                 <div class="header-subtitle">{st.session_state.cliente} · {hoje_br.strftime('%d/%m/%Y')}</div>
             </div>
             <div class="sync-status">
@@ -1171,7 +1169,7 @@ else:
     df_raw = carregar_dados_nuvem()
 
     if df_raw.empty:
-        st.info("Aguardando novas informações do C.C.O na base de dados...")
+        st.info("Aguardando novas informações do Torre de Controle na base de dados...")
     else:
         if conf["filtro"] == "TODOS":
             df_cliente = df_raw.copy()
@@ -1739,7 +1737,7 @@ else:
                                 """, unsafe_allow_html=True)
 
                             agora_sp    = datetime.now(FUSO_BR)
-                            data_minima = agora_sp.date() if agora_sp.hour < 10 else agora_sp.date() + timedelta(days=1)
+                            data_minima = agora_sp.date() + timedelta(days=1)  # 🔥 Sempre D+1 em dias úteis
                             
                             while data_minima.weekday() >= 5:
                                 data_minima += timedelta(days=1)
@@ -1757,13 +1755,13 @@ else:
                                 height=100
                             )
 
-                            if st.form_submit_button("🚀 Enviar Solicitação ao C.C.O.", type="primary", use_container_width=True):
+                            if st.form_submit_button("🚀 Enviar Solicitação ao Torre de Controle.", type="primary", use_container_width=True):
                                 if lab_sel == "Selecione...":
                                     st.error("⚠️ Selecione um Ponto de Coleta válido.")
                                 elif data_coleta.weekday() >= 5:
                                     st.error("⚠️ Coletas não são realizadas aos finais de semana. Escolha um dia útil.")
                                 else:
-                                    with st.spinner("Registrando pedido e notificando o C.C.O..."):
+                                    with st.spinner("Registrando pedido e notificando o Torre de Controle..."):
                                         try:
                                             gc       = conectar_banco_seguro()
                                             planilha = gc.open("DB_IGO_Logistica")
@@ -1800,11 +1798,13 @@ else:
                                                 f"📍 *Cidade:* {local_data.get('CIDADE','')} - {local_data.get('UF','')}\n"
                                                 f"📅 *Data Desejada:* {data_coleta.strftime('%d/%m/%Y')}\n"
                                                 f"📦 *ID do Pedido:* {prox_id}\n\n"
-                                                f"Acesse o painel do C.C.O para aprovar ou recusar."
+                                                f"Acesse o painel do Torre de Controle para aprovar ou recusar."
                                             )
-                                            enviar_whatsapp_zapi_cliente("5511947996371", texto_zap)
+                                            numeros_notificacao = ["5511947996371", "5511997163954", "5511984911231"]
+                                            for numero in numeros_notificacao:
+                                                enviar_whatsapp_zapi_cliente(numero, texto_zap)
 
-                                            st.success(f"🎉 Pedido #{prox_id} criado para {data_coleta.strftime('%d/%m/%Y')}. Aguardando aprovação do C.C.O.")
+                                            st.success(f"🎉 Pedido #{prox_id} criado para {data_coleta.strftime('%d/%m/%Y')}. Aguardando aprovação do Torre de Controle.")
                                             carregar_dados_nuvem.clear()
 
                                         except Exception as e:
@@ -1815,7 +1815,7 @@ else:
         # ===================================================
         with tab_chamados:
             st.markdown("### 🎧 Histórico de Atendimento")
-            st.markdown("<p style='color:#64748b;font-size:13px;margin-top:-8px;'>Acompanhe a resolução das suas solicitações junto ao nosso C.C.O.</p>", unsafe_allow_html=True)
+            st.markdown("<p style='color:#64748b;font-size:13px;margin-top:-8px;'>Acompanhe a resolução das suas solicitações junto ao nosso Torre de Controle.</p>", unsafe_allow_html=True)
             
             try:
                 gc = conectar_banco_seguro()
@@ -1845,7 +1845,7 @@ else:
                                 <p style="font-size: 12px; color: #64748b; margin-bottom: 5px;"><b>Data:</b> {row['DATA']} | <b>Pedido Ref:</b> {row['PEDIDO']}</p>
                                 <p style="font-size: 14px; color: #334155;"><b>Sua Mensagem:</b> {row['MENSAGEM']}</p>
                                 <div style="background: {fundo_resp}; padding: 12px; border-radius: 6px; margin-top: 10px; border: 1px solid #e2e8f0;">
-                                    <p style="margin: 0; font-size: 13px; color: #0f172a;"><b>Resposta do C.C.O:</b> {row['RESPOSTA'] if row.get('RESPOSTA', '') else '<i>Aguardando análise de um de nossos agentes...</i>'}</p>
+                                    <p style="margin: 0; font-size: 13px; color: #0f172a;"><b>Resposta do Torre de Controle:</b> {row['RESPOSTA'] if row.get('RESPOSTA', '') else '<i>Aguardando análise de um de nossos agentes...</i>'}</p>
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
