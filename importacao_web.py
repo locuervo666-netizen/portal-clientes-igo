@@ -51,8 +51,9 @@ def gerar_saudacao_spintax(nome, uf=""):
         uf: Estado (UF) para mensagens regionalizadas (opcional)
     """
     
-    # 🔥 SAUDAÇÕES GENÉRICAS (FUNCIONAM EM QUALQUER REGIÃO)
+    # 🔥 SAUDAÇÕES GENÉRICAS (FUNCIONAM EM QUALQUER REGIÃO - VERSÃO ULTRA)
     saudacoes_genericas = [
+        # --- As Clássicas (Originais) ---
         f"Olá {nome}, tudo bem? Segue a ",
         f"Bom dia, {nome}. Aqui está a ",
         f"Fala {nome}! Passando para deixar a ",
@@ -73,15 +74,121 @@ def gerar_saudacao_spintax(nome, uf=""):
         f"Força {nome}! Partiu rodar essa ",
         f"Valeu {nome}, agora é com você. Bora nessa ",
         f"{nome}, bomba! Tá saindo agora a ",
+
+        # --- Casuais e Amigáveis ---
+        f"E aí {nome}, beleza pura? Confere a ",
+        f"Tudo joia, {nome}? Acabei de gerar a ",
+        f"Fala {nome}, na escuta? Aqui vai a ",
+        f"Salve {nome}! Tudo no jeito por aqui, segue a ",
+        f"Oi {nome}! Passando rapidinho pra deixar a ",
+        f"Fala meu caro {nome}! Tudo pronto, aqui vai a ",
+        f"Tudo em ordem, {nome}? Já mandei a ",
+        f"E aí {nome}, como estamos? Dá um confere na ",
+        f"Opa {nome}, tranquilo? Já puxei a ",
+        f"Fala {nome}! Direto ao ponto, aqui tá a ",
+        f"Tudo ótimo por aí, {nome}? Segue o link da ",
+        f"{nome}, como vai a lida? Deixando aqui a ",
+        f"Boa {nome}! Passando a bola pra você, segue a ",
+        f"Ei {nome}, tudo certo? Acabei de atualizar a ",
+        f"Tudo sussa, {nome}? Passando pra deixar a ",
+        f"Aí sim, {nome}! Já tá separada a ",
+        f"Opa {nome}, tudo nos trinks? Já saiu a ",
+        f"Fala {nome}, meu consagrado! Dá uma olhada na ",
+        f"E aí {nome}, de boa na lagoa? Dá uma checada na ",
+        f"Tamo na área, {nome}! Já soltei a ",
+
+        # --- Focadas em Operação / Logística / Trecho ---
+        f"Bora acelerar, {nome}! Já está na mão a ",
+        f"E aí {nome}, preparado? Aqui está a ",
+        f"{nome}, bom dia! Partiu? Segue a ",
+        f"Opa {nome}! Rumo a mais um fechamento, confere a ",
+        f"Salve {nome}! Boa rota pra você, segue a ",
+        f"Fala {nome}! Caminho livre, aqui vai a ",
+        f"Motor ligado, {nome}? Já soltei a ",
+        f"Bora pra mais uma, {nome}! Segue a ",
+        f"Atenção {nome}, na agulha! Aqui tá a ",
+        f"Fala mestre {nome}! Bora despachar, segue a ",
+        f"Opa {nome}! Tudo mapeado, confere a ",
+        f"Vamos nessa, {nome}! Tá liberada a ",
+        f"{nome}! Pra cima deles, segue a ",
+        f"Fala {nome}, pé na estrada! Aqui vai a ",
+        f"Pronto pro trecho, {nome}? Segue a ",
+        f"Simbora {nome}! Já deixei no esquema a ",
+        f"Tudo engatilhado, {nome}. Dá uma olhada na ",
+        f"Boa viagem hoje, {nome}! Passando a ",
+        f"Chegou a hora, {nome}! Partiu rodar a ",
+        f"Aperta o cinto, {nome}! Já mandei a ",
+        f"Chama na rota, {nome}! Tá liberada a ",
+        f"Fala {nome}! Pneu no asfalto, aqui tá a ",
+        f"Salve {nome}, na marcha! Confere aí a ",
+
+        # --- Alta Energia / Motivacionais ---
+        f"Tudo no grau, {nome}? Aqui tá a ",
+        f"Dá o start aí, {nome}! Segue a ",
+        f"Bora fazer acontecer, {nome}! Segue a ",
+        f"Dia de vitória, {nome}! Aqui vai a ",
+        f"E aí {nome}, 100%? Aqui tá a ",
+        f"Bora que o dia tá rendendo, {nome}! Segue a ",
+        f"Missão dada é missão cumprida, {nome}! Segue a ",
+        f"E aí {nome}, pronto pro bote? Aqui tá a ",
+        f"Fala {nome}, correria pura? Aqui vai a ",
+        f"Bora bater meta, {nome}! Segue a ",
+        f"Bora pro game, {nome}! Aqui tá a ",
+        f"E aí {nome}, bora pra luta? Segue a ",
+        f"Fala {nome}! Tá na hora do show, aqui vai a ",
+        f"Simbora {nome}, sem perder tempo! Segue a ",
+        f"Boa sorte no trecho hoje, {nome}! Segue a ",
+        f"Tudo tranquilo, {nome}? Foco na missão, segue a ",
+        f"Fala {nome}, bora acelerar os fretes! Aqui vai a ",
+        f"Firme e forte, {nome}? Aqui tá a ",
+        f"Opa {nome}, que hoje seja top! Aqui vai a ",
+        f"Bora fazer grana, {nome}! Segue a ",
+        f"Fala {nome}, bora fazer render! Tá liberada a ",
+        f"Partiu pro ataque, {nome}! Aqui vai a ",
+        f"E aí {nome}, bora dar o nome hoje! Tá na mão a ",
+
+        # --- Mais Diretas, Formais e Status Check ---
+        f"Prezado {nome}, segue a ",
+        f"{nome}, conforme alinhado, envio a ",
+        f"Atenção {nome}, já está disponível a ",
+        f"Bom trabalho, {nome}. Aqui está a ",
+        f"Olá {nome}. Segue para acompanhamento a ",
+        f"{nome}, atualizando: segue a ",
+        f"Opa {nome}, tudo nos conformes? Dá um confere na ",
+        f"Fala {nome}, tudo em paz? Já puxei a ",
+        f"Opa {nome}, na atividade? Confere a ",
+        f"Tudo 100%, {nome}? Partiu rodar com a ",
+        f"Opa {nome}, firmão? Já deixei engatilhada a ",
+        f"E aí {nome}, na pegada? Aqui tá a ",
+        f"Opa {nome}, tudo no esquema? Já enviei a ",
+        f"E aí {nome}! Deixando tudo no prumo, segue a ",
+        f"Salve {nome}, bora produzir! Confere a ",
+        f"Fala {nome}! Tudo no radar, segue a ",
+        f"E aí {nome}, na boa? Passando pra entregar a ",
+        f"Opa {nome}, prontinho por aqui! Segue a ",
+        f"Tudo zerado, {nome}? Confere a ",
+        f"Salve {nome}, bora triturar essas entregas! Segue a ",
+        f"E aí {nome}, tudo nos eixos? Já puxei a ",
+        f"Opa {nome}, boa lida! Segue a "
     ]
     
-    # 🔥 SAUDAÇÕES REGIONALIZADAS POR ESTADO
+    # 🔥 SAUDAÇÕES REGIONALIZADAS POR ESTADO (VERSÃO ULTRA)
+    
     saudacoes_sp = [
         f"Ô {nome}! Tá rolando rota aí em SP, segue a ",
         f"E lá vem mais, {nome}. Aqui tá liberada a ",
         f"Bora lá, {nome}! São Paulo chama, segue a ",
         f"Ó o trem, {nome}! A rota de SP tá pronta. Confere aí a ",
         f"{nome}, toma lá sua rota de SP! Aqui vai a ",
+        f"Fala {nome}, beleza meu? Rota de SP na mão, segue a ",
+        f"E aí {nome}, suave? São Paulo não para, aqui tá a ",
+        f"Salve {nome}, a milhão! Tá liberada a ",
+        f"Opa {nome}, trampo chamando! Rota de SP pronta, confere a ",
+        f"E aí {nome}, daora? Já soltei a ",
+        f"Fala {nome}, meu bom! Aqui em SP o bicho pega, segue a ",
+        f"Ô loco {nome}, bora rodar! Aqui tá a ",
+        f"Salve {nome}! Rota paulista no esquema, segue a ",
+        f"Bora pro corre, {nome}! SP na área, aqui vai a "
     ]
     
     saudacoes_rj = [
@@ -90,6 +197,14 @@ def gerar_saudacao_spintax(nome, uf=""):
         f"Meu brother {nome}! Tá liberada sua rota carioca. Confere aí a ",
         f"Fala {nome} do Rio! Partiu essa rota, vamo que vamo. Segue a ",
         f"{nome}, meu parceiro carioca! Bora rodar essa. Aqui tá a ",
+        f"Qual é {nome}, tranquilidade? Rio de Janeiro chama, aqui vai a ",
+        f"Fala tu, {nome}! Tá liberada sua rota. Confere aí a ",
+        f"E aí {nome}, suave na nave? Partiu corre, segue a ",
+        f"Papo reto, {nome}! Sua rota tá na mão, segue a ",
+        f"Coé {nome}, demorou! Partiu rua, segue a ",
+        f"Bora pro corre, {nome}! RJ fervendo, confere a ",
+        f"Fala mestre {nome}! Rota carioca no jeito, aqui tá a ",
+        f"E aí {nome}, tudo na paz mermão? Aqui vai a "
     ]
     
     saudacoes_mg = [
@@ -98,6 +213,13 @@ def gerar_saudacao_spintax(nome, uf=""):
         f"Bora lá, {nome}. A rota mineira chegou! Confere aí a ",
         f"Fala {nome}, guerreiro de MG! Essa aqui é sua. Segue a ",
         f"{nome}, mineiro de lei! Partiu essa rota agora. Aqui tá a ",
+        f"Uai {nome}, bão demais? Minas na área, aqui vai a ",
+        f"Fala {nome}, pega esse trem aí! Segue a ",
+        f"Nu, {nome}! Trem tá feio não, partiu essa rota. Aqui tá a ",
+        f"Ô sô {nome}, beleza? Bora rodar esse trecho mineiro. Segue a ",
+        f"Bom demais da conta, {nome}! Confere a ",
+        f"Bora pelejar, {nome}! Trem tá pronto, segue a ",
+        f"E aí {nome}, firme? Sua rota mineira no capricho. Aqui vai a "
     ]
     
     saudacoes_ba = [
@@ -106,6 +228,13 @@ def gerar_saudacao_spintax(nome, uf=""):
         f"E aí meu nordestino {nome}? Bora explorar essa rota. Confere aí a ",
         f"{nome}, partiu Bahia! Força nessa labuta. Segue a ",
         f"Ô jóia, {nome}! Mais uma rota baiana pra você mandar bem. Aqui tá a ",
+        f"Oxe {nome}! A rota baiana tá no esquema. Aqui vai a ",
+        f"E aí {nome}, meu rei? Bora brocar nessa rota. Confere aí a ",
+        f"Fala {nome}, arretado! Força nessa labuta, segue a ",
+        f"Bora rodar, {nome}! Oxe, tá esperando o quê? Segue a ",
+        f"Fala {nome}, partiu malvado? Aqui vai a ",
+        f"E aí {nome}, beleza pura? Bahia na área, confere a ",
+        f"{nome}, meu parceiro! Bora pra cima dessa rota. Segue a "
     ]
     
     saudacoes_rs = [
@@ -114,6 +243,13 @@ def gerar_saudacao_spintax(nome, uf=""):
         f"Fala guerreiro do RS! {nome}, essa rota é sua. Confere aí a ",
         f"{nome}, tá rolando mais uma no Sul. Bora bombar. Segue a ",
         f"Ó o tremendo, {nome}! Sua rota gaúcha tá saindo. Aqui tá a ",
+        f"Opa {nome}, tchê! Bora rodar. Segue a ",
+        f"Bah {nome}! A rota tá quente. Aqui vai a ",
+        f"Mas que barbaridade, {nome}! Bora meter ficha. Segue a ",
+        f"E aí {nome}, tri legal? Partiu trecho. Segue a ",
+        f"Bora lá, {nome}! O Rio Grande te chama. Confere a ",
+        f"Fala {nome}, cupincha! Rota liberada, aqui vai a ",
+        f"Tudo nos trinques, {nome}? Pega essa rota gaúcha. Segue a "
     ]
     
     saudacoes_sc = [
@@ -122,6 +258,12 @@ def gerar_saudacao_spintax(nome, uf=""):
         f"E aqui pro Sul, {nome}! Essa rota catarinense é show. Confere aí a ",
         f"Fala {nome} de SC! Partiu mais essa. Segue a ",
         f"Opa {nome}, tamo junto! Sua rota tá saindo. Aqui tá a ",
+        f"Fala {nome}, beleza? Essa rota barriga-verde é show. Confere aí a ",
+        f"E aí {nome}, tudo certo? Bora rodar pelo litoral e serra. Segue a ",
+        f"Bora acelerar, {nome}! SC te chama. Confere a ",
+        f"{nome}, firmeza? Rota catarinense engatilhada. Aqui vai a ",
+        f"Fala parceiro {nome}! Santa Catarina tá no jeito. Segue a ",
+        f"Tudo pronto, {nome}! Acelera em SC. Aqui tá a "
     ]
     
     saudacoes_pr = [
@@ -130,6 +272,12 @@ def gerar_saudacao_spintax(nome, uf=""):
         f"E lá vem mais, {nome}! Paraná tá bombando. Confere aí a ",
         f"{nome}, tamo junto! Rota de PR saindo agora. Segue a ",
         f"Bora lá {nome}! Sua labuta em PR tá aqui. Aqui tá a ",
+        f"Fala {nome}! Sua rota paranaense tá pronta. Aqui vai a ",
+        f"E aí {nome}, firme e forte? Bora rodar o Paraná. Segue a ",
+        f"Opa {nome}, beleza? Trecho paranaense liberado. Confere a ",
+        f"Fala {nome}! Capricha nessa rota aí no PR. Aqui vai a ",
+        f"Simbora {nome}! Paraná não para, segue a ",
+        f"{nome}, tudo certo por aí? Puxa essa rota. Aqui tá a "
     ]
     
     saudacoes_go = [
@@ -138,6 +286,12 @@ def gerar_saudacao_spintax(nome, uf=""):
         f"E lá em Goiás, {nome}! Bora rodar essa. Confere aí a ",
         f"Fala {nome}! Sua rota goiana tá pronta. Aqui vai a ",
         f"{nome}, parceiro! Goiás chama, vamo que vamo. Segue a ",
+        f"Opa {nome}, bão? Goiás tá ligado em você. Aqui vai a ",
+        f"{nome}, moço! Bora rodar esse trem. Confere aí a ",
+        f"E aí {nome}, bão ou não? Rota liberada. Aqui tá a ",
+        f"Bora rodar, {nome}! Pega essa rota em GO. Segue a ",
+        f"Fala {nome}, firmeza no cerrado? Confere a ",
+        f"Tudo nos eixos, {nome}? Goiás te aguarda. Aqui vai a "
     ]
     
     saudacoes_df = [
@@ -146,11 +300,16 @@ def gerar_saudacao_spintax(nome, uf=""):
         f"E lá tá, {nome}! Sua rota de DF bombando. Confere aí a ",
         f"Opa {nome}, capital do país chamando! Bora nessa. Segue a ",
         f"Salve {nome}! DF com tudo, aqui tá sua rota. Aqui tá a ",
+        f"{nome}, beleza? Sua rota no Quadrado tá saindo. Segue a ",
+        f"E aí véi, {nome}! Sua rota de BSB bombando. Confere aí a ",
+        f"Bora rodar o quadrado, {nome}! Rota no DF liberada. Segue a ",
+        f"Fala {nome}, tranquilo? DF na área, confere a ",
+        f"{nome}, na pista! Partiu eixão, aqui vai a ",
+        f"Bora fechar o dia, {nome}! Rota do DF na mão. Aqui tá a "
     ]
     
-    # Mapear UF para saudações regionalizadas
+    # Mapear UF para saudações regionalizadas (SP removido para cair na lista de +100)
     dict_saudacoes_uf = {
-        'SP': saudacoes_sp,
         'RJ': saudacoes_rj,
         'MG': saudacoes_mg,
         'BA': saudacoes_ba,
