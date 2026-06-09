@@ -1941,10 +1941,46 @@ with st.sidebar:
 
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
-    if st.button(
-        "🚪 Sair do Sistema",
-        type="primary",
-            use_container_width=True):
+    
+    # 🔥 ESTILO EXCLUSIVO E DEFINITIVO PARA O BOTÃO SAIR 🔥
+    st.markdown("""
+        <style>
+        /* Pinta o fundo do botão e ajusta bordas */
+        [data-testid="stSidebar"] div.stButton > button {
+            background-color: #ef4444 !important; /* Vermelho vibrante */
+            border: 1px solid #dc2626 !important;
+            border-radius: 8px !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2) !important;
+            min-height: 45px !important;
+        }
+        
+        /* FORÇA a cor branca no texto e em qualquer tag interna (ícones/parágrafos) */
+        [data-testid="stSidebar"] div.stButton > button,
+        [data-testid="stSidebar"] div.stButton > button p,
+        [data-testid="stSidebar"] div.stButton > button span,
+        [data-testid="stSidebar"] div.stButton > button div {
+            color: #ffffff !important; 
+            font-weight: 700 !important;
+            font-size: 15px !important;
+        }
+
+        /* Efeito Hover (passar o mouse) */
+        [data-testid="stSidebar"] div.stButton > button:hover {
+            background-color: #dc2626 !important; /* Vermelho mais escuro */
+            border-color: #b91c1c !important;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4) !important;
+            transform: translateY(-2px) !important;
+        }
+        
+        [data-testid="stSidebar"] div.stButton > button:hover p,
+        [data-testid="stSidebar"] div.stButton > button:hover span {
+            color: #ffffff !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    if st.button("🚪 Sair do Sistema", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
 
