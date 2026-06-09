@@ -2527,20 +2527,29 @@ if menu == "📊 GRID":
 
         custom_css = {".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif",
                                            "--ag-font-size": "13px",
-                                           "background-color": "#ffffff !important"},
-                      ".ag-root-wrapper": {"background-color": "#ffffff !important"},
-                      ".ag-root-wrapper-body": {"background-color": "#ffffff !important"},
-                      ".ag-body-viewport": {"background-color": "#ffffff !important"},
-                      ".ag-header": {"background-color": "#f1f5f9 !important",
-                                     "border-bottom": "2px solid #e2e8f0 !important"},
-                      ".ag-header-cell-text": {"color": "#0f172a !important",
+                                           "background-color": "#f9fafb !important"},
+                      ".ag-root-wrapper": {"background-color": "#f9fafb !important"},
+                      ".ag-root-wrapper-body": {"background-color": "#f9fafb !important"},
+                      ".ag-body-viewport": {"background-color": "#f9fafb !important"},
+                      ".ag-header": {"background-color": "#f3f4f6 !important",
+                                     "border-bottom": "3px solid #e5e7eb !important"},
+                      ".ag-header-cell": {"border-right": "1px solid #d1d5db !important"},
+                      ".ag-header-cell-text": {"color": "#1f2937 !important",
                                                "font-weight": "700 !important",
-                                               "font-size": "13px !important"},
-                      ".ag-row:hover": {"background-color": "#e2e8f0 !important",
+                                               "font-size": "12px !important",
+                                               "letter-spacing": "0.3px !important"},
+                      ".ag-row": {"border-bottom": "1px solid #f0f1f3 !important",
+                                  "height": "40px !important"},
+                      ".ag-row:hover": {"background-color": "#eff6ff !important",
                                         "cursor": "pointer",
-                                        "transition": "background-color 0.2s"},
-                      ".ag-row-odd": {"background-color": "#f8fafc !important"},
-                      ".ag-row-even": {"background-color": "#ffffff !important"}}
+                                        "transition": "background-color 0.15s ease-in-out",
+                                        "box-shadow": "inset 0 0 0 1px #dbeafe !important"},
+                      ".ag-row-odd": {"background-color": "#ffffff !important"},
+                      ".ag-row-even": {"background-color": "#f9fafb !important"},
+                      ".ag-cell": {"display": "flex !important",
+                                   "align-items": "center !important",
+                                   "border-right": "1px solid #eeeff2 !important"},
+                      ".ag-cell-focus": {"border": "none !important"}}
 
         tabela_renderizada = AgGrid(
             df_grid_final,
@@ -2564,22 +2573,81 @@ if menu == "📊 GRID":
         tem_sel = len(p_ids) > 0
 
         # 🔥 PREENCHENDO A BARRA DE AÇÕES NO TOPO DA TELA 🔥
+        st.markdown("""
+            <style>
+                /* 1. Padroniza TODOS os botões nativos e popovers para o Azul Claro/Ciano */
+                div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]) > button[kind="secondary"],
+                div[data-testid="stPopover"] > div > button,
+                div[data-testid="stPopover"] > button {
+                    background-color: #06b6d4 !important; /* Azul Claro / Ciano */
+                    color: #ffffff !important;
+                    border: 1px solid #0891b2 !important; /* Força borda sólida igual para todos */
+                    border-radius: 8px !important;
+                    font-weight: 600 !important;
+                    font-size: 14px !important;
+                    transition: all 0.2s ease !important;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+                    min-height: 40px !important;
+                }
+                
+                /* Efeito ao passar o mouse */
+                div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]) > button[kind="secondary"]:hover,
+                div[data-testid="stPopover"] > div > button:hover,
+                div[data-testid="stPopover"] > button:hover {
+                    background-color: #0891b2 !important; /* Azul mais escuro */
+                    border-color: #0891b2 !important;
+                    color: #ffffff !important;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+                    transform: translateY(-2px) !important;
+                }
+                
+                div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]) > button[kind="secondary"]:active,
+                div[data-testid="stPopover"] > div > button:active,
+                div[data-testid="stPopover"] > button:active {
+                    transform: translateY(0px) !important;
+                }
+                
+                /* 2. Botões internos de AÇÃO/CONFIRMAÇÃO dentro dos popovers (Verdes para destaque) */
+                div[data-testid="stPopoverBody"] button,
+                div[data-testid="popover"] button {
+                    background-color: #10b981 !important; /* Verde */
+                    color: white !important;
+                    border: 1px solid #059669 !important;
+                    transform: none !important;
+                    font-weight: bold !important;
+                }
+                div[data-testid="stPopoverBody"] button:hover,
+                div[data-testid="popover"] button:hover {
+                    background-color: #059669 !important;
+                    border-color: #059669 !important;
+                }
+                
+                /* Layout dos Popovers e Forms nativos */
+                div[data-testid="stPopoverBody"], div[data-testid="popover"] {
+                    border-radius: 12px !important;
+                    box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+                }
+                div.stForm {
+                    border: none !important;
+                    border-radius: 8px !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+        
         with box_botoes.container():
             col_b0, col_b1, col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns(7)
 
             with col_b0:
-                # O BOTÃO AGORA ABRE A TELA DIRETAMENTE, SEM USAR A MEMÓRIA DO
-                # SISTEMA
+                # O BOTÃO AGORA ABRE A TELA DIRETAMENTE, SEM USAR A MEMÓRIA DO SISTEMA
                 if st.button(
                     "🔍 Ver Detalhes",
                     use_container_width=True,
-                        type="primary"):
+                        type="secondary"):
                     if not tem_sel or len(p_ids) > 1:
                         st.warning(
                             "Selecione apenas 1 pedido na caixinha para ver os detalhes!")
                     else:
-                        linha_dict = df_raw[df_raw['PEDIDO']
-                                            == p_ids[0]].iloc[0].to_dict()
+                        linha_dict = df_raw[df_raw['PEDIDO'] == p_ids[0]].iloc[0].to_dict()
                         modal_detalhes_pedido(linha_dict)
 
             with col_b1.popover("🛎️ Cobrar", use_container_width=True):
@@ -2588,28 +2656,22 @@ if menu == "📊 GRID":
                 else:
                     with st.form("form_cobrar_grid"):
                         st.markdown("Enviar lembrete amigável?")
-                        if st.form_submit_button(
-                            "📲 Mandar Cobrança Agora",
-                            type="primary",
-                                use_container_width=True):
-                            agentes_selecionados = list(
-                                set(linhas_selecionadas['AGENTE_RAW'].tolist()))
+                        if st.form_submit_button("📲 Mandar Cobrança Agora", type="secondary", use_container_width=True):
+                            agentes_selecionados = list(set(linhas_selecionadas['AGENTE_RAW'].tolist()))
                             for ag in agentes_selecionados:
                                 login_ag = str(ag).lower().strip()
                                 tel_row = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == login_ag]
                                 if not tel_row.empty:
                                     tel = tel_row.iloc[0]['TELEFONE']
                                     nome = tel_row.iloc[0]['NOME DO AGENTE']
-                                    qtd_ag = len(
-                                        linhas_selecionadas[linhas_selecionadas['AGENTE_RAW'] == ag])
+                                    qtd_ag = len(linhas_selecionadas[linhas_selecionadas['AGENTE_RAW'] == ag])
                                     msg_ind = f"Olá {nome}, a IGO Logística informa que possui {qtd_ag} pedidos pendentes na rota de hoje. Lembre-se de dar baixa. Bom trabalho!"
                                     if enviar_whatsapp_zapi(tel, msg_ind):
                                         st.success(f"Enviado para {nome}!")
                                     else:
                                         st.error(f"Erro ao enviar para {nome}")
                                 else:
-                                    st.error(
-                                        f"Telefone do agente {login_ag} não encontrado.")
+                                    st.error(f"Telefone do agente {login_ag} não encontrado.")
 
             with col_b2.popover("📲 Baixa", use_container_width=True):
                 if not tem_sel:
@@ -2619,24 +2681,16 @@ if menu == "📊 GRID":
                         status_baixa = st.selectbox(
                             "Novo Status:", [
                                 "ENTREGUE ✅", "COLETADO 📦", "FRUSTRADA ❌", "PROBLEMA 🚨", "CANCELADO ❌", "PENDENTE ⏳"])
-                        data_baixa = st.date_input(
-                            "Data:", format="DD/MM/YYYY", value=hoje_br)
-                        tem_entregue = df_f[df_f['PEDIDO'].isin(
-                            p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
+                        data_baixa = st.date_input("Data:", format="DD/MM/YYYY", value=hoje_br)
+                        tem_entregue = df_f[df_f['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
                         senha_reversao = ""
                         if tem_entregue:
-                            st.warning(
-                                "⚠️ Desfazendo pedido já **ENTREGUES**.")
-                            senha_reversao = st.text_input(
-                                "🔑 Senha:", type="password")
+                            st.warning("⚠️ Desfazendo pedido já **ENTREGUES**.")
+                            senha_reversao = st.text_input("🔑 Senha:", type="password")
 
-                        if st.form_submit_button(
-                            "Confirmar Nova Baixa",
-                            type="primary",
-                                use_container_width=True):
+                        if st.form_submit_button("Confirmar Nova Baixa", type="secondary", use_container_width=True):
                             with st.spinner("A atualizar C.C.O. e a limpar a App do Motorista..."):
-                                status_limpo = status_baixa.split(" ")[
-                                    0].upper()
+                                status_limpo = status_baixa.split(" ")[0].upper()
                                 if tem_entregue and status_limpo != 'ENTREGUE' and senha_reversao != '123':
                                     st.error("❌ Senha incorreta!")
                                 else:
@@ -2648,43 +2702,33 @@ if menu == "📊 GRID":
                                             for pid in p_ids:
                                                 mask = df_nuvem['PEDIDO'] == pid
                                                 df_nuvem.loc[mask, 'STATUS'] = status_limpo
-    
                                                 if status_limpo == "ENTREGUE":
                                                     df_nuvem.loc[mask, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y")
                                                 elif status_limpo in ["PENDENTE", "COLETADO"]:
                                                     df_nuvem.loc[mask, 'DATA_ENTREGA'] = ""
-    
                                             aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
 
                                         try:
-                                            aba_app = planilha_db.worksheet(
-                                                "App_Tarefas")
+                                            aba_app = planilha_db.worksheet("App_Tarefas")
                                             dados_app = aba_app.get_all_values()
                                             if len(dados_app) > 1:
-                                                df_app = pd.DataFrame(
-                                                    dados_app[1:], columns=dados_app[0])
+                                                df_app = pd.DataFrame(dados_app[1:], columns=dados_app[0])
                                                 for pid in p_ids:
                                                     mask_app = df_app['PEDIDO'] == pid
                                                     if mask_app.any():
-                                                        df_app.loc[mask_app,
-                                                                   'STATUS'] = status_limpo
+                                                        df_app.loc[mask_app, 'STATUS'] = status_limpo
                                                         if status_limpo == "ENTREGUE" and 'DATA_ENTREGA' in df_app.columns:
-                                                            df_app.loc[mask_app, 'DATA_ENTREGA'] = data_baixa.strftime(
-                                                                "%d/%m/%Y %H:%M:%S")
+                                                            df_app.loc[mask_app, 'DATA_ENTREGA'] = data_baixa.strftime("%d/%m/%Y %H:%M:%S")
 
                                                 if 'PEDIDO' in df_app.columns:
-                                                    df_app = df_app.drop_duplicates(
-                                                        subset=['PEDIDO'], keep='last')
+                                                    df_app = df_app.drop_duplicates(subset=['PEDIDO'], keep='last')
 
                                                 aba_app.clear()
-                                                aba_app.update(
-                                                    "A1", [
-                                                        df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
+                                                aba_app.update("A1", [df_app.columns.tolist()] + df_app.fillna("").astype(str).values.tolist())
                                         except Exception:
                                             pass
 
-                                        st.success(
-                                            "🎉 Atualizado no CCO e App sincronizada!")
+                                        st.success("🎉 Atualizado no CCO e App sincronizada!")
                                         time.sleep(1)
                                         carregar_dados_completos.clear()
                                         st.rerun()
@@ -2696,20 +2740,14 @@ if menu == "📊 GRID":
                     st.warning("Selecione um pedido!")
                 else:
                     with st.form("form_troca_motorista"):
-                        tem_entregue = df_f[df_f['PEDIDO'].isin(
-                            p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
+                        tem_entregue = df_f[df_f['PEDIDO'].isin(p_ids)]['STATUS_DISPLAY'].str.contains('Entregue').any()
                         if tem_entregue:
-                            st.error(
-                                "⚠️ Impossível trocar motorista de ENTREGUES.")
+                            st.error("⚠️ Impossível trocar motorista de ENTREGUES.")
                         else:
-                            logins_disp = sorted(
-                                DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-                            novo_mot = st.selectbox(
-                                "Novo Agente:", logins_disp)
-                            nova_data_troca = st.date_input(
-                                "Nova Data:", format="DD/MM/YYYY", value=hoje_br)
-                            if st.form_submit_button(
-                                    "Confirmar Troca", type="primary", use_container_width=True):
+                            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                            novo_mot = st.selectbox("Novo Agente:", logins_disp)
+                            nova_data_troca = st.date_input("Nova Data:", format="DD/MM/YYYY", value=hoje_br)
+                            if st.form_submit_button("Confirmar Troca", type="secondary", use_container_width=True):
                                 with st.spinner("A atualizar rotas e motoristas..."):
                                     try:
                                         aba = planilha_db.worksheet("Memoria_Sistema")
@@ -2725,21 +2763,12 @@ if menu == "📊 GRID":
                                                     df_nuvem.loc[mask, 'AGENTE_RAW'] = novo_mot
                                                     df_nuvem.loc[mask, 'ZAP_ENVIADO'] = ""
                                                     l_app = df_nuvem[mask].iloc[0]
-                                                    lista_app_troca.append(
-                                                        {
-                                                            'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get(
-                                                                'ENDERECO', ''), 'NUMERO': l_app.get(
-                                                                'NUMERO', ''), 'BAIRRO': l_app.get(
-                                                                'BAIRRO', ''), 'CIDADE': l_app.get(
-                                                                'CIDADE', ''), 'CEP': l_app.get(
-                                                                'CEP', ''), 'LABORATORIO': l_app.get(
-                                                                'LABORATORIO', ''), 'TOMADOR': l_app.get(
-                                                                'TOMADOR', '')})
+                                                    lista_app_troca.append({
+                                                            'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO', ''), 'NUMERO': l_app.get('NUMERO', ''), 'BAIRRO': l_app.get('BAIRRO', ''), 'CIDADE': l_app.get('CIDADE', ''), 'CEP': l_app.get('CEP', ''), 'LABORATORIO': l_app.get('LABORATORIO', ''), 'TOMADOR': l_app.get('TOMADOR', '')})
                                             aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                             if lista_app_troca:
                                                 despachar_para_appsheet(lista_app_troca)
-                                        st.success(
-                                            "🎉 Troca realizada preservando o estado original!")
+                                        st.success("🎉 Troca realizada preservando o estado original!")
                                         time.sleep(1.5)
                                         carregar_dados_completos.clear()
                                         st.rerun()
@@ -2751,14 +2780,10 @@ if menu == "📊 GRID":
                     st.warning("Selecione um pedido!")
                 else:
                     with st.form("form_clonar_pedido"):
-                        clone_data = st.date_input(
-                            "Nova Data de Embarque:", format="DD/MM/YYYY", value=hoje_br)
-                        logins_disp = sorted(
-                            DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-                        clone_mot = st.selectbox(
-                            "Agente Designado:", ["Manter Original"] + logins_disp)
-                        if st.form_submit_button(
-                                "Confirmar Clone", type="primary"):
+                        clone_data = st.date_input("Nova Data de Embarque:", format="DD/MM/YYYY", value=hoje_br)
+                        logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                        clone_mot = st.selectbox("Agente Designado:", ["Manter Original"] + logins_disp)
+                        if st.form_submit_button("Confirmar Clone", type="secondary"):
                             with st.spinner("👯 A clonar pedidos e organizar rotas..."):
                                 try:
                                     aba = planilha_db.worksheet("Memoria_Sistema")
@@ -2776,8 +2801,7 @@ if menu == "📊 GRID":
                                             novo_id = str(prox_id)
                                             prox_id += 1
                                             l_orig['PEDIDO'] = novo_id
-                                            l_orig['DATA'] = clone_data.strftime(
-                                                "%d/%m/%Y")
+                                            l_orig['DATA'] = clone_data.strftime("%d/%m/%Y")
 
                                             l_orig['STATUS'] = "PENDENTE"
                                             l_orig['DATA_ENTREGA'] = ""
@@ -2788,28 +2812,14 @@ if menu == "📊 GRID":
 
                                             if clone_mot != "Manter Original":
                                                 l_orig['AGENTE_RAW'] = clone_mot
-                                            prazo = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(
-                                                l_orig.get('CIDADE', '')), str(l_orig.get('TOMADOR', '')))
+                                            prazo = calcular_sla_dias(str(l_orig.get('UF', 'SP')), str(l_orig.get('CIDADE', '')), str(l_orig.get('TOMADOR', '')))
                                             l_orig['PRAZO_DIAS'] = str(prazo)
-                                            l_orig['DATA_LIMITE'] = str(
-                                                calcular_data_limite(l_orig['DATA'], prazo))
+                                            l_orig['DATA_LIMITE'] = str(calcular_data_limite(l_orig['DATA'], prazo))
                                             l_orig = l_orig.astype(str)
-                                            df_nuvem = pd.concat(
-                                                [df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
-                                            if str(
-                                                l_orig.get(
-                                                    'AGENTE_RAW',
-                                                    '')).strip():
-                                                clones_app.append(
-                                                    {
-                                                        'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'], 'ENDERECO': l_orig.get(
-                                                            'ENDERECO', ''), 'NUMERO': l_orig.get(
-                                                            'NUMERO', ''), 'BAIRRO': l_orig.get(
-                                                            'BAIRRO', ''), 'CIDADE': l_orig.get(
-                                                            'CIDADE', ''), 'CEP': l_orig.get(
-                                                            'CEP', ''), 'LABORATORIO': l_orig.get(
-                                                            'LABORATORIO', ''), 'TOMADOR': l_orig.get(
-                                                            'TOMADOR', '')})
+                                            df_nuvem = pd.concat([df_nuvem, pd.DataFrame([l_orig])], ignore_index=True)
+                                            if str(l_orig.get('AGENTE_RAW', '')).strip():
+                                                clones_app.append({
+                                                        'PEDIDO': novo_id, 'MOTORISTA': l_orig['AGENTE_RAW'], 'ENDERECO': l_orig.get('ENDERECO', ''), 'NUMERO': l_orig.get('NUMERO', ''), 'BAIRRO': l_orig.get('BAIRRO', ''), 'CIDADE': l_orig.get('CIDADE', ''), 'CEP': l_orig.get('CEP', ''), 'LABORATORIO': l_orig.get('LABORATORIO', ''), 'TOMADOR': l_orig.get('TOMADOR', '')})
                                     aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                     if clones_app:
                                         despachar_para_appsheet(clones_app)
@@ -2825,9 +2835,8 @@ if menu == "📊 GRID":
                     st.warning("Selecione um pedido!")
                 else:
                     with st.form("form_excluir_grid"):
-                        senha_del = st.text_input(
-                            "🔑 Senha Master:", type="password")
-                        if st.form_submit_button("Confirmar Exclusão"):
+                        senha_del = st.text_input("🔑 Senha Master:", type="password")
+                        if st.form_submit_button("Confirmar Exclusão", type="secondary"):
                             if senha_del == "123":
                                 with st.spinner("A apagar registos da base de dados..."):
                                     try:
@@ -2855,11 +2864,10 @@ if menu == "📊 GRID":
                                     except Exception as e:
                                         st.error(f"Erro: {e}")
 
-            
-
             col_b6.button(
                 "🔄 Atualizar",
                 use_container_width=True,
+                type="secondary",
                 on_click=lambda: [
                     carregar_dados_completos.clear(),
                     st.rerun()])
@@ -5010,8 +5018,8 @@ elif menu == "📥 Importações Umove":
     if "df_preview_sb" not in st.session_state:
         st.session_state.df_preview_sb = pd.DataFrame()
 
-    tab_matriz, tab_fixos, tab_carrinho, tab_envios = st.tabs(
-        ["📋 1. Colar Matriz", "🔁 2. Gestão de Pedidos Fixos", "🛒 3. Carrinho & Arquivos", "🚀 4. Central de Envios"])
+    tab_matriz, tab_fixos, tab_carrinho, tab_envios, tab_backup = st.tabs(
+        ["📋 1. Colar Matriz", "🔁 2. Gestão de Pedidos Fixos", "🛒 3. Carrinho & Arquivos", "🚀 4. Central de Envios", "🛟 5. Recuperação Offline"])
 
     # -------------------------------------------------------------------------
     # ABA 1: COLAR MATRIZ TRADICIONAL
@@ -5601,7 +5609,7 @@ elif menu == "📥 Importações Umove":
                 pass
 
         if df_fonte_envio.empty and st.session_state.umove_step not in ['PROCESSING', 'COMPLETED']:
-            st.warning("⚠️ Você precisa adicionar pedidos ao Carrinho (Aba 1 ou 2) antes de acessar a Central de Envios.")
+            st.warning("⚠️ Você precisa adicionar pedidos ao Carrinho (Aba 1 ou 2) ou fazer o Backup (Aba 5) antes de acessar a Central de Envios.")
         else:
             # -------------------------------------------------------------
             # MÁQUINA DE ESTADOS: IDLE (PREPARAÇÃO) OU CONFIRMAÇÃO
@@ -5912,6 +5920,72 @@ elif menu == "📥 Importações Umove":
                     st.info("Nenhum histórico registrado no Google Sheets ainda.")
             except Exception:
                 st.info("Arquivo de histórico não encontrado ou em construção.")
+
+    # -------------------------------------------------------------------------
+    # ABA 5: RECUPERAÇÃO OFFLINE (QUEDA DE INTERNET)
+    # -------------------------------------------------------------------------
+    with tab_backup:
+        st.markdown("#### 🛟 Recuperação de Carrinho (Queda de Internet)")
+        st.info("Se a internet caiu e você perdeu o carrinho antes de disparar o WhatsApp na **Central de Envios**, faça o upload dos arquivos **LOC e AGD** exportados (na Aba 3) aqui para reconstruir a mesa instantaneamente.")
+        
+        with st.container(border=True):
+            uploaded_files = st.file_uploader("📂 Arraste e solte os arquivos LOC_GERAL e AGD_GERAL aqui (.csv)", type=["csv"], accept_multiple_files=True)
+            
+            if st.button("🔄 Reconstruir Carrinho e Preparar Envios", type="primary", use_container_width=True):
+                loc_file = next((f for f in uploaded_files if "LOC" in f.name.upper()), None)
+                agd_file = next((f for f in uploaded_files if "AGD" in f.name.upper()), None)
+                
+                if loc_file and agd_file:
+                    with st.spinner("Lendo cruzamento de matriz e reconstruindo os dados originais..."):
+                        try:
+                            # 1. LER LOC
+                            df_loc = pd.read_csv(loc_file, sep=";", dtype=str).fillna("")
+                            
+                            # 2. LER AGD (lidando com a linha "C")
+                            content_agd = agd_file.getvalue().decode('utf-8').splitlines()
+                            if content_agd and content_agd[0].strip() == 'C':
+                                content_agd = content_agd[1:]
+                            df_agd = pd.read_csv(io.StringIO("\n".join(content_agd)), sep=";", dtype=str).fillna("")
+                            
+                            # 3. MERGE E ALINHAMENTO
+                            if 'serviceLocal' in df_agd.columns and 'alternativeIdentifier' in df_loc.columns:
+                                df_merged = pd.merge(df_agd, df_loc, left_on="serviceLocal", right_on="alternativeIdentifier", how="left")
+                            else:
+                                st.error("❌ Os arquivos enviados não possuem as colunas esperadas. Verifique se são os arquivos reais gerados pelo sistema.")
+                                st.stop()
+                                
+                            # 4. RECONSTRUIR ESTRUTURA PARA A MEMÓRIA
+                            df_rec = pd.DataFrame()
+                            df_rec['PEDIDO'] = df_merged['alternativeIdentifier_x']
+                            df_rec['AGENTE_RAW'] = df_merged['agent']
+                            df_rec['DATA'] = df_merged['date']
+                            df_rec['TOMADOR'] = df_merged['CF_loc_responsavel_cliente']
+                            
+                            def extract_lab(row):
+                                corp = str(row.get('corporateName', ''))
+                                tom = str(row.get('CF_loc_responsavel_cliente', ''))
+                                if corp.startswith(tom + "-"):
+                                    return corp[len(tom)+1:]
+                                return corp
+                            
+                            df_rec['LABORATORIO'] = df_merged.apply(extract_lab, axis=1)
+                            df_rec['ENDERECO'] = df_merged['street']
+                            df_rec['NUMERO'] = df_merged['streetNumber'].apply(lambda x: str(x).replace('.0', '') if x else '')
+                            df_rec['BAIRRO'] = df_merged['cityNeighborhood']
+                            df_rec['CIDADE'] = df_merged['city']
+                            df_rec['UF'] = df_merged['state']
+                            df_rec['CEP'] = df_merged['zipCode']
+                            df_rec['CNPJ'] = df_merged['CF_CNPJ'].apply(lambda x: str(x).replace("'", "") if x else "")
+                            df_rec['OBSERVACOES'] = ""
+                            
+                            st.session_state.df_sandbox_mem = df_rec
+                            st.success("✅ Carrinho reconstruído com sucesso! Pode ir até a aba '🚀 4. Central de Envios' para engatilhar seus disparos.")
+                            time.sleep(2.5)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao processar os arquivos de recuperação: {e}")
+                else:
+                    st.warning("⚠️ Faça o upload simultâneo dos **2 arquivos (.LOC e .AGD)** para cruzamento exato e reconstrução do lote.")
 # =============================================================================
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO (COM CONTINGÊNCIA AVULSA E HISTÓRICO)
 # =============================================================================
