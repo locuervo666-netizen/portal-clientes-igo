@@ -840,16 +840,23 @@ def carregar_dados_completos(_planilha):
                     def get_true_foto(row):
                         f_db = str(row.get('FOTO', '')).strip()
                         f_app = str(row.get('APP_FOTO', '')).strip()
-                        rom_id = str(row.get('ROMANEIO', '')).strip()
-                        if rom_id in rom_dict:
-                            f_rom = str(
-                                rom_dict[rom_id].get(
-                                    'APP_FOTO', '')).strip()
-                            if f_rom and f_rom.upper() != 'NAN':
-                                return f_rom
+                        
+                        # 1º PRIORIDADE: Foto da COLETA (atrelada diretamente ao número do PEDIDO no App)
                         if f_app and f_app.upper() != 'NAN':
                             return f_app
-                        return f_db
+                            
+                        # 2º PRIORIDADE: Foto original da base (Memoria_Sistema)
+                        if f_db and f_db.upper() != 'NAN':
+                            return f_db
+                            
+                        # 3º PRIORIDADE (Último Caso): Foto da ENTREGA (atrelada ao ROMANEIO)
+                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        if rom_id in rom_dict:
+                            f_rom = str(rom_dict[rom_id].get('APP_FOTO', '')).strip()
+                            if f_rom and f_rom.upper() != 'NAN':
+                                return f_rom
+                                
+                        return ""
 
                     if 'APP_FOTO' in df.columns or len(rom_dict) > 0:
                         df['FOTO'] = df.apply(get_true_foto, axis=1)
