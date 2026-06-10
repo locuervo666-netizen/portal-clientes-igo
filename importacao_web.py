@@ -5251,7 +5251,7 @@ elif menu == "📥 Importações Umove":
         else:
             st.info("🛒 Seu carrinho está vazio.")
 
-        # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # ABA 4: A NOVA "CENTRAL DE ENVIOS" (DASHBOARD EXCLUSIVO)
     # -------------------------------------------------------------------------
     with tab_envios:
@@ -5313,6 +5313,7 @@ elif menu == "📥 Importações Umove":
                                 df_resgatado = pd.read_json(io.StringIO(json_dados), orient='records')
                                 st.session_state.df_sandbox_mem = df_resgatado.astype(str)
                                 st.session_state.umove_lote_atual_id = row_rasc['ID_EVENTO']
+                                st.session_state.umove_step = 'IDLE'
                                 st.success("✅ Lote resgatado e jogado no Carrinho!")
                                 time.sleep(1)
                                 st.rerun()
@@ -5338,7 +5339,6 @@ elif menu == "📥 Importações Umove":
         except:
             df_fonte_envio = df_sb.copy()
 
-        # Função de Backup físico bruto (Garante cópia extra)
         def salvar_backup_completo_umove(df_bkp, id_ev, planilha):
             if planilha is None or df_bkp.empty: return
             try:
@@ -5398,6 +5398,7 @@ elif menu == "📥 Importações Umove":
                 qtd_pedidos = len(df_preview)
                 qtd_motoristas = len(df_preview['AGENTE_RAW'].dropna().unique())
 
+                # --- CORREÇÃO DA INDENTAÇÃO AQUI ---
                 if st.session_state.umove_step == 'IDLE':
                     if qtd_pedidos == 0:
                         st.error("🚨 Nenhum pedido atende aos filtros atuais. O disparo está bloqueado.")
@@ -5418,7 +5419,6 @@ elif menu == "📥 Importações Umove":
                             st.session_state.umove_step = 'CONFIRMING'
                             st.rerun()
 
-                        # 🔥 DEVOLVENDO A OPÇÃO INDIVIDUAL QUE HAVIA SUMIDO 🔥
                         st.markdown("---")
                         st.markdown("#### 🎯 Opção 2: Disparo Individual (Motorista por Motorista)")
                         st.info("Caso prefira avisar motorista por motorista, utilize os botões abaixo. O envio será registrado no seu Rascunho.")
@@ -5548,24 +5548,25 @@ elif menu == "📥 Importações Umove":
                                             else:
                                                 st.error("❌ Falha ao enviar.")
 
-            elif st.session_state.umove_step == 'CONFIRMING':
-                datas_temp = pd.to_datetime(st.session_state.umove_df_dispatch['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
-                if not datas_temp.empty:
-                    d_min = datas_temp.min().strftime('%d/%m/%Y')
-                    d_max = datas_temp.max().strftime('%d/%m/%Y')
-                    periodo_str = f"{d_min}" if d_min == d_max else f"de {d_min} até {d_max}"
-                else:
-                    periodo_str = "Desconhecido"
+                # 🔥 CORREÇÃO: O ELIF DE CONFIRMING AGORA É DO 'IF' DE DENTRO 🔥
+                elif st.session_state.umove_step == 'CONFIRMING':
+                    datas_temp = pd.to_datetime(st.session_state.umove_df_dispatch['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
+                    if not datas_temp.empty:
+                        d_min = datas_temp.min().strftime('%d/%m/%Y')
+                        d_max = datas_temp.max().strftime('%d/%m/%Y')
+                        periodo_str = f"{d_min}" if d_min == d_max else f"de {d_min} até {d_max}"
+                    else:
+                        periodo_str = "Desconhecido"
 
-                st.markdown("---")
-                st.warning(f"⚠️ **ÚLTIMO AVISO:** Você está prestes a disparar o WhatsApp oficial para **{qtd_motoristas} motoristas**, contendo os pedidos da data **{periodo_str}**. Esta ação não poderá ser desfeita.")
-                c_sim, c_nao = st.columns(2)
-                if c_sim.button("🔥 SIM, CONFIRMO E QUERO DISPARAR AGORA", type="primary", use_container_width=True):
-                    st.session_state.umove_step = 'PROCESSING'
-                    st.rerun()
-                if c_nao.button("❌ Cancelar", use_container_width=True):
-                    st.session_state.umove_step = 'IDLE'
-                    st.rerun()
+                    st.markdown("---")
+                    st.warning(f"⚠️ **ÚLTIMO AVISO:** Você está prestes a disparar o WhatsApp oficial para **{qtd_motoristas} motoristas**, contendo os pedidos da data **{periodo_str}**. Esta ação não poderá ser desfeita.")
+                    c_sim, c_nao = st.columns(2)
+                    if c_sim.button("🔥 SIM, CONFIRMO E QUERO DISPARAR AGORA", type="primary", use_container_width=True):
+                        st.session_state.umove_step = 'PROCESSING'
+                        st.rerun()
+                    if c_nao.button("❌ Cancelar", use_container_width=True):
+                        st.session_state.umove_step = 'IDLE'
+                        st.rerun()
 
             # -------------------------------------------------------------
             # MÁQUINA DE ESTADOS: PROCESSANDO (DASHBOARD EM TEMPO REAL)
@@ -5771,7 +5772,6 @@ elif menu == "📥 Importações Umove":
                         st.session_state.umove_xls_bytes = None
                         st.session_state.umove_resultados_disparo = {}
                         st.rerun()
-
 
     # -------------------------------------------------------------------------
     # ABA 5: RECUPERAÇÃO OFFLINE E REPROCESSAMENTO (QUEDA DE INTERNET)
