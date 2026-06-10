@@ -5251,7 +5251,7 @@ elif menu == "📥 Importações Umove":
         else:
             st.info("🛒 Seu carrinho está vazio.")
 
-    # -------------------------------------------------------------------------
+        # -------------------------------------------------------------------------
     # ABA 4: A NOVA "CENTRAL DE ENVIOS" (DASHBOARD EXCLUSIVO)
     # -------------------------------------------------------------------------
     with tab_envios:
@@ -5304,7 +5304,6 @@ elif menu == "📥 Importações Umove":
                 st.warning("⚠️ **ATENÇÃO:** O sistema detectou lotes que foram montados mas não foram disparados (Rascunhos).")
                 with st.expander("🔄 Resgatar Lotes Inacabados", expanded=True):
                     for _, row_rasc in df_rascunhos.iterrows():
-                        # 🔥 MUDANÇA: Colunas reestruturadas para dar espaço ao botão de excluir
                         c_r1, c_r2, c_r3 = st.columns([2.5, 1, 1], vertical_alignment="center")
                         c_r1.markdown(f"**Lote:** `{row_rasc['ID_EVENTO']}` | **Criado em:** {row_rasc['DATA_DISPARO']} | **Volumes:** {row_rasc['TOTAL_PEDIDOS']}")
                         
@@ -5312,7 +5311,6 @@ elif menu == "📥 Importações Umove":
                             try:
                                 json_dados = row_rasc['DADOS_JSON']
                                 df_resgatado = pd.read_json(io.StringIO(json_dados), orient='records')
-                                # Evitar que números ou datas virem float/int caso o pandas zoe na importação
                                 st.session_state.df_sandbox_mem = df_resgatado.astype(str)
                                 st.session_state.umove_lote_atual_id = row_rasc['ID_EVENTO']
                                 st.success("✅ Lote resgatado e jogado no Carrinho!")
@@ -5332,10 +5330,10 @@ elif menu == "📥 Importações Umove":
                                     st.error(f"Erro ao excluir o lote: {e}")
         # ====================================================
 
-        # Puxamos os dados da grid da Aba 3 para cá (st.session_state se encarrega disso se houver edições)
+        # Puxamos os dados da grid da Aba 3 para cá
         try:
             df_fonte_envio = st.session_state.get('sandbox_grid_master_umove', df_sb).copy()
-            if isinstance(df_fonte_envio, dict): # Caso o data_editor retorne um formato interno
+            if isinstance(df_fonte_envio, dict): 
                 df_fonte_envio = df_sb.copy()
         except:
             df_fonte_envio = df_sb.copy()
@@ -5404,7 +5402,6 @@ elif menu == "📥 Importações Umove":
                     if qtd_pedidos == 0:
                         st.error("🚨 Nenhum pedido atende aos filtros atuais. O disparo está bloqueado.")
                     else:
-                        # --- EXTRATOR INTELIGENTE DO PERÍODO DO LOTE ---
                         datas_temp = pd.to_datetime(df_preview['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
                         if not datas_temp.empty:
                             d_min = datas_temp.min().strftime('%d/%m/%Y')
@@ -5415,13 +5412,143 @@ elif menu == "📥 Importações Umove":
                         
                         st.success(f"✔️ **Validação Concluída:** O sistema identificou **{qtd_pedidos} pedidos** direcionados a **{qtd_motoristas} motoristas**.\n\n📅 **Período das rotas no lote:** **{periodo_str}**")
                         
-                        if st.button("🚀 INICIAR PROTOCOLO DE DISPARO", type="primary", use_container_width=True):
+                        st.markdown("#### 🚀 Opção 1: Disparo em Massa (Automático)")
+                        if st.button("INICIAR PROTOCOLO DE DISPARO (TODOS)", type="primary", use_container_width=True):
                             st.session_state.umove_df_dispatch = df_preview
                             st.session_state.umove_step = 'CONFIRMING'
                             st.rerun()
 
+                        # 🔥 DEVOLVENDO A OPÇÃO INDIVIDUAL QUE HAVIA SUMIDO 🔥
+                        st.markdown("---")
+                        st.markdown("#### 🎯 Opção 2: Disparo Individual (Motorista por Motorista)")
+                        st.info("Caso prefira avisar motorista por motorista, utilize os botões abaixo. O envio será registrado no seu Rascunho.")
+                        
+                        dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
+                        dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
+                        
+                        if 'ZAP_ENVIADO' not in st.session_state.df_sandbox_mem.columns:
+                            st.session_state.df_sandbox_mem['ZAP_ENVIADO'] = ""
+                            
+                        for agente in sorted(df_preview['AGENTE_RAW'].dropna().unique()):
+                            if not str(agente).strip(): continue
+                            df_agente = df_preview[df_preview['AGENTE_RAW'] == agente]
+                            nome_ag = dict_nom.get(str(agente).strip().lower(), str(agente).upper())
+                            tel_ag = dict_tel.get(str(agente).strip().lower(), "")
+                            
+                            ag_login = str(agente).strip().lower()
+                            login_base = ag_login.split('|')[0].split('/')[0].strip()
+                            is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
+                            is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
+                            
+                            pedidos_do_agente = df_agente['PEDIDO'].tolist()
+                            mask_ag_mem = st.session_state.df_sandbox_mem['PEDIDO'].isin(pedidos_do_agente)
+                            
+                            enviado = False
+                            if not df_agente.empty and 'ZAP_ENVIADO' in st.session_state.df_sandbox_mem.columns:
+                                enviado = st.session_state.df_sandbox_mem.loc[mask_ag_mem, 'ZAP_ENVIADO'].astype(str).str.startswith('SIM').all()
+                                
+                            selo_status = '✅ ENVIADO' if enviado else '⏳ PENDENTE'
+                            selo_vip = ' 🌟 [RECEBE EXCEL]' if is_autorizado_xls else ''
+                            
+                            with st.expander(f"{selo_status} | 👤 {nome_ag}{selo_vip} | Coletas: {len(df_agente)}", expanded=not enviado):
+                                st.dataframe(df_agente[['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE']], hide_index=True)
+                                
+                                if st.button("🔄 Reenviar WhatsApp" if enviado else f"📲 Disparar WhatsApp ({nome_ag})", key=f"umove_ind_{agente}", type="secondary" if enviado else "primary"):
+                                    if not tel_ag:
+                                        st.error("Sem telefone cadastrado.")
+                                    else:
+                                        with st.spinner(f"Enviando rota para {nome_ag}..."):
+                                            datas_na_rota = pd.to_datetime(df_agente['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
+                                            if not datas_na_rota.empty:
+                                                d_min_zap = datas_na_rota.min().strftime('%d/%m/%Y')
+                                                d_max_zap = datas_na_rota.max().strftime('%d/%m/%Y')
+                                                data_str = f"{d_min_zap}" if d_min_zap == d_max_zap else f"{d_min_zap} a {d_max_zap}"
+                                            else:
+                                                data_str = hoje_br.strftime('%d/%m/%Y')
+
+                                            uf_agente_ind = ""
+                                            if 'UF' in df_agente.columns:
+                                                ufs_unicos_ind = df_agente['UF'].dropna().unique()
+                                                if len(ufs_unicos_ind) > 0:
+                                                    uf_agente_ind = str(ufs_unicos_ind[0]).upper().strip()
+                                            
+                                            saudacao, fechamento = gerar_saudacao_spintax(nome_ag, uf_agente_ind)
+                                            sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
+                                            sep2 = random.choice(['---', '...', '===', ' '])
+                                            bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
+                                            lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
+
+                                            msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
+                                            tot_qtd = 0
+                                            for cid, count in df_agente['CIDADE'].value_counts().items():
+                                                msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}")
+                                                tot_qtd += count
+                                            msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
+
+                                            for cid, group in df_agente.groupby('CIDADE'):
+                                                msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
+                                                items = []
+                                                for _, row in group.iterrows():
+                                                    item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                                    obs = str(row.get('OBSERVACOES', '')).strip()
+                                                    if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
+                                                    items.append(item_str)
+                                                msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
+                                            msg_parts.append(f"\n{fechamento}")
+
+                                            INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711"
+                                            TOKEN = "2321563615C4242CB6031504"
+                                            CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S"
+                                            try:
+                                                requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel_ag, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                                time.sleep(random.uniform(2.0, 4.0))
+                                            except: pass
+
+                                            if enviar_whatsapp_zapi(tel_ag, "\n".join(msg_parts)):
+                                                time.sleep(2)
+
+                                                if is_autorizado_pdf:
+                                                    try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel_ag, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                                    except: pass
+                                                    enviar_pdf_zapi(tel_ag, gerar_pdf_rota_whatsapp(nome_ag, data_str, df_agente), f"ROTA_IGO_{nome_ag.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
+                                                    time.sleep(2.5)
+
+                                                if is_autorizado_xls:
+                                                    try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel_ag, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                                    except: pass
+                                                    if ag_login == 'luiz.paulo':
+                                                        df_para_xls = df_preview[df_preview['UF'] == 'RJ']
+                                                        nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
+                                                    else:
+                                                        df_para_xls = df_agente
+                                                        nome_arq_xls = f"ROTA_ESTRUTURADA_{nome_ag.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx"
+                                                    enviar_excel_zapi(tel_ag, gerar_excel_rota_whatsapp(df_para_xls), nome_arq_xls)
+                                                    time.sleep(2)
+                                                
+                                                # Carimba que foi enviado individualmente e salva no Rascunho
+                                                st.session_state.df_sandbox_mem.loc[mask_ag_mem, 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
+                                                gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
+                                                
+                                                try:
+                                                    import gspread
+                                                    from google.oauth2.credentials import Credentials
+                                                    import json
+                                                    token_info = json.loads(os.environ.get("google_token_json", st.secrets.get("google_token_json")))
+                                                    creds = Credentials.from_authorized_user_info(token_info, scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"])
+                                                    gc = gspread.authorize(creds)
+                                                    planilha_logs_externa = gc.open_by_key('1ckrOm_UyvD-Pc4TeLFfdVJA-48jXmULoisF7T5Pqv20')
+                                                    aba_logs = planilha_logs_externa.worksheet("Disparos")
+                                                    pedidos_str = ", ".join(df_agente['PEDIDO'].astype(str).tolist())[:200]
+                                                    aba_logs.append_row([datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S'), nome_ag, len(df_agente), pedidos_str, 'SUCESSO', tel_ag, 'SIM' if is_autorizado_pdf else 'NÃO', 'SIM' if is_autorizado_xls else 'NÃO', '', 'DISPARO_INDIVIDUAL'], value_input_option='USER_ENTERED')
+                                                except: pass
+
+                                                st.success("✅ Enviado com sucesso!")
+                                                time.sleep(1)
+                                                st.rerun()
+                                            else:
+                                                st.error("❌ Falha ao enviar.")
+
             elif st.session_state.umove_step == 'CONFIRMING':
-                # Recalcula a data para exibir no aviso de confirmação
                 datas_temp = pd.to_datetime(st.session_state.umove_df_dispatch['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
                 if not datas_temp.empty:
                     d_min = datas_temp.min().strftime('%d/%m/%Y')
@@ -5460,12 +5587,10 @@ elif menu == "📥 Importações Umove":
                 logs_google_sheets_zap = []
                 id_evento = f"UMOVE-{datetime.now(FUSO_BR).strftime('%Y%m%d%H%M%S')}"
                 
-                # Placeholders visuais para atualização ao vivo
                 metrics_placeholder = st.empty()
                 driver_placeholder = st.empty()
                 progress_bar = st.progress(0)
                 
-                # Renderiza métricas zeradas
                 metrics_placeholder.markdown(render_big_metrics(total_agentes, total_agentes, 0, 0), unsafe_allow_html=True)
 
                 st.markdown("#### 🖥️ Terminal de Registros")
@@ -5489,10 +5614,8 @@ elif menu == "📥 Importações Umove":
                     st.session_state.umove_resultados_disparo[nom] = {'total': len(df_ag_sb), 'sucesso': 0, 'pedidos': df_ag_sb['PEDIDO'].tolist()}
 
                     if tel:
-                        # ATUALIZA O BANNER GIGANTE DO MOTORISTA ATUAL
                         driver_placeholder.markdown(render_current_driver(nom, idx_ag + 1, total_agentes), unsafe_allow_html=True)
                         
-                        # A data usada no cabeçalho da mensagem do WhatsApp passa a respeitar as datas extraídas da rota
                         datas_na_rota = pd.to_datetime(df_ag_sb['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
                         if not datas_na_rota.empty:
                             d_min_zap = datas_na_rota.min().strftime('%d/%m/%Y')
@@ -5501,7 +5624,6 @@ elif menu == "📥 Importações Umove":
                         else:
                             data_str = hoje_br.strftime('%d/%m/%Y')
 
-                        # 🔥 Extrai UF para personalização regional
                         uf_agente_sb = ""
                         if 'UF' in df_ag_sb.columns:
                             ufs_unicos_sb = df_ag_sb['UF'].dropna().unique()
@@ -5571,7 +5693,6 @@ elif menu == "📥 Importações Umove":
                             falhas_calc += 1
                             st.session_state.umove_resultados_disparo[nom]['sucesso'] = 0
 
-                        # ATUALIZA O PLACAR GIGANTE
                         pendentes_agora = total_agentes - (idx_ag + 1)
                         metrics_placeholder.markdown(render_big_metrics(total_agentes, pendentes_agora, sucessos_sb, falhas_calc), unsafe_allow_html=True)
 
@@ -5585,11 +5706,8 @@ elif menu == "📥 Importações Umove":
 
                     progress_bar.progress((idx_ag + 1) / total_agentes)
 
-                # FIM DO LOOP
-                
-                # Salva as métricas finais na sessão para a tela de conclusão puxar
                 st.session_state.umove_final_metrics = {'total': total_agentes, 'sucesso': sucessos_sb, 'falhas': falhas_calc}
-                driver_placeholder.empty() # Remove o banner do motorista ativo
+                driver_placeholder.empty() 
                 
                 if logs_google_sheets_zap:
                     try:
@@ -5615,21 +5733,15 @@ elif menu == "📥 Importações Umove":
                     aba_contador.update("A1", [[str(max_id_gerado + 1)]])
                 except: pass
 
-                # === FECHAMENTO DA MÁQUINA DE ESTADOS E GERAÇÃO DE RELATÓRIO ===
                 st.session_state.umove_xls_bytes = gerar_relatorio_umove_xls(df_dispatch, st.session_state.umove_resultados_disparo)
                 
-                # Transforma o lote atual de RASCUNHO para CONCLUÍDO
                 lote_id_final = st.session_state.umove_lote_atual_id if st.session_state.umove_lote_atual_id else id_evento
                 gerenciar_estado_lote("CONCLUIR", lote_id_final, resultados=st.session_state.umove_resultados_disparo)
                 
-                # Mantemos o Backup físico bruto que o sistema já tinha como medida de segurança extra
                 salvar_backup_completo_umove(df_dispatch, lote_id_final, planilha_sandbox)
                 
-                # Desconecta a variável de sessão do lote atual
                 st.session_state.umove_lote_atual_id = None
-                # ===============================================================
 
-                # Trava a máquina de estados no final e reinicia a tela
                 st.session_state.umove_step = 'COMPLETED'
                 st.rerun()
 
@@ -5639,7 +5751,6 @@ elif menu == "📥 Importações Umove":
             elif st.session_state.umove_step == 'COMPLETED':
                 st.markdown("## 📊 Relatório Final da Missão")
                 
-                # Renderiza o placar final recuperado da memória
                 metrics = st.session_state.umove_final_metrics
                 st.markdown(render_big_metrics(metrics['total'], 0, metrics['sucesso'], metrics['falhas']), unsafe_allow_html=True)
                 
@@ -5660,6 +5771,7 @@ elif menu == "📥 Importações Umove":
                         st.session_state.umove_xls_bytes = None
                         st.session_state.umove_resultados_disparo = {}
                         st.rerun()
+
 
     # -------------------------------------------------------------------------
     # ABA 5: RECUPERAÇÃO OFFLINE E REPROCESSAMENTO (QUEDA DE INTERNET)
