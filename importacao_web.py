@@ -4776,109 +4776,124 @@ elif menu == "📥 Importações Umove":
         ["📋 1. Colar Matriz", "🔁 2. Gestão de Pedidos Fixos", "🛒 3. Carrinho & Arquivos", "🚀 4. Central de Envios", "🛟 5. Recuperação Offline"])
 
     # -------------------------------------------------------------------------
-    # ABA 1: COLAR MATRIZ TRADICIONAL (Layout e UX Otimizados + Contador Blindado)
+    # ABA 1: COLAR MATRIZ TRADICIONAL (Layout Super Premium + Contador Blindado)
     # -------------------------------------------------------------------------
     with tab_matriz:
-        st.markdown("### 📋 1. Importação Avulsa (Matriz do Cliente)")
-        st.markdown("<p style='font-size:14px; color:#64748B; margin-top:-10px;'>Insira os metadados da carga e cole as informações do sistema legado para mapeamento inteligente dos motoristas.</p>", unsafe_allow_html=True)
+        # Cabeçalho Premium
+        st.markdown("""
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+            <div style="background-color: #EFF6FF; padding: 12px 15px; border-radius: 12px; border: 1px solid #BFDBFE; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <span style="font-size: 26px;">📋</span>
+            </div>
+            <div>
+                <h3 style="margin: 0; color: #1E293B; font-weight: 800;">Importação de Matriz Externa</h3>
+                <p style="margin: 0; color: #64748B; font-size: 13px;">Insira os parâmetros operacionais e cole os dados brutos para mapeamento geográfico automático.</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Grid superior de configurações básicas
-        c1_sb, c2_sb = st.columns([2, 1])
-        with c1_sb:
-            tom_sandbox = st.selectbox("🏢 Tomador Desta Carga *", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="tom_sb")
-        with c2_sb:
-            dt_sandbox = st.date_input("📅 Data da Rota *", format="DD/MM/YYYY", value=hoje_br, key="dt_sb")
+        # Passo 1: Parâmetros
+        st.markdown("#### 1️⃣ Configuração da Carga")
+        with st.container(border=True):
+            c1_sb, c2_sb = st.columns([2, 1], vertical_alignment="center")
+            with c1_sb:
+                tom_sandbox = st.selectbox("🏢 Tomador Desta Carga *", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="tom_sb")
+            with c2_sb:
+                dt_sandbox = st.date_input("📅 Data da Rota *", format="DD/MM/YYYY", value=hoje_br, key="dt_sb")
 
-        # Área de transferência proeminente
-        txt_sb = st.text_area("📋 Dados Brutos (Ctrl+V):", height=180, placeholder="Cole as colunas copiadas do Excel ou sistema legado aqui...")
+        # Passo 2: Inserção
+        st.markdown("#### 2️⃣ Inserção de Dados Legados")
+        with st.container(border=True):
+            st.markdown("<span style='font-size:13px; font-weight:bold; color:#475569;'>Área de Transferência (Ctrl+V)</span>", unsafe_allow_html=True)
+            txt_sb = st.text_area("Dados Brutos", height=180, placeholder="Cole aqui as colunas copiadas do Excel ou do seu sistema legado...", label_visibility="collapsed")
+            
+            st.write("") # Respiro visual
+            if st.button("🔍 PROCESSAR E VALIDAR MATRIZ", type="primary", use_container_width=True):
+                if not txt_sb or tom_sandbox == "Selecione...":
+                    st.error("⚠️ **Bloqueio:** Por favor, selecione o Tomador e cole os dados da matriz antes de processar.")
+                else:
+                    with st.spinner("Analisando estrutura de colunas e cruzando dados geográficos..."):
+                        try:
+                            delim = '\t' if '\t' in txt_sb else (';' if ';' in txt_sb else ',')
+                            df_raw_sb = pd.read_csv(io.StringIO(txt_sb), sep=delim, header=None, dtype=str).fillna("")
 
-        # Botão de processamento principal com destaque visual
-        if st.button("🔍 Processar e Validar Matriz", type="primary", use_container_width=True):
-            if not txt_sb or tom_sandbox == "Selecione...":
-                st.warning("⚠️ **Impossível Prosseguir:** Por favor, selecione o Tomador e cole os dados da matriz antes de processar.")
-            else:
-                with st.spinner("Analisando estrutura de colunas e cruzando dados..."):
-                    try:
-                        delim = '\t' if '\t' in txt_sb else (';' if ';' in txt_sb else ',')
-                        df_raw_sb = pd.read_csv(io.StringIO(txt_sb), sep=delim, header=None, dtype=str).fillna("")
+                            idx_h, max_matches = 0, 0
+                            for i in range(min(15, len(df_raw_sb))):
+                                row_str = unicodedata.normalize('NFKD', " ".join(df_raw_sb.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
+                                matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP', 'HORARIO', 'FUNCIONAMENTO', 'OBSERVA'] if kw in row_str)
+                                if matches > max_matches:
+                                    max_matches, idx_h = matches, i
 
-                        idx_h, max_matches = 0, 0
-                        for i in range(min(15, len(df_raw_sb))):
-                            row_str = unicodedata.normalize('NFKD', " ".join(df_raw_sb.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
-                            matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP', 'HORARIO', 'FUNCIONAMENTO', 'OBSERVA'] if kw in row_str)
-                            if matches > max_matches:
-                                max_matches, idx_h = matches, i
+                            df_limpo_sb = df_raw_sb.iloc[idx_h + 1:].copy()
+                            df_limpo_sb.columns = [str(c).strip() for c in df_raw_sb.iloc[idx_h].values]
+                            df_limpo_sb = df_limpo_sb.loc[:, ~df_limpo_sb.columns.duplicated()]
 
-                        df_limpo_sb = df_raw_sb.iloc[idx_h + 1:].copy()
-                        df_limpo_sb.columns = [str(c).strip() for c in df_raw_sb.iloc[idx_h].values]
-                        df_limpo_sb = df_limpo_sb.loc[:, ~df_limpo_sb.columns.duplicated()]
+                            for col in df_limpo_sb.columns:
+                                df_limpo_sb[col] = df_limpo_sb[col].apply(tratar_texto_global)
 
-                        for col in df_limpo_sb.columns:
-                            df_limpo_sb[col] = df_limpo_sb[col].apply(tratar_texto_global)
+                            mapa_sb = {}
+                            for c in df_limpo_sb.columns:
+                                c_upper = str(c).upper().strip()
+                                cl = ''.join(e for e in unicodedata.normalize('NFKD', c_upper).encode('ASCII', 'ignore').decode('utf-8') if e.isalnum())
+                                if c_upper in ['Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in ['N', 'NO', 'NR', 'NUM', 'NUMERO']: mapa_sb[c] = 'NUMERO'
+                                elif any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': mapa_sb[c] = 'PEDIDO'
+                                elif any(x in cl for x in ['CNPJ', 'CPF', 'DOCUMENTO', 'DOC']): mapa_sb[c] = 'CNPJ'
+                                elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): mapa_sb[c] = 'LABORATORIO'
+                                elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): mapa_sb[c] = 'ENDERECO'
+                                elif 'BAIRRO' in cl: mapa_sb[c] = 'BAIRRO'
+                                elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa_sb[c] = 'CIDADE'
+                                elif any(x in cl for x in ['ESTADO', 'UF']): mapa_sb[c] = 'UF'
+                                elif 'CEP' in cl: mapa_sb[c] = 'CEP'
+                                elif any(x in cl for x in ['HORARIO', 'HORA', 'FUNCIONAMENTO', 'PERIODO']): mapa_sb[c] = 'HORARIO'
+                                elif any(x in cl for x in ['OBSERVA', 'OBS', 'NOTA']): mapa_sb[c] = 'OBSERVACOES'
 
-                        mapa_sb = {}
-                        for c in df_limpo_sb.columns:
-                            c_upper = str(c).upper().strip()
-                            cl = ''.join(e for e in unicodedata.normalize('NFKD', c_upper).encode('ASCII', 'ignore').decode('utf-8') if e.isalnum())
-                            if c_upper in ['Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in ['N', 'NO', 'NR', 'NUM', 'NUMERO']: mapa_sb[c] = 'NUMERO'
-                            elif any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': mapa_sb[c] = 'PEDIDO'
-                            elif any(x in cl for x in ['CNPJ', 'CPF', 'DOCUMENTO', 'DOC']): mapa_sb[c] = 'CNPJ'
-                            elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): mapa_sb[c] = 'LABORATORIO'
-                            elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): mapa_sb[c] = 'ENDERECO'
-                            elif 'BAIRRO' in cl: mapa_sb[c] = 'BAIRRO'
-                            elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa_sb[c] = 'CIDADE'
-                            elif any(x in cl for x in ['ESTADO', 'UF']): mapa_sb[c] = 'UF'
-                            elif 'CEP' in cl: mapa_sb[c] = 'CEP'
-                            elif any(x in cl for x in ['HORARIO', 'HORA', 'FUNCIONAMENTO', 'PERIODO']): mapa_sb[c] = 'HORARIO'
-                            elif any(x in cl for x in ['OBSERVA', 'OBS', 'NOTA']): mapa_sb[c] = 'OBSERVACOES'
+                            df_limpo_sb.rename(columns=mapa_sb, inplace=True)
 
-                        df_limpo_sb.rename(columns=mapa_sb, inplace=True)
+                            for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
+                                if c not in df_limpo_sb.columns:
+                                    df_limpo_sb[c] = ""
 
-                        for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
-                            if c not in df_limpo_sb.columns:
-                                df_limpo_sb[c] = ""
+                            if 'HORARIO' in df_limpo_sb.columns:
+                                for idx, row in df_limpo_sb.iterrows():
+                                    horario_val = str(row['HORARIO']).strip()
+                                    obs_val = str(row['OBSERVACOES']).strip()
+                                    if horario_val and horario_val.upper() not in ['NAN', 'NONE']:
+                                        nova_obs = f"[COLETA: {horario_val}]"
+                                        if obs_val and obs_val.upper() not in ['NAN', 'NONE']:
+                                            nova_obs += f" - {obs_val}"
+                                        df_limpo_sb.at[idx, 'OBSERVACOES'] = nova_obs
 
-                        if 'HORARIO' in df_limpo_sb.columns:
+                            df_limpo_sb['PEDIDO'] = ""
                             for idx, row in df_limpo_sb.iterrows():
-                                horario_val = str(row['HORARIO']).strip()
-                                obs_val = str(row['OBSERVACOES']).strip()
-                                if horario_val and horario_val.upper() not in ['NAN', 'NONE']:
-                                    nova_obs = f"[COLETA: {horario_val}]"
-                                    if obs_val and obs_val.upper() not in ['NAN', 'NONE']:
-                                        nova_obs += f" - {obs_val}"
-                                    df_limpo_sb.at[idx, 'OBSERVACOES'] = nova_obs
+                                e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
+                                if e and (not n or not b):
+                                    cep_m = re.search(r'(\d{5}-?\d{3})', e)
+                                    if cep_m:
+                                        df_limpo_sb.at[idx, 'CEP'] = cep_m.group(1)
+                                        e = e.replace(cep_m.group(1), '').strip(' ,-')
+                                    if ',' in e and not n:
+                                        pts = e.split(',')
+                                        df_limpo_sb.at[idx, 'ENDERECO'], df_limpo_sb.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
 
-                        df_limpo_sb['PEDIDO'] = ""
-                        for idx, row in df_limpo_sb.iterrows():
-                            e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
-                            if e and (not n or not b):
-                                cep_m = re.search(r'(\d{5}-?\d{3})', e)
-                                if cep_m:
-                                    df_limpo_sb.at[idx, 'CEP'] = cep_m.group(1)
-                                    e = e.replace(cep_m.group(1), '').strip(' ,-')
-                                if ',' in e and not n:
-                                    pts = e.split(',')
-                                    df_limpo_sb.at[idx, 'ENDERECO'], df_limpo_sb.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
+                            df_limpo_sb['UF'] = df_limpo_sb['UF'].astype(str).str.upper().str.strip()
+                            df_limpo_sb['TOMADOR'] = tom_sandbox
+                            df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
 
-                        df_limpo_sb['UF'] = df_limpo_sb['UF'].astype(str).str.upper().str.strip()
-                        df_limpo_sb['TOMADOR'] = tom_sandbox
-                        df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
+                            df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
+                            df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
 
-                        df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
-                        df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
+                            df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
 
-                        df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
+                            st.session_state.df_preview_sb = df_final_sb
+                            time.sleep(0.5)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Falha crítica no processamento da matriz: {e}")
 
-                        st.session_state.df_preview_sb = df_final_sb
-                        st.toast("✅ Dados importados com sucesso! Verifique a validação abaixo.", icon="🔍")
-                        time.sleep(0.5)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Falha crítica no processamento da matriz: {e}")
-
-        # PREVIEW DA MATRIZ - Seção Visual de Tratamento de Erros
+        # Passo 3: PREVIEW DA MATRIZ - Seção Visual de Tratamento de Erros
         if not st.session_state.df_preview_sb.empty:
             st.markdown("---")
+            st.markdown("#### 3️⃣ Validação de Roteirização")
             df_preview = st.session_state.df_preview_sb
             mask_err = (df_preview['AGENTE_RAW'].astype(str).str.strip() == "") | (df_preview['AGENTE_RAW'].astype(str).str.upper() == "NAN")
             df_err = df_preview[mask_err]
@@ -4886,9 +4901,12 @@ elif menu == "📥 Importações Umove":
 
             if not df_err.empty:
                 st.markdown(f"""
-                <div style='background-color:#FEF2F2; border: 1px solid #FCA5A5; padding:15px; border-radius:10px; margin-bottom:15px;'>
-                    <h5 style='color:#991B1B; margin:0;'>🚨 Tratamento de Exceções Requerido</h5>
-                    <p style='color:#7F1D1D; font-size:13px; margin:5px 0 0 0;'>Detectamos <b>{len(df_err)} pedido(s)</b> sem motorista correspondente na base geográfica. Atribua manualmente para liberar o lote.</p>
+                <div style='background-color:#FEF2F2; border: 1px solid #FCA5A5; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; gap:15px; align-items:center; box-shadow: 0 4px 6px rgba(220, 38, 38, 0.05);'>
+                    <div style='font-size: 38px;'>🚨</div>
+                    <div>
+                        <h5 style='color:#991B1B; margin:0; font-weight:800; font-size:16px;'>Tratamento de Exceções Requerido</h5>
+                        <p style='color:#7F1D1D; font-size:14px; margin:5px 0 0 0;'>O motor de IA detectou <b>{len(df_err)} pedido(s)</b> sem motorista correspondente na base geográfica. Atribua um motorista manualmente para liberar a carga.</p>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -4896,13 +4914,14 @@ elif menu == "📥 Importações Umove":
                     correcoes = {}
                     logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                     
-                    # Layout em colunas para os formulários de correção ficarem compactos
+                    # Layout limpo para correção manual
                     for idx, row in df_err.iterrows():
-                        cx1, cx2 = st.columns([2, 1])
-                        cx1.markdown(f"🔬 **{row['LABORATORIO']}** <br><span style='font-size:12px; color:#64748B;'>{row['CIDADE']} - {row['BAIRRO']}</span>", unsafe_allow_html=True)
-                        correcoes[idx] = cx2.selectbox(f"Motorista para ID {idx}", ["Selecione..."] + logins_disp, key=f"fix_mot_sb_{idx}", label_visibility="collapsed")
+                        cx1, cx2 = st.columns([2.5, 1])
+                        cx1.markdown(f"<div style='padding-top:8px;'>🔬 <b>{row['LABORATORIO']}</b> <br><span style='font-size:12px; color:#64748B;'>📍 {row['CIDADE']} - {row['BAIRRO']}</span></div>", unsafe_allow_html=True)
+                        correcoes[idx] = cx2.selectbox(f"Motorista", ["Selecione..."] + logins_disp, key=f"fix_mot_sb_{idx}", label_visibility="collapsed")
+                        st.markdown("<hr style='margin: 10px 0; border-color: #F1F5F9;'>", unsafe_allow_html=True)
                     
-                    if st.button("💾 Validar & Vincular Motoristas Selecionados", type="primary", use_container_width=True):
+                    if st.button("💾 Salvar Roteirização Manual e Validar", type="primary", use_container_width=True):
                         novas_rotas = []
                         for idx, novo_mot in correcoes.items():
                             if novo_mot != "Selecione...":
@@ -4929,45 +4948,45 @@ elif menu == "📥 Importações Umove":
                         st.rerun()
             else:
                 st.markdown(f"""
-                <div style='background-color:#F0FDF4; border: 1px solid #BBF7D0; padding:12px; border-radius:8px; margin-bottom:15px;'>
-                    <span style='color:#166534; font-weight:bold;'>✔️ Validação Concluída com Sucesso!</span> <span style='color:#14532D; font-size:13px;'>Todos os {len(df_ok)} pedidos foram devidamente mapeados para seus respectivos agentes comerciais.</span>
+                <div style='background-color:#F0FDF4; border: 1px solid #BBF7D0; padding:20px; border-radius:12px; margin-bottom:20px; display:flex; gap:15px; align-items:center; box-shadow: 0 4px 6px rgba(22, 101, 52, 0.05);'>
+                    <div style='font-size: 38px;'>✅</div>
+                    <div>
+                        <h5 style='color:#166534; margin:0; font-weight:800; font-size:16px;'>Validação Concluída com Sucesso!</h5>
+                        <p style='color:#14532D; font-size:14px; margin:5px 0 0 0;'>A IA processou e roteirizou <b>{len(df_ok)} pedidos</b> com base na malha de agentes disponível.</p>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                st.dataframe(df_ok, hide_index=True, use_container_width=True)
+                with st.container(border=True):
+                    st.dataframe(df_ok, hide_index=True, use_container_width=True, height=250)
                 
-                if st.button("➕ Enviar Tudo para o Carrinho de Expedição", type="primary", use_container_width=True, key="add_carrinho_sb"):
-                    with st.spinner("Registrando novos identificadores de controle (700020+)..."):
+                st.write("")
+                if st.button("➕ ADICIONAR TUDO AO CARRINHO DE EXPEDIÇÃO", type="primary", use_container_width=True, key="add_carrinho_sb"):
+                    with st.spinner("Registrando identificadores de controle (IDs) blindados..."):
                         try:
-                            # 🛡️ PROTEÇÃO BLINDADA DO CONTADOR (FAIL-SAFE)
+                            # 🛡️ PROTEÇÃO BLINDADA DO CONTADOR (FAIL-SAFE) MANTIDA
                             aba_contador = None
                             try:
                                 aba_contador = planilha_sandbox.worksheet("Contador")
                             except Exception:
                                 try:
-                                    # Só tenta criar se realmente não existir, mas blinda caso dê erro de API
                                     aba_contador = planilha_sandbox.add_worksheet(title="Contador", rows=10, cols=10)
                                     aba_contador.update("A1", [["700020"]])
                                 except Exception:
-                                    try: 
-                                        # Última tentativa de resgate se foi só oscilação de rede
-                                        aba_contador = planilha_sandbox.worksheet("Contador")
+                                    try: aba_contador = planilha_sandbox.worksheet("Contador")
                                     except: pass
 
                             prox_id_sb = 700020
                             
-                            # Tenta ler da nuvem
                             if aba_contador:
                                 try:
                                     val = aba_contador.acell('A1').value
                                     if val and str(val).isdigit(): prox_id_sb = int(val)
                                 except: pass
                             
-                            # Plano B: Tenta ler da memória temporária global
                             if 'contador_temp' in st.session_state:
                                 prox_id_sb = st.session_state.contador_temp
                             
-                            # Plano C: Analisa o próprio carrinho para não cruzar IDs
                             if not st.session_state.df_sandbox_mem.empty and 'PEDIDO' in st.session_state.df_sandbox_mem.columns:
                                 try:
                                     max_id_carrinho = pd.to_numeric(st.session_state.df_sandbox_mem['PEDIDO'], errors='coerce').max()
@@ -4975,36 +4994,31 @@ elif menu == "📥 Importações Umove":
                                         prox_id_sb = int(max_id_carrinho) + 1
                                 except: pass
 
-                            # Atribui os IDs blindados
                             for idx, row in df_ok.iterrows():
                                 df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
                                 prox_id_sb += 1
                                 
-                            # Atualiza a memória de fallback
                             st.session_state.contador_temp = prox_id_sb
 
-                            # Tenta salvar de volta na nuvem, falha silenciosamente se a API engasgar
                             if aba_contador:
                                 try: aba_contador.update("A1", [[str(prox_id_sb)]])
                                 except Exception: pass
 
-                            # Consolidação no Carrinho
                             if st.session_state.df_sandbox_mem.empty:
                                 st.session_state.df_sandbox_mem = df_ok
                             else:
                                 st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_ok], ignore_index=True)
 
-                            # Modulação automática da máquina de estados em background
                             if st.session_state.umove_lote_atual_id is None:
                                 st.session_state.umove_lote_atual_id = f"LOTE-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
                             gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
 
                             st.session_state.df_preview_sb = pd.DataFrame()
-                            st.toast("🛒 Pedidos consolidados no carrinho com sucesso!", icon="✅")
+                            st.toast("🛒 Carga consolidada no Carrinho de Expedição!", icon="🚀")
                             time.sleep(1)
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Erro ao injetar dados no carrinho corrente: {e}")
+                            st.error(f"Erro ao injetar dados no carrinho: {e}")
 
     # -------------------------------------------------------------------------
     # ABA 2: GESTÃO DE PEDIDOS FIXOS (A FÁBRICA) - ATUALIZADO COM AGGRID
