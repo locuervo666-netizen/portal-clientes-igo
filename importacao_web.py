@@ -840,16 +840,23 @@ def carregar_dados_completos(_planilha):
                     def get_true_foto(row):
                         f_db = str(row.get('FOTO', '')).strip()
                         f_app = str(row.get('APP_FOTO', '')).strip()
-                        rom_id = str(row.get('ROMANEIO', '')).strip()
-                        if rom_id in rom_dict:
-                            f_rom = str(
-                                rom_dict[rom_id].get(
-                                    'APP_FOTO', '')).strip()
-                            if f_rom and f_rom.upper() != 'NAN':
-                                return f_rom
+                        
+                        # 1º PRIORIDADE: Foto da COLETA (atrelada diretamente ao número do PEDIDO no App)
                         if f_app and f_app.upper() != 'NAN':
                             return f_app
-                        return f_db
+                            
+                        # 2º PRIORIDADE: Foto original da base (Memoria_Sistema)
+                        if f_db and f_db.upper() != 'NAN':
+                            return f_db
+                            
+                        # 3º PRIORIDADE (Último Caso): Foto da ENTREGA (atrelada ao ROMANEIO)
+                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        if rom_id in rom_dict:
+                            f_rom = str(rom_dict[rom_id].get('APP_FOTO', '')).strip()
+                            if f_rom and f_rom.upper() != 'NAN':
+                                return f_rom
+                                
+                        return ""
 
                     if 'APP_FOTO' in df.columns or len(rom_dict) > 0:
                         df['FOTO'] = df.apply(get_true_foto, axis=1)
@@ -1941,10 +1948,46 @@ with st.sidebar:
 
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
-    if st.button(
-        "🚪 Sair do Sistema",
-        type="primary",
-            use_container_width=True):
+    
+    # 🔥 ESTILO EXCLUSIVO E DEFINITIVO PARA O BOTÃO SAIR 🔥
+    st.markdown("""
+        <style>
+        /* Pinta o fundo do botão e ajusta bordas */
+        [data-testid="stSidebar"] div.stButton > button {
+            background-color: #ef4444 !important; /* Vermelho vibrante */
+            border: 1px solid #dc2626 !important;
+            border-radius: 8px !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2) !important;
+            min-height: 45px !important;
+        }
+        
+        /* FORÇA a cor branca no texto e em qualquer tag interna (ícones/parágrafos) */
+        [data-testid="stSidebar"] div.stButton > button,
+        [data-testid="stSidebar"] div.stButton > button p,
+        [data-testid="stSidebar"] div.stButton > button span,
+        [data-testid="stSidebar"] div.stButton > button div {
+            color: #ffffff !important; 
+            font-weight: 700 !important;
+            font-size: 15px !important;
+        }
+
+        /* Efeito Hover (passar o mouse) */
+        [data-testid="stSidebar"] div.stButton > button:hover {
+            background-color: #dc2626 !important; /* Vermelho mais escuro */
+            border-color: #b91c1c !important;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4) !important;
+            transform: translateY(-2px) !important;
+        }
+        
+        [data-testid="stSidebar"] div.stButton > button:hover p,
+        [data-testid="stSidebar"] div.stButton > button:hover span {
+            color: #ffffff !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    if st.button("🚪 Sair do Sistema", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
 
@@ -3866,7 +3909,6 @@ elif menu == "📝 Pedido Manual":
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao injetar pedido: {e}")
-
 # =============================================================================
 # ➕ MÓDULO 2: IMPORTAÇÃO DE LOTES (OFICIAL)
 # =============================================================================
@@ -3948,38 +3990,19 @@ elif menu == "📥 Importações":
                                     'ASCII', 'ignore').decode('utf-8')
                                 matches = sum(
                                     1 for kw in [
-                                        'PEDIDO',
-                                        'CODIGO',
-                                        'CNPJ',
-                                        'CPF',
-                                        'DOCUMENTO',
-                                        'DOC',
-                                        'ID',
-                                        'CIDADE',
-                                        'MUNIC',
-                                        'LABORAT',
-                                        'POSTO',
-                                        'NOME',
-                                        'CLIENTE',
-                                        'ENDERE',
-                                        'RUA',
-                                        'BAIRRO',
-                                        'CEP',
-                                        'HORARIO',
-                                        'FUNCIONAMENTO',
-                                        'OBSERVA'] if kw in row_str)
+                                        'PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID',
+                                        'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE',
+                                        'ENDERE', 'RUA', 'BAIRRO', 'CEP', 'HORARIO', 'FUNCIONAMENTO', 'OBSERVA'] if kw in row_str)
                                 if matches > max_matches:
                                     max_matches, idx_h = matches, i
 
                             df_limpo = df_raw_import.iloc[idx_h + 1:].copy()
                             df_limpo.columns = [
                                 str(c).strip() for c in df_raw_import.iloc[idx_h].values]
-                            df_limpo = df_limpo.loc[:, ~
-                                                    df_limpo.columns.duplicated()]
+                            df_limpo = df_limpo.loc[:, ~df_limpo.columns.duplicated()]
 
                             for col in df_limpo.columns:
-                                df_limpo[col] = df_limpo[col].apply(
-                                    tratar_texto_global)
+                                df_limpo[col] = df_limpo[col].apply(tratar_texto_global)
 
                             mapa = {}
                             for c in df_limpo.columns:
@@ -3989,9 +4012,7 @@ elif menu == "📥 Importações":
                                         'NFKD', c_upper).encode(
                                         'ASCII', 'ignore').decode('utf-8') if e.isalnum())
 
-                                if c_upper in [
-                                        'Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in [
-                                        'N', 'NO', 'NR', 'NUM', 'NUMERO']:
+                                if c_upper in ['Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in ['N', 'NO', 'NR', 'NUM', 'NUMERO']:
                                     mapa[c] = 'NUMERO'
                                 elif any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID':
                                     mapa[c] = 'PEDIDO'
@@ -4016,17 +4037,7 @@ elif menu == "📥 Importações":
 
                             df_limpo.rename(columns=mapa, inplace=True)
 
-                            for c in [
-                                'PEDIDO',
-                                'LABORATORIO',
-                                'CNPJ',
-                                'CEP',
-                                'ENDERECO',
-                                'NUMERO',
-                                'BAIRRO',
-                                'CIDADE',
-                                'UF',
-                                    'OBSERVACOES']:
+                            for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
                                 if c not in df_limpo.columns:
                                     df_limpo[c] = ""
 
@@ -4034,46 +4045,33 @@ elif menu == "📥 Importações":
                                 for idx, row in df_limpo.iterrows():
                                     horario_val = str(row['HORARIO']).strip()
                                     obs_val = str(row['OBSERVACOES']).strip()
-                                    if horario_val and horario_val.upper() not in [
-                                            'NAN', 'NONE']:
+                                    if horario_val and horario_val.upper() not in ['NAN', 'NONE']:
                                         nova_obs = f"[COLETA: {horario_val}]"
-                                        if obs_val and obs_val.upper() not in [
-                                                'NAN', 'NONE']:
+                                        if obs_val and obs_val.upper() not in ['NAN', 'NONE']:
                                             nova_obs += f" - {obs_val}"
-                                        df_limpo.at[idx,
-                                                    'OBSERVACOES'] = nova_obs
+                                        df_limpo.at[idx, 'OBSERVACOES'] = nova_obs
 
                             df_limpo['PEDIDO'] = ""
 
                             for idx, row in df_limpo.iterrows():
-                                e, n, b = str(
-                                    row['ENDERECO']), str(
-                                    row['NUMERO']), str(
-                                    row['BAIRRO'])
+                                e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
                                 if e and (not n or not b):
                                     cep_m = re.search(r'(\d{5}-?\d{3})', e)
                                     if cep_m:
-                                        df_limpo.at[idx,
-                                                    'CEP'] = cep_m.group(1)
-                                        e = e.replace(
-                                            cep_m.group(1), '').strip(' ,-')
+                                        df_limpo.at[idx, 'CEP'] = cep_m.group(1)
+                                        e = e.replace(cep_m.group(1), '').strip(' ,-')
                                     if ',' in e and not n:
                                         pts = e.split(',')
-                                        df_limpo.at[idx, 'ENDERECO'], df_limpo.at[idx, 'NUMERO'] = pts[0].strip(
-                                        ), pts[1].strip()
+                                        df_limpo.at[idx, 'ENDERECO'], df_limpo.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
 
-                            df_limpo['UF'] = df_limpo['UF'].astype(
-                                str).str.upper().str.strip()
+                            df_limpo['UF'] = df_limpo['UF'].astype(str).str.upper().str.strip()
                             df_limpo['TOMADOR'] = tom
                             df_limpo['DATA'] = dt_c.strftime("%d/%m/%Y")
 
-                            df_limpo['CIDADE'] = df_limpo['CIDADE'].apply(
-                                lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
-                            df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(
-                                r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
+                            df_limpo['CIDADE'] = df_limpo['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
+                            df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
 
-                            st.session_state.df_preview_oficial = df_limpo[df_limpo['LABORATORIO'].str.strip(
-                            ) != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
+                            st.session_state.df_preview_oficial = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
                             st.success("✅ Processamento Concluído!")
                             time.sleep(1)
                             st.rerun()
@@ -4084,92 +4082,65 @@ elif menu == "📥 Importações":
             st.markdown("---")
             col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
             col_tit.markdown("### 👀 2. Preview de Carga Oficial")
-            if col_canc.button(
-                "❌ Cancelar / Limpar",
-                type="secondary",
-                use_container_width=True,
-                    key="canc_oficial"):
+            if col_canc.button("❌ Cancelar / Limpar", type="secondary", use_container_width=True, key="canc_oficial"):
                 st.session_state.df_preview_oficial = pd.DataFrame()
                 st.rerun()
 
             df_preview = st.session_state.df_preview_oficial
-            mask_err = (df_preview['AGENTE_RAW'].astype(str).str.strip() == "") | (
-                df_preview['AGENTE_RAW'].astype(str).str.upper() == "NAN")
+            mask_err = (df_preview['AGENTE_RAW'].astype(str).str.strip() == "") | (df_preview['AGENTE_RAW'].astype(str).str.upper() == "NAN")
             df_err = df_preview[mask_err]
             df_ok = df_preview[~mask_err]
 
             if not df_err.empty:
-                st.error(
-                    f"🚨 **Atenção:** {len(df_err)} pedido(s) sem motorista. Corrija abaixo.")
+                st.error(f"🚨 **Atenção:** {len(df_err)} pedido(s) sem motorista. Corrija abaixo.")
                 with st.form("form_correcao_agentes_of"):
                     correcoes = {}
-                    logins_disp = sorted(
-                        DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                    logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
                     for idx, row in df_err.iterrows():
-                        st.markdown(
-                            f"**Local:** {row['LABORATORIO']} | **Cidade:** {row['CIDADE']}")
-                        correcoes[idx] = st.selectbox(
-                            f"Motorista:", ["Selecione..."] + logins_disp, key=f"fix_mot_of_{idx}")
-                    if st.form_submit_button(
-                            "💾 Validar Motoristas", type="primary"):
+                        st.markdown(f"**Local:** {row['LABORATORIO']} | **Cidade:** {row['CIDADE']}")
+                        correcoes[idx] = st.selectbox(f"Motorista:", ["Selecione..."] + logins_disp, key=f"fix_mot_of_{idx}")
+                    
+                    if st.form_submit_button("💾 Validar Motoristas", type="primary"):
                         novas_rotas = []
                         for idx, novo_mot in correcoes.items():
                             if novo_mot != "Selecione...":
-                                st.session_state.df_preview_oficial.at[idx,
-                                                                       'AGENTE_RAW'] = novo_mot
-                                r_cid = str(
-                                    st.session_state.df_preview_oficial.at[idx, 'CIDADE'])
-                                r_bai = str(
-                                    st.session_state.df_preview_oficial.at[idx, 'BAIRRO'])
-                                rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(
-                                    r_cid), limpar_nome_local_rota(r_bai)] if p])
+                                st.session_state.df_preview_oficial.at[idx, 'AGENTE_RAW'] = novo_mot
+                                r_cid = str(st.session_state.df_preview_oficial.at[idx, 'CIDADE'])
+                                r_bai = str(st.session_state.df_preview_oficial.at[idx, 'BAIRRO'])
+                                rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai)] if p])
                                 if not DF_AGENTES.empty:
-                                    dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE']
-                                                          == novo_mot].iloc[0]
-                                    novas_rotas.append(
-                                        {
-                                            "ROTA MAPEADA": rota_str,
-                                            "LOGIN DO AGENTE": novo_mot,
-                                            "NOME DO AGENTE": dados_ag['NOME DO AGENTE'],
-                                            "TELEFONE": dados_ag['TELEFONE']})
+                                    dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == novo_mot].iloc[0]
+                                    novas_rotas.append({
+                                        "ROTA MAPEADA": rota_str,
+                                        "LOGIN DO AGENTE": novo_mot,
+                                        "NOME DO AGENTE": dados_ag['NOME DO AGENTE'],
+                                        "TELEFONE": dados_ag['TELEFONE']})
 
                         if novas_rotas:
                             try:
                                 df_novas_rotas = pd.DataFrame(novas_rotas)
                                 aba_agentes = planilha_db.worksheet("Agentes")
                                 dados_atuais_ag = aba_agentes.get_all_values()
-                                df_ag_atual = pd.DataFrame(dados_atuais_ag[1:], columns=dados_atuais_ag[0]) if len(
-                                    dados_atuais_ag) > 1 else pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
-                                df_novo = pd.concat([df_ag_atual, df_novas_rotas], ignore_index=True).drop_duplicates(
-                                    subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+                                df_ag_atual = pd.DataFrame(dados_atuais_ag[1:], columns=dados_atuais_ag[0]) if len(dados_atuais_ag) > 1 else pd.DataFrame(columns=["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"])
+                                df_novo = pd.concat([df_ag_atual, df_novas_rotas], ignore_index=True).drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
                                 aba_agentes.clear()
-                                aba_agentes.update(
-                                    "A1", [
-                                        df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
+                                aba_agentes.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                                 carregar_dados_agentes.clear()
                             except Exception as e:
-                                st.warning(
-                                    f"Erro ao salvar rota inteligente: {e}")
-
+                                st.warning(f"Erro ao salvar rota inteligente: {e}")
                         st.rerun()
             else:
                 st.success(f"✅ Lote validado! {len(df_ok)} pedidos prontos.")
                 st.dataframe(df_ok, hide_index=True)
 
-                if st.button(
-                    "➕ Adicionar ao Carrinho Oficial (Cumulativo)",
-                    type="primary",
-                        key="add_carrinho_oficial"):
+                if st.button("➕ Adicionar ao Carrinho Oficial (Cumulativo)", type="primary", key="add_carrinho_oficial"):
                     with st.spinner("Gerando IDs sequenciais e adicionando ao carrinho..."):
                         try:
                             aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            df_up = pd.DataFrame(
-                                aba_m.get_all_values()[
-                                    1:], columns=aba_m.get_all_values()[0])
+                            df_up = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
 
                             if 'contador_oficial_temp' not in st.session_state:
-                                st.session_state.contador_oficial_temp = obter_proximo_id(
-                                    df_up)
+                                st.session_state.contador_oficial_temp = obter_proximo_id(df_up)
 
                             prox_id_of = st.session_state.contador_oficial_temp
 
@@ -4179,18 +4150,8 @@ elif menu == "📥 Importações":
 
                             st.session_state.contador_oficial_temp = prox_id_of
 
-                            df_ok['PRAZO_DIAS'] = df_ok.apply(
-                                lambda r: str(
-                                    calcular_sla_dias(
-                                        r['UF'],
-                                        r['CIDADE'],
-                                        r['TOMADOR'])),
-                                axis=1)
-                            df_ok['DATA_LIMITE'] = df_ok.apply(
-                                lambda r: str(
-                                    calcular_data_limite(
-                                        r['DATA'], int(
-                                            r['PRAZO_DIAS']))), axis=1)
+                            df_ok['PRAZO_DIAS'] = df_ok.apply(lambda r: str(calcular_sla_dias(r['UF'], r['CIDADE'], r['TOMADOR'])), axis=1)
+                            df_ok['DATA_LIMITE'] = df_ok.apply(lambda r: str(calcular_data_limite(r['DATA'], int(r['PRAZO_DIAS']))), axis=1)
                             df_ok['STATUS'] = 'PENDENTE'
                             df_ok['DATA_ENTREGA'] = ''
                             df_ok['FOTO'] = ''
@@ -4203,27 +4164,20 @@ elif menu == "📥 Importações":
                             if st.session_state.df_carrinho_oficial.empty:
                                 st.session_state.df_carrinho_oficial = df_ok
                             else:
-                                st.session_state.df_carrinho_oficial = pd.concat(
-                                    [st.session_state.df_carrinho_oficial, df_ok], ignore_index=True)
+                                st.session_state.df_carrinho_oficial = pd.concat([st.session_state.df_carrinho_oficial, df_ok], ignore_index=True)
 
                             st.session_state.df_preview_oficial = pd.DataFrame()
-                            st.success(
-                                "✅ Pedidos adicionados ao carrinho com sucesso!")
+                            st.success("✅ Pedidos adicionados ao carrinho com sucesso!")
                             time.sleep(1.5)
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro: {e}")
 
-        # 🔥 MUDANÇA 2: O CARRINHO E A MESA DE COMANDO DE 3 PASSOS 🔥
         st.markdown("---")
         col_tit_c, col_canc_c = st.columns([4, 1], vertical_alignment="center")
         col_tit_c.markdown("### 🛒 2. Carrinho de Expedição Oficial")
 
-        if col_canc_c.button(
-            "🗑️ Esvaziar Carrinho Manual",
-            type="secondary",
-            use_container_width=True,
-                key="canc_carr_of"):
+        if col_canc_c.button("🗑️ Esvaziar Carrinho Manual", type="secondary", use_container_width=True, key="canc_carr_of"):
             st.session_state.df_carrinho_oficial = pd.DataFrame()
             if 'contador_oficial_temp' in st.session_state:
                 del st.session_state.contador_oficial_temp
@@ -4235,76 +4189,37 @@ elif menu == "📥 Importações":
             aba_fixos_of = planilha_db.worksheet("Agendamentos_Fixos_Oficial")
             dados_fixos_of = aba_fixos_of.get_all_values()
             if len(dados_fixos_of) > 1:
-                df_regras_temp = pd.DataFrame(
-                    dados_fixos_of[1:], columns=dados_fixos_of[0])
-                mapa_dias = {
-                    0: 'SEG',
-                    1: 'TER',
-                    2: 'QUA',
-                    3: 'QUI',
-                    4: 'SEX',
-                    5: 'SAB',
-                    6: 'DOM'}
+                df_regras_temp = pd.DataFrame(dados_fixos_of[1:], columns=dados_fixos_of[0])
+                mapa_dias = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
                 dia_atual = mapa_dias[hoje_br.weekday()]
 
                 if dia_atual != 'DOM':
-                    df_alvo = df_regras_temp[(df_regras_temp[dia_atual] == "SIM") & (
-                        df_regras_temp['STATUS'] == "ATIVO")].copy()
+                    df_alvo = df_regras_temp[(df_regras_temp[dia_atual] == "SIM") & (df_regras_temp['STATUS'] == "ATIVO")].copy()
 
                     if not df_alvo.empty:
                         try:
                             aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            df_up_temp = pd.DataFrame(
-                                aba_m.get_all_values()[
-                                    1:], columns=aba_m.get_all_values()[0])
+                            df_up_temp = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
 
                             if 'contador_oficial_temp' not in st.session_state:
-                                st.session_state.contador_oficial_temp = obter_proximo_id(
-                                    df_up_temp)
+                                st.session_state.contador_oficial_temp = obter_proximo_id(df_up_temp)
 
                             prox_id_fixo = st.session_state.contador_oficial_temp
-                            # Pular os IDs que já estão no carrinho manual para
-                            # não haver duplicidade
                             if not st.session_state.df_carrinho_oficial.empty:
-                                prox_id_fixo += len(
-                                    st.session_state.df_carrinho_oficial)
+                                prox_id_fixo += len(st.session_state.df_carrinho_oficial)
 
                             novos_pedidos_fixos = []
                             for _, regra in df_alvo.iterrows():
-                                agente = str(
-                                    regra.get(
-                                        'MOTORISTA',
-                                        '')).strip()
-                                if not agente or agente.upper() in [
-                                        'AUTOMÁTICO (POR ROTA)', 'AUTOMATICO (POR ROTA)']:
-                                    agente = obter_login_agente(
-                                        str(
-                                            regra.get(
-                                                'CIDADE', '')), str(
-                                            regra.get(
-                                                'BAIRRO', '')), str(
-                                            regra.get(
-                                                'LABORATORIO', '')), str(
-                                            regra.get(
-                                                'ENDERECO', '')), DF_AGENTES)
+                                agente = str(regra.get('MOTORISTA', '')).strip()
+                                if not agente or agente.upper() in ['AUTOMÁTICO (POR ROTA)', 'AUTOMATICO (POR ROTA)']:
+                                    agente = obter_login_agente(str(regra.get('CIDADE', '')), str(regra.get('BAIRRO', '')), str(regra.get('LABORATORIO', '')), str(regra.get('ENDERECO', '')), DF_AGENTES)
 
-                                obs_fix = str(
-                                    regra.get(
-                                        'OBSERVACOES',
-                                        '')).strip()
-                                if obs_fix and obs_fix.upper() not in [
-                                        'NAN', 'NONE']:
-                                    obs_fix = obs_fix + ' [FIXO]'
-                                else:
-                                    obs_fix = '[FIXO]'
+                                obs_fix = str(regra.get('OBSERVACOES', '')).strip()
+                                if obs_fix and obs_fix.upper() not in ['NAN', 'NONE']: obs_fix = obs_fix + ' [FIXO]'
+                                else: obs_fix = '[FIXO]'
 
-                                prazo = calcular_sla_dias(
-                                    regra.get(
-                                        'UF', 'SP'), regra.get(
-                                        'CIDADE', ''), regra.get(
-                                        'TOMADOR', ''))
-                                dt_lim = calcular_data_limite(
-                                    hoje_br.strftime("%d/%m/%Y"), int(prazo))
+                                prazo = calcular_sla_dias(regra.get('UF', 'SP'), regra.get('CIDADE', ''), regra.get('TOMADOR', ''))
+                                dt_lim = calcular_data_limite(hoje_br.strftime("%d/%m/%Y"), int(prazo))
 
                                 novo_pedido = {
                                     'DATA': hoje_br.strftime("%d/%m/%Y"),
@@ -4332,8 +4247,7 @@ elif menu == "📥 Importações":
                                 novos_pedidos_fixos.append(novo_pedido)
                                 prox_id_fixo += 1
 
-                            df_fixos_hoje_of = pd.DataFrame(
-                                novos_pedidos_fixos)
+                            df_fixos_hoje_of = pd.DataFrame(novos_pedidos_fixos)
                         except Exception as e:
                             pass
         except Exception:
@@ -4341,32 +4255,22 @@ elif menu == "📥 Importações":
 
         incluir_fixos_of = False
         if not df_fixos_hoje_of.empty:
-            st.info(
-                f"💡 O sistema encontrou **{
-                    len(df_fixos_hoje_of)} pedidos fixos** programados para hoje ({dia_atual}).")
-            incluir_fixos_of = st.toggle(
-                "👉 INCLUIR PEDIDOS FIXOS NA CARGA OFICIAL DE HOJE",
-                value=False,
-                key="toggle_fixos_oficial")
+            st.info(f"💡 O sistema encontrou **{len(df_fixos_hoje_of)} pedidos fixos** programados para hoje ({dia_atual}).")
+            incluir_fixos_of = st.toggle("👉 INCLUIR PEDIDOS FIXOS NA CARGA OFICIAL DE HOJE", value=False, key="toggle_fixos_oficial")
         else:
             st.info("Nenhum pedido fixo programado para hoje.")
 
         df_cart_of = st.session_state.df_carrinho_oficial.copy()
 
         if incluir_fixos_of and not df_fixos_hoje_of.empty:
-            if df_cart_of.empty:
-                df_cart_of = df_fixos_hoje_of
-            else:
-                df_cart_of = pd.concat(
-                    [df_cart_of, df_fixos_hoje_of], ignore_index=True)
+            if df_cart_of.empty: df_cart_of = df_fixos_hoje_of
+            else: df_cart_of = pd.concat([df_cart_of, df_fixos_hoje_of], ignore_index=True)
 
         if not df_cart_of.empty:
             c_kpi1_of, c_kpi2_of = st.columns([1, 4])
             c_kpi1_of.metric("TOTAL NO CARRINHO", len(df_cart_of))
-            resumo_tom_of = df_cart_of.groupby(
-                'TOMADOR').size().reset_index(name='QTD')
-            c_kpi2_of.info(
-                f"**Detalhamento por Cliente:**\n{' | '.join([f'**{row['TOMADOR']}**: {row['QTD']}' for _, row in resumo_tom_of.iterrows()])}")
+            resumo_tom_of = df_cart_of.groupby('TOMADOR').size().reset_index(name='QTD')
+            c_kpi2_of.info(f"**Detalhamento por Cliente:**\n{' | '.join([f'**{row['TOMADOR']}**: {row['QTD']}' for _, row in resumo_tom_of.iterrows()])}")
 
             st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
             df_editado_oficial = st.data_editor(
@@ -4382,61 +4286,27 @@ elif menu == "📥 Importações":
 
             # PASSO 1: INJETAR
             with col_inj:
-                if st.button(
-                    "🚀 1. Injetar Lote no Banco",
-                    type="primary",
-                        use_container_width=True):
+                if st.button("🚀 1. Injetar Lote no Banco", type="primary", use_container_width=True):
                     with st.spinner("🚀 Injetando lotes no banco de dados principal e AppSheet..."):
                         try:
-                            # Blindagem: Garantir que apenas colunas oficiais
-                            # subam
-                            colunas_bd_oficiais = [
-                                'DATA',
-                                'PEDIDO',
-                                'TOMADOR',
-                                'LABORATORIO',
-                                'CNPJ',
-                                'ENDERECO',
-                                'NUMERO',
-                                'BAIRRO',
-                                'CIDADE',
-                                'UF',
-                                'CEP',
-                                'STATUS',
-                                'AGENTE_RAW',
-                                'PRAZO_DIAS',
-                                'DATA_LIMITE',
-                                'DATA_ENTREGA',
-                                'FOTO',
-                                'ROMANEIO',
-                                'ZAP_ENVIADO',
-                                'FATURA',
-                                'OBSERVACOES']
+                            colunas_bd_oficiais = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO', 'ZAP_ENVIADO', 'FATURA', 'OBSERVACOES']
 
                             df_to_insert = df_editado_oficial.copy()
                             for c in colunas_bd_oficiais:
                                 if c not in df_to_insert.columns:
                                     df_to_insert[c] = ""
-                            df_to_insert = df_to_insert[colunas_bd_oficiais].astype(
-                                str)
+                            df_to_insert = df_to_insert[colunas_bd_oficiais].astype(str)
 
                             aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            df_up_final = pd.DataFrame(
-                                aba_m.get_all_values()[
-                                    1:], columns=aba_m.get_all_values()[0])
+                            df_up_final = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
 
-                            # Evitar duplicações caso haja um duplo clique
-                            pedidos_existentes = df_up_final['PEDIDO'].astype(
-                                str).tolist()
-                            df_to_insert_clean = df_to_insert[~df_to_insert['PEDIDO'].astype(
-                                str).isin(pedidos_existentes)]
+                            pedidos_existentes = df_up_final['PEDIDO'].astype(str).tolist()
+                            df_to_insert_clean = df_to_insert[~df_to_insert['PEDIDO'].astype(str).isin(pedidos_existentes)]
 
                             if not df_to_insert_clean.empty:
-                                df_up_final = pd.concat(
-                                    [df_up_final, df_to_insert_clean], ignore_index=True)
+                                df_up_final = pd.concat([df_up_final, df_to_insert_clean], ignore_index=True)
                                 aba_m.clear()
-                                aba_m.update("A1", [df_up_final.columns.tolist(
-                                )] + df_up_final.fillna("").astype(str).values.tolist())
+                                aba_m.update("A1", [df_up_final.columns.tolist()] + df_up_final.fillna("").astype(str).values.tolist())
 
                                 lista_app_of = []
                                 for _, r in df_to_insert_clean.iterrows():
@@ -4451,9 +4321,7 @@ elif menu == "📥 Importações":
                                 if lista_app_of:
                                     despachar_para_appsheet(lista_app_of)
 
-                            # 🚨 O CARRINHO É PRESERVADO NA TELA APÓS A INJEÇÃO 🚨
-                            st.success(
-                                f"🎉 SUCESSO! O Lote foi injetado no C.C.O. Prossiga para o Passo 2.")
+                            st.success(f"🎉 SUCESSO! O Lote foi injetado no C.C.O. Prossiga para o Passo 2.")
                             time.sleep(2.5)
                             carregar_dados_completos.clear()
                             st.rerun()
@@ -4462,19 +4330,12 @@ elif menu == "📥 Importações":
 
             # PASSO 2: WHATSAPP
             with col_zap.popover("📲 2. Disparar WhatsApp", use_container_width=True):
-                st.markdown(
-                    "Isso disparará as rotas para todos os motoristas. **Lembre-se de clicar em Injetar no Banco depois para salvar o status do disparo!**")
-                if st.button(
-                    "🚀 Confirmar Disparos",
-                    use_container_width=True,
-                        key="zap_oficial"):
-                    dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(
-                        r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
-                    dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(
-                        r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
+                st.markdown("Isso disparará as rotas para todos os motoristas. **Lembre-se de clicar em Injetar no Banco depois para salvar o status do disparo!**")
+                if st.button("🚀 Confirmar Disparos", use_container_width=True, key="zap_oficial"):
+                    dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
+                    dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
 
-                    agentes_selecionados = df_editado_oficial['AGENTE_RAW'].dropna(
-                    ).unique()
+                    agentes_selecionados = df_editado_oficial['AGENTE_RAW'].dropna().unique()
                     sucessos_of = 0
 
                     if len(agentes_selecionados) > 0:
@@ -4482,96 +4343,50 @@ elif menu == "📥 Importações":
                         status_txt = st.empty()
 
                         for idx_ag, ag in enumerate(agentes_selecionados):
-                            if not str(ag).strip():
-                                continue
+                            if not str(ag).strip(): continue
                             df_ag_of = df_editado_oficial[df_editado_oficial['AGENTE_RAW'] == ag]
                             tel = dict_tel.get(str(ag).strip().lower(), "")
-                            nom = dict_nom.get(
-                                str(ag).strip().lower(), str(ag).upper())
+                            nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
 
-                            # 🔥 A CATRACA E BLINDAGEM AGORA NA IMPORTAÇÃO OFICIAL 🔥
                             ag_login = str(ag).strip().lower()
-                            login_base = ag_login.split(
-                                '|')[0].split('/')[0].strip()
+                            login_base = ag_login.split('|')[0].split('/')[0].strip()
                             is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
                             is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
 
                             if tel:
-                                status_txt.markdown(
-                                    f"**Enviando rota para:** {nom} ({idx_ag + 1}/{len(agentes_selecionados)})...")
-                                dt_ref = pd.to_datetime(
-                                    df_ag_of.iloc[0]['DATA'],
-                                    format='%d/%m/%Y',
-                                    errors='coerce').date() if not df_ag_of.empty else hoje_br
+                                status_txt.markdown(f"**Enviando rota para:** {nom} ({idx_ag + 1}/{len(agentes_selecionados)})...")
+                                dt_ref = pd.to_datetime(df_ag_of.iloc[0]['DATA'], format='%d/%m/%Y', errors='coerce').date() if not df_ag_of.empty else hoje_br
                                 data_str = dt_ref.strftime('%d/%m/%Y')
 
-                                # 🔥 Extrai UF para personalização regional
                                 uf_agente_of = ""
                                 if 'UF' in df_ag_of.columns:
                                     ufs_unicos_of = df_ag_of['UF'].dropna().unique()
                                     if len(ufs_unicos_of) > 0:
                                         uf_agente_of = str(ufs_unicos_of[0]).upper().strip()
                                 
-                                saudacao, fechamento = gerar_saudacao_spintax(
-                                    nom, uf_agente_of)
-                                sep1 = random.choice(
-                                    [
-                                        '-------------------------------',
-                                        '...............................',
-                                        '=========================',
-                                        '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
-                                sep2 = random.choice(
-                                    ['---', '...', '===', ' '])
-                                bullet = random.choice(
-                                    ['> 🔸', '👉', '📌', '📦', '➖'])
-                                lab_lbl = random.choice(
-                                    ['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
+                                saudacao, fechamento = gerar_saudacao_spintax(nom, uf_agente_of)
+                                sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
+                                sep2 = random.choice(['---', '...', '===', ' '])
+                                bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
+                                lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
 
-                                msg_parts = [
-                                    f"{saudacao}rota de 🗓️ {data_str}\n",
-                                    "RESUMO DA ROTA:\n",
-                                    "CIDADE                  | QTD",
-                                    sep1]
+                                msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
                                 tot_qtd = 0
-                                for cid, count in df_ag_of['CIDADE'].value_counts(
-                                ).items():
-                                    msg_parts.append(
-                                        f"{str(cid).strip().ljust(20)} | {count:02d}")
+                                for cid, count in df_ag_of['CIDADE'].value_counts().items():
+                                    msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}")
                                     tot_qtd += count
-                                msg_parts.extend(
-                                    [sep1, f"TOTAL                   | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
+                                msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
 
                                 for cid, group in df_ag_of.groupby('CIDADE'):
-                                    msg_parts.extend(
-                                        [sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
+                                    msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
                                     items = []
                                     for _, row in group.iterrows():
-                                        item_str = f"{bullet} PEDIDO: {
-                                            row.get(
-                                                'PEDIDO',
-                                                '')}\n> 🔬 {lab_lbl}: {
-                                            row.get(
-                                                'LABORATORIO',
-                                                '')}\n> 📍 Rua: {
-                                            row.get(
-                                                'ENDERECO',
-                                                '')}, {
-                                            row.get(
-                                                'NUMERO',
-                                                '')}\n> 🏘️ Bairro: {
-                                            row.get(
-                                                'BAIRRO',
-                                                '')}\n> 🏢 Tomador: {
-                                            row.get(
-                                                'TOMADOR',
-                                                '')}"
-                                        obs = str(
-                                            row.get('OBSERVACOES', '')).strip()
+                                        item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                        obs = str(row.get('OBSERVACOES', '')).strip()
                                         if obs and obs.upper() != 'NAN':
                                             item_str += f"\n> 📝 Aviso: {obs}"
                                         items.append(item_str)
-                                    msg_parts.append(
-                                        f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
+                                    msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
 
                                 msg_parts.append(f"\n{fechamento}")
 
@@ -4579,104 +4394,54 @@ elif menu == "📥 Importações":
                                 TOKEN = "2321563615C4242CB6031504"
                                 CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S"
                                 try:
-                                    requests.post(
-                                        f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence",
-                                        json={
-                                            "phone": tel,
-                                            "presence": "composing"},
-                                        headers={
-                                            "Client-Token": CLIENT_TOKEN},
-                                        timeout=2)
+                                    requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
                                     time.sleep(random.uniform(3.0, 5.0))
-                                except BaseException:
-                                    pass
+                                except BaseException: pass
 
-                                if enviar_whatsapp_zapi(
-                                        tel, "\n".join(msg_parts)):
+                                if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
                                     time.sleep(random.uniform(2.0, 4.0))
 
                                     if is_autorizado_pdf:
                                         try:
-                                            requests.post(
-                                                f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence",
-                                                json={
-                                                    "phone": tel,
-                                                    "presence": "composing"},
-                                                headers={
-                                                    "Client-Token": CLIENT_TOKEN},
-                                                timeout=2)
+                                            requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
                                             time.sleep(2)
-                                        except BaseException:
-                                            pass
-                                        enviar_pdf_zapi(
-                                            tel, gerar_pdf_rota_whatsapp(
-                                                nom, data_str, df_ag_of), f"ROTA_IGO_{
-                                                nom.replace(
-                                                    ' ', '_')}_{
-                                                dt_ref.strftime('%d%m')}.pdf")
+                                        except BaseException: pass
+                                        enviar_pdf_zapi(tel, gerar_pdf_rota_whatsapp(nom, data_str, df_ag_of), f"ROTA_IGO_{nom.replace(' ', '_')}_{dt_ref.strftime('%d%m')}.pdf")
                                         time.sleep(3.0)
 
                                     if is_autorizado_xls:
                                         try:
-                                            requests.post(
-                                                f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence",
-                                                json={
-                                                    "phone": tel,
-                                                    "presence": "composing"},
-                                                headers={
-                                                    "Client-Token": CLIENT_TOKEN},
-                                                timeout=2)
+                                            requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
                                             time.sleep(2)
-                                        except BaseException:
-                                            pass
-                                        enviar_excel_zapi(
-                                            tel,
-                                            gerar_excel_rota_whatsapp(df_ag_of),
-                                            f"ROTA_ESTRUTURADA_{
-                                                nom.replace(
-                                                    ' ',
-                                                    '_')}_{
-                                                dt_ref.strftime('%d%m')}.xlsx")
+                                        except BaseException: pass
+                                        enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_ag_of), f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{dt_ref.strftime('%d%m')}.xlsx")
                                         time.sleep(2.0)
 
                                     sucessos_of += 1
 
                                     try:
-                                        aba_m = planilha_db.worksheet(
-                                            "Memoria_Sistema")
-                                        df_nuvem = pd.DataFrame(
-                                            aba_m.get_all_values()[
-                                                1:], columns=aba_m.get_all_values()[0])
+                                        aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                        df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
                                         if 'ZAP_ENVIADO' not in df_nuvem.columns:
                                             df_nuvem['ZAP_ENVIADO'] = ""
-                                        df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_ag_of['PEDIDO'].tolist(
-                                        )), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
+                                        df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_ag_of['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
                                         aba_m.clear()
-                                        aba_m.update(
-                                            "A1", [
-                                                df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    except BaseException:
-                                        pass
+                                        aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                    except BaseException: pass
 
-                            progress_bar.progress(
-                                (idx_ag + 1) / len(agentes_selecionados))
+                        progress_bar.progress((idx_ag + 1) / len(agentes_selecionados))
 
                         status_txt.markdown("✅ **Processo finalizado!**")
                         if sucessos_of > 0:
-                            st.success(
-                                f"🎉 Disparo concluído para {sucessos_of} motorista(s)!")
+                            st.success(f"🎉 Disparo concluído para {sucessos_of} motorista(s)!")
                             time.sleep(3.5)
                             st.rerun()
                         else:
-                            st.error(
-                                "🚨 Nenhum envio realizado. Verifique os agentes.")
+                            st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
 
             # PASSO 3: LIMPAR MESA
             with col_limp:
-                if st.button(
-                    "🧹 3. Limpar Mesa e Finalizar",
-                    type="secondary",
-                        use_container_width=True):
+                if st.button("🧹 3. Limpar Mesa e Finalizar", type="secondary", use_container_width=True):
                     st.session_state.df_carrinho_oficial = pd.DataFrame()
                     if 'contador_oficial_temp' in st.session_state:
                         del st.session_state.contador_oficial_temp
@@ -4686,107 +4451,65 @@ elif menu == "📥 Importações":
         else:
             st.info("🛒 O carrinho está vazio. Cole uma matriz acima para começar ou marque o interruptor dos pedidos fixos para adicioná-los.")
 
-    # =========================================================================
-    # 🔁 ABA 2: GESTÃO DE PEDIDOS FIXOS (IMPORTAÇÃO OFICIAL)
-    # =========================================================================
+    # -------------------------------------------------------------------------
+    # ABA 2: GESTÃO DE PEDIDOS FIXOS (IMPORTAÇÃO OFICIAL)
+    # -------------------------------------------------------------------------
     with tab_fixos_of:
         st.markdown("#### 🏭 Criar Novo Agendamento Fixo")
 
-        cols_fixos_of = [
-            'ID_REGRA',
-            'TOMADOR',
-            'LABORATORIO',
-            'ENDERECO',
-            'NUMERO',
-            'BAIRRO',
-            'CIDADE',
-            'UF',
-            'CEP',
-            'OBSERVACOES',
-            'MOTORISTA',
-            'SEG',
-            'TER',
-            'QUA',
-            'QUI',
-            'SEX',
-            'SAB',
-            'STATUS']
+        cols_fixos_of = ['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
         df_regras_of = pd.DataFrame(columns=cols_fixos_of)
 
         try:
             aba_fixos_of = planilha_db.worksheet("Agendamentos_Fixos_Oficial")
             dados_fixos_of = aba_fixos_of.get_all_values()
             if len(dados_fixos_of) > 1:
-                df_regras_of = pd.DataFrame(
-                    dados_fixos_of[1:], columns=dados_fixos_of[0])
+                df_regras_of = pd.DataFrame(dados_fixos_of[1:], columns=dados_fixos_of[0])
         except Exception:
             try:
-                aba_fixos_of = planilha_db.add_worksheet(
-                    "Agendamentos_Fixos_Oficial", 100, 20)
+                aba_fixos_of = planilha_db.add_worksheet("Agendamentos_Fixos_Oficial", 100, 20)
                 aba_fixos_of.update("A1", [cols_fixos_of])
-            except Exception:
-                pass
+            except Exception: pass
 
         def buscar_cep_fixo_of_callback():
-            chave_atual = f"cep_input_fixo_of_{
-                st.session_state.cep_version_of}"
+            chave_atual = f"cep_input_fixo_of_{st.session_state.cep_version_of}"
             cep_digitado = st.session_state.get(chave_atual, "")
             cep_limpo = re.sub(r'\D', '', cep_digitado)
             if len(cep_limpo) == 8:
                 try:
-                    resp = requests.get(
-                        f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
+                    resp = requests.get(f"https://viacep.com.br/ws/{cep_limpo}/json/").json()
                     if "erro" not in resp:
-                        st.session_state['f_rua_of'] = padronizar_texto(
-                            resp.get("logradouro", ""))
-                        st.session_state['f_bai_of'] = padronizar_texto(
-                            resp.get("bairro", ""))
-                        st.session_state['f_cid_of'] = padronizar_texto(
-                            resp.get("localidade", ""))
-                        st.session_state['f_uf_of'] = padronizar_texto(
-                            resp.get("uf", ""))
-                except Exception:
-                    pass
+                        st.session_state['f_rua_of'] = padronizar_texto(resp.get("logradouro", ""))
+                        st.session_state['f_bai_of'] = padronizar_texto(resp.get("bairro", ""))
+                        st.session_state['f_cid_of'] = padronizar_texto(resp.get("localidade", ""))
+                        st.session_state['f_uf_of'] = padronizar_texto(resp.get("uf", ""))
+                except Exception: pass
 
-        cc1_f, cc2_f, cc3_f = st.columns(
-            [2, 1, 3], vertical_alignment="bottom")
+        cc1_f, cc2_f, cc3_f = st.columns([2, 1, 3], vertical_alignment="bottom")
 
-        key_dinamica_of = f"cep_input_fixo_of_{
-            st.session_state.cep_version_of}"
-        cc1_f.text_input(
-            "Digite o CEP e aperte ENTER",
-            max_chars=9,
-            key=key_dinamica_of,
-            on_change=buscar_cep_fixo_of_callback)
+        key_dinamica_of = f"cep_input_fixo_of_{st.session_state.cep_version_of}"
+        cc1_f.text_input("Digite o CEP e aperte ENTER", max_chars=9, key=key_dinamica_of, on_change=buscar_cep_fixo_of_callback)
 
-        if cc2_f.button(
-            "🔍 Buscar CEP",
-            key="btn_busc_cep_fixo_of",
-                use_container_width=True):
+        if cc2_f.button("🔍 Buscar CEP", key="btn_busc_cep_fixo_of", use_container_width=True):
             buscar_cep_fixo_of_callback()
 
         st.markdown("---")
 
         with st.form("form_novo_fixo_oficial", clear_on_submit=True):
             col_f1, col_f2 = st.columns(2)
-            f_tomador = col_f1.selectbox(
-                "Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
+            f_tomador = col_f1.selectbox("Tomador *", ["Selecione..."] + CLIENTES_AUTORIZADOS)
             f_lab = col_f2.text_input("Ponto de Coleta / Laboratório *")
 
             c_rua, c_num = st.columns([3, 1])
-            f_rua = c_rua.text_input(
-                "Logradouro *", value=st.session_state['f_rua_of'])
+            f_rua = c_rua.text_input("Logradouro *", value=st.session_state['f_rua_of'])
             f_num = c_num.text_input("Número *")
 
             c_bai, c_cid, c_uf = st.columns([2, 2, 1])
-            f_bai = c_bai.text_input(
-                "Bairro *", value=st.session_state['f_bai_of'])
-            f_cid = c_cid.text_input(
-                "Cidade *", value=st.session_state['f_cid_of'])
+            f_bai = c_bai.text_input("Bairro *", value=st.session_state['f_bai_of'])
+            f_cid = c_cid.text_input("Cidade *", value=st.session_state['f_cid_of'])
             f_uf = c_uf.text_input("UF *", value=st.session_state['f_uf_of'])
 
-            f_obs = st.text_input(
-                "Observações Padrão (Ex: [COLETA: 08:00 - 12:00])")
+            f_obs = st.text_input("Observações Padrão (Ex: [COLETA: 08:00 - 12:00])")
 
             st.markdown("**Dias da Semana com Coleta Fixa:**")
             d1, d2, d3, d4, d5, d6 = st.columns(6)
@@ -4797,16 +4520,10 @@ elif menu == "📥 Importações":
             b_sex = d5.checkbox("Sexta")
             b_sab = d6.checkbox("Sábado")
 
-            logins_disp = sorted(
-                DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
-            f_agente = st.selectbox(
-                "Motorista Fixo:",
-                ["Automático (Por Rota)"] +
-                logins_disp)
+            logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+            f_agente = st.selectbox("Motorista Fixo:", ["Automático (Por Rota)"] + logins_disp)
 
-            if st.form_submit_button(
-                "💾 Salvar Agendamento Fixo",
-                    type="primary"):
+            if st.form_submit_button("💾 Salvar Agendamento Fixo", type="primary"):
                 if f_tomador == "Selecione..." or not f_lab or not f_rua or not f_num or not f_bai or not f_cid:
                     st.error("Preencha todos os campos obrigatórios (*).")
                 elif not any([b_seg, b_ter, b_qua, b_qui, b_sex, b_sab]):
@@ -4814,8 +4531,7 @@ elif menu == "📥 Importações":
                 else:
                     with st.spinner("Salvando regra..."):
                         if f_agente == "Automático (Por Rota)":
-                            f_agente = obter_login_agente(
-                                f_cid, f_bai, f_lab, f_rua, DF_AGENTES)
+                            f_agente = obter_login_agente(f_cid, f_bai, f_lab, f_rua, DF_AGENTES)
 
                         nova_regra = [
                             f"REG-{str(uuid.uuid4())[:6].upper()}", f_tomador, padronizar_texto(f_lab),
@@ -4843,74 +4559,32 @@ elif menu == "📥 Importações":
 
         st.markdown("---")
         st.markdown("#### ⚙️ Gerar Pedidos Fixos para a Importação")
-        dt_fixos_of = st.date_input(
-            "📅 Data da Rota Fixa:",
-            value=hoje_br,
-            key="dt_fixos_of")
-        dia_sem_of = {
-            0: 'SEG',
-            1: 'TER',
-            2: 'QUA',
-            3: 'QUI',
-            4: 'SEX',
-            5: 'SAB',
-            6: 'DOM'}
+        dt_fixos_of = st.date_input("📅 Data da Rota Fixa:", value=hoje_br, key="dt_fixos_of")
+        dia_sem_of = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
         dia_selecionado_of = dia_sem_of[dt_fixos_of.weekday()]
 
         df_geracao_of = pd.DataFrame()
         if not df_regras_of.empty and dia_selecionado_of != 'DOM':
-            df_geracao_of = df_regras_of[(df_regras_of['STATUS'].astype(str).str.upper() == 'ATIVO') & (
-                df_regras_of[dia_selecionado_of].astype(str).str.upper() == 'SIM')].copy()
+            df_geracao_of = df_regras_of[(df_regras_of['STATUS'].astype(str).str.upper() == 'ATIVO') & (df_regras_of[dia_selecionado_of].astype(str).str.upper() == 'SIM')].copy()
 
         if dia_selecionado_of == 'DOM':
-            st.info(
-                f"Hoje é domingo. Pedidos fixos não são gerados para domingo.")
+            st.info(f"Hoje é domingo. Pedidos fixos não são gerados para domingo.")
         elif df_geracao_of.empty:
-            st.info(
-                f"Nenhum pedido fixo programado para {
-                    dt_fixos_of.strftime('%d/%m/%Y')} ({dia_selecionado_of}).")
+            st.info(f"Nenhum pedido fixo programado para {dt_fixos_of.strftime('%d/%m/%Y')} ({dia_selecionado_of}).")
         else:
-            st.info(
-                f"{
-                    len(df_geracao_of)} pedido(s) fixo(s) encontrados para {
-                    dt_fixos_of.strftime('%d/%m/%Y')} ({dia_selecionado_of}).")
-            st.dataframe(df_geracao_of[['TOMADOR',
-                                        'LABORATORIO',
-                                        'ENDERECO',
-                                        'NUMERO',
-                                        'BAIRRO',
-                                        'CIDADE',
-                                        'UF',
-                                        'MOTORISTA',
-                                        'OBSERVACOES']].fillna(""),
-                         use_container_width=True)
+            st.info(f"{len(df_geracao_of)} pedido(s) fixo(s) encontrados para {dt_fixos_of.strftime('%d/%m/%Y')} ({dia_selecionado_of}).")
+            st.dataframe(df_geracao_of[['TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'MOTORISTA', 'OBSERVACOES']].fillna(""), use_container_width=True)
 
-            if st.button(
-                "➕ Adicionar Regras Fixas ao Preview Oficial",
-                    key="btn_add_fixos_preview_of"):
+            if st.button("➕ Adicionar Regras Fixas ao Preview Oficial", key="btn_add_fixos_preview_of"):
                 novos_fixos = []
                 for _, regra in df_geracao_of.iterrows():
                     agente = str(regra.get('MOTORISTA', '')).strip()
-                    if not agente or agente.upper() in [
-                        'AUTOMÁTICO (POR ROTA)',
-                        'AUTOMATICO (POR ROTA)',
-                            'AUTOMATICO (POR ROTA)']:
-                        agente = obter_login_agente(
-                            str(
-                                regra.get(
-                                    'CIDADE', '')), str(
-                                regra.get(
-                                    'BAIRRO', '')), str(
-                                regra.get(
-                                    'LABORATORIO', '')), str(
-                                regra.get(
-                                    'ENDERECO', '')), DF_AGENTES)
+                    if not agente or agente.upper() in ['AUTOMÁTICO (POR ROTA)', 'AUTOMATICO (POR ROTA)', 'AUTOMATICO (POR ROTA)']:
+                        agente = obter_login_agente(str(regra.get('CIDADE', '')), str(regra.get('BAIRRO', '')), str(regra.get('LABORATORIO', '')), str(regra.get('ENDERECO', '')), DF_AGENTES)
 
                     obs_fix = str(regra.get('OBSERVACOES', '')).strip()
-                    if obs_fix and obs_fix.upper() not in ['NAN', 'NONE']:
-                        obs_fix = obs_fix + ' [FIXO]'
-                    else:
-                        obs_fix = '[FIXO]'
+                    if obs_fix and obs_fix.upper() not in ['NAN', 'NONE']: obs_fix = obs_fix + ' [FIXO]'
+                    else: obs_fix = '[FIXO]'
 
                     novos_fixos.append({
                         'DATA': dt_fixos_of.strftime('%d/%m/%Y'),
@@ -4931,22 +4605,19 @@ elif menu == "📥 Importações":
                 df_novos_fixos_of = pd.DataFrame(novos_fixos)
                 if not df_novos_fixos_of.empty:
                     if not st.session_state.df_preview_oficial.empty:
-                        st.session_state.df_preview_oficial = pd.concat(
-                            [st.session_state.df_preview_oficial, df_novos_fixos_of], ignore_index=True)
+                        st.session_state.df_preview_oficial = pd.concat([st.session_state.df_preview_oficial, df_novos_fixos_of], ignore_index=True)
                     else:
                         st.session_state.df_preview_oficial = df_novos_fixos_of
-                    st.success(
-                        "✅ Pedidos fixos adicionados ao preview oficial. Volte à Aba 1 para revisar e adicionar ao carrinho.")
-                    time.sleep(1.5)
-                    st.rerun()
+                st.success("✅ Pedidos fixos adicionados ao preview oficial. Volte à Aba 1 para revisar e adicionar ao carrinho.")
+                time.sleep(1.5)
+                st.rerun()
 
         st.markdown("---")
         st.markdown("#### 📋 Gerenciar Laboratórios Fixos")
         st.info("💡 **Edite diretamente na tabela!** Mude o Status (ATIVO/INATIVO), ajuste os dias da semana ou troque o Motorista. Para deletar, selecione a linha no canto esquerdo e aperte a tecla 'Delete' ou 'Backspace'.")
 
         if not df_regras_of.empty:
-            logins_p_tabela_of = sorted(
-                DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+            logins_p_tabela_of = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
 
             df_regras_edit_of = st.data_editor(
                 df_regras_of,
@@ -4966,18 +4637,14 @@ elif menu == "📥 Importações":
                 key="editor_regras_fixas_oficial"
             )
 
-            if st.button(
-                "💾 Salvar Alterações na Base de Regras",
-                type="primary",
-                    use_container_width=True):
+            if st.button("💾 Salvar Alterações na Base de Regras", type="primary", use_container_width=True):
                 with st.spinner("Atualizando banco de dados..."):
                     try:
                         aba_fixos_of.clear()
                         if df_regras_edit_of.empty:
                             aba_fixos_of.update("A1", [cols_fixos_of])
                         else:
-                            aba_fixos_of.update("A1", [df_regras_edit_of.columns.tolist(
-                            )] + df_regras_edit_of.fillna("").astype(str).values.tolist())
+                            aba_fixos_of.update("A1", [df_regras_edit_of.columns.tolist()] + df_regras_edit_of.fillna("").astype(str).values.tolist())
                         st.success("✅ Regras atualizadas com sucesso!")
                         time.sleep(1.5)
                         st.rerun()
@@ -4991,6 +4658,8 @@ elif menu == "📥 Importações":
 # =============================================================================
 elif menu == "📥 Importações Umove":
     import streamlit.components.v1 as components
+    # Garante que o AgGrid está disponível neste bloco
+    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
     # 🔥 PING SILENCIOSO (ANTI-TIMEOUT DO RENDER) 🔥
     components.html(
@@ -5005,12 +4674,11 @@ elif menu == "📥 Importações Umove":
     )
 
     st.markdown(
-        "<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Zona de Importação & Pedidos Fixos</h3></div>",
+        "<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Zona de Importação & Central de Envios</h3></div>",
         unsafe_allow_html=True)
 
     if planilha_sandbox is None or planilha_db is None:
-        st.error(
-            "❌ Erro de conexão com as planilhas no Drive. Verifique as permissões.")
+        st.error("❌ Erro de conexão com as planilhas no Drive. Verifique as permissões.")
         st.stop()
 
     if "df_sandbox_mem" not in st.session_state:
@@ -5018,175 +4686,223 @@ elif menu == "📥 Importações Umove":
     if "df_preview_sb" not in st.session_state:
         st.session_state.df_preview_sb = pd.DataFrame()
 
+    # --- INÍCIO: VARIÁVEIS DA MÁQUINA DE ESTADOS ---
+    if "umove_lote_atual_id" not in st.session_state:
+        st.session_state.umove_lote_atual_id = None
+
+    def gerenciar_estado_lote(acao, lote_id=None, df_carrinho=None, resultados=None):
+        if planilha_sandbox is None: return None
+        try:
+            try:
+                aba = planilha_sandbox.worksheet("Historico_Disparos_Umove")
+            except:
+                aba = planilha_sandbox.add_worksheet("Historico_Disparos_Umove", 200, 20)
+                aba.update("A1", [["ID_EVENTO", "DATA_DISPARO", "PERIODO", "MOTORISTA", "TOTAL_PEDIDOS", "SUCESSOS", "FALHAS", "PEDIDOS", "STATUS_LOTE", "DADOS_JSON"]])
+            
+            dados = aba.get_all_values()
+            cabecalho = dados[0] if len(dados) > 0 else []
+            
+            if "STATUS_LOTE" not in cabecalho:
+                cabecalho.extend(["STATUS_LOTE", "DADOS_JSON"])
+                aba.update("A1", [cabecalho])
+                
+            # 🔥 CORREÇÃO ANTI-CRASH: Força todas as linhas a terem o mesmo tamanho da coluna do cabeçalho
+            dados_pad = []
+            for linha in dados[1:]:
+                linha_completa = linha + [""] * (len(cabecalho) - len(linha))
+                dados_pad.append(linha_completa)
+                
+            df_hist = pd.DataFrame(dados_pad, columns=cabecalho) if dados_pad else pd.DataFrame(columns=cabecalho)
+            
+            if acao == "SALVAR_RASCUNHO":
+                if df_carrinho is None or df_carrinho.empty:
+                    return
+                json_dados = df_carrinho.to_json(orient='records')
+                agora = datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S')
+                
+                if lote_id in df_hist['ID_EVENTO'].values:
+                    linha_idx = df_hist.index[df_hist['ID_EVENTO'] == lote_id][0] + 2
+                    aba.update_cell(linha_idx, cabecalho.index("DADOS_JSON") + 1, json_dados)
+                    aba.update_cell(linha_idx, cabecalho.index("TOTAL_PEDIDOS") + 1, len(df_carrinho))
+                    aba.update_cell(linha_idx, cabecalho.index("STATUS_LOTE") + 1, "RASCUNHO")
+                else:
+                    nova_linha = {c: "" for c in cabecalho}
+                    nova_linha["ID_EVENTO"] = lote_id
+                    nova_linha["DATA_DISPARO"] = agora
+                    nova_linha["PERIODO"] = "Lote em Rascunho"
+                    nova_linha["TOTAL_PEDIDOS"] = len(df_carrinho)
+                    nova_linha["STATUS_LOTE"] = "RASCUNHO"
+                    nova_linha["DADOS_JSON"] = json_dados
+                    aba.append_row([nova_linha.get(c, "") for c in cabecalho], value_input_option='USER_ENTERED')
+                    
+            elif acao == "LISTAR_RASCUNHOS":
+                if not df_hist.empty and 'STATUS_LOTE' in df_hist.columns:
+                    return df_hist[df_hist['STATUS_LOTE'].str.contains("RASCUNHO", case=False, na=False)]
+                return pd.DataFrame()
+                
+            elif acao == "EXCLUIR_RASCUNHO":
+                if lote_id in df_hist['ID_EVENTO'].values:
+                    linha_idx = df_hist.index[df_hist['ID_EVENTO'] == lote_id][0] + 2
+                    aba.delete_rows(int(linha_idx))
+                    
+            elif acao == "CONCLUIR":
+                if lote_id in df_hist['ID_EVENTO'].values:
+                    linha_idx = df_hist.index[df_hist['ID_EVENTO'] == lote_id][0] + 2
+                    suc = sum([d.get('sucesso', 0) for d in resultados.values()]) if resultados else 0
+                    fal = sum([(d.get('total', 0) - d.get('sucesso', 0)) for d in resultados.values()]) if resultados else 0
+                    
+                    motoristas_list = list(resultados.keys()) if resultados else []
+                    motoristas_str = ", ".join(motoristas_list)[:200]
+                    
+                    pedidos_list = []
+                    if resultados:
+                        for d in resultados.values(): pedidos_list.extend(d.get('pedidos', []))
+                    pedidos_text = ", ".join([str(p) for p in pedidos_list])[:3000]
+
+                    aba.update_cell(linha_idx, cabecalho.index("STATUS_LOTE") + 1, "CONCLUÍDO")
+                    aba.update_cell(linha_idx, cabecalho.index("DADOS_JSON") + 1, "[]") # Apaga o peso da memória
+                    aba.update_cell(linha_idx, cabecalho.index("SUCESSOS") + 1, suc)
+                    aba.update_cell(linha_idx, cabecalho.index("FALHAS") + 1, fal)
+                    aba.update_cell(linha_idx, cabecalho.index("MOTORISTA") + 1, motoristas_str)
+                    aba.update_cell(linha_idx, cabecalho.index("PEDIDOS") + 1, pedidos_text)
+        except Exception as e:
+            pass # Silencia o erro para não quebrar a tela de login
+    # --- FIM: MOTOR DE ESTADOS ---
+
+    if 'cep_version_of' not in st.session_state:
+        st.session_state['cep_version_of'] = 0
+
     tab_matriz, tab_fixos, tab_carrinho, tab_envios, tab_backup = st.tabs(
         ["📋 1. Colar Matriz", "🔁 2. Gestão de Pedidos Fixos", "🛒 3. Carrinho & Arquivos", "🚀 4. Central de Envios", "🛟 5. Recuperação Offline"])
 
     # -------------------------------------------------------------------------
-    # ABA 1: COLAR MATRIZ TRADICIONAL
+    # ABA 1: COLAR MATRIZ TRADICIONAL (Layout e UX Otimizados + Contador Blindado)
     # -------------------------------------------------------------------------
     with tab_matriz:
-        with st.container(border=True):
-            st.markdown("#### Importação Avulsa (Matriz do Cliente)")
-            c1_sb, c2_sb, c3_sb = st.columns([1, 1, 2])
-            with c1_sb:
-                tom_sandbox = st.selectbox(
-                    "🏢 Tomador Desta Carga:",
-                    ["Selecione..."] +
-                    CLIENTES_AUTORIZADOS,
-                    key="tom_sb")
-            with c2_sb:
-                dt_sandbox = st.date_input(
-                    "📅 Data da Rota:",
-                    format="DD/MM/YYYY",
-                    value=hoje_br,
-                    key="dt_sb")
+        st.markdown("### 📋 1. Importação Avulsa (Matriz do Cliente)")
+        st.markdown("<p style='font-size:14px; color:#64748B; margin-top:-10px;'>Insira os metadados da carga e cole as informações do sistema legado para mapeamento inteligente dos motoristas.</p>", unsafe_allow_html=True)
+        
+        # Grid superior de configurações básicas
+        c1_sb, c2_sb = st.columns([2, 1])
+        with c1_sb:
+            tom_sandbox = st.selectbox("🏢 Tomador Desta Carga *", ["Selecione..."] + CLIENTES_AUTORIZADOS, key="tom_sb")
+        with c2_sb:
+            dt_sandbox = st.date_input("📅 Data da Rota *", format="DD/MM/YYYY", value=hoje_br, key="dt_sb")
 
-            txt_sb = st.text_area(
-                "📋 Cole os dados (Ctrl+V) do sistema legado:", height=150)
+        # Área de transferência proeminente
+        txt_sb = st.text_area("📋 Dados Brutos (Ctrl+V):", height=180, placeholder="Cole as colunas copiadas do Excel ou sistema legado aqui...")
 
-            if st.button(
-                "🔍 Processar Matriz",
-                type="primary",
-                    use_container_width=True):
-                if not txt_sb or tom_sandbox == "Selecione...":
-                    st.warning("⚠️ Preencha o Tomador e cole os dados!")
-                else:
-                    with st.spinner("Lendo dados colados..."):
-                        try:
-                            delim = '\t' if '\t' in txt_sb else (
-                                ';' if ';' in txt_sb else ',')
-                            df_raw_sb = pd.read_csv(
-                                io.StringIO(txt_sb), sep=delim, header=None, dtype=str).fillna("")
+        # Botão de processamento principal com destaque visual
+        if st.button("🔍 Processar e Validar Matriz", type="primary", use_container_width=True):
+            if not txt_sb or tom_sandbox == "Selecione...":
+                st.warning("⚠️ **Impossível Prosseguir:** Por favor, selecione o Tomador e cole os dados da matriz antes de processar.")
+            else:
+                with st.spinner("Analisando estrutura de colunas e cruzando dados..."):
+                    try:
+                        delim = '\t' if '\t' in txt_sb else (';' if ';' in txt_sb else ',')
+                        df_raw_sb = pd.read_csv(io.StringIO(txt_sb), sep=delim, header=None, dtype=str).fillna("")
 
-                            idx_h, max_matches = 0, 0
-                            for i in range(min(15, len(df_raw_sb))):
-                                row_str = unicodedata.normalize(
-                                    'NFKD', " ".join(
-                                        df_raw_sb.iloc[i].astype(str).values).upper()).encode(
-                                    'ASCII', 'ignore').decode('utf-8')
-                                matches = sum(
-                                    1 for kw in [
-                                        'PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID',
-                                        'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE',
-                                        'ENDERE', 'RUA', 'BAIRRO', 'CEP', 'HORARIO', 'FUNCIONAMENTO', 'OBSERVA'] if kw in row_str)
-                                if matches > max_matches:
-                                    max_matches, idx_h = matches, i
+                        idx_h, max_matches = 0, 0
+                        for i in range(min(15, len(df_raw_sb))):
+                            row_str = unicodedata.normalize('NFKD', " ".join(df_raw_sb.iloc[i].astype(str).values).upper()).encode('ASCII', 'ignore').decode('utf-8')
+                            matches = sum(1 for kw in ['PEDIDO', 'CODIGO', 'CNPJ', 'CPF', 'DOCUMENTO', 'DOC', 'ID', 'CIDADE', 'MUNIC', 'LABORAT', 'POSTO', 'NOME', 'CLIENTE', 'ENDERE', 'RUA', 'BAIRRO', 'CEP', 'HORARIO', 'FUNCIONAMENTO', 'OBSERVA'] if kw in row_str)
+                            if matches > max_matches:
+                                max_matches, idx_h = matches, i
 
-                            df_limpo_sb = df_raw_sb.iloc[idx_h + 1:].copy()
-                            df_limpo_sb.columns = [
-                                str(c).strip() for c in df_raw_sb.iloc[idx_h].values]
-                            df_limpo_sb = df_limpo_sb.loc[:, ~
-                                                          df_limpo_sb.columns.duplicated()]
+                        df_limpo_sb = df_raw_sb.iloc[idx_h + 1:].copy()
+                        df_limpo_sb.columns = [str(c).strip() for c in df_raw_sb.iloc[idx_h].values]
+                        df_limpo_sb = df_limpo_sb.loc[:, ~df_limpo_sb.columns.duplicated()]
 
-                            for col in df_limpo_sb.columns:
-                                df_limpo_sb[col] = df_limpo_sb[col].apply(
-                                    tratar_texto_global)
+                        for col in df_limpo_sb.columns:
+                            df_limpo_sb[col] = df_limpo_sb[col].apply(tratar_texto_global)
 
-                            mapa_sb = {}
-                            for c in df_limpo_sb.columns:
-                                c_upper = str(c).upper().strip()
-                                cl = ''.join(
-                                    e for e in unicodedata.normalize(
-                                        'NFKD', c_upper).encode(
-                                        'ASCII', 'ignore').decode('utf-8') if e.isalnum())
+                        mapa_sb = {}
+                        for c in df_limpo_sb.columns:
+                            c_upper = str(c).upper().strip()
+                            cl = ''.join(e for e in unicodedata.normalize('NFKD', c_upper).encode('ASCII', 'ignore').decode('utf-8') if e.isalnum())
+                            if c_upper in ['Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in ['N', 'NO', 'NR', 'NUM', 'NUMERO']: mapa_sb[c] = 'NUMERO'
+                            elif any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID': mapa_sb[c] = 'PEDIDO'
+                            elif any(x in cl for x in ['CNPJ', 'CPF', 'DOCUMENTO', 'DOC']): mapa_sb[c] = 'CNPJ'
+                            elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): mapa_sb[c] = 'LABORATORIO'
+                            elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): mapa_sb[c] = 'ENDERECO'
+                            elif 'BAIRRO' in cl: mapa_sb[c] = 'BAIRRO'
+                            elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa_sb[c] = 'CIDADE'
+                            elif any(x in cl for x in ['ESTADO', 'UF']): mapa_sb[c] = 'UF'
+                            elif 'CEP' in cl: mapa_sb[c] = 'CEP'
+                            elif any(x in cl for x in ['HORARIO', 'HORA', 'FUNCIONAMENTO', 'PERIODO']): mapa_sb[c] = 'HORARIO'
+                            elif any(x in cl for x in ['OBSERVA', 'OBS', 'NOTA']): mapa_sb[c] = 'OBSERVACOES'
 
-                                if c_upper in ['Nº', 'N°', 'N.', 'N', 'NUM', 'NUMERO', 'NRO'] or cl in ['N', 'NO', 'NR', 'NUM', 'NUMERO']:
-                                    mapa_sb[c] = 'NUMERO'
-                                elif any(x in cl for x in ['PEDIDO', 'SOLICITA', 'CODIGO', 'CDIGO']) or cl == 'ID':
-                                    mapa_sb[c] = 'PEDIDO'
-                                elif any(x in cl for x in ['CNPJ', 'CPF', 'DOCUMENTO', 'DOC']):
-                                    mapa_sb[c] = 'CNPJ'
-                                elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']):
-                                    mapa_sb[c] = 'LABORATORIO'
-                                elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']):
-                                    mapa_sb[c] = 'ENDERECO'
-                                elif 'BAIRRO' in cl:
-                                    mapa_sb[c] = 'BAIRRO'
-                                elif any(x in cl for x in ['CIDADE', 'MUNIC']):
-                                    mapa_sb[c] = 'CIDADE'
-                                elif any(x in cl for x in ['ESTADO', 'UF']):
-                                    mapa_sb[c] = 'UF'
-                                elif 'CEP' in cl:
-                                    mapa_sb[c] = 'CEP'
-                                elif any(x in cl for x in ['HORARIO', 'HORA', 'FUNCIONAMENTO', 'PERIODO']):
-                                    mapa_sb[c] = 'HORARIO'
-                                elif any(x in cl for x in ['OBSERVA', 'OBS', 'NOTA']):
-                                    mapa_sb[c] = 'OBSERVACOES'
+                        df_limpo_sb.rename(columns=mapa_sb, inplace=True)
 
-                            df_limpo_sb.rename(columns=mapa_sb, inplace=True)
+                        for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
+                            if c not in df_limpo_sb.columns:
+                                df_limpo_sb[c] = ""
 
-                            for c in [
-                                'PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO',
-                                'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
-                                if c not in df_limpo_sb.columns:
-                                    df_limpo_sb[c] = ""
-
-                            if 'HORARIO' in df_limpo_sb.columns:
-                                for idx, row in df_limpo_sb.iterrows():
-                                    horario_val = str(row['HORARIO']).strip()
-                                    obs_val = str(row['OBSERVACOES']).strip()
-                                    if horario_val and horario_val.upper() not in ['NAN', 'NONE']:
-                                        nova_obs = f"[COLETA: {horario_val}]"
-                                        if obs_val and obs_val.upper() not in ['NAN', 'NONE']:
-                                            nova_obs += f" - {obs_val}"
-                                        df_limpo_sb.at[idx, 'OBSERVACOES'] = nova_obs
-
-                            df_limpo_sb['PEDIDO'] = ""
+                        if 'HORARIO' in df_limpo_sb.columns:
                             for idx, row in df_limpo_sb.iterrows():
-                                e, n, b = str(
-                                    row['ENDERECO']), str(
-                                    row['NUMERO']), str(
-                                    row['BAIRRO'])
-                                if e and (not n or not b):
-                                    cep_m = re.search(r'(\d{5}-?\d{3})', e)
-                                    if cep_m:
-                                        df_limpo_sb.at[idx, 'CEP'] = cep_m.group(1)
-                                        e = e.replace(cep_m.group(1), '').strip(' ,-')
-                                    if ',' in e and not n:
-                                        pts = e.split(',')
-                                        df_limpo_sb.at[idx, 'ENDERECO'], df_limpo_sb.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
+                                horario_val = str(row['HORARIO']).strip()
+                                obs_val = str(row['OBSERVACOES']).strip()
+                                if horario_val and horario_val.upper() not in ['NAN', 'NONE']:
+                                    nova_obs = f"[COLETA: {horario_val}]"
+                                    if obs_val and obs_val.upper() not in ['NAN', 'NONE']:
+                                        nova_obs += f" - {obs_val}"
+                                    df_limpo_sb.at[idx, 'OBSERVACOES'] = nova_obs
 
-                            df_limpo_sb['UF'] = df_limpo_sb['UF'].astype(str).str.upper().str.strip()
-                            df_limpo_sb['TOMADOR'] = tom_sandbox
-                            df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
+                        df_limpo_sb['PEDIDO'] = ""
+                        for idx, row in df_limpo_sb.iterrows():
+                            e, n, b = str(row['ENDERECO']), str(row['NUMERO']), str(row['BAIRRO'])
+                            if e and (not n or not b):
+                                cep_m = re.search(r'(\d{5}-?\d{3})', e)
+                                if cep_m:
+                                    df_limpo_sb.at[idx, 'CEP'] = cep_m.group(1)
+                                    e = e.replace(cep_m.group(1), '').strip(' ,-')
+                                if ',' in e and not n:
+                                    pts = e.split(',')
+                                    df_limpo_sb.at[idx, 'ENDERECO'], df_limpo_sb.at[idx, 'NUMERO'] = pts[0].strip(), pts[1].strip()
 
-                            df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(
-                                lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
-                            df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(
-                                r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
+                        df_limpo_sb['UF'] = df_limpo_sb['UF'].astype(str).str.upper().str.strip()
+                        df_limpo_sb['TOMADOR'] = tom_sandbox
+                        df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
 
-                            df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
+                        df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
+                        df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
 
-                            st.session_state.df_preview_sb = df_final_sb
-                            st.success("✅ Matriz processada! Verifique o preview abaixo.")
-                            time.sleep(1)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao processar a matriz: {e}")
+                        df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
 
-        # PREVIEW DA MATRIZ (Sandbox)
+                        st.session_state.df_preview_sb = df_final_sb
+                        st.toast("✅ Dados importados com sucesso! Verifique a validação abaixo.", icon="🔍")
+                        time.sleep(0.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Falha crítica no processamento da matriz: {e}")
+
+        # PREVIEW DA MATRIZ - Seção Visual de Tratamento de Erros
         if not st.session_state.df_preview_sb.empty:
             st.markdown("---")
             df_preview = st.session_state.df_preview_sb
-            mask_err = (df_preview['AGENTE_RAW'].astype(str).str.strip() == "") | (
-                df_preview['AGENTE_RAW'].astype(str).str.upper() == "NAN")
+            mask_err = (df_preview['AGENTE_RAW'].astype(str).str.strip() == "") | (df_preview['AGENTE_RAW'].astype(str).str.upper() == "NAN")
             df_err = df_preview[mask_err]
             df_ok = df_preview[~mask_err]
 
             if not df_err.empty:
-                st.error(
-                    f"🚨 **Atenção:** {len(df_err)} pedido(s) não encontraram motorista automático. Corrija abaixo para liberar o botão.")
-                with st.form("form_correcao_agentes_sb"):
+                st.markdown(f"""
+                <div style='background-color:#FEF2F2; border: 1px solid #FCA5A5; padding:15px; border-radius:10px; margin-bottom:15px;'>
+                    <h5 style='color:#991B1B; margin:0;'>🚨 Tratamento de Exceções Requerido</h5>
+                    <p style='color:#7F1D1D; font-size:13px; margin:5px 0 0 0;'>Detectamos <b>{len(df_err)} pedido(s)</b> sem motorista correspondente na base geográfica. Atribua manualmente para liberar o lote.</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                with st.container(border=True):
                     correcoes = {}
-                    logins_disp = sorted(
-                        DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                    logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
+                    
+                    # Layout em colunas para os formulários de correção ficarem compactos
                     for idx, row in df_err.iterrows():
-                        st.markdown(
-                            f"**Local:** {row['LABORATORIO']} | **Cidade:** {row['CIDADE']}")
-                        correcoes[idx] = st.selectbox(
-                            f"Motorista:", ["Selecione..."] + logins_disp, key=f"fix_mot_sb_{idx}")
-
-                    if st.form_submit_button("💾 Validar Motoristas", type="primary"):
+                        cx1, cx2 = st.columns([2, 1])
+                        cx1.markdown(f"🔬 **{row['LABORATORIO']}** <br><span style='font-size:12px; color:#64748B;'>{row['CIDADE']} - {row['BAIRRO']}</span>", unsafe_allow_html=True)
+                        correcoes[idx] = cx2.selectbox(f"Motorista para ID {idx}", ["Selecione..."] + logins_disp, key=f"fix_mot_sb_{idx}", label_visibility="collapsed")
+                    
+                    if st.button("💾 Validar & Vincular Motoristas Selecionados", type="primary", use_container_width=True):
                         novas_rotas = []
                         for idx, novo_mot in correcoes.items():
                             if novo_mot != "Selecione...":
@@ -5196,8 +4912,7 @@ elif menu == "📥 Importações Umove":
                                 rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai)] if p])
                                 if not DF_AGENTES.empty:
                                     dados_ag = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'] == novo_mot].iloc[0]
-                                    novas_rotas.append(
-                                        {"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": novo_mot, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']})
+                                    novas_rotas.append({"ROTA MAPEADA": rota_str, "LOGIN DO AGENTE": novo_mot, "NOME DO AGENTE": dados_ag['NOME DO AGENTE'], "TELEFONE": dados_ag['TELEFONE']})
 
                         if novas_rotas:
                             try:
@@ -5210,64 +4925,101 @@ elif menu == "📥 Importações Umove":
                                 aba_agentes.update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
                                 carregar_dados_agentes.clear()
                             except Exception as e:
-                                st.warning(f"Erro ao salvar rota inteligente: {e}")
+                                st.warning(f"Aviso: Não foi possível salvar a rota inteligente no banco de dados: {e}")
                         st.rerun()
             else:
-                st.success(f"✅ Preview validado! {len(df_ok)} pedidos com motoristas atrelados.")
-                st.dataframe(df_ok, hide_index=True)
-                if st.button("➕ Adicionar ao Carrinho (Cumulativo)", type="primary", key="add_carrinho_sb"):
-                    with st.spinner("Gerando IDs 700020+ e adicionando ao carrinho..."):
+                st.markdown(f"""
+                <div style='background-color:#F0FDF4; border: 1px solid #BBF7D0; padding:12px; border-radius:8px; margin-bottom:15px;'>
+                    <span style='color:#166534; font-weight:bold;'>✔️ Validação Concluída com Sucesso!</span> <span style='color:#14532D; font-size:13px;'>Todos os {len(df_ok)} pedidos foram devidamente mapeados para seus respectivos agentes comerciais.</span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.dataframe(df_ok, hide_index=True, use_container_width=True)
+                
+                if st.button("➕ Enviar Tudo para o Carrinho de Expedição", type="primary", use_container_width=True, key="add_carrinho_sb"):
+                    with st.spinner("Registrando novos identificadores de controle (700020+)..."):
                         try:
+                            # 🛡️ PROTEÇÃO BLINDADA DO CONTADOR (FAIL-SAFE)
+                            aba_contador = None
                             try:
                                 aba_contador = planilha_sandbox.worksheet("Contador")
-                            except BaseException:
-                                aba_contador = planilha_sandbox.add_worksheet(title="Contador", rows=100, cols=20)
-                                aba_contador.update("A1", [["700020"]])
+                            except Exception:
+                                try:
+                                    # Só tenta criar se realmente não existir, mas blinda caso dê erro de API
+                                    aba_contador = planilha_sandbox.add_worksheet(title="Contador", rows=10, cols=10)
+                                    aba_contador.update("A1", [["700020"]])
+                                except Exception:
+                                    try: 
+                                        # Última tentativa de resgate se foi só oscilação de rede
+                                        aba_contador = planilha_sandbox.worksheet("Contador")
+                                    except: pass
 
                             prox_id_sb = 700020
+                            
+                            # Tenta ler da nuvem
                             if aba_contador:
-                                val = aba_contador.acell('A1').value
-                                if val and str(val).isdigit():
-                                    prox_id_sb = int(val)
-                                else:
-                                    aba_contador.update("A1", [["700020"]])
+                                try:
+                                    val = aba_contador.acell('A1').value
+                                    if val and str(val).isdigit(): prox_id_sb = int(val)
+                                except: pass
+                            
+                            # Plano B: Tenta ler da memória temporária global
+                            if 'contador_temp' in st.session_state:
+                                prox_id_sb = st.session_state.contador_temp
+                            
+                            # Plano C: Analisa o próprio carrinho para não cruzar IDs
+                            if not st.session_state.df_sandbox_mem.empty and 'PEDIDO' in st.session_state.df_sandbox_mem.columns:
+                                try:
+                                    max_id_carrinho = pd.to_numeric(st.session_state.df_sandbox_mem['PEDIDO'], errors='coerce').max()
+                                    if pd.notna(max_id_carrinho) and max_id_carrinho >= prox_id_sb:
+                                        prox_id_sb = int(max_id_carrinho) + 1
+                                except: pass
 
+                            # Atribui os IDs blindados
                             for idx, row in df_ok.iterrows():
                                 df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
                                 prox_id_sb += 1
+                                
+                            # Atualiza a memória de fallback
+                            st.session_state.contador_temp = prox_id_sb
 
+                            # Tenta salvar de volta na nuvem, falha silenciosamente se a API engasgar
                             if aba_contador:
                                 try: aba_contador.update("A1", [[str(prox_id_sb)]])
-                                except BaseException: pass
+                                except Exception: pass
 
+                            # Consolidação no Carrinho
                             if st.session_state.df_sandbox_mem.empty:
                                 st.session_state.df_sandbox_mem = df_ok
                             else:
                                 st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_ok], ignore_index=True)
 
+                            # Modulação automática da máquina de estados em background
+                            if st.session_state.umove_lote_atual_id is None:
+                                st.session_state.umove_lote_atual_id = f"LOTE-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
+                            gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
+
                             st.session_state.df_preview_sb = pd.DataFrame()
-                            st.success("✅ Pedidos adicionados ao carrinho com sucesso!")
-                            time.sleep(1.5)
+                            st.toast("🛒 Pedidos consolidados no carrinho com sucesso!", icon="✅")
+                            time.sleep(1)
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Erro ao adicionar ao carrinho: {e}")
+                            st.error(f"Erro ao injetar dados no carrinho corrente: {e}")
 
     # -------------------------------------------------------------------------
-    # ABA 2: GESTÃO DE PEDIDOS FIXOS (A FÁBRICA)
+    # ABA 2: GESTÃO DE PEDIDOS FIXOS (A FÁBRICA) - ATUALIZADO COM AGGRID
     # -------------------------------------------------------------------------
     with tab_fixos:
         st.markdown("#### 🏭 Criar Novo Agendamento Fixo")
 
-        cols_fixos = [
-            'ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
+        cols_fixos = ['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
         df_regras = pd.DataFrame(columns=cols_fixos)
 
         try:
             aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
             dados_fixos = aba_fixos.get_all_values()
             if len(dados_fixos) > 1:
-                df_regras = pd.DataFrame(
-                    dados_fixos[1:], columns=dados_fixos[0])
+                df_regras = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0])
         except Exception:
             try:
                 aba_fixos = planilha_db.add_worksheet("Agendamentos_Fixos", 100, 20)
@@ -5364,30 +5116,41 @@ elif menu == "📥 Importações Umove":
 
         st.markdown("---")
         st.markdown("#### 📋 Gerenciar Laboratórios Fixos")
-        st.info("💡 **Edite diretamente na tabela!** Mude o Status (ATIVO/INATIVO), ajuste os dias da semana ou troque o Motorista. Para deletar, selecione a linha no canto esquerdo e aperte a tecla 'Delete' ou 'Backspace'.")
+        st.info("💡 **Edite diretamente na tabela dando dois cliques!** Para deletar uma regra, marque a caixa (checkbox) na primeira coluna e clique em 'Excluir Selecionados'.")
 
         if not df_regras.empty:
             logins_p_tabela = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
 
-            df_regras_edit = st.data_editor(
+            gb_fixos = GridOptionsBuilder.from_dataframe(df_regras)
+            gb_fixos.configure_default_column(editable=True, resizable=True, sortable=True, filter=True)
+            
+            opcoes_sim_nao = ["SIM", "NAO"]
+            for col_dia in ["SEG", "TER", "QUA", "QUI", "SEX", "SAB"]:
+                gb_fixos.configure_column(col_dia, cellEditor='agSelectCellEditor', cellEditorParams={'values': opcoes_sim_nao})
+            
+            gb_fixos.configure_column("STATUS", cellEditor='agSelectCellEditor', cellEditorParams={'values': ["ATIVO", "INATIVO"]})
+            gb_fixos.configure_column("MOTORISTA", cellEditor='agSelectCellEditor', cellEditorParams={'values': logins_p_tabela})
+            
+            gb_fixos.configure_selection('multiple', use_checkbox=True)
+            grid_options_fixos = gb_fixos.build()
+
+            resposta_grid_fixos = AgGrid(
                 df_regras,
-                num_rows="dynamic",
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "STATUS": st.column_config.SelectboxColumn("STATUS", options=["ATIVO", "INATIVO"]),
-                    "SEG": st.column_config.SelectboxColumn("SEG", options=["SIM", "NAO"]),
-                    "TER": st.column_config.SelectboxColumn("TER", options=["SIM", "NAO"]),
-                    "QUA": st.column_config.SelectboxColumn("QUA", options=["SIM", "NAO"]),
-                    "QUI": st.column_config.SelectboxColumn("QUI", options=["SIM", "NAO"]),
-                    "SEX": st.column_config.SelectboxColumn("SEX", options=["SIM", "NAO"]),
-                    "SAB": st.column_config.SelectboxColumn("SAB", options=["SIM", "NAO"]),
-                    "MOTORISTA": st.column_config.SelectboxColumn("MOTORISTA", options=logins_p_tabela)
-                },
-                key="editor_regras_fixas"
+                gridOptions=grid_options_fixos,
+                update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED,
+                data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
+                theme='alpine',
+                height=450,
+                allow_unsafe_jscode=True,
+                key="aggrid_regras_fixas"
             )
 
-            if st.button("💾 Salvar Alterações na Base de Regras", type="primary", use_container_width=True):
+            df_regras_edit = pd.DataFrame(resposta_grid_fixos['data'])
+            linhas_selecionadas_fixos = resposta_grid_fixos['selected_rows']
+
+            c_btn_salvar, c_btn_excluir = st.columns([3, 1])
+
+            if c_btn_salvar.button("💾 Salvar Alterações na Base de Regras", type="primary", use_container_width=True):
                 with st.spinner("Atualizando banco de dados..."):
                     try:
                         aba_fixos.clear()
@@ -5400,14 +5163,34 @@ elif menu == "📥 Importações Umove":
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao salvar regras: {e}")
+
+            if isinstance(linhas_selecionadas_fixos, list) and len(linhas_selecionadas_fixos) > 0:
+                if c_btn_excluir.button("🗑️ Excluir Regras", type="secondary", use_container_width=True):
+                    try:
+                        df_selecionados = pd.DataFrame(linhas_selecionadas_fixos)
+                        ids_para_remover = df_selecionados['ID_REGRA'].tolist()
+                        df_regras_edit = df_regras_edit[~df_regras_edit['ID_REGRA'].isin(ids_para_remover)]
+                        
+                        aba_fixos.clear()
+                        if df_regras_edit.empty:
+                            aba_fixos.update("A1", [cols_fixos])
+                        else:
+                            aba_fixos.update("A1", [df_regras_edit.columns.tolist()] + df_regras_edit.fillna("").astype(str).values.tolist())
+                        st.success(f"✅ {len(ids_para_remover)} regras excluídas!")
+                        time.sleep(1.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao excluir: {e}")
         else:
             st.info("Nenhuma regra de agendamento cadastrada ainda.")
 
     # -------------------------------------------------------------------------
-    # ABA 3: CARRINHO & ARQUIVOS (Apenas Grid e Downloads Locais)
+    # ABA 3: CARRINHO & ARQUIVOS (Layout Premium + Toggle Blindado)
     # -------------------------------------------------------------------------
     with tab_carrinho:
+        # --- BLOCAGEM DE PROCESSAMENTO: AGENDAMENTOS FIXOS ---
         df_fixos_hoje = pd.DataFrame()
+        prox_id_sb = 700020
         try:
             aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
             dados_fixos = aba_fixos.get_all_values()
@@ -5422,13 +5205,13 @@ elif menu == "📥 Importações Umove":
                         try: aba_contador = planilha_sandbox.worksheet("Contador")
                         except: aba_contador = None
 
-                        prox_id_sb = 700020
                         if aba_contador:
                             val = aba_contador.acell('A1').value
                             if val and str(val).isdigit(): prox_id_sb = int(val)
                         elif 'contador_temp' in st.session_state:
                             prox_id_sb = st.session_state.contador_temp
 
+                        # Incrementa com base nos registros já presentes em memória para não chocar IDs
                         prox_id_sb += len(st.session_state.df_sandbox_mem)
 
                         novos_pedidos = []
@@ -5454,47 +5237,138 @@ elif menu == "📥 Importações Umove":
         except Exception:
             pass
 
-        incluir_fixos = False
-        if not df_fixos_hoje.empty:
-            st.info(f"💡 O sistema encontrou **{len(df_fixos_hoje)} pedidos fixos** programados para hoje ({dia_atual}).")
-            incluir_fixos = st.toggle("👉 INCLUIR PEDIDOS FIXOS NA CARGA DE HOJE", value=False, key="toggle_fixos_umove")
-        else:
-            st.info("Nenhum pedido fixo programado para hoje.")
+        # Lógica Inteligente para a Chave Seletiva (Toggle)
+        tem_fixos_na_memoria = False
+        if not st.session_state.df_sandbox_mem.empty and 'OBSERVACOES' in st.session_state.df_sandbox_mem.columns:
+            tem_fixos_na_memoria = st.session_state.df_sandbox_mem['OBSERVACOES'].astype(str).str.contains(r'\[FIXO\]', regex=True, na=False).any()
 
+        # 🔥 CORREÇÃO: O Toggle DEVE aparecer se a API cair, MAS os pedidos fixos já estiverem na memória do carrinho.
+        mostrar_painel_fixos = (not df_fixos_hoje.empty) or tem_fixos_na_memoria
+
+        if mostrar_painel_fixos:
+            qtd_msg = f"{len(df_fixos_hoje)} agendamentos fixos" if not df_fixos_hoje.empty else "agendamentos fixos (preservados na memória)"
+            dia_msg = f" para esta <b>{dia_atual}-feira</b>" if 'dia_atual' in locals() else ""
+            
+            st.markdown(f"""
+            <div style='background-color:#FFFBEB; border: 1px solid #FCD34D; padding:15px; border-radius:10px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;'>
+                <div style='margin-right:10px;'>
+                    <h5 style='color:#92400E; margin:0;'>📅 Rotinas Fixas Disponíveis</h5>
+                    <p style='color:#B45309; font-size:13px; margin:3px 0 0 0;'>Identificamos <b>{qtd_msg}</b> programados automáticos{dia_msg}.</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # A chave seletiva que reflete o estado real da memória
+            incluir_fixos = st.toggle("⚡ Injetar/Manter Pedidos Fixos no Carrinho", value=tem_fixos_na_memoria, key="toggle_seguro_fixos")
+            
+            # Gerenciador de mudança de estado (Só roda se houver clique na chave)
+            if incluir_fixos != tem_fixos_na_memoria:
+                if incluir_fixos:
+                    if not df_fixos_hoje.empty:
+                        with st.spinner("Consolidando rotinas permanentes..."):
+                            if st.session_state.df_sandbox_mem.empty:
+                                st.session_state.df_sandbox_mem = df_fixos_hoje
+                            else:
+                                st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_fixos_hoje], ignore_index=True)
+                            
+                            try:
+                                planilha_sandbox.worksheet("Contador").update("A1", [[str(prox_id_sb)]])
+                            except: pass
+                            
+                            if st.session_state.umove_lote_atual_id is None:
+                                st.session_state.umove_lote_atual_id = f"LOTE-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
+                            gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
+                            st.rerun()
+                    else:
+                        st.error("⚠️ Banco de dados instável no momento. Tente acionar novamente.")
+                        time.sleep(1.5)
+                        st.rerun()
+                else:
+                    with st.spinner("Desfazendo injeção de pedidos fixos..."):
+                        mask_fixos = st.session_state.df_sandbox_mem['OBSERVACOES'].astype(str).str.contains(r'\[FIXO\]', regex=True, na=False)
+                        st.session_state.df_sandbox_mem = st.session_state.df_sandbox_mem[~mask_fixos]
+                        
+                        if st.session_state.umove_lote_atual_id:
+                            gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
+                        st.rerun()
+        else:
+            st.markdown("<p style='font-size:13px; color:#64748B;'>ℹ️ Sem registros fixos programados para o dia atual no sistema.</p>", unsafe_allow_html=True)
+
+        # --- EXIBIÇÃO DO CARRINHO CONSOLIDADO ---
         df_sb = st.session_state.df_sandbox_mem.copy()
-        if incluir_fixos and not df_fixos_hoje.empty:
-            if df_sb.empty: df_sb = df_fixos_hoje
-            else: df_sb = pd.concat([df_sb, df_fixos_hoje], ignore_index=True)
 
         if not df_sb.empty:
-            col_tit, col_canc = st.columns([4, 1], vertical_alignment="center")
-            col_tit.markdown("### 🛒 Seu Carrinho de Expedição")
-            if col_canc.button("🗑️ Esvaziar Carrinho", type="secondary", use_container_width=True, key="canc_carrinho_sb"):
-                st.session_state.df_sandbox_mem = pd.DataFrame()
-                try: planilha_sandbox.sheet1.clear()
-                except: pass
-                st.rerun()
-
-            c_kpi1, c_kpi2 = st.columns([1, 4])
-            c_kpi1.metric("TOTAL NO CARRINHO", len(df_sb))
-
+            st.markdown("---")
+            
+            # Dashboard de métricas em CSS Grid
             resumo_tom = df_sb.groupby('TOMADOR').size().reset_index(name='QTD')
-            resumo_str = " | ".join([f"**{row['TOMADOR']}**: {row['QTD']}" for _, row in resumo_tom.iterrows()])
-            c_kpi2.info(f"**Detalhamento por Cliente:**\n{resumo_str}")
+            resumo_str = " | ".join([f"<b>{row['TOMADOR']}</b>: {row['QTD']}" for _, row in resumo_tom.iterrows()])
+            
+            st.markdown(f"""
+            <div style="display:flex; gap:12px; margin-bottom: 20px;">
+                <div style="flex:1; background:#F8FAFC; border: 2px solid #E2E8F0; padding:15px; border-radius:12px; text-align:center;">
+                    <div style="font-size:12px; font-weight:800; color:#64748B; text-transform:uppercase;">Volumes no Carrinho</div>
+                    <div style="font-size:36px; font-weight:900; color:#0F172A; line-height:1.2;">{len(df_sb)}</div>
+                </div>
+                <div style="flex:3; background:#F0FDF4; border: 2px solid #BBF7D0; padding:15px; border-radius:12px;">
+                    <div style="font-size:12px; font-weight:800; color:#166534; text-transform:uppercase; margin-bottom:5px;">Detalhamento por Conta de Cliente</div>
+                    <div style="font-size:14px; color:#14532D; font-weight:500; line-height:1.4;">{resumo_str}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
-            st.markdown("<p style='font-size:12px; color:#64748B;'>Edite qualquer campo dando dois cliques. As alterações aqui refletirão nos arquivos e nos disparos de WhatsApp.</p>", unsafe_allow_html=True)
+            # Cabeçalho da tabela interativa com botões de ação estruturados lateralmente
+            chead1, chead2 = st.columns([3, 1], vertical_alignment="center")
+            with chead1:
+                st.markdown("#### 🕵️‍♂️ Mesa de Conferência e Modificações")
+            with chead2:
+                if st.button("🗑️ Esvaziar Todo Carrinho", type="secondary", use_container_width=True, help="Zera completamente a memória temporária"):
+                    st.session_state.df_sandbox_mem = pd.DataFrame()
+                    st.session_state.umove_lote_atual_id = None
+                    try: planilha_sandbox.sheet1.clear()
+                    except: pass
+                    st.rerun()
 
-            df_editado_sb = st.data_editor(
+            # Renderização Customizada do AgGrid Master
+            gb_sb = GridOptionsBuilder.from_dataframe(df_sb)
+            gb_sb.configure_default_column(editable=True, resizable=True, sortable=True, filter=True)
+            # A linha gb_sb.configure_selection() foi removida para limpar as caixas de seleção
+            gb_sb.configure_column("AGENTE_RAW", pinned='right', cellStyle={'backgroundColor': '#FFFBEB', 'fontWeight': 'bold', 'color': '#92400E'})
+            grid_options_sb = gb_sb.build()
+
+            resposta_grid_sb = AgGrid(
                 df_sb,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="sandbox_grid_master_umove"
+                gridOptions=grid_options_sb,
+                update_mode=GridUpdateMode.MODEL_CHANGED, # SELECTION_CHANGED removido
+                data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
+                theme='alpine',
+                height=400,
+                allow_unsafe_jscode=True,
+                key="aggrid_master_umove"
             )
 
+            df_editado_sb = pd.DataFrame(resposta_grid_sb['data'])
+            
+            # Painel de Controle Inferior da Grid (Agora limpo, apenas com o botão principal)
+            if st.button("💾 Persistir Alterações da Tabela na Nuvem", type="primary", use_container_width=True):
+                st.session_state.df_sandbox_mem = df_editado_sb
+                if st.session_state.umove_lote_atual_id is None:
+                    st.session_state.umove_lote_atual_id = f"UMOVE-{datetime.now(FUSO_BR).strftime('%Y%m%d%H%M%S')}"
+                gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
+                st.toast("✅ Base de rascunhos atualizada com sucesso na nuvem!", icon="💾")
+                time.sleep(0.5)
+                st.rerun()
+
+            # Sincronização direta com a Aba de Disparos
+            if not df_editado_sb.empty:
+                st.session_state.sandbox_grid_master_umove = df_editado_sb
+
+            # Bloco de Exportação de Documentação Legada (Formatado em Cards)
             st.markdown("---")
-            st.markdown("### 📁 Gerar Arquivos Legados")
-            col_cmd1, col_cmd2 = st.columns([1, 1])
+            st.markdown("### 📁 Centros de Exportação Legada")
+            st.info("Utilize os botões abaixo se necessitar exportar os arquivos de carregamento estrutural em formato `.LOC` ou `.AGD` para os sistemas corporativos legados.")
+            
+            col_cmd1, col_cmd2 = st.columns(2)
 
             def criar_arquivos_legados(df):
                 loc_lines = ["alternativeIdentifier;description;corporateName;state;city;cityNeighborhood;street;streetNumber;zipCode;CF_loc_responsavel_cliente;CF_loc_whats;CF_CNPJ;active"]
@@ -5527,21 +5401,23 @@ elif menu == "📥 Importações Umove":
 
             bytes_loc, bytes_agd = criar_arquivos_legados(df_editado_sb)
 
-            def notify_loc(): st.toast("✅ Download do arquivo .LOC finalizado com sucesso!", icon="💾")
-            def notify_agd(): st.toast("✅ Download do arquivo .AGD finalizado com sucesso!", icon="💾")
-
             with col_cmd1:
-                st.download_button("💾 Baixar Arquivo .LOC", data=bytes_loc, file_name=f"LOC_GERAL_{hoje_br.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_loc)
+                st.download_button("💾 Baixar Arquivo de Locais (.LOC)", data=bytes_loc, file_name=f"LOC_GERAL_{hoje_br.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=lambda: st.toast("Baixando arquivo LOC...", icon="📥"))
             with col_cmd2:
-                st.download_button("💾 Baixar Arquivo .AGD", data=bytes_agd, file_name=f"AGD_GERAL_{hoje_br.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=notify_agd)
+                st.download_button("💾 Baixar Arquivo de Agendas (.AGD)", data=bytes_agd, file_name=f"AGD_GERAL_{hoje_br.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=lambda: st.toast("Baixando arquivo AGD...", icon="📥"))
         else:
-            st.info("🛒 Seu carrinho está vazio.")
+            st.markdown("""
+            <div style="text-align: center; padding: 40px; background-color: #F8FAFC; border: 2px dashed #CBD5E1; border-radius: 12px; margin-top: 20px;">
+                <p style="font-size: 48px; margin: 0;">🛒</p>
+                <h5 style="color: #475569; margin: 10px 0 5px 0;">O Carrinho de Expedição está Vazio</h5>
+                <p style="color: #94A3B8; font-size: 13px; margin: 0;">Processe uma matriz na <b>Aba 1</b> ou injete agendamentos automáticos fixos para carregar a mesa de trabalho.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-    # -------------------------------------------------------------------------
-    # ABA 4: A NOVA "CENTRAL DE ENVIOS" (DASHBOARD EXCLUSIVO)
-    # -------------------------------------------------------------------------
+    # =============================================================================
+    # 🚀 ABA 4: CENTRAL DE ENVIOS (Dashboard Premium e Disparo em Lote Blindado)
+    # =============================================================================
     with tab_envios:
-        # Funções de Design dos KPIs Gigantes
         def render_big_metrics(tot, pend, suc, fal):
             return f"""
             <div style="display:flex; gap:12px; text-align:center; margin-bottom: 20px;">
@@ -5566,32 +5442,60 @@ elif menu == "📥 Importações Umove":
 
         def render_current_driver(nom, idx, total):
             return f"""
-            <div style="background: linear-gradient(135deg, #0F172A 0%, #334155 100%); color: white; padding: 25px 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); border-left: 5px solid #3B82F6;">
-                <div style="font-size: 13px; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 5px;">🚀 Transmitindo agora para ({idx}/{total})</div>
+            <div style="background: linear-gradient(135deg, #0F172A 0%, #334155 100%); color: white; padding: 25px 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border-left: 5px solid #3B82F6;">
+                <div style="font-size: 13px; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 5px;">🚀 Transmitindo Lote ({idx}/{total})</div>
                 <div style="font-size: 36px; font-weight: 900; letter-spacing: -0.5px; color: #FFFFFF;">👤 {nom}</div>
             </div>
             """
 
-        # Puxamos os dados da grid da Aba 3 para cá (st.session_state se encarrega disso se houver edições)
-        try:
-            df_fonte_envio = st.session_state.get('sandbox_grid_master_umove', df_sb).copy()
-            if isinstance(df_fonte_envio, dict): # Caso o data_editor retorne um formato interno
-                df_fonte_envio = df_sb.copy()
-        except:
-            df_fonte_envio = df_sb.copy()
+        if 'umove_step' not in st.session_state: st.session_state.umove_step = 'IDLE'
+        if 'umove_df_dispatch' not in st.session_state: st.session_state.umove_df_dispatch = pd.DataFrame()
+        if 'umove_resultados_disparo' not in st.session_state: st.session_state.umove_resultados_disparo = {}
+        if 'umove_xls_bytes' not in st.session_state: st.session_state.umove_xls_bytes = None
+        if 'umove_final_metrics' not in st.session_state: st.session_state.umove_final_metrics = {'total': 0, 'sucesso': 0, 'falhas': 0}
 
-        if 'umove_step' not in st.session_state:
-            st.session_state.umove_step = 'IDLE'
-        if 'umove_df_dispatch' not in st.session_state:
-            st.session_state.umove_df_dispatch = pd.DataFrame()
-        if 'umove_resultados_disparo' not in st.session_state:
-            st.session_state.umove_resultados_disparo = {}
-        if 'umove_xls_bytes' not in st.session_state:
-            st.session_state.umove_xls_bytes = None
-        if 'umove_final_metrics' not in st.session_state:
-            st.session_state.umove_final_metrics = {'total': 0, 'sucesso': 0, 'falhas': 0}
+        # Dicionários de mapeamento robustos com chaves extremamente normalizadas
+        dict_tel = {}
+        dict_nom = {}
+        if not DF_AGENTES.empty:
+            for _, r in DF_AGENTES.iterrows():
+                # Remove espaços, transforma em minúsculo e limpa caracteres como | e /
+                login_ag = str(r.get('LOGIN DO AGENTE', '')).strip().lower().split('|')[0].split('/')[0].strip()
+                if login_ag:
+                    # Salva apenas números no telefone
+                    dict_tel[login_ag] = re.sub(r'\D', '', str(r.get('TELEFONE', '')))
+                    dict_nom[login_ag] = str(r.get('NOME DO AGENTE', '')).strip()
 
-        # Função de Clone para salvar a tabela enviada
+        if st.session_state.umove_step == 'IDLE':
+            df_rascunhos = gerenciar_estado_lote("LISTAR_RASCUNHOS")
+            if df_rascunhos is not None and not df_rascunhos.empty:
+                st.warning("⚠️ **ATENÇÃO:** Lotes inativos ou pendentes encontrados na nuvem.")
+                with st.expander("🔄 Resgatar Lotes Inacabados", expanded=False):
+                    # 🔥 Correção: enumerate e to_dict garantem que o 'i' seja único sempre
+                    for i, row_rasc in enumerate(df_rascunhos.to_dict('records')):
+                        c_r1, c_r2, c_r3 = st.columns([2.5, 1, 1], vertical_alignment="center")
+                        c_r1.markdown(f"**Lote:** `{row_rasc.get('ID_EVENTO','')}` | **Criado:** {row_rasc.get('DATA_DISPARO','')} | **Volumes:** {row_rasc.get('TOTAL_PEDIDOS','')}")
+                        if c_r2.button("Resgatar", key=f"resg_t4_{i}_{row_rasc.get('ID_EVENTO','')}", use_container_width=True, type="primary"):
+                            try:
+                                df_resgatado = pd.read_json(io.StringIO(str(row_rasc.get('DADOS_JSON','[]'))), orient='records')
+                                st.session_state.df_sandbox_mem = df_resgatado.astype(str)
+                                st.session_state.umove_lote_atual_id = row_rasc.get('ID_EVENTO')
+                                st.session_state.umove_step = 'IDLE'
+                                st.toast("✅ Lote resgatado para o Carrinho!")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e: st.error(f"Falha ao resgatar: {e}")
+                        if c_r3.button("🗑️ Excluir", key=f"excl_t4_{i}_{row_rasc.get('ID_EVENTO','')}", use_container_width=True):
+                            try:
+                                gerenciar_estado_lote("EXCLUIR_RASCUNHO", lote_id=row_rasc.get('ID_EVENTO'))
+                                st.toast("🗑️ Lote apagado!")
+                                time.sleep(1)
+                                st.rerun()
+                            except: pass
+
+        # Fonte da verdade sempre será a memória em sessão
+        df_fonte_envio = st.session_state.df_sandbox_mem.copy()
+
         def salvar_backup_completo_umove(df_bkp, id_ev, planilha):
             if planilha is None or df_bkp.empty: return
             try:
@@ -5605,29 +5509,43 @@ elif menu == "📥 Importações Umove":
                 df_to_save.insert(0, "DATA_DISPARO", datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S'))
                 df_to_save.insert(0, "ID_EVENTO", id_ev)
                 aba_bkp.append_rows(df_to_save.fillna("").astype(str).values.tolist(), value_input_option='USER_ENTERED')
-            except Exception as e:
-                pass
+            except: pass
 
         if df_fonte_envio.empty and st.session_state.umove_step not in ['PROCESSING', 'COMPLETED']:
-            st.warning("⚠️ Você precisa adicionar pedidos ao Carrinho (Aba 1 ou 2) ou fazer o Backup (Aba 5) antes de acessar a Central de Envios.")
+            st.markdown("""
+            <div style="text-align: center; padding: 40px; background-color: #F8FAFC; border: 2px dashed #CBD5E1; border-radius: 12px; margin-top: 20px;">
+                <p style="font-size: 48px; margin: 0;">📡</p>
+                <h5 style="color: #475569; margin: 10px 0 5px 0;">Mesa de Transmissão Inativa</h5>
+                <p style="color: #94A3B8; font-size: 13px; margin: 0;">O carrinho de expedição está vazio. Adicione pedidos na aba anterior para habilitar os controles de disparo.</p>
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            # -------------------------------------------------------------
-            # MÁQUINA DE ESTADOS: IDLE (PREPARAÇÃO) OU CONFIRMAÇÃO
-            # -------------------------------------------------------------
             if st.session_state.umove_step in ['IDLE', 'CONFIRMING']:
-                st.markdown("### 🎛️ Painel de Preparação de Disparo")
+                st.markdown("### 🎛️ Terminal de Comando e Lançamento")
+                st.markdown("<p style='font-size:13px; color:#64748B; margin-top:-10px;'>Configure os parâmetros operacionais e inicie a transmissão da carga para os agentes.</p>", unsafe_allow_html=True)
                 
-                with st.container(border=True):
-                    c_opt, c_cal = st.columns(2)
-                    dispatch_choice = c_opt.radio(
-                        "1. Selecione o alvo do disparo:",
-                        ["Todos os pedidos do carrinho", "Filtrar por data específica", "Reenviar Falhas (Recuperação)"],
-                        key="ui_dispatch_choice")
+                # DIVISÃO MESTRA: Painel de Controle à Esquerda, Detalhamento à Direita
+                col_main, col_side = st.columns([2.3, 1], gap="large")
+                
+                with col_main:
+                    st.markdown("#### 1️⃣ Configuração do Alvo")
+                    with st.container(border=True):
+                        c_opt, c_cal = st.columns([2.2, 1], vertical_alignment="center")
+                        with c_opt:
+                            dispatch_choice = st.radio(
+                                "Selecione a abrangência do disparo:",
+                                ["Todos os pedidos do carrinho", "Filtrar por data específica", "Reenviar Falhas (Recuperação)"],
+                                horizontal=True,
+                                key="ui_dispatch_choice")
 
-                    dispatch_period = None
-                    if dispatch_choice == "Filtrar por data específica":
-                        dispatch_period = c_cal.date_input("2. Selecione o período de rotas:", value=(hoje_br, hoje_br), format="DD/MM/YYYY")
+                        dispatch_period = None
+                        with c_cal:
+                            if dispatch_choice == "Filtrar por data específica":
+                                dispatch_period = st.date_input("📅 Período da Rota:", value=(hoje_br, hoje_br), format="DD/MM/YYYY")
+                            else:
+                                st.write("")
 
+                # Filtragem aplicada globalmente na memória temporária para alimentar ambos os lados
                 df_preview = df_fonte_envio.copy()
                 
                 if dispatch_choice == "Filtrar por data específica":
@@ -5643,57 +5561,95 @@ elif menu == "📥 Importações Umove":
                         df_preview = df_preview.drop(columns=['__DATA_FILTRADA'])
                         
                 elif dispatch_choice == "Reenviar Falhas (Recuperação)":
-                    dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
                     todos_agentes = df_preview['AGENTE_RAW'].dropna().unique()
-                    falhas = [ag for ag in todos_agentes if dict_nom.get(str(ag).strip().lower(), str(ag).upper()) in st.session_state.umove_resultados_disparo and st.session_state.umove_resultados_disparo[dict_nom.get(str(ag).strip().lower(), str(ag).upper())].get('sucesso', 1) == 0]
+                    falhas = []
+                    for ag in todos_agentes:
+                        ag_key = str(ag).strip().lower().split('|')[0].split('/')[0].strip()
+                        nom = dict_nom.get(ag_key, str(ag).upper())
+                        if nom in st.session_state.umove_resultados_disparo and st.session_state.umove_resultados_disparo[nom].get('sucesso', 1) == 0:
+                            falhas.append(ag)
                     df_preview = df_preview[df_preview['AGENTE_RAW'].isin(falhas)]
 
                 qtd_pedidos = len(df_preview)
                 qtd_motoristas = len(df_preview['AGENTE_RAW'].dropna().unique())
 
-                if st.session_state.umove_step == 'IDLE':
-                    if qtd_pedidos == 0:
-                        st.error("🚨 Nenhum pedido atende aos filtros atuais. O disparo está bloqueado.")
-                    else:
-                        # --- EXTRATOR INTELIGENTE DO PERÍODO DO LOTE ---
-                        datas_temp = pd.to_datetime(df_preview['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
-                        if not datas_temp.empty:
-                            d_min = datas_temp.min().strftime('%d/%m/%Y')
-                            d_max = datas_temp.max().strftime('%d/%m/%Y')
-                            periodo_str = f"{d_min}" if d_min == d_max else f"de {d_min} até {d_max}"
+                # CONTINUAÇÃO DA COLUNA ESQUERDA (Controles e Ações)
+                with col_main:
+                    if st.session_state.umove_step == 'IDLE':
+                        st.markdown("#### 2️⃣ Pré-Visualização da Carga")
+                        if qtd_pedidos == 0:
+                            st.markdown("""
+                            <div style="background-color: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                                <span style="color: #991B1B; font-weight: bold;">🚨 Bloqueio Operacional:</span> <span style="color: #7F1D1D;">Nenhum pedido atende aos filtros atuais. Modifique a configuração acima.</span>
+                            </div>
+                            """, unsafe_allow_html=True)
                         else:
-                            periodo_str = "Desconhecido"
+                            datas_temp = pd.to_datetime(df_preview['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
+                            if not datas_temp.empty:
+                                d_min = datas_temp.min().strftime('%d/%m/%Y')
+                                d_max = datas_temp.max().strftime('%d/%m/%Y')
+                                periodo_str = f"{d_min}" if d_min == d_max else f"de {d_min} até {d_max}"
+                            else:
+                                periodo_str = "Desconhecido"
+                            
+                            st.markdown(f"""
+                            <div style="display:flex; gap:15px; margin-bottom: 25px;">
+                                <div style="flex:1; background:#F8FAFC; border-left: 4px solid #3B82F6; padding:15px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase;">Volumes Mapeados</div>
+                                    <div style="font-size:28px; font-weight:900; color:#0F172A; line-height:1.2;">{qtd_pedidos}</div>
+                                </div>
+                                <div style="flex:1; background:#F8FAFC; border-left: 4px solid #10B981; padding:15px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase;">Motoristas Acionados</div>
+                                    <div style="font-size:28px; font-weight:900; color:#0F172A; line-height:1.2;">{qtd_motoristas}</div>
+                                </div>
+                                <div style="flex:2; background:#F8FAFC; border-left: 4px solid #8B5CF6; padding:15px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase;">Período da Rota</div>
+                                    <div style="font-size:18px; font-weight:700; color:#0F172A; line-height:1.4; margin-top:2px;">📅 {periodo_str}</div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            st.markdown("#### 3️⃣ Autorização de Disparo")
+                            st.info("ℹ️ O sistema conectará à Z-API e transmitirá sequencialmente as mensagens, PDFs e planilhas para todos os motoristas alocados.")
+                            
+                            if st.button("🚀 INICIAR TRANSMISSÃO EM LOTE AGORA", type="primary", use_container_width=True):
+                                st.session_state.umove_df_dispatch = df_preview
+                                st.session_state.umove_step = 'CONFIRMING'
+                                st.rerun()
+
+                    elif st.session_state.umove_step == 'CONFIRMING':
+                        st.markdown("---")
+                        st.markdown(f"""
+                        <div style="background-color: #FEF2F2; border: 2px solid #FCA5A5; border-radius: 12px; padding: 25px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(220, 38, 38, 0.1);">
+                            <h3 style="color: #991B1B; margin-top: 0;">⚠️ Confirmação de Disparo Crítico</h3>
+                            <p style="color: #7F1D1D; font-size: 16px; margin-bottom: 5px;">Você está prestes a disparar mensagens oficiais via WhatsApp para <b>{qtd_motoristas} motoristas</b>.</p>
+                            <p style="color: #7F1D1D; font-size: 14px; font-weight: bold; margin-bottom: 0;">Esta ação entrará na fila de processamento e não deverá ser interrompida.</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
-                        st.success(f"✔️ **Validação Concluída:** O sistema identificou **{qtd_pedidos} pedidos** direcionados a **{qtd_motoristas} motoristas**.\n\n📅 **Período das rotas no lote:** **{periodo_str}**")
-                        
-                        if st.button("🚀 INICIAR PROTOCOLO DE DISPARO", type="primary", use_container_width=True):
-                            st.session_state.umove_df_dispatch = df_preview
-                            st.session_state.umove_step = 'CONFIRMING'
+                        c_sim, c_nao = st.columns(2)
+                        if c_sim.button("✔️ CONFIRMAR E DISPARAR", type="primary", use_container_width=True):
+                            st.session_state.umove_step = 'PROCESSING'
+                            st.rerun()
+                        if c_nao.button("❌ Cancelar Operação", use_container_width=True):
+                            st.session_state.umove_step = 'IDLE'
                             st.rerun()
 
-                elif st.session_state.umove_step == 'CONFIRMING':
-                    # Recalcula a data para exibir no aviso de confirmação
-                    datas_temp = pd.to_datetime(st.session_state.umove_df_dispatch['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
-                    if not datas_temp.empty:
-                        d_min = datas_temp.min().strftime('%d/%m/%Y')
-                        d_max = datas_temp.max().strftime('%d/%m/%Y')
-                        periodo_str = f"{d_min}" if d_min == d_max else f"de {d_min} até {d_max}"
-                    else:
-                        periodo_str = "Desconhecido"
+                # PAINEL DA COLUNA DIREITA (Composição da Carga Dinâmica - APENAS TOMADORES)
+                with col_side:
+                    st.markdown("#### 📦 Composição da Carga")
+                    with st.container(border=True):
+                        if qtd_pedidos == 0:
+                            st.markdown("<span style='color:#94A3B8; font-size:13px;'>Nenhum volume alocado.</span>", unsafe_allow_html=True)
+                        else:
+                            # Tabela de Clientes (Tomadores) - Tudo em 1 linha de HTML para o Streamlit não interpretar como Bloco de Código Markdown
+                            resumo_tom = df_preview.groupby('TOMADOR').size().reset_index(name='QTD').sort_values(by='QTD', ascending=False)
+                            html_breakdown = "<div style='display: flex; flex-direction: column; gap: 8px;'>"
+                            for _, row in resumo_tom.iterrows():
+                                html_breakdown += f"<div style='background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;'><span style='font-weight: 600; color: #334155; font-size: 13px;'>{row['TOMADOR']}</span><span style='background: #DBEAFE; color: #1D4ED8; padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 13px;'>{row['QTD']}</span></div>"
+                            html_breakdown += "</div>"
+                            st.markdown(html_breakdown, unsafe_allow_html=True)
 
-                    st.markdown("---")
-                    st.warning(f"⚠️ **ÚLTIMO AVISO:** Você está prestes a disparar o WhatsApp oficial para **{qtd_motoristas} motoristas**, contendo os pedidos da data **{periodo_str}**. Esta ação não poderá ser desfeita.")
-                    c_sim, c_nao = st.columns(2)
-                    if c_sim.button("🔥 SIM, CONFIRMO E QUERO DISPARAR AGORA", type="primary", use_container_width=True):
-                        st.session_state.umove_step = 'PROCESSING'
-                        st.rerun()
-                    if c_nao.button("❌ Cancelar", use_container_width=True):
-                        st.session_state.umove_step = 'IDLE'
-                        st.rerun()
-
-            # -------------------------------------------------------------
-            # MÁQUINA DE ESTADOS: PROCESSANDO (DASHBOARD EM TEMPO REAL)
-            # -------------------------------------------------------------
             elif st.session_state.umove_step == 'PROCESSING':
                 st.markdown("## 📡 Monitor de Transmissão")
                 st.error("⚠️ **PROCESSO EM ANDAMENTO - NÃO ATUALIZE OU MUDE DE ABA!**")
@@ -5701,9 +5657,6 @@ elif menu == "📥 Importações Umove":
                 df_dispatch = st.session_state.umove_df_dispatch
                 agentes_selecionados = df_dispatch['AGENTE_RAW'].dropna().unique()
                 total_agentes = len(agentes_selecionados)
-                
-                dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
-                dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
 
                 st.session_state.umove_resultados_disparo = {}
                 sucessos_sb = 0
@@ -5711,12 +5664,10 @@ elif menu == "📥 Importações Umove":
                 logs_google_sheets_zap = []
                 id_evento = f"UMOVE-{datetime.now(FUSO_BR).strftime('%Y%m%d%H%M%S')}"
                 
-                # Placeholders visuais para atualização ao vivo
                 metrics_placeholder = st.empty()
                 driver_placeholder = st.empty()
                 progress_bar = st.progress(0)
                 
-                # Renderiza métricas zeradas
                 metrics_placeholder.markdown(render_big_metrics(total_agentes, total_agentes, 0, 0), unsafe_allow_html=True)
 
                 st.markdown("#### 🖥️ Terminal de Registros")
@@ -5724,26 +5675,32 @@ elif menu == "📥 Importações Umove":
                 log_table_placeholder = container_log.empty()
                 logs_df_data = []
 
-                # LOOP DE DISPARO POR MOTORISTA
+                # LOOP DO DISPARO EM LOTE BLINDADO
                 for idx_ag, ag in enumerate(agentes_selecionados):
                     if not str(ag).strip(): continue
                     
-                    df_ag_sb = df_dispatch[df_dispatch['AGENTE_RAW'] == ag]
-                    tel = dict_tel.get(str(ag).strip().lower(), "")
-                    nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
-                    
-                    ag_login = str(ag).strip().lower()
-                    login_base = ag_login.split('|')[0].split('/')[0].strip()
-                    is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
-                    is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
+                    try:
+                        import os
+                        import requests
+                        df_ag_sb = df_dispatch[df_dispatch['AGENTE_RAW'] == ag]
+                        
+                        # Normalização da chave de busca de contatos
+                        ag_key = str(ag).strip().lower().split('|')[0].split('/')[0].strip()
+                        tel = dict_tel.get(ag_key, "")
+                        nom = dict_nom.get(ag_key, str(ag).upper())
+                        
+                        ag_login = ag_key
+                        is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or ag_login in [x.split('|')[0].split('/')[0].strip().lower() for x in AGENTES_PDF_AUTORIZADOS]
+                        is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or ag_login in [x.split('|')[0].split('/')[0].strip().lower() for x in AGENTES_XLS_AUTORIZADOS]
 
-                    st.session_state.umove_resultados_disparo[nom] = {'total': len(df_ag_sb), 'sucesso': 0, 'pedidos': df_ag_sb['PEDIDO'].tolist()}
+                        st.session_state.umove_resultados_disparo[nom] = {'total': len(df_ag_sb), 'sucesso': 0, 'pedidos': df_ag_sb['PEDIDO'].tolist()}
 
-                    if tel:
-                        # ATUALIZA O BANNER GIGANTE DO MOTORISTA ATUAL
+                        # Validação do telefone - Se não tiver, pula diretamente pro except blindado sem derrubar a aplicação
+                        if not tel:
+                            raise ValueError("Telefone não localizado no banco de Agentes.")
+
                         driver_placeholder.markdown(render_current_driver(nom, idx_ag + 1, total_agentes), unsafe_allow_html=True)
                         
-                        # A data usada no cabeçalho da mensagem do WhatsApp passa a respeitar as datas extraídas da rota
                         datas_na_rota = pd.to_datetime(df_ag_sb['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
                         if not datas_na_rota.empty:
                             d_min_zap = datas_na_rota.min().strftime('%d/%m/%Y')
@@ -5752,7 +5709,6 @@ elif menu == "📥 Importações Umove":
                         else:
                             data_str = hoje_br.strftime('%d/%m/%Y')
 
-                        # 🔥 Extrai UF para personalização regional
                         uf_agente_sb = ""
                         if 'UF' in df_ag_sb.columns:
                             ufs_unicos_sb = df_ag_sb['UF'].dropna().unique()
@@ -5784,24 +5740,24 @@ elif menu == "📥 Importações Umove":
                             msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
                         msg_parts.append(f"\n{fechamento}")
 
-                        # Z-API
                         INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711"
                         TOKEN = "2321563615C4242CB6031504"
                         CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S"
                         try:
                             requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
-                            time.sleep(random.uniform(3.0, 5.0))
+                            time.sleep(random.uniform(2.0, 3.0))
                         except: pass
 
                         resultado_msg = "✅"
+                        # Executa o envio principal do zap
                         if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
-                            time.sleep(random.uniform(2.0, 4.0))
+                            time.sleep(random.uniform(2.0, 3.0))
 
                             if is_autorizado_pdf:
                                 try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
                                 except: pass
                                 enviar_pdf_zapi(tel, gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb), f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
-                                time.sleep(3.0)
+                                time.sleep(2.5)
 
                             if is_autorizado_xls:
                                 try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
@@ -5818,84 +5774,86 @@ elif menu == "📥 Importações Umove":
                             sucessos_sb += 1
                             st.session_state.umove_resultados_disparo[nom]['sucesso'] = len(df_ag_sb)
                         else:
-                            resultado_msg = "❌"
+                            resultado_msg = "❌ Erro API WhatsApp"
                             falhas_calc += 1
                             st.session_state.umove_resultados_disparo[nom]['sucesso'] = 0
 
-                        # ATUALIZA O PLACAR GIGANTE
                         pendentes_agora = total_agentes - (idx_ag + 1)
                         metrics_placeholder.markdown(render_big_metrics(total_agentes, pendentes_agora, sucessos_sb, falhas_calc), unsafe_allow_html=True)
 
                         pedidos_list = df_ag_sb['PEDIDO'].astype(str).tolist() if 'PEDIDO' in df_ag_sb.columns else []
                         pedidos_str = ", ".join(pedidos_list)[:200] + "..." if len(", ".join(pedidos_list)) > 200 else ", ".join(pedidos_list)
 
-                        logs_google_sheets_zap.append([datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S'), nom, len(df_ag_sb), pedidos_str, 'SUCESSO' if resultado_msg == '✅' else 'FALHA', tel, 'SIM' if is_autorizado_pdf else 'NÃO', 'SIM' if is_autorizado_xls else 'NÃO', '', id_evento])
+                        logs_google_sheets_zap.append([datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S'), nom, len(df_ag_sb), pedidos_str, 'SUCESSO' if '✅' in resultado_msg else 'FALHA', tel, 'SIM' if is_autorizado_pdf else 'NÃO', 'SIM' if is_autorizado_xls else 'NÃO', '', id_evento])
+                        logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": resultado_msg, "Motorista": nom, "Msg": f"Processados {len(df_ag_sb)} vols"})
 
-                        logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": resultado_msg, "Motorista": nom, "Qtd Pedidos": len(df_ag_sb)})
-                        log_table_placeholder.dataframe(pd.DataFrame(logs_df_data), use_container_width=True, hide_index=True)
+                    except Exception as e:
+                        # 🔥 CAPA PROTETORA CONTRA QUEDAS: Se ocorrer qualquer erro, registra e continua pro próximo motorista.
+                        falhas_calc += 1
+                        nom_err = nom if 'nom' in locals() else f"ID: {ag}"
+                        if nom_err not in st.session_state.umove_resultados_disparo:
+                            st.session_state.umove_resultados_disparo[nom_err] = {'total': len(df_ag_sb) if 'df_ag_sb' in locals() else 0, 'sucesso': 0, 'pedidos': []}
+                        logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": "❌ ERRO", "Motorista": nom_err, "Msg": str(e)[:35]})
+                        
+                        pendentes_agora = total_agentes - (idx_ag + 1)
+                        metrics_placeholder.markdown(render_big_metrics(total_agentes, pendentes_agora, sucessos_sb, falhas_calc), unsafe_allow_html=True)
 
+                    log_table_placeholder.dataframe(pd.DataFrame(logs_df_data), use_container_width=True, hide_index=True)
                     progress_bar.progress((idx_ag + 1) / total_agentes)
 
-                # FIM DO LOOP
-                
-                # Salva as métricas finais na sessão para a tela de conclusão puxar
                 st.session_state.umove_final_metrics = {'total': total_agentes, 'sucesso': sucessos_sb, 'falhas': falhas_calc}
-                driver_placeholder.empty() # Remove o banner do motorista ativo
+                driver_placeholder.empty() 
                 
                 if logs_google_sheets_zap:
                     try:
                         import json
                         import gspread
                         from google.oauth2.credentials import Credentials
-                        token_str = os.environ.get("google_token_json")
-                        if not token_str:
-                            try: token_str = st.secrets.get("google_token_json")
-                            except: pass
+                        token_str = os.environ.get("google_token_json", st.secrets.get("google_token_json"))
                         token_info = json.loads(token_str)
                         creds = Credentials.from_authorized_user_info(token_info, scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"])
                         cliente_gspread_novo = gspread.authorize(creds)
                         planilha_logs_externa = cliente_gspread_novo.open_by_key('1ckrOm_UyvD-Pc4TeLFfdVJA-48jXmULoisF7T5Pqv20')
                         aba_logs = planilha_logs_externa.worksheet("Disparos")
                         aba_logs.append_rows(logs_google_sheets_zap, value_input_option='USER_ENTERED')
-                    except Exception as e:
-                        pass
+                    except: pass
 
                 try:
-                    aba_contador = planilha_sandbox.worksheet("Contador")
-                    max_id_gerado = df_editado_sb['PEDIDO'].astype(int).max()
-                    aba_contador.update("A1", [[str(max_id_gerado + 1)]])
+                    if 'PEDIDO' in df_dispatch.columns:
+                        aba_contador = planilha_sandbox.worksheet("Contador")
+                        max_id_gerado = df_dispatch['PEDIDO'].astype(int).max()
+                        aba_contador.update("A1", [[str(max_id_gerado + 1)]])
                 except: pass
 
-                # Geração ÚNICA do Relatório e Clone Final
                 st.session_state.umove_xls_bytes = gerar_relatorio_umove_xls(df_dispatch, st.session_state.umove_resultados_disparo)
-                salvar_historico_disparo_umove(df_dispatch, st.session_state.umove_resultados_disparo, "Rotina Tática", planilha_sandbox)
-                salvar_backup_completo_umove(df_dispatch, id_evento, planilha_sandbox)
-
-                # Trava a máquina de estados no final e reinicia a tela
+                
+                lote_id_final = st.session_state.umove_lote_atual_id if st.session_state.umove_lote_atual_id else id_evento
+                gerenciar_estado_lote("CONCLUIR", lote_id_final, resultados=st.session_state.umove_resultados_disparo)
+                
+                salvar_backup_completo_umove(df_dispatch, lote_id_final, planilha_sandbox)
+                
+                st.session_state.umove_lote_atual_id = None
                 st.session_state.umove_step = 'COMPLETED'
                 st.rerun()
 
-            # -------------------------------------------------------------
-            # MÁQUINA DE ESTADOS: COMPLETED (RESUMO E DOWNLOADS)
-            # -------------------------------------------------------------
             elif st.session_state.umove_step == 'COMPLETED':
                 st.markdown("## 📊 Relatório Final da Missão")
                 
-                # Renderiza o placar final recuperado da memória (Total, 0 pendentes, Sucessos, Falhas)
                 metrics = st.session_state.umove_final_metrics
                 st.markdown(render_big_metrics(metrics['total'], 0, metrics['sucesso'], metrics['falhas']), unsafe_allow_html=True)
                 
-                st.success("🎉 O disparo foi finalizado com sucesso! Um backup com todos os dados brutos e IDs já foi registrado e salvo na sua base de dados na nuvem.")
+                st.success("🎉 O disparo em lote foi finalizado! O histórico foi consolidado na nuvem.")
                 
                 col_rel1, col_rel2 = st.columns(2)
                 with col_rel1:
-                    st.download_button(
-                        "📥 Baixar Relatório Sintético XLS",
-                        data=st.session_state.umove_xls_bytes,
-                        file_name=f"RELATORIO_DISPAROS_{hoje_br.strftime('%d%m%y_%H%M%S')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                        type="primary")
+                    if st.session_state.umove_xls_bytes:
+                        st.download_button(
+                            "📥 Baixar Relatório Sintético (XLS)",
+                            data=st.session_state.umove_xls_bytes,
+                            file_name=f"RELATORIO_DISPAROS_{hoje_br.strftime('%d%m%y_%H%M%S')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True,
+                            type="primary")
                 with col_rel2:
                     if st.button("🔄 Liberar Mesa para Novo Disparo", use_container_width=True):
                         st.session_state.umove_step = 'IDLE'
@@ -5903,89 +5861,110 @@ elif menu == "📥 Importações Umove":
                         st.session_state.umove_resultados_disparo = {}
                         st.rerun()
 
-        # -------------------------------------------------------------
-        # HISTÓRICO DE DISPAROS (MOSTRADO QUANDO ESTÁ OCIOSO)
-        # -------------------------------------------------------------
-        if st.session_state.umove_step == 'IDLE':
-            st.markdown("---")
-            st.markdown("#### 🗄️ Histórico Recente de Lotes (Umove)")
-            try:
-                aba_hist = planilha_sandbox.worksheet("Historico_Disparos_Umove")
-                dados_hist = aba_hist.get_all_values()
-                if len(dados_hist) > 1:
-                    df_h = pd.DataFrame(dados_hist[1:], columns=dados_hist[0])
-                    df_h = df_h.sort_values(by="ID_EVENTO", ascending=False).head(20) # Mostra últimos 20
-                    st.dataframe(df_h[['ID_EVENTO', 'DATA_DISPARO', 'MOTORISTA', 'TOTAL_PEDIDOS', 'SUCESSOS', 'FALHAS']], use_container_width=True, hide_index=True)
-                else:
-                    st.info("Nenhum histórico registrado no Google Sheets ainda.")
-            except Exception:
-                st.info("Arquivo de histórico não encontrado ou em construção.")
-
-    # -------------------------------------------------------------------------
-    # ABA 5: RECUPERAÇÃO OFFLINE (QUEDA DE INTERNET)
-    # -------------------------------------------------------------------------
+    # =============================================================================
+    # 🛟 ABA 5: RECUPERAÇÃO OFFLINE E REPROCESSAMENTO
+    # =============================================================================
     with tab_backup:
-        st.markdown("#### 🛟 Recuperação de Carrinho (Queda de Internet)")
-        st.info("Se a internet caiu e você perdeu o carrinho antes de disparar o WhatsApp na **Central de Envios**, faça o upload dos arquivos **LOC e AGD** exportados (na Aba 3) aqui para reconstruir a mesa instantaneamente.")
-        
-        with st.container(border=True):
-            uploaded_files = st.file_uploader("📂 Arraste e solte os arquivos LOC_GERAL e AGD_GERAL aqui (.csv)", type=["csv"], accept_multiple_files=True)
-            
-            if st.button("🔄 Reconstruir Carrinho e Preparar Envios", type="primary", use_container_width=True):
-                loc_file = next((f for f in uploaded_files if "LOC" in f.name.upper()), None)
-                agd_file = next((f for f in uploaded_files if "AGD" in f.name.upper()), None)
-                
-                if loc_file and agd_file:
-                    with st.spinner("Lendo cruzamento de matriz e reconstruindo os dados originais..."):
+        st.markdown("#### 🛟 Resgate de Lotes Inacabados (Nuvem)")
+        df_rascunhos_bkp = gerenciar_estado_lote("LISTAR_RASCUNHOS")
+        if df_rascunhos_bkp is not None and not df_rascunhos_bkp.empty:
+            st.success("✅ **Lotes salvos na nuvem encontrados!**")
+            # 🔥 Correção: enumerate garante a exclusividade das chaves para não quebrar a página
+            for i, row_rasc in enumerate(df_rascunhos_bkp.to_dict('records')):
+                with st.container(border=True):
+                    col_r1, col_r2, col_r3 = st.columns([2.5, 1, 1], vertical_alignment="center")
+                    col_r1.markdown(f"**Lote:** `{row_rasc.get('ID_EVENTO','')}` | **Criado em:** {row_rasc.get('DATA_DISPARO','')} | **Volumes:** {row_rasc.get('TOTAL_PEDIDOS','')}")
+                    
+                    if col_r2.button("Resgatar para o Carrinho", key=f"resg_t5_{i}_{row_rasc.get('ID_EVENTO','')}", use_container_width=True, type="primary"):
                         try:
-                            # 1. LER LOC
-                            df_loc = pd.read_csv(loc_file, sep=";", dtype=str).fillna("")
-                            
-                            # 2. LER AGD (lidando com a linha "C")
-                            content_agd = agd_file.getvalue().decode('utf-8').splitlines()
-                            if content_agd and content_agd[0].strip() == 'C':
-                                content_agd = content_agd[1:]
-                            df_agd = pd.read_csv(io.StringIO("\n".join(content_agd)), sep=";", dtype=str).fillna("")
-                            
-                            # 3. MERGE E ALINHAMENTO
-                            if 'serviceLocal' in df_agd.columns and 'alternativeIdentifier' in df_loc.columns:
-                                df_merged = pd.merge(df_agd, df_loc, left_on="serviceLocal", right_on="alternativeIdentifier", how="left")
-                            else:
-                                st.error("❌ Os arquivos enviados não possuem as colunas esperadas. Verifique se são os arquivos reais gerados pelo sistema.")
-                                st.stop()
-                                
-                            # 4. RECONSTRUIR ESTRUTURA PARA A MEMÓRIA
-                            df_rec = pd.DataFrame()
-                            df_rec['PEDIDO'] = df_merged['alternativeIdentifier_x']
-                            df_rec['AGENTE_RAW'] = df_merged['agent']
-                            df_rec['DATA'] = df_merged['date']
-                            df_rec['TOMADOR'] = df_merged['CF_loc_responsavel_cliente']
-                            
-                            def extract_lab(row):
-                                corp = str(row.get('corporateName', ''))
-                                tom = str(row.get('CF_loc_responsavel_cliente', ''))
-                                if corp.startswith(tom + "-"):
-                                    return corp[len(tom)+1:]
-                                return corp
-                            
-                            df_rec['LABORATORIO'] = df_merged.apply(extract_lab, axis=1)
-                            df_rec['ENDERECO'] = df_merged['street']
-                            df_rec['NUMERO'] = df_merged['streetNumber'].apply(lambda x: str(x).replace('.0', '') if x else '')
-                            df_rec['BAIRRO'] = df_merged['cityNeighborhood']
-                            df_rec['CIDADE'] = df_merged['city']
-                            df_rec['UF'] = df_merged['state']
-                            df_rec['CEP'] = df_merged['zipCode']
-                            df_rec['CNPJ'] = df_merged['CF_CNPJ'].apply(lambda x: str(x).replace("'", "") if x else "")
-                            df_rec['OBSERVACOES'] = ""
-                            
-                            st.session_state.df_sandbox_mem = df_rec
-                            st.success("✅ Carrinho reconstruído com sucesso! Pode ir até a aba '🚀 4. Central de Envios' para engatilhar seus disparos.")
-                            time.sleep(2.5)
+                            df_resgatado = pd.read_json(io.StringIO(str(row_rasc.get('DADOS_JSON','[]'))), orient='records')
+                            st.session_state.df_sandbox_mem = df_resgatado.astype(str)
+                            st.session_state.umove_lote_atual_id = row_rasc.get('ID_EVENTO')
+                            st.session_state.umove_step = 'IDLE'
+                            st.toast("✅ Lote resgatado com sucesso!")
+                            time.sleep(1)
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Erro ao processar os arquivos de recuperação: {e}")
-                else:
-                    st.warning("⚠️ Faça o upload simultâneo dos **2 arquivos (.LOC e .AGD)** para cruzamento exato e reconstrução do lote.")
+                            st.error("Falha na leitura do lote.")
+                            
+                    if col_r3.button("🗑️ Excluir Backup", key=f"excl_t5_{i}_{row_rasc.get('ID_EVENTO','')}", use_container_width=True):
+                        try:
+                            with st.spinner("Excluindo lote da nuvem..."):
+                                gerenciar_estado_lote("EXCLUIR_RASCUNHO", lote_id=row_rasc.get('ID_EVENTO'))
+                                st.toast("🗑️ Lote excluído permanentemente!")
+                                time.sleep(1)
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao excluir: {e}")
+        else:
+            st.info("Nenhum lote salvo na nuvem no momento.")
+            
+        st.markdown("---")
+        st.markdown("#### 📂 Reconstrução por Arquivo (LOC/AGD)")
+        st.info("Caso os arquivos não estejam na nuvem, você pode reconstruir a mesa fazendo o upload do par **LOC** e **AGD** gerados anteriormente.")
+        
+        with st.container(border=True):
+            arquivos_upload = st.file_uploader("📂 Arraste e solte os arquivos LOC_GERAL e AGD_GERAL aqui (.csv)", type=["csv"], accept_multiple_files=True, key="upload_recuperacao")
+            
+            if arquivos_upload and len(arquivos_upload) == 2:
+                try:
+                    df_loc = None
+                    df_agd = None
+
+                    for arquivo in arquivos_upload:
+                        if "LOC" in arquivo.name.upper():
+                            df_loc = pd.read_csv(arquivo, sep=";", encoding="utf-8-sig")
+                        elif "AGD" in arquivo.name.upper():
+                            df_agd = pd.read_csv(arquivo, sep=";", skiprows=1, encoding="utf-8-sig")
+
+                    if df_loc is not None and df_agd is not None:
+                        df_loc['corporateName'] = df_loc['corporateName'].str.replace('CAEP', 'SYNVIA', regex=False).str.replace('CUNHA', 'GRALAB', regex=False)
+                        df_loc['alternativeIdentifier'] = df_loc['alternativeIdentifier'].str.replace('CAEP', 'SYNVIA', regex=False).str.replace('CUNHA', 'GRALAB', regex=False)
+                        df_agd['serviceLocal'] = df_agd['serviceLocal'].str.replace('CAEP', 'SYNVIA', regex=False).str.replace('CUNHA', 'GRALAB', regex=False)
+                        if 'city' in df_loc.columns: df_loc['city'] = df_loc['city'].str.replace('Brodosqui', 'Brodowski', regex=False)
+
+                        df_cruzado = pd.merge(df_agd, df_loc, left_on="serviceLocal", right_on="alternativeIdentifier", how="inner")
+                        df_cruzado = df_cruzado.dropna(subset=['agent'])
+
+                        st.success(f"✅ Arquivos lidos e cruzados com sucesso: {len(df_cruzado)} volumes encontrados.")
+
+                        if st.button("🚀 Restaurar Carrinho e Salvar Rascunho", type="primary", use_container_width=True):
+                            with st.spinner("Reconstruindo estrutura original..."):
+                                df_rec = pd.DataFrame()
+                                df_rec['PEDIDO'] = df_cruzado['alternativeIdentifier_x']
+                                df_rec['AGENTE_RAW'] = df_cruzado['agent']
+                                df_rec['DATA'] = df_cruzado['date']
+                                df_rec['TOMADOR'] = df_cruzado['CF_loc_responsavel_cliente']
+                                
+                                def extract_lab(row):
+                                    corp = str(row.get('corporateName', ''))
+                                    tom = str(row.get('CF_loc_responsavel_cliente', ''))
+                                    if corp.startswith(tom + "-"): return corp[len(tom)+1:]
+                                    return corp
+                                
+                                df_rec['LABORATORIO'] = df_cruzado.apply(extract_lab, axis=1)
+                                df_rec['ENDERECO'] = df_cruzado['street']
+                                df_rec['NUMERO'] = df_cruzado['streetNumber'].apply(lambda x: str(x).replace('.0', '') if x else '')
+                                df_rec['BAIRRO'] = df_cruzado['cityNeighborhood']
+                                df_rec['CIDADE'] = df_cruzado['city']
+                                df_rec['UF'] = df_cruzado['state']
+                                df_rec['CEP'] = df_cruzado['zipCode']
+                                df_rec['CNPJ'] = df_cruzado['CF_CNPJ'].apply(lambda x: str(x).replace("'", "") if x else "")
+                                df_rec['OBSERVACOES'] = ""
+
+                                st.session_state.df_sandbox_mem = df_rec
+
+                                if st.session_state.umove_lote_atual_id is None:
+                                    st.session_state.umove_lote_atual_id = f"UMOVE-{datetime.now(FUSO_BR).strftime('%Y%m%d%H%M%S')}"
+                                gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
+                                
+                                st.success("✅ Mesa reconstruída e rascunho salvo na nuvem! Volte à '🚀 Central de Envios' para disparar.")
+                                time.sleep(1.5)
+                                st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao processar a recuperação: {e}")
+            else:
+                st.warning("⚠️ Insira exatamente os dois arquivos (LOC_GERAL e AGD_GERAL) gerados pela plataforma simultaneamente para reprocessar os dados.")
 # =============================================================================
 # 📋 MÓDULO 3: TRIAGEM E ROMANEIO (COM CONTINGÊNCIA AVULSA E HISTÓRICO)
 # =============================================================================
