@@ -714,6 +714,11 @@ def carregar_dados_completos(_planilha):
                     if col_qr_app:
                         cols_to_extract.append(col_qr_app)
 
+                    # Captura a coluna de hora do AppSheet
+                    col_hora = next((c for c in ['HORA_STATUS', 'HORASTATUS', 'HORA'] if c in df_app.columns), None)
+                    if col_hora:
+                        cols_to_extract.append(col_hora)
+
                     col_nome = None
                     for c in [
                         'DETALHES',
@@ -739,6 +744,9 @@ def carregar_dados_completos(_planilha):
                         rename_map[col_qr_app] = 'APP_QR'
                     if col_nome:
                         rename_map[col_nome] = 'A_CONTATO'
+                    # Mantém o mapeamento da hora para o pop-up
+                    if col_hora:
+                        rename_map[col_hora] = 'HORA_STATUS'
 
                     df_app_clean.rename(columns=rename_map, inplace=True)
                     df_app_clean['PEDIDO'] = df_app_clean['PEDIDO'].astype(
@@ -1176,12 +1184,18 @@ def modal_detalhes_pedido(pedido_data):
         data_efetiva = str(pedido_data.get('DATA_ENTREGA', '---')).strip()
         data_limite = str(pedido_data.get('DATA_LIMITE', '---')).strip()
 
+        # Extrai a hora do registro HORA_STATUS, caso ele exista. (Exemplo de retorno bruto: '11/06/2026 12:35:01')
+        hora_status_raw = str(pedido_data.get('HORA_STATUS', '')).strip()
+        # Quebra na primeira ocorrência de espaço e pega os primeiros 5 dígitos da parte de hora, deixando só o "HH:MM"
+        hora_formatada = hora_status_raw.split(' ')[1][:5] if ' ' in hora_status_raw else '---'
+
         html_c2 = (
             f"<div style='background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0;height:100%;'>"
             f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>📅 Solicitação Criada Em</p>"
             f"<p style='margin:2px 0 12px 0;font-size:14px;color:#334155;'>{pedido_data.get('DATA', '---')}</p>"
-            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>🕒 Status da Operação</p>"
-            f"<p style='margin:2px 0 12px 0;font-size:14px;color:#334155;'>✅ Baixa Efetiva: <b>{data_efetiva if data_efetiva else 'Pendente'}</b></p>"
+            f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>🕒 Detalhes da Baixa</p>"
+            f"<p style='margin:2px 0 4px 0;font-size:14px;color:#334155;'>⏱️ Horário (App): <b>{hora_formatada}</b></p>"
+            f"<p style='margin:0 0 12px 0;font-size:14px;color:#334155;'>✅ Data Efetiva: <b>{data_efetiva if data_efetiva else 'Pendente'}</b></p>"
             f"<p style='margin:0;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;'>🏁 Prazo Acordado</p>"
             f"<p style='margin:2px 0 0 0;font-size:13px;color:#334155;'>🎯 Previsão Limite: {data_limite}</p>"
             f"</div>"
@@ -5474,15 +5488,15 @@ elif menu == "📥 Importações Umove":
         dict_nom = {}
         if not DF_AGENTES.empty:
             for _, r in DF_AGENTES.iterrows():
-                # Agora mantemos a string inteira (ex: igo.log|anderson) para achar o WhatsApp certo
                 login_ag = str(r.get('LOGIN DO AGENTE', '')).strip().lower()
+                
+                # Se o login contém pipe (ex: igo.log|anderson), não corta ele aqui, grava inteiro para consulta da ZAPI.
                 if login_ag:
-                    # Limpa tudo que não for número
                     num_limpo = re.sub(r'\D', '', str(r.get('TELEFONE', '')))
-                    # Se tiver 10 ou 11 dígitos (padrão BR sem DDI), injeta o '55' obrigatoriamente para a Z-API não rejeitar
+                    # Se não vier com 55 e tiver os 10 ou 11 dígitos, injeta o 55 da Z-API.
                     if num_limpo and not num_limpo.startswith('55') and len(num_limpo) <= 11:
                         num_limpo = '55' + num_limpo
-                        
+                    
                     dict_tel[login_ag] = num_limpo
                     dict_nom[login_ag] = str(r.get('NOME DO AGENTE', '')).strip()
 
@@ -5709,12 +5723,10 @@ elif menu == "📥 Importações Umove":
                         nom = dict_nom.get(ag_key, str(ag).upper())
                         
                         ag_login = ag_key
-                        # Isolamos o login base apenas para checar permissões do App (mantém o igo.log)
                         login_base = ag_login.split('|')[0].split('/')[0].strip()
                         
                         is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
                         is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
-                        is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or ag_login in [x.split('|')[0].split('/')[0].strip().lower() for x in AGENTES_XLS_AUTORIZADOS]
 
                         st.session_state.umove_resultados_disparo[nom] = {'total': len(df_ag_sb), 'sucesso': 0, 'pedidos': df_ag_sb['PEDIDO'].tolist()}
 
