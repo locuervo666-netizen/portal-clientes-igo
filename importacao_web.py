@@ -3089,8 +3089,9 @@ elif menu == "💰 Faturamento":
 
         pdf.set_text_color(51, 65, 85)
         pdf.set_font("Arial", "", 7)
-        for idx, row in df_cobrados.iterrows():
-            fill = (idx % 2 == 0)
+        # Envolvemos o df_cobrados.iterrows() com um enumerate()
+        for contador, (idx, row) in enumerate(df_cobrados.iterrows()):
+            fill = (contador % 2 == 0) # Agora usamos o 'contador' que é sempre Int
             pdf.set_fill_color(241, 245, 249) if fill else pdf.set_fill_color(255, 255, 255)
             d_col = str(row.get('DATA', '')).split(' ')[0]
             d_ent = str(row.get('DATA_ENTREGA', '')).split(' ')[0]
@@ -5468,16 +5469,21 @@ elif menu == "📥 Importações Umove":
         if 'umove_xls_bytes' not in st.session_state: st.session_state.umove_xls_bytes = None
         if 'umove_final_metrics' not in st.session_state: st.session_state.umove_final_metrics = {'total': 0, 'sucesso': 0, 'falhas': 0}
 
-        # Dicionários de mapeamento robustos com chaves extremamente normalizadas
+        # 🛡️ CORREÇÃO 1: Dicionários de mapeamento com injeção automática do DDI (55)
         dict_tel = {}
         dict_nom = {}
         if not DF_AGENTES.empty:
             for _, r in DF_AGENTES.iterrows():
-                # Remove espaços, transforma em minúsculo e limpa caracteres como | e /
-                login_ag = str(r.get('LOGIN DO AGENTE', '')).strip().lower().split('|')[0].split('/')[0].strip()
+                # Agora mantemos a string inteira (ex: igo.log|anderson) para achar o WhatsApp certo
+                login_ag = str(r.get('LOGIN DO AGENTE', '')).strip().lower()
                 if login_ag:
-                    # Salva apenas números no telefone
-                    dict_tel[login_ag] = re.sub(r'\D', '', str(r.get('TELEFONE', '')))
+                    # Limpa tudo que não for número
+                    num_limpo = re.sub(r'\D', '', str(r.get('TELEFONE', '')))
+                    # Se tiver 10 ou 11 dígitos (padrão BR sem DDI), injeta o '55' obrigatoriamente para a Z-API não rejeitar
+                    if num_limpo and not num_limpo.startswith('55') and len(num_limpo) <= 11:
+                        num_limpo = '55' + num_limpo
+                        
+                    dict_tel[login_ag] = num_limpo
                     dict_nom[login_ag] = str(r.get('NOME DO AGENTE', '')).strip()
 
         if st.session_state.umove_step == 'IDLE':
@@ -5485,7 +5491,6 @@ elif menu == "📥 Importações Umove":
             if df_rascunhos is not None and not df_rascunhos.empty:
                 st.warning("⚠️ **ATENÇÃO:** Lotes inativos ou pendentes encontrados na nuvem.")
                 with st.expander("🔄 Resgatar Lotes Inacabados", expanded=False):
-                    # 🔥 Correção: enumerate e to_dict garantem que o 'i' seja único sempre
                     for i, row_rasc in enumerate(df_rascunhos.to_dict('records')):
                         c_r1, c_r2, c_r3 = st.columns([2.5, 1, 1], vertical_alignment="center")
                         c_r1.markdown(f"**Lote:** `{row_rasc.get('ID_EVENTO','')}` | **Criado:** {row_rasc.get('DATA_DISPARO','')} | **Volumes:** {row_rasc.get('TOTAL_PEDIDOS','')}")
@@ -5698,20 +5703,24 @@ elif menu == "📥 Importações Umove":
                         import requests
                         df_ag_sb = df_dispatch[df_dispatch['AGENTE_RAW'] == ag]
                         
-                        # Normalização da chave de busca de contatos
-                        ag_key = str(ag).strip().lower().split('|')[0].split('/')[0].strip()
+                        # Mantemos a chave completa para achar o WhatsApp do Anderson
+                        ag_key = str(ag).strip().lower() 
                         tel = dict_tel.get(ag_key, "")
                         nom = dict_nom.get(ag_key, str(ag).upper())
                         
                         ag_login = ag_key
-                        is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or ag_login in [x.split('|')[0].split('/')[0].strip().lower() for x in AGENTES_PDF_AUTORIZADOS]
+                        # Isolamos o login base apenas para checar permissões do App (mantém o igo.log)
+                        login_base = ag_login.split('|')[0].split('/')[0].strip()
+                        
+                        is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
+                        is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
                         is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or ag_login in [x.split('|')[0].split('/')[0].strip().lower() for x in AGENTES_XLS_AUTORIZADOS]
 
                         st.session_state.umove_resultados_disparo[nom] = {'total': len(df_ag_sb), 'sucesso': 0, 'pedidos': df_ag_sb['PEDIDO'].tolist()}
 
                         # Validação do telefone - Se não tiver, pula diretamente pro except blindado sem derrubar a aplicação
                         if not tel:
-                            raise ValueError("Telefone não localizado no banco de Agentes.")
+                            raise ValueError(f"Telefone não localizado no banco para {nom}.")
 
                         driver_placeholder.markdown(render_current_driver(nom, idx_ag + 1, total_agentes), unsafe_allow_html=True)
                         
@@ -5767,28 +5776,35 @@ elif menu == "📥 Importações Umove":
                         if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
                             time.sleep(random.uniform(2.0, 3.0))
 
+                            # 🛡️ CORREÇÃO 2: Isolamento de falhas nos anexos. Se o PDF falhar, não derruba o sucesso da mensagem.
                             if is_autorizado_pdf:
-                                try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
-                                except: pass
-                                enviar_pdf_zapi(tel, gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb), f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
-                                time.sleep(2.5)
+                                try:
+                                    try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                    except: pass
+                                    enviar_pdf_zapi(tel, gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb), f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
+                                    time.sleep(2.5)
+                                except Exception as e_pdf:
+                                    resultado_msg += " (Sem PDF)"
 
                             if is_autorizado_xls:
-                                try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
-                                except: pass
-                                if ag_login == 'luiz.paulo':
-                                    df_para_xls = df_dispatch[df_dispatch['UF'] == 'RJ']
-                                    nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
-                                else:
-                                    df_para_xls = df_ag_sb
-                                    nome_arq_xls = f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx"
-                                enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_para_xls), nome_arq_xls)
-                                time.sleep(2.0)
+                                try:
+                                    try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                    except: pass
+                                    if ag_login == 'luiz.paulo':
+                                        df_para_xls = df_dispatch[df_dispatch['UF'] == 'RJ']
+                                        nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
+                                    else:
+                                        df_para_xls = df_ag_sb
+                                        nome_arq_xls = f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx"
+                                    enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_para_xls), nome_arq_xls)
+                                    time.sleep(2.0)
+                                except Exception as e_xls:
+                                    resultado_msg += " (Sem XLS)"
 
                             sucessos_sb += 1
                             st.session_state.umove_resultados_disparo[nom]['sucesso'] = len(df_ag_sb)
                         else:
-                            resultado_msg = "❌ Erro API WhatsApp"
+                            resultado_msg = "❌ Erro Z-API"
                             falhas_calc += 1
                             st.session_state.umove_resultados_disparo[nom]['sucesso'] = 0
 
@@ -5799,10 +5815,10 @@ elif menu == "📥 Importações Umove":
                         pedidos_str = ", ".join(pedidos_list)[:200] + "..." if len(", ".join(pedidos_list)) > 200 else ", ".join(pedidos_list)
 
                         logs_google_sheets_zap.append([datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S'), nom, len(df_ag_sb), pedidos_str, 'SUCESSO' if '✅' in resultado_msg else 'FALHA', tel, 'SIM' if is_autorizado_pdf else 'NÃO', 'SIM' if is_autorizado_xls else 'NÃO', '', id_evento])
-                        logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": resultado_msg, "Motorista": nom, "Msg": f"Processados {len(df_ag_sb)} vols"})
+                        logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": resultado_msg, "Motorista": nom, "Msg": f"Enviados {len(df_ag_sb)} vols"})
 
                     except Exception as e:
-                        # 🔥 CAPA PROTETORA CONTRA QUEDAS: Se ocorrer qualquer erro, registra e continua pro próximo motorista.
+                        # 🔥 CAPA PROTETORA CONTRA QUEDAS: Se ocorrer erro grave (ex: Falta telefone), marca e segue.
                         falhas_calc += 1
                         nom_err = nom if 'nom' in locals() else f"ID: {ag}"
                         if nom_err not in st.session_state.umove_resultados_disparo:
@@ -5883,7 +5899,6 @@ elif menu == "📥 Importações Umove":
         df_rascunhos_bkp = gerenciar_estado_lote("LISTAR_RASCUNHOS")
         if df_rascunhos_bkp is not None and not df_rascunhos_bkp.empty:
             st.success("✅ **Lotes salvos na nuvem encontrados!**")
-            # 🔥 Correção: enumerate garante a exclusividade das chaves para não quebrar a página
             for i, row_rasc in enumerate(df_rascunhos_bkp.to_dict('records')):
                 with st.container(border=True):
                     col_r1, col_r2, col_r3 = st.columns([2.5, 1, 1], vertical_alignment="center")
