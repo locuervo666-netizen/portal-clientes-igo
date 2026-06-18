@@ -7,6 +7,8 @@ import json
 import requests
 import re
 import random
+import io
+import google.auth.transport.requests
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta, timezone
 from google.oauth2.credentials import Credentials
@@ -299,7 +301,7 @@ def conectar_banco_seguro():
         return None
 
 @st.cache_data(ttl=30)
-def carregar_dados_nuvem():
+def carregar_dados_nuvem(cliente_filtro):
     try:
         gc = conectar_banco_seguro()
         if not gc:
@@ -331,11 +333,56 @@ def carregar_dados_nuvem():
             pass # Segue sem quebrar se a aba não for encontrada
 
         aba_m = planilha.worksheet("Memoria_Sistema")
-        dados_m = aba_m.get_all_values()
+        
+        # =======================================================
+        # 🚀 OTIMIZAÇÃO GVIZ API (FILTRO NO SERVIDOR DO GOOGLE)
+        # =======================================================
+        df = pd.DataFrame()
+        cabecalhos = aba_m.row_values(1)
+        
+        try:
+            # Descobre a letra da coluna TOMADOR (ex: 3 -> C)
+            idx_tomador = cabecalhos.index("TOMADOR") + 1
+            def col_num_to_letter(n):
+                letra = ""
+                while n > 0:
+                    n, rem = divmod(n - 1, 26)
+                    letra = chr(65 + rem) + letra
+                return letra
+            
+            col_letra = col_num_to_letter(idx_tomador)
+            
+            # Monta a instrução SQL para enviar ao Google (Com UPPER para evitar erros de maiúsculas)
+            if cliente_filtro == "TODOS":
+                query = "SELECT *"
+            elif cliente_filtro == "LABEST":
+                query = f"SELECT * WHERE UPPER({col_letra}) = 'LABEST' OR UPPER({col_letra}) = 'UNILABOR'"
+            else:
+                query = f"SELECT * WHERE UPPER({col_letra}) = '{cliente_filtro.upper()}'"
+                
+            query_encoded = urllib.parse.quote(query)
+            url = f"https://docs.google.com/spreadsheets/d/{planilha.id}/gviz/tq?tqx=out:csv&gid={aba_m.id}&tq={query_encoded}"
+            
+            request_auth = google.auth.transport.requests.Request()
+            gc.auth.refresh(request_auth)
+            
+            headers = {"Authorization": f"Bearer {gc.auth.token}"}
+            resposta = requests.get(url, headers=headers)
+            
+            if resposta.status_code == 200:
+                df = pd.read_csv(io.StringIO(resposta.text), dtype=str)
+                df.columns = df.columns.str.strip().str.upper()
+            else:
+                raise Exception("Falha na API GViz")
+                
+        except Exception as e:
+            # 🛟 MODO DE SEGURANÇA: Se a API falhar, recua para o método antigo
+            dados_m = aba_m.get_all_values()
+            if len(dados_m) > 1:
+                df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
+                df.columns = df.columns.str.strip().str.upper()
 
-        if len(dados_m) > 1:
-            df = pd.DataFrame(dados_m[1:], columns=dados_m[0])
-            df.columns = df.columns.str.strip().str.upper()
+        if not df.empty:
             df = df.loc[:, ~df.columns.duplicated()]
 
             # 🧹 HIGIENIZAÇÃO DE DADOS OFICIAL
@@ -517,9 +564,10 @@ def carregar_dados_nuvem():
                 df['MOTORISTA_ENTREGA'] = ""
 
             if 'DATA' in df.columns:
-                df['DATA_OBJ'] = pd.to_datetime(df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+                # 🔥 CORREÇÃO DA DATA APLICADA AQUI 🔥
+                df['DATA_OBJ'] = pd.to_datetime(df['DATA'], dayfirst=True, errors='coerce').dt.date
             
-            return df
+        return df
 
     except Exception as e:
         st.error(f"Erro ao carregar dados: {e}")
@@ -1167,19 +1215,14 @@ else:
     """, unsafe_allow_html=True)
 
     # ── DADOS ───────────────────────────────────────────
-    df_raw = carregar_dados_nuvem()
+    filtro_atual = conf["filtro"]
+    
+    # Chama a função nova passando o filtro do cliente
+    df_cliente = carregar_dados_nuvem(filtro_atual)
 
-    if df_raw.empty:
+    if df_cliente.empty:
         st.info("Aguardando novas informações do Torre de Controle na base de dados...")
     else:
-        if conf["filtro"] == "TODOS":
-            df_cliente = df_raw.copy()
-        elif conf["filtro"] == "LABEST":
-            # Filtro especial para LABEST: inclui também UNILABOR
-            df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip().isin(["LABEST", "UNILABOR"])].copy()
-        else:
-            df_cliente = df_raw[df_raw['TOMADOR'].str.upper().str.strip() == conf["filtro"]].copy()
-
         # 🔥 MOTOR DE ETA E SLA (CÁLCULO 100% E OTD PONTUALIDADE) 🔥
         df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
         
@@ -1319,7 +1362,8 @@ else:
                             </div>
                         """, unsafe_allow_html=True)
 
-                        if button(label, key=key, help=f"Filtrar por: {texto_card}"):
+                        # 🔥 CORREÇÃO 1: Botão padrão do Streamlit para resgatar o clique no CSS
+                        if st.button(label, key=key, help=f"Filtrar por: {texto_card}", use_container_width=True):
                             st.session_state.filtro_kpi = filtro
                             st.rerun()
 
