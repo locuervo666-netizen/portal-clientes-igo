@@ -513,7 +513,15 @@ if not st.session_state.autenticado:
     st.stop()
 
 # Aplica o CSS do painel
+# Aplica o CSS do painel
 st.markdown(CSS_DASHBOARD, unsafe_allow_html=True)
+
+# =============================================================================
+# 🔔 SISTEMA GLOBAL DE NOTIFICAÇÕES (TOASTS NA MEMÓRIA)
+# =============================================================================
+if 'ui_toast' in st.session_state:
+    st.toast(st.session_state.ui_toast['msg'], icon=st.session_state.ui_toast['icon'])
+    del st.session_state.ui_toast
 
 # =============================================================================
 # 🔗 2. CONEXÕES OFICIAL E SANDBOX (MOTOR DE DADOS INTACTO)
@@ -2174,8 +2182,8 @@ if menu == "📊 GRID":
                                         df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 if lista_para_app:
                                     despachar_para_appsheet(lista_para_app)
-                                st.success("🎉 Solicitações aprovadas!")
-                                time.sleep(2)
+                                
+                                st.session_state.ui_toast = {'msg': "Solicitações aprovadas!", 'icon': "🎉"}
                                 carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e:
@@ -2788,8 +2796,7 @@ if menu == "📊 GRID":
                                         except Exception:
                                             pass
 
-                                        st.success("🎉 Atualizado no CCO e App sincronizada!")
-                                        time.sleep(1)
+                                        st.session_state.ui_toast = {'msg': "Atualizado no CCO e App sincronizada!", 'icon': "🎉"}
                                         carregar_dados_completos.clear()
                                         st.rerun()
                                     except Exception as e:
@@ -3915,9 +3922,7 @@ elif menu == "📝 Pedido Manual":
                             if m_agente:
                                 despachar_para_appsheet([novo_ped_dict])
 
-                            st.success(
-                                f"🎉 Pedido {m_pedido} criado com sucesso!")
-                            time.sleep(2.0)
+                            st.session_state.ui_toast = {'msg': f"Pedido {m_pedido} criado com sucesso!", 'icon': "🎉"}
 
                             carregar_dados_completos.clear()
                             st.session_state['m_rua'] = ""
@@ -4090,8 +4095,7 @@ elif menu == "📥 Importações":
                             df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
 
                             st.session_state.df_preview_oficial = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
-                            st.success("✅ Processamento Concluído!")
-                            time.sleep(1)
+                            st.session_state.ui_toast = {'msg': "Processamento Concluído!", 'icon': "✅"}
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro no processamento: {e}")
@@ -4185,8 +4189,7 @@ elif menu == "📥 Importações":
                                 st.session_state.df_carrinho_oficial = pd.concat([st.session_state.df_carrinho_oficial, df_ok], ignore_index=True)
 
                             st.session_state.df_preview_oficial = pd.DataFrame()
-                            st.success("✅ Pedidos adicionados ao carrinho com sucesso!")
-                            time.sleep(1.5)
+                            st.session_state.ui_toast = {'msg': "Pedidos adicionados ao carrinho com sucesso!", 'icon': "🛒"}
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro: {e}")
@@ -4626,8 +4629,8 @@ elif menu == "📥 Importações":
                         st.session_state.df_preview_oficial = pd.concat([st.session_state.df_preview_oficial, df_novos_fixos_of], ignore_index=True)
                     else:
                         st.session_state.df_preview_oficial = df_novos_fixos_of
-                st.success("✅ Pedidos fixos adicionados ao preview oficial. Volte à Aba 1 para revisar e adicionar ao carrinho.")
-                time.sleep(1.5)
+                
+                st.session_state.ui_toast = {'msg': "Pedidos fixos adicionados ao preview!", 'icon': "✅"}
                 st.rerun()
 
         st.markdown("---")
@@ -4663,8 +4666,8 @@ elif menu == "📥 Importações":
                             aba_fixos_of.update("A1", [cols_fixos_of])
                         else:
                             aba_fixos_of.update("A1", [df_regras_edit_of.columns.tolist()] + df_regras_edit_of.fillna("").astype(str).values.tolist())
-                        st.success("✅ Regras atualizadas com sucesso!")
-                        time.sleep(1.5)
+                        
+                        st.session_state.ui_toast = {'msg': f"{len(ids_para_remover)} regras excluídas!", 'icon': "🗑️"}
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao salvar regras: {e}")
@@ -6033,12 +6036,9 @@ elif menu == "🔬 Triagem":
     df_raw = carregar_dados_completos(planilha_db)
 
     # =========================================================================
-    # ⚙️ RECURSOS VISUAIS GLOBAIS, TOASTS E COMPONENTES UI
+    # ⚙️ RECURSOS VISUAIS GLOBAIS E COMPONENTES UI
     # =========================================================================
-    if 'ui_toast' in st.session_state:
-        st.toast(st.session_state.ui_toast['msg'], icon=st.session_state.ui_toast['icon'])
-        del st.session_state.ui_toast
-
+    
     def exibir_empty_state(icone, titulo, subtitulo):
         html = (
             f'<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 50px 20px; text-align: center; background-color: #f8fafc; border-radius: 12px; border: 2px dashed #cbd5e1; margin-top: 10px; margin-bottom: 20px;">'
@@ -7129,9 +7129,8 @@ elif menu == "⚙️ Rotas":
                         try:
                             planilha_db.worksheet("Agentes").clear()
                             planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
-                            st.success(f"Campão! Agente **{name_ag.upper()}** cadastrado com sucesso!")
+                            st.session_state.ui_toast = {'msg': f"Campão! Agente {name_ag.upper()} cadastrado com sucesso!", 'icon': "🧑‍✈️"}
                             carregar_dados_agentes.clear()
-                            time.sleep(1)
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao cadastrar: {e}")
@@ -7234,9 +7233,8 @@ elif menu == "⚙️ Rotas":
                                     aba_ag = planilha_db.worksheet("Agentes")
                                     aba_ag.clear()
                                     aba_ag.update("A1", [df_ag_edit.columns.tolist()] + df_ag_edit.fillna("").astype(str).values.tolist())
-                                    st.success("✅ Cadastro atualizado com sucesso!")
+                                    st.session_state.ui_toast = {'msg': "Cadastro atualizado com sucesso!", 'icon': "✅"}
                                     carregar_dados_agentes.clear()
-                                    time.sleep(1)
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Erro ao editar: {e}")
@@ -7265,9 +7263,8 @@ elif menu == "⚙️ Rotas":
                                 try:
                                     planilha_db.worksheet("Agentes").clear()
                                     planilha_db.worksheet("Agentes").update("A1", [df_novo.columns.tolist()] + df_novo.fillna("").astype(str).values.tolist())
-                                    st.success("Rota adicionada!")
+                                    st.session_state.ui_toast = {'msg': "Rota adicionada!", 'icon': "📍"}
                                     carregar_dados_agentes.clear()
-                                    time.sleep(0.5)
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Erro ao salvar: {e}")
@@ -7290,9 +7287,8 @@ elif menu == "⚙️ Rotas":
                                             aba_ag.update("A1", [["ROTA MAPEADA", "LOGIN DO AGENTE", "NOME DO AGENTE", "TELEFONE"]])
                                         else:
                                             aba_ag.update("A1", [df_ag_novo.columns.tolist()] + df_ag_novo.fillna("").astype(str).values.tolist())
-                                        st.success("Motorista apagado com sucesso!")
+                                        st.session_state.ui_toast = {'msg': "Motorista apagado com sucesso!", 'icon': "🗑️"}
                                         carregar_dados_agentes.clear()
-                                        time.sleep(1.5)
                                         st.rerun()
                                     except Exception as e:
                                         st.error(f"Erro ao excluir: {e}")
@@ -7348,9 +7344,8 @@ elif menu == "⚙️ Rotas":
                                     try:
                                         planilha_db.worksheet("Agentes").clear()
                                         planilha_db.worksheet("Agentes").update("A1", [df_rotas_full.columns.tolist()] + df_rotas_full.fillna("").astype(str).values.tolist())
-                                        st.success(f"🎉 Todas as rotas migradas para {para_todos}! O cadastro de **{dados_agente_original['NOME DO AGENTE']}** permanece ativo e disponível para novas rotas.")
+                                        st.session_state.ui_toast = {'msg': f"Rotas migradas para {para_todos}!", 'icon': "🚀"}
                                         carregar_dados_agentes.clear()
-                                        time.sleep(1)
                                         st.rerun()
                                     except Exception as e:
                                         st.error(f"Erro na transferência: {e}")
@@ -7430,8 +7425,8 @@ elif menu == "⚙️ Rotas":
                                 try:
                                     planilha_db.worksheet("Agentes").clear()
                                     planilha_db.worksheet("Agentes").update("A1", [DF_AGENTES.drop(idx).columns.tolist()] + DF_AGENTES.drop(idx).fillna("").astype(str).values.tolist())
+                                    st.session_state.ui_toast = {'msg': "Rota excluída!", 'icon': "✂️"}
                                     carregar_dados_agentes.clear()
-                                    time.sleep(0.5)
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Erro ao remover: {e}")
