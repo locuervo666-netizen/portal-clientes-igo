@@ -1655,6 +1655,7 @@ else:
                     mapa_csv = {
                         'PEDIDO': 'Pedido',
                         'DATA': 'Data Coleta',
+                        'HORA_LIMPA': 'Hora Coleta',  # 🔥 NOVA COLUNA ADICIONADA AQUI 🔥
                         'LABORATORIO': 'Ponto de Coleta',
                         'CIDADE': 'Cidade',
                         'UF': 'UF',
