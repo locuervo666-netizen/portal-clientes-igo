@@ -11,3 +11,4 @@ google-auth
 plotly
 qrcode
 Pillow
+streamlit-shadcn-ui
