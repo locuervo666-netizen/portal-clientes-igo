@@ -1712,9 +1712,12 @@ def gerar_pdf_romaneio(
 
     for idx, item in enumerate(sel_lista, 1):
         fill = (idx % 2 == 0)
-        pdf.set_fill_color(
-            241, 245, 249) if fill else pdf.set_fill_color(
-            255, 255, 255)
+        
+        # Correção para evitar que o Streamlit imprima "None" na tela
+        if fill:
+            pdf.set_fill_color(241, 245, 249)
+        else:
+            pdf.set_fill_color(255, 255, 255)
         qr_val = str(item.get('QR_CODE', ''))
         if qr_val.upper() == 'NAN' or not qr_val:
             qr_val = "-"
@@ -6458,6 +6461,14 @@ elif menu == "🔬 Triagem":
             exibir_empty_state("📭", "Banco Vazio", "Aguardando geração de dados.")
         else:
             df_hist = df_raw[df_raw['STATUS'].astype(str).str.upper().isin(['CONFERIDO', 'EM ROTA DE ENTREGA', 'ENTREGUE', 'FRUSTRADA', 'PROBLEMA', 'CANCELADO'])].copy()
+            
+            # --- NORMALIZAÇÃO DE DADOS ---
+            if 'TOMADOR' in df_hist.columns:
+                df_hist['TOMADOR'] = df_hist['TOMADOR'].replace({'CAEP': 'SYNVIA', 'CUNHA': 'GRALAB'})
+            if 'CIDADE' in df_hist.columns:
+                df_hist['CIDADE'] = df_hist['CIDADE'].replace({'Brodosqui': 'Brodowski'})
+            # -----------------------------
+            
             if not df_hist.empty:
                 renderizar_kpis([
                     (df_hist['ROMANEIO'].nunique(), "📄 Romaneios Emitidos", "#1E293B", "#334155"),
@@ -6465,16 +6476,74 @@ elif menu == "🔬 Triagem":
                 ])
 
                 with st.expander("🖨️ Reimpressão de Romaneios Específicos", expanded=False):
-                    romaneios_disponiveis = [r for r in df_hist['ROMANEIO'].unique() if str(r).strip() and str(r).upper() != 'NAN']
-                    if romaneios_disponiveis:
-                        col_re_1, col_re_2 = st.columns([2, 1])
-                        rom_sel = col_re_1.selectbox("Selecione o Lote (Romaneio):", ["Selecione..."] + sorted(romaneios_disponiveis, reverse=True))
-                        if rom_sel != "Selecione...":
-                            df_rom = df_hist[df_hist['ROMANEIO'] == rom_sel].copy()
-                            pdf_reprint = gerar_pdf_romaneio(rom_sel, hoje_br, df_rom.iloc[0].get('AGENTE_RAW', '---'), df_rom.to_dict('records'))
-                            col_re_2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-                            col_re_2.download_button("📥 REIMPRIMIR PDF", pdf_reprint, file_name=f"Reprint_{rom_sel}.pdf", mime="application/pdf", type="primary", use_container_width=True)
+                    st.markdown("<p style='font-size: 14px; color: #475569;'>Filtre para encontrar o romaneio desejado:</p>", unsafe_allow_html=True)
+                    
+                    # 1. Filtros de Pesquisa
+                    col_f1, col_f2 = st.columns(2)
+                    with col_f1:
+                        data_filtro = st.date_input("🗓️ Data da Coleta:", value=[], format="DD/MM/YYYY")
+                    with col_f2:
+                        lista_tomadores = ["TODOS"] + sorted([str(x) for x in df_hist['TOMADOR'].dropna().unique() if str(x).strip() != ''])
+                        tomador_filtro = st.selectbox("🏢 Hub (Tomador):", lista_tomadores)
 
+                    # 2. Aplicação dos Filtros
+                    df_filtrado = df_hist.copy()
+
+                    if len(data_filtro) == 2: # Período
+                        dt_inicio, dt_fim = data_filtro
+                        if 'DATA' in df_filtrado.columns:
+                            df_filtrado['DATA_OBJ'] = pd.to_datetime(df_filtrado['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+                            df_filtrado = df_filtrado[(df_filtrado['DATA_OBJ'] >= dt_inicio) & (df_filtrado['DATA_OBJ'] <= dt_fim)]
+                    elif len(data_filtro) == 1: # Data Única
+                        dt_unica = data_filtro[0]
+                        if 'DATA' in df_filtrado.columns:
+                            df_filtrado['DATA_OBJ'] = pd.to_datetime(df_filtrado['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+                            df_filtrado = df_filtrado[df_filtrado['DATA_OBJ'] == dt_unica]
+
+                    if tomador_filtro != "TODOS":
+                        df_filtrado = df_filtrado[df_filtrado['TOMADOR'] == tomador_filtro]
+
+                    romaneios_disponiveis = [r for r in df_filtrado['ROMANEIO'].unique() if str(r).strip() and str(r).upper() != 'NAN']
+
+                    # 3. Construção do Menu Inteligente e Botão de Download
+                    if romaneios_disponiveis:
+                        opcoes_romaneio = ["Selecione..."]
+                        mapa_romaneio_id = {}
+                        
+                        for rom in sorted(romaneios_disponiveis, reverse=True):
+                            detalhes = df_filtrado[df_filtrado['ROMANEIO'] == rom].iloc[0]
+                            
+                            # Função interna para limpar textos nulos, "None" ou "nan"
+                            def limpar_texto_none(val):
+                                v_str = str(val).strip()
+                                if v_str.lower() in ['none', 'nan', '', 'nat', '<na>']:
+                                    return '---'
+                                return v_str
+
+                            r_data = limpar_texto_none(detalhes.get('DATA'))
+                            r_tomador = limpar_texto_none(detalhes.get('TOMADOR'))
+                            r_agente = limpar_texto_none(detalhes.get('AGENTE_RAW'))
+                            
+                            texto_exibicao = f"🔖 {rom}  |  📅 {r_data}  |  🏢 {r_tomador}  |  👤 {r_agente}"
+                            opcoes_romaneio.append(texto_exibicao)
+                            mapa_romaneio_id[texto_exibicao] = rom
+                            
+                        st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+                        col_re_1, col_re_2 = st.columns([2, 1])
+                        rom_sel_texto = col_re_1.selectbox("Selecione o Lote (Romaneio):", opcoes_romaneio)
+                        
+                        if rom_sel_texto != "Selecione...":
+                            rom_sel_id = mapa_romaneio_id[rom_sel_texto]
+                            df_rom = df_hist[df_hist['ROMANEIO'] == rom_sel_id].copy()
+                            
+                            pdf_reprint = gerar_pdf_romaneio(rom_sel_id, hoje_br, df_rom.iloc[0].get('AGENTE_RAW', '---'), df_rom.to_dict('records'))
+                            
+                            col_re_2.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                            col_re_2.download_button("📥 REIMPRIMIR PDF", pdf_reprint, file_name=f"Reprint_{rom_sel_id}.pdf", mime="application/pdf", type="primary", use_container_width=True)
+                    else:
+                        st.info("Nenhum romaneio encontrado com os filtros selecionados.")
+
+                # 4. Trilha de Auditoria (AgGrid mantida intacta)
                 st.markdown("#### 📜 Trilha de Auditoria (Últimos Volumes)")
                 
                 colunas_validas_hist = [c for c in ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO'] if c in df_hist.columns]
