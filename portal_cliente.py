@@ -14,6 +14,7 @@ from google.oauth2.credentials import Credentials
 # 🚀 IMPORTAÇÃO DO AGGRID E DO AUTO-REFRESH SILENCIOSO
 from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
 from streamlit_autorefresh import st_autorefresh
+from streamlit_shadcn_ui import button, input as shadcn_input
 
 FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
@@ -946,10 +947,10 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 🔘 BOTÃO DE FECHAR
+    # 🔘 BOTÃO DE FECHAR (shadcn-ui)
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        if st.button("✖️ Fechar Detalhes", use_container_width=True, type="secondary"):
+        if button("✖️ Fechar Detalhes", key="fechar_detalhes_btn", variant="secondary"):
             st.session_state.modal_aberto = False
             st.session_state.pedido_modal = None
             st.session_state.linha_clicada = None
@@ -1318,7 +1319,7 @@ else:
                             </div>
                         """, unsafe_allow_html=True)
 
-                        if st.button(label, key=key, use_container_width=True, help=f"Filtrar por: {texto_card}"):
+                        if button(label, key=key, help=f"Filtrar por: {texto_card}"):
                             st.session_state.filtro_kpi = filtro
                             st.rerun()
 
@@ -1334,6 +1335,8 @@ else:
                     }
                     </style>
                 """, unsafe_allow_html=True)
+
+                st.markdown("<br><br>", unsafe_allow_html=True)
 
                 df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
                 if not df_h.empty:
@@ -1373,7 +1376,7 @@ else:
 
                 col_busca, col_export = st.columns([5, 1])
                 with col_busca:
-                    busca = st.text_input("🔎 Busca Rápida:", placeholder="Buscar por pedido, laboratório, cidade...", label_visibility="collapsed")
+                    busca = shadcn_input(placeholder="🔎 Buscar por pedido, laboratório, cidade...", key="busca_grid_input")
                 with col_export:
                     holder_download = st.empty()
 
@@ -1769,10 +1772,26 @@ else:
                                             dados_m  = aba_m.get_all_values()
 
                                             df_m_temp = pd.DataFrame(dados_m[1:], columns=dados_m[0])
+                                            
+                                            # 🛑 INÍCIO DA TRAVA DE DUPLICIDADE (IDEMPOTÊNCIA) 🛑
+                                            data_formatada = data_coleta.strftime("%d/%m/%Y")
+                                            
+                                            filtro_duplicidade = df_m_temp[
+                                                (df_m_temp['TOMADOR'] == nome_tomador_oficial) &
+                                                (df_m_temp['LABORATORIO'] == local_data['LABORATORIO']) &
+                                                (df_m_temp['DATA'] == data_formatada) &
+                                                (df_m_temp['STATUS'] == 'AGUARDANDO APROVAÇÃO')
+                                            ]
+                                            
+                                            if not filtro_duplicidade.empty:
+                                                st.warning("⚠️ Solicitação já recebida! Já existe um pedido idêntico aguardando aprovação para este local e data.")
+                                                st.stop() # Interrompe o script para impedir a criação do pedido duplicado
+                                            # 🛑 FIM DA TRAVA 🛑
+
                                             prox_id = obter_proximo_id(df_m_temp)
 
                                             nova_linha_dict = {
-                                                'DATA':       data_coleta.strftime("%d/%m/%Y"),
+                                                'DATA':       data_formatada,
                                                 'PEDIDO':     str(prox_id),
                                                 'TOMADOR':    nome_tomador_oficial,
                                                 'LABORATORIO':local_data['LABORATORIO'],
