@@ -2820,30 +2820,30 @@ if menu == "📊 GRID":
         # 🔥 PREENCHENDO A BARRA DE AÇÕES NO TOPO DA TELA 🔥
         st.markdown("""
             <style>
-                /* 1. Padroniza TODOS os botões nativos e popovers para o Azul Claro/Ciano */
+                /* 1. Padroniza TODOS os botões nativos e popovers para a paleta azul da sidebar */
                 div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"],
                 div[data-testid="stPopover"] > div > button,
                 div[data-testid="stPopover"] > button {
-                    background-color: #06b6d4 !important; /* Azul Claro / Ciano */
-                    color: #ffffff !important;
-                    border: 1px solid #0891b2 !important; /* Força borda sólida igual para todos */
-                    border-radius: 8px !important;
-                    font-weight: 600 !important;
+                    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+                    color: #0f172a !important;
+                    border: 1px solid #93c5fd !important;
+                    border-radius: 10px !important;
+                    font-weight: 700 !important;
                     font-size: 14px !important;
                     transition: all 0.2s ease !important;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-                    min-height: 40px !important;
+                    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.10) !important;
+                    min-height: 42px !important;
                 }
                 
                 /* Efeito ao passar o mouse */
                 div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"]:hover,
                 div[data-testid="stPopover"] > div > button:hover,
                 div[data-testid="stPopover"] > button:hover {
-                    background-color: #0891b2 !important; /* Azul mais escuro */
-                    border-color: #0891b2 !important;
-                    color: #ffffff !important;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-                    transform: translateY(-2px) !important;
+                    background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%) !important;
+                    border-color: #60a5fa !important;
+                    color: #0f172a !important;
+                    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18) !important;
+                    transform: translateY(-1px) !important;
                 }
                 
                 div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"]:active,
