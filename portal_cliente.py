@@ -331,6 +331,14 @@ CLIENTES_CONFIG = {
     }
 }
 
+
+def normalizar_chave_cliente(valor):
+    """Normaliza e valida a chave de cliente usada na autenticação/sessão."""
+    if valor is None:
+        return None
+    chave = str(valor).strip().upper()
+    return chave if chave in CLIENTES_CONFIG else None
+
 # =======================================================
 # 🔗 2. MOTOR DE DADOS
 # =======================================================
@@ -622,6 +630,28 @@ def carregar_dados_nuvem(cliente_filtro):
             if 'DATA' in df.columns:
                 # 🔥 CORREÇÃO DA DATA APLICADA AQUI 🔥
                 df['DATA_OBJ'] = pd.to_datetime(df['DATA'], dayfirst=True, errors='coerce').dt.date
+
+            # 🔐 BLINDAGEM FINAL: garante isolamento por TOMADOR mesmo em fallback
+            if 'TOMADOR' in df.columns and cliente_filtro != "TODOS":
+                tomador_norm = (
+                    df['TOMADOR']
+                    .astype(str)
+                    .str.upper()
+                    .str.strip()
+                    .str.replace(r'\s+', ' ', regex=True)
+                )
+
+                if cliente_filtro == "LABEST":
+                    tomadores_permitidos = {"LABEST", "UNILABOR"}
+                else:
+                    tomadores_permitidos = {
+                        str(cliente_filtro)
+                        .upper()
+                        .strip()
+                        .replace('  ', ' ')
+                    }
+
+                df = df.loc[tomador_norm.isin(tomadores_permitidos)].copy()
             
         return df
 
@@ -679,11 +709,24 @@ def enviar_whatsapp_zapi_cliente(telefone_destino, texto_mensagem):
 
 # ── Session State (Controle Seguro do Modal) ──
 if 'logado' not in st.session_state:
-    if "token_cli" in st.query_params:
-        st.session_state.logado = True
-        st.session_state.cliente = st.query_params["token_cli"]
-    else:
+    st.session_state.logado = False
+
+if 'cliente' not in st.session_state:
+    st.session_state.cliente = None
+
+token_cliente = normalizar_chave_cliente(st.query_params.get("token_cli"))
+if not st.session_state.logado and token_cliente:
+    st.session_state.logado = True
+    st.session_state.cliente = token_cliente
+
+if st.session_state.logado:
+    cliente_sessao = normalizar_chave_cliente(st.session_state.cliente)
+    if not cliente_sessao:
         st.session_state.logado = False
+        st.session_state.cliente = None
+        st.query_params.clear()
+        st.rerun()
+    st.session_state.cliente = cliente_sessao
 
 if 'filtro_kpi' not in st.session_state: st.session_state.filtro_kpi = "TODOS"
 if 'linha_clicada' not in st.session_state: st.session_state.linha_clicada = None
