@@ -4363,6 +4363,120 @@ elif menu == "📥 Importações":
     st.markdown(
         """
         <style>
+        div[data-baseweb="tab-list"] {
+            gap: 14px;
+            margin-bottom: 16px;
+            align-items: stretch;
+        }
+        div[data-baseweb="tab"] {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid #dbe3ef !important;
+            border-radius: 12px !important;
+            color: #334155 !important;
+            font-weight: 700 !important;
+            min-height: 50px !important;
+            padding: 0 18px !important;
+            line-height: 1.25 !important;
+            letter-spacing: 0.15px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+            transition: all 0.2s ease !important;
+        }
+        button[role="tab"] {
+            padding: 0 18px !important;
+            min-height: 50px !important;
+            line-height: 1.25 !important;
+        }
+        button[role="tab"] p {
+            margin: 0 !important;
+            line-height: 1.25 !important;
+            white-space: nowrap !important;
+        }
+        div[data-baseweb="tab"]:hover {
+            border-color: #93c5fd !important;
+            color: #0f172a !important;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.10) !important;
+        }
+        button[role="tab"][aria-selected="true"] {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+            border-color: #1d4ed8 !important;
+            border-radius: 12px !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22) !important;
+            overflow: hidden !important;
+            padding: 0 20px !important;
+        }
+        button[role="tab"][aria-selected="true"] p {
+            letter-spacing: 0.2px !important;
+            line-height: 1.3 !important;
+        }
+        div[data-testid="stTextArea"] textarea,
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stDateInput"] input,
+        div[data-testid="stDateInput"] button,
+        div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div,
+        div[data-testid="stMultiSelect"] > div[data-baseweb="select"] > div {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stTextArea"] textarea:focus,
+        div[data-testid="stTextInput"] input:focus,
+        div[data-testid="stDateInput"] input:focus {
+            border-color: #60a5fa !important;
+            box-shadow: 0 0 0 1px #93c5fd !important;
+        }
+        div[data-testid="stForm"],
+        div[data-testid="stExpander"],
+        div[data-testid="stDataFrame"],
+        div[data-testid="stVerticalBlockBorderWrapper"],
+        div[data-testid="stAlert"] {
+            border-radius: 14px !important;
+        }
+        div[data-testid="stExpander"] {
+            border: 1px solid #dbe3ef !important;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stFormSubmitButton"] > button,
+        div.stButton > button:not([kind="primary"]),
+        div[data-testid="stPopover"] > div > button,
+        div[data-testid="stPopover"] > button {
+            background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+            color: #0f172a !important;
+            border: 1px solid #93c5fd !important;
+            border-radius: 10px !important;
+            font-weight: 700 !important;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.10) !important;
+            min-height: 42px !important;
+            transition: all 0.2s ease !important;
+        }
+        div[data-testid="stFormSubmitButton"] > button:hover,
+        div.stButton > button:not([kind="primary"]):hover,
+        div[data-testid="stPopover"] > div > button:hover,
+        div[data-testid="stPopover"] > button:hover {
+            background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%) !important;
+            border-color: #60a5fa !important;
+            box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18) !important;
+            transform: translateY(-1px) !important;
+        }
+        div.stButton > button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"] {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+            border: 1px solid #1d4ed8 !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22) !important;
+        }
+        div.stButton > button[kind="primary"]:hover,
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"]:hover {
+            background: linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%) !important;
+            border-color: #1e40af !important;
+            color: #ffffff !important;
+        }
         .of-card {
             background: #F8FAFC;
             border: 1px solid #E2E8F0;
