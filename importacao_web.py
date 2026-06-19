@@ -357,16 +357,84 @@ CSS_DASHBOARD = """
         background-color: #FFFFFF !important; 
     }
 
-    /* ── SIDEBAR 100% BRANCA ── */
+    /* ── SIDEBAR PREMIUM ── */
     [data-testid="stSidebar"],
     [data-testid="stSidebar"] > div:first-child {
-        background-color: #FFFFFF !important;
-        border-right: 1px solid #e2e8f0 !important;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+        border-right: 1px solid #dbe3ef !important;
     }
     [data-testid="stSidebar"] p,
     [data-testid="stSidebar"] label,
     [data-testid="stSidebar"] h3 {
         color: #1e293b !important;
+    }
+    [data-testid="stSidebar"] div.stRadio > div {
+        gap: 8px;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label {
+        background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 8px 10px;
+        margin: 0;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+        transition: all 0.2s ease;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
+        border-color: #93C5FD;
+        transform: translateX(2px);
+        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.14);
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
+        display: none;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label p {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0F172A;
+        margin: 0;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
+        background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%);
+        border-color: #1D4ED8;
+        box-shadow: 0 10px 20px rgba(37, 99, 235, 0.30);
+        transform: translateX(4px);
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p {
+        color: #FFFFFF;
+        font-weight: 800;
+    }
+    [data-testid="stSidebar"] .stButton > button,
+    [data-testid="stSidebar"] [data-testid="stFormSubmitButton"] > button {
+        border-radius: 10px !important;
+        border: 1px solid #93c5fd !important;
+        background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.10) !important;
+        transition: all 0.2s ease !important;
+        min-height: 42px !important;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover,
+    [data-testid="stSidebar"] [data-testid="stFormSubmitButton"] > button:hover {
+        transform: translateY(-1px) !important;
+        border-color: #60a5fa !important;
+        background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%) !important;
+        box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18) !important;
+    }
+    [data-testid="stSidebar"] .stDateInput input,
+    [data-testid="stSidebar"] .stDateInput button,
+    [data-testid="stSidebar"] .stDateInput [role="button"],
+    [data-testid="stSidebar"] [data-baseweb="select"] > div {
+        border-radius: 10px !important;
+        border: 1px solid #cbd5e1 !important;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+        color: #0f172a !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+    }
+    [data-testid="stSidebar"] .stDateInput input:focus {
+        border-color: #93c5fd !important;
+        box-shadow: 0 0 0 1px #93c5fd !important;
     }
 
     /* ── LAYOUT ── */
@@ -1947,6 +2015,79 @@ with st.sidebar:
         use_container_width=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
+    st.markdown("""
+        <style>
+        [data-testid="stSidebar"] .nav-premium-wrap {
+            background: linear-gradient(140deg, #0F172A 0%, #1E293B 60%, #334155 100%);
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 14px;
+            padding: 14px 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.25);
+        }
+        [data-testid="stSidebar"] .nav-premium-title {
+            color: #F8FAFC;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 1.3px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        [data-testid="stSidebar"] .nav-premium-subtitle {
+            color: #CBD5E1;
+            font-size: 12px;
+            margin: 0;
+        }
+        [data-testid="stSidebar"] div.stRadio > div {
+            gap: 7px;
+        }
+        [data-testid="stSidebar"] div[role="radiogroup"] > label {
+            width: 100%;
+            min-height: 48px;
+            box-sizing: border-box;
+            background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+            transition: all 0.2s ease;
+        }
+        [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
+            border-color: #93C5FD;
+            transform: translateX(2px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.14);
+        }
+        [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
+            display: none;
+        }
+        [data-testid="stSidebar"] div[role="radiogroup"] > label p {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0F172A;
+            margin: 0;
+            line-height: 1.15;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
+            background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%);
+            border-color: #1D4ED8;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.35);
+            transform: translateX(4px);
+        }
+        [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p {
+            color: #FFFFFF;
+            font-weight: 800;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     qtd_chamados_abertos = checar_chamados_pendentes(planilha_db)
     if qtd_chamados_abertos > 0:
         st.markdown(f"""
@@ -1969,7 +2110,7 @@ with st.sidebar:
         "🔬 Triagem",
         "🎧 Atendimento",
         "📱 WhatsApp"
-    ], index=1)
+    ], index=1, label_visibility="collapsed")
 
     st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
@@ -1977,42 +2118,41 @@ with st.sidebar:
     # 🔥 ESTILO EXCLUSIVO E DEFINITIVO PARA O BOTÃO SAIR 🔥
     st.markdown("""
         <style>
-        /* Pinta o fundo do botão e ajusta bordas */
-        [data-testid="stSidebar"] div.stButton > button {
-            background-color: #ef4444 !important; /* Vermelho vibrante */
+        /* Botão sair simples e legível */
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] {
+            background: #ef4444 !important;
             border: 1px solid #dc2626 !important;
-            border-radius: 8px !important;
-            transition: all 0.3s ease !important;
-            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2) !important;
-            min-height: 45px !important;
-        }
-        
-        /* FORÇA a cor branca no texto e em qualquer tag interna (ícones/parágrafos) */
-        [data-testid="stSidebar"] div.stButton > button,
-        [data-testid="stSidebar"] div.stButton > button p,
-        [data-testid="stSidebar"] div.stButton > button span,
-        [data-testid="stSidebar"] div.stButton > button div {
-            color: #ffffff !important; 
-            font-weight: 700 !important;
-            font-size: 15px !important;
+            border-radius: 6px !important;
+            box-shadow: none !important;
+            min-height: 42px !important;
         }
 
-        /* Efeito Hover (passar o mouse) */
-        [data-testid="stSidebar"] div.stButton > button:hover {
-            background-color: #dc2626 !important; /* Vermelho mais escuro */
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] p,
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] span,
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] div {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            font-size: 14px !important;
+        }
+
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"]:hover {
+            background: #dc2626 !important;
             border-color: #b91c1c !important;
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4) !important;
-            transform: translateY(-2px) !important;
+            box-shadow: none !important;
+            transform: none !important;
         }
         
-        [data-testid="stSidebar"] div.stButton > button:hover p,
-        [data-testid="stSidebar"] div.stButton > button:hover span {
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"]:hover p,
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"]:hover span {
             color: #ffffff !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    if st.button("🚪 Sair do Sistema", use_container_width=True):
+    if st.button("🚪 Sair do Sistema", key="btn_sair_sidebar", use_container_width=True, type="primary"):
         st.session_state.autenticado = False
         st.rerun()
 
@@ -2644,7 +2784,7 @@ if menu == "📊 GRID":
         st.markdown("""
             <style>
                 /* 1. Padroniza TODOS os botões nativos e popovers para o Azul Claro/Ciano */
-                div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]) > button[kind="secondary"],
+                div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"],
                 div[data-testid="stPopover"] > div > button,
                 div[data-testid="stPopover"] > button {
                     background-color: #06b6d4 !important; /* Azul Claro / Ciano */
@@ -2659,7 +2799,7 @@ if menu == "📊 GRID":
                 }
                 
                 /* Efeito ao passar o mouse */
-                div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]) > button[kind="secondary"]:hover,
+                div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"]:hover,
                 div[data-testid="stPopover"] > div > button:hover,
                 div[data-testid="stPopover"] > button:hover {
                     background-color: #0891b2 !important; /* Azul mais escuro */
@@ -2669,7 +2809,7 @@ if menu == "📊 GRID":
                     transform: translateY(-2px) !important;
                 }
                 
-                div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]) > button[kind="secondary"]:active,
+                div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"]:active,
                 div[data-testid="stPopover"] > div > button:active,
                 div[data-testid="stPopover"] > button:active {
                     transform: translateY(0px) !important;
@@ -2954,17 +3094,17 @@ elif menu == "💰 Faturamento":
         <style>
         /* Estilização Premium para Inputs (Filtros) */
         div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div {
-            background-color: #f8fafc !important;
-            border-radius: 8px !important;
-            border: 1px solid #e2e8f0 !important;
-            box-shadow: none !important;
-        }
-        div[data-testid="stDateInput"] > div {
-            background-color: #f8fafc !important;
-            border-radius: 8px !important;
-            border: 1px solid #e2e8f0 !important;
-            box-shadow: none !important;
-        }
+                background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+                border-radius: 10px !important;
+                border: 1px solid #cbd5e1 !important;
+                box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+            }
+            div[data-testid="stDateInput"] > div {
+                background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+                border-radius: 10px !important;
+                border: 1px solid #cbd5e1 !important;
+                box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+            }
         </style>
     """, unsafe_allow_html=True)
 
@@ -3008,12 +3148,54 @@ elif menu == "💰 Faturamento":
     """)
 
     custom_css_premium = {
-        ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px", "background-color": "#ffffff !important"},
-        ".ag-header": {"background-color": "#f1f5f9 !important", "border-bottom": "2px solid #e2e8f0 !important"},
-        ".ag-header-cell-text": {"color": "#0f172a !important", "font-weight": "700 !important", "font-size": "13px !important"},
-        ".ag-row:hover": {"background-color": "#e2e8f0 !important", "cursor": "pointer", "transition": "background-color 0.2s"},
-        ".ag-row-odd": {"background-color": "#f8fafc !important"},
-        ".ag-row-even": {"background-color": "#ffffff !important"}
+        ".ag-theme-alpine": {
+            "--ag-font-family": "Inter, sans-serif",
+            "--ag-font-size": "13px",
+            "background-color": "#ffffff !important",
+            "border": "1px solid #dbe3ef",
+            "border-radius": "12px",
+            "overflow": "hidden",
+            "box-shadow": "0 8px 22px rgba(15, 23, 42, 0.08)"
+        },
+        ".ag-root-wrapper": {"background-color": "#ffffff !important"},
+        ".ag-root-wrapper-body": {"background-color": "#ffffff !important"},
+        ".ag-body-viewport": {"background-color": "#ffffff !important"},
+        ".ag-header": {
+            "background": "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important",
+            "border-bottom": "1px solid #cbd5e1 !important",
+            "min-height": "48px !important"
+        },
+        ".ag-header-cell": {
+            "border-right": "1px solid #dbe3ef !important",
+            "padding-top": "6px !important",
+            "padding-bottom": "6px !important"
+        },
+        ".ag-header-cell-text": {
+            "color": "#0f172a !important",
+            "font-weight": "800 !important",
+            "font-size": "12px !important",
+            "text-transform": "uppercase !important",
+            "letter-spacing": "0.4px !important"
+        },
+        ".ag-row": {
+            "border-bottom": "1px solid #eef2f7 !important",
+            "height": "40px !important",
+            "transition": "background-color 0.22s ease"
+        },
+        ".ag-row:hover": {
+            "background-color": "#dbeafe !important",
+            "cursor": "pointer",
+            "box-shadow": "inset 3px 0 0 #2563eb"
+        },
+        ".ag-row-odd": {"background": "linear-gradient(90deg, #ffffff 0%, #fbfdff 100%) !important"},
+        ".ag-row-even": {"background": "linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%) !important"},
+        ".ag-cell": {
+            "display": "flex !important",
+            "align-items": "center !important",
+            "border-right": "1px solid #eef2f7 !important",
+            "font-size": "13px !important"
+        },
+        ".ag-cell-focus": {"border": "none !important", "outline": "none !important"}
     }
 
     # =========================================================================
@@ -3951,7 +4133,17 @@ elif menu == "📥 Importações":
     )
 
     st.markdown(
-        "<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>➕ Central de Importação de Lotes (Oficial) & Pedidos Fixos</h3></div>",
+        """
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 24px;">
+            <div style="background-color: #EFF6FF; padding: 12px 15px; border-radius: 12px; border: 1px solid #BFDBFE; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <span style="font-size: 26px;">➕</span>
+            </div>
+            <div>
+                <h3 style="margin: 0; color: #1E293B; font-weight: 800;">Central de Importação de Lotes (Oficial)</h3>
+                <p style="margin: 0; color: #64748B; font-size: 13px;">Entrada oficial, carrinho cumulativo, gestão de pedidos fixos e central de envio na mesma linha visual do sandbox.</p>
+            </div>
+        </div>
+        """,
         unsafe_allow_html=True)
 
     if "df_preview_oficial" not in st.session_state:
@@ -3973,9 +4165,56 @@ elif menu == "📥 Importações":
     if 'cep_version_of' not in st.session_state:
         st.session_state['cep_version_of'] = 0
 
+    st.markdown(
+        """
+        <style>
+        .of-card {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+        }
+        .of-card-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .of-card-value {
+            font-size: 34px;
+            font-weight: 900;
+            color: #0F172A;
+            line-height: 1.1;
+        }
+        .of-card-subtitle {
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.4;
+            margin-top: 4px;
+        }
+        .of-terminal {
+            background: linear-gradient(135deg, #0F172A 0%, #334155 100%);
+            color: white;
+            padding: 24px 20px;
+            border-radius: 14px;
+            border-left: 5px solid #3B82F6;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .of-sticky-driver {
+            position: sticky;
+            top: 84px;
+            z-index: 5;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True)
+
     # 🔥 CRIAR TABS: IMPORTAÇÃO AVULSA E GESTÃO DE PEDIDOS FIXOS 🔥
-    tab_import, tab_fixos_of = st.tabs(
-        ["📋 1. Importação Avulsa (Matriz)", "🔁 2. Gestão de Pedidos Fixos"])
+    tab_import, tab_fixos_of, tab_envios_of = st.tabs(
+        ["📋 1. Importação Avulsa (Matriz)", "🔁 2. Gestão de Pedidos Fixos", "🚀 3. Central de Envios"])
 
     with tab_import:
         with st.container(border=True):
@@ -4194,284 +4433,6 @@ elif menu == "📥 Importações":
                         except Exception as e:
                             st.error(f"Erro: {e}")
 
-        st.markdown("---")
-        col_tit_c, col_canc_c = st.columns([4, 1], vertical_alignment="center")
-        col_tit_c.markdown("### 🛒 2. Carrinho de Expedição Oficial")
-
-        if col_canc_c.button("🗑️ Esvaziar Carrinho Manual", type="secondary", use_container_width=True, key="canc_carr_of"):
-            st.session_state.df_carrinho_oficial = pd.DataFrame()
-            if 'contador_oficial_temp' in st.session_state:
-                del st.session_state.contador_oficial_temp
-            st.rerun()
-
-        # ---> LÓGICA DE PEDIDOS FIXOS NO CARRINHO OFICIAL <---
-        df_fixos_hoje_of = pd.DataFrame()
-        try:
-            aba_fixos_of = planilha_db.worksheet("Agendamentos_Fixos_Oficial")
-            dados_fixos_of = aba_fixos_of.get_all_values()
-            if len(dados_fixos_of) > 1:
-                df_regras_temp = pd.DataFrame(dados_fixos_of[1:], columns=dados_fixos_of[0])
-                mapa_dias = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
-                dia_atual = mapa_dias[hoje_br.weekday()]
-
-                if dia_atual != 'DOM':
-                    df_alvo = df_regras_temp[(df_regras_temp[dia_atual] == "SIM") & (df_regras_temp['STATUS'] == "ATIVO")].copy()
-
-                    if not df_alvo.empty:
-                        try:
-                            aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            df_up_temp = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-
-                            if 'contador_oficial_temp' not in st.session_state:
-                                st.session_state.contador_oficial_temp = obter_proximo_id(df_up_temp)
-
-                            prox_id_fixo = st.session_state.contador_oficial_temp
-                            if not st.session_state.df_carrinho_oficial.empty:
-                                prox_id_fixo += len(st.session_state.df_carrinho_oficial)
-
-                            novos_pedidos_fixos = []
-                            for _, regra in df_alvo.iterrows():
-                                agente = str(regra.get('MOTORISTA', '')).strip()
-                                if not agente or agente.upper() in ['AUTOMÁTICO (POR ROTA)', 'AUTOMATICO (POR ROTA)']:
-                                    agente = obter_login_agente(str(regra.get('CIDADE', '')), str(regra.get('BAIRRO', '')), str(regra.get('LABORATORIO', '')), str(regra.get('ENDERECO', '')), DF_AGENTES)
-
-                                obs_fix = str(regra.get('OBSERVACOES', '')).strip()
-                                if obs_fix and obs_fix.upper() not in ['NAN', 'NONE']: obs_fix = obs_fix + ' [FIXO]'
-                                else: obs_fix = '[FIXO]'
-
-                                prazo = calcular_sla_dias(regra.get('UF', 'SP'), regra.get('CIDADE', ''), regra.get('TOMADOR', ''))
-                                dt_lim = calcular_data_limite(hoje_br.strftime("%d/%m/%Y"), int(prazo))
-
-                                novo_pedido = {
-                                    'DATA': hoje_br.strftime("%d/%m/%Y"),
-                                    'TOMADOR': regra.get('TOMADOR', ''),
-                                    'PEDIDO': str(prox_id_fixo),
-                                    'LABORATORIO': regra.get('LABORATORIO', ''),
-                                    'CNPJ': "",
-                                    'ENDERECO': regra.get('ENDERECO', ''),
-                                    'NUMERO': regra.get('NUMERO', ''),
-                                    'BAIRRO': regra.get('BAIRRO', ''),
-                                    'CIDADE': regra.get('CIDADE', ''),
-                                    'UF': regra.get('UF', ''),
-                                    'CEP': regra.get('CEP', ''),
-                                    'STATUS': 'PENDENTE',
-                                    'AGENTE_RAW': agente,
-                                    'PRAZO_DIAS': str(prazo),
-                                    'DATA_LIMITE': str(dt_lim),
-                                    'DATA_ENTREGA': "",
-                                    'FOTO': "",
-                                    'ROMANEIO': "",
-                                    'ZAP_ENVIADO': "",
-                                    'FATURA': "",
-                                    'OBSERVACOES': obs_fix
-                                }
-                                novos_pedidos_fixos.append(novo_pedido)
-                                prox_id_fixo += 1
-
-                            df_fixos_hoje_of = pd.DataFrame(novos_pedidos_fixos)
-                        except Exception as e:
-                            pass
-        except Exception:
-            pass
-
-        incluir_fixos_of = False
-        if not df_fixos_hoje_of.empty:
-            st.info(f"💡 O sistema encontrou **{len(df_fixos_hoje_of)} pedidos fixos** programados para hoje ({dia_atual}).")
-            incluir_fixos_of = st.toggle("👉 INCLUIR PEDIDOS FIXOS NA CARGA OFICIAL DE HOJE", value=False, key="toggle_fixos_oficial")
-        else:
-            st.info("Nenhum pedido fixo programado para hoje.")
-
-        df_cart_of = st.session_state.df_carrinho_oficial.copy()
-
-        if incluir_fixos_of and not df_fixos_hoje_of.empty:
-            if df_cart_of.empty: df_cart_of = df_fixos_hoje_of
-            else: df_cart_of = pd.concat([df_cart_of, df_fixos_hoje_of], ignore_index=True)
-
-        if not df_cart_of.empty:
-            c_kpi1_of, c_kpi2_of = st.columns([1, 4])
-            c_kpi1_of.metric("TOTAL NO CARRINHO", len(df_cart_of))
-            resumo_tom_of = df_cart_of.groupby('TOMADOR').size().reset_index(name='QTD')
-            c_kpi2_of.info(f"**Detalhamento por Cliente:**\n{' | '.join([f'**{row['TOMADOR']}**: {row['QTD']}' for _, row in resumo_tom_of.iterrows()])}")
-
-            st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
-            df_editado_oficial = st.data_editor(
-                df_cart_of,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="oficial_grid_master")
-
-            st.markdown("---")
-            st.markdown("### 🎛️ Mesa de Comando Oficial")
-
-            col_inj, col_zap, col_limp = st.columns(3)
-
-            # PASSO 1: INJETAR
-            with col_inj:
-                if st.button("🚀 1. Injetar Lote no Banco", type="primary", use_container_width=True):
-                    with st.spinner("🚀 Injetando lotes no banco de dados principal e AppSheet..."):
-                        try:
-                            colunas_bd_oficiais = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO', 'ZAP_ENVIADO', 'FATURA', 'OBSERVACOES']
-
-                            df_to_insert = df_editado_oficial.copy()
-                            for c in colunas_bd_oficiais:
-                                if c not in df_to_insert.columns:
-                                    df_to_insert[c] = ""
-                            df_to_insert = df_to_insert[colunas_bd_oficiais].astype(str)
-
-                            aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            df_up_final = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-
-                            pedidos_existentes = df_up_final['PEDIDO'].astype(str).tolist()
-                            df_to_insert_clean = df_to_insert[~df_to_insert['PEDIDO'].astype(str).isin(pedidos_existentes)]
-
-                            if not df_to_insert_clean.empty:
-                                df_up_final = pd.concat([df_up_final, df_to_insert_clean], ignore_index=True)
-                                aba_m.clear()
-                                aba_m.update("A1", [df_up_final.columns.tolist()] + df_up_final.fillna("").astype(str).values.tolist())
-
-                                lista_app_of = []
-                                for _, r in df_to_insert_clean.iterrows():
-                                    if str(r.get('AGENTE_RAW', '')).strip():
-                                        lista_app_of.append({
-                                            'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'],
-                                            'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'],
-                                            'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'],
-                                            'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'],
-                                            'TOMADOR': r['TOMADOR'], 'OBSERVACOES': r.get('OBSERVACOES', '')
-                                        })
-                                if lista_app_of:
-                                    despachar_para_appsheet(lista_app_of)
-
-                            st.success(f"🎉 SUCESSO! O Lote foi injetado no C.C.O. Prossiga para o Passo 2.")
-                            time.sleep(2.5)
-                            carregar_dados_completos.clear()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao injetar: {e}")
-
-            # PASSO 2: WHATSAPP
-            with col_zap.popover("📲 2. Disparar WhatsApp", use_container_width=True):
-                st.markdown("Isso disparará as rotas para todos os motoristas. **Lembre-se de clicar em Injetar no Banco depois para salvar o status do disparo!**")
-                if st.button("🚀 Confirmar Disparos", use_container_width=True, key="zap_oficial"):
-                    dict_tel = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): re.sub(r'\D', '', str(r.get('TELEFONE', ''))) for _, r in DF_AGENTES.iterrows()}
-                    dict_nom = {str(r.get('LOGIN DO AGENTE', '')).strip().lower(): str(r.get('NOME DO AGENTE', '')).strip() for _, r in DF_AGENTES.iterrows()}
-
-                    agentes_selecionados = df_editado_oficial['AGENTE_RAW'].dropna().unique()
-                    sucessos_of = 0
-
-                    if len(agentes_selecionados) > 0:
-                        progress_bar = st.progress(0)
-                        status_txt = st.empty()
-
-                        for idx_ag, ag in enumerate(agentes_selecionados):
-                            if not str(ag).strip(): continue
-                            df_ag_of = df_editado_oficial[df_editado_oficial['AGENTE_RAW'] == ag]
-                            tel = dict_tel.get(str(ag).strip().lower(), "")
-                            nom = dict_nom.get(str(ag).strip().lower(), str(ag).upper())
-
-                            ag_login = str(ag).strip().lower()
-                            login_base = ag_login.split('|')[0].split('/')[0].strip()
-                            is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
-                            is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
-
-                            if tel:
-                                status_txt.markdown(f"**Enviando rota para:** {nom} ({idx_ag + 1}/{len(agentes_selecionados)})...")
-                                dt_ref = pd.to_datetime(df_ag_of.iloc[0]['DATA'], format='%d/%m/%Y', errors='coerce').date() if not df_ag_of.empty else hoje_br
-                                data_str = dt_ref.strftime('%d/%m/%Y')
-
-                                uf_agente_of = ""
-                                if 'UF' in df_ag_of.columns:
-                                    ufs_unicos_of = df_ag_of['UF'].dropna().unique()
-                                    if len(ufs_unicos_of) > 0:
-                                        uf_agente_of = str(ufs_unicos_of[0]).upper().strip()
-                                
-                                saudacao, fechamento = gerar_saudacao_spintax(nom, uf_agente_of)
-                                sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
-                                sep2 = random.choice(['---', '...', '===', ' '])
-                                bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
-                                lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
-
-                                msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
-                                tot_qtd = 0
-                                for cid, count in df_ag_of['CIDADE'].value_counts().items():
-                                    msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}")
-                                    tot_qtd += count
-                                msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
-
-                                for cid, group in df_ag_of.groupby('CIDADE'):
-                                    msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
-                                    items = []
-                                    for _, row in group.iterrows():
-                                        item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
-                                        obs = str(row.get('OBSERVACOES', '')).strip()
-                                        if obs and obs.upper() != 'NAN':
-                                            item_str += f"\n> 📝 Aviso: {obs}"
-                                        items.append(item_str)
-                                    msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
-
-                                msg_parts.append(f"\n{fechamento}")
-
-                                INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711"
-                                TOKEN = "2321563615C4242CB6031504"
-                                CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S"
-                                try:
-                                    requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
-                                    time.sleep(random.uniform(3.0, 5.0))
-                                except BaseException: pass
-
-                                if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
-                                    time.sleep(random.uniform(2.0, 4.0))
-
-                                    if is_autorizado_pdf:
-                                        try:
-                                            requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
-                                            time.sleep(2)
-                                        except BaseException: pass
-                                        enviar_pdf_zapi(tel, gerar_pdf_rota_whatsapp(nom, data_str, df_ag_of), f"ROTA_IGO_{nom.replace(' ', '_')}_{dt_ref.strftime('%d%m')}.pdf")
-                                        time.sleep(3.0)
-
-                                    if is_autorizado_xls:
-                                        try:
-                                            requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
-                                            time.sleep(2)
-                                        except BaseException: pass
-                                        enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_ag_of), f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{dt_ref.strftime('%d%m')}.xlsx")
-                                        time.sleep(2.0)
-
-                                    sucessos_of += 1
-
-                                    try:
-                                        aba_m = planilha_db.worksheet("Memoria_Sistema")
-                                        df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-                                        if 'ZAP_ENVIADO' not in df_nuvem.columns:
-                                            df_nuvem['ZAP_ENVIADO'] = ""
-                                        df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_ag_of['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
-                                        aba_m.clear()
-                                        aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                    except BaseException: pass
-
-                        progress_bar.progress((idx_ag + 1) / len(agentes_selecionados))
-
-                        status_txt.markdown("✅ **Processo finalizado!**")
-                        if sucessos_of > 0:
-                            st.success(f"🎉 Disparo concluído para {sucessos_of} motorista(s)!")
-                            time.sleep(3.5)
-                            st.rerun()
-                        else:
-                            st.error("🚨 Nenhum envio realizado. Verifique os agentes.")
-
-            # PASSO 3: LIMPAR MESA
-            with col_limp:
-                if st.button("🧹 3. Limpar Mesa e Finalizar", type="secondary", use_container_width=True):
-                    st.session_state.df_carrinho_oficial = pd.DataFrame()
-                    if 'contador_oficial_temp' in st.session_state:
-                        del st.session_state.contador_oficial_temp
-                    st.success("Mesa limpa e pronta para o próximo lote!")
-                    time.sleep(1)
-                    st.rerun()
-        else:
-            st.info("🛒 O carrinho está vazio. Cole uma matriz acima para começar ou marque o interruptor dos pedidos fixos para adicioná-los.")
-
     # -------------------------------------------------------------------------
     # ABA 2: GESTÃO DE PEDIDOS FIXOS (IMPORTAÇÃO OFICIAL)
     # -------------------------------------------------------------------------
@@ -4673,6 +4634,442 @@ elif menu == "📥 Importações":
                         st.error(f"Erro ao salvar regras: {e}")
         else:
             st.info("Nenhuma regra de agendamento cadastrada ainda.")
+
+    # -------------------------------------------------------------------------
+    # ABA 3: CENTRAL DE ENVIOS OFICIAL
+    # -------------------------------------------------------------------------
+    with tab_envios_of:
+        st.markdown("#### 🚀 Central de Envios Oficial")
+        st.info("O carrinho oficial continua sendo alimentado na aba de importação; aqui você confere, injeta e dispara.")
+
+        # --- BLOCAGEM DE PROCESSAMENTO: AGENDAMENTOS FIXOS ---
+        df_fixos_hoje_of = pd.DataFrame()
+        try:
+            aba_fixos_of = planilha_db.worksheet("Agendamentos_Fixos_Oficial")
+            dados_fixos_of = aba_fixos_of.get_all_values()
+            if len(dados_fixos_of) > 1:
+                df_regras_temp = pd.DataFrame(dados_fixos_of[1:], columns=dados_fixos_of[0])
+                mapa_dias = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
+                dia_atual = mapa_dias[hoje_br.weekday()]
+
+                if dia_atual != 'DOM':
+                    df_alvo = df_regras_temp[(df_regras_temp[dia_atual] == "SIM") & (df_regras_temp['STATUS'] == "ATIVO")].copy()
+
+                    if not df_alvo.empty:
+                        try:
+                            aba_m = planilha_db.worksheet("Memoria_Sistema")
+                            df_up_temp = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+
+                            if 'contador_oficial_temp' not in st.session_state:
+                                st.session_state.contador_oficial_temp = obter_proximo_id(df_up_temp)
+
+                            prox_id_fixo = st.session_state.contador_oficial_temp
+                            if not st.session_state.df_carrinho_oficial.empty:
+                                prox_id_fixo += len(st.session_state.df_carrinho_oficial)
+
+                            novos_pedidos_fixos = []
+                            for _, regra in df_alvo.iterrows():
+                                agente = str(regra.get('MOTORISTA', '')).strip()
+                                if not agente or agente.upper() in ['AUTOMÁTICO (POR ROTA)', 'AUTOMATICO (POR ROTA)']:
+                                    agente = obter_login_agente(str(regra.get('CIDADE', '')), str(regra.get('BAIRRO', '')), str(regra.get('LABORATORIO', '')), str(regra.get('ENDERECO', '')), DF_AGENTES)
+
+                                obs_fix = str(regra.get('OBSERVACOES', '')).strip()
+                                if obs_fix and obs_fix.upper() not in ['NAN', 'NONE']: obs_fix = obs_fix + ' [FIXO]'
+                                else: obs_fix = '[FIXO]'
+
+                                prazo = calcular_sla_dias(regra.get('UF', 'SP'), regra.get('CIDADE', ''), regra.get('TOMADOR', ''))
+                                dt_lim = calcular_data_limite(hoje_br.strftime("%d/%m/%Y"), int(prazo))
+
+                                novo_pedido = {
+                                    'DATA': hoje_br.strftime("%d/%m/%Y"),
+                                    'TOMADOR': regra.get('TOMADOR', ''),
+                                    'PEDIDO': str(prox_id_fixo),
+                                    'LABORATORIO': regra.get('LABORATORIO', ''),
+                                    'CNPJ': "",
+                                    'ENDERECO': regra.get('ENDERECO', ''),
+                                    'NUMERO': regra.get('NUMERO', ''),
+                                    'BAIRRO': regra.get('BAIRRO', ''),
+                                    'CIDADE': regra.get('CIDADE', ''),
+                                    'UF': regra.get('UF', ''),
+                                    'CEP': regra.get('CEP', ''),
+                                    'STATUS': 'PENDENTE',
+                                    'AGENTE_RAW': agente,
+                                    'PRAZO_DIAS': str(prazo),
+                                    'DATA_LIMITE': str(dt_lim),
+                                    'DATA_ENTREGA': "",
+                                    'FOTO': "",
+                                    'ROMANEIO': "",
+                                    'ZAP_ENVIADO': "",
+                                    'FATURA': "",
+                                    'OBSERVACOES': obs_fix
+                                }
+                                novos_pedidos_fixos.append(novo_pedido)
+                                prox_id_fixo += 1
+
+                            df_fixos_hoje_of = pd.DataFrame(novos_pedidos_fixos)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+        incluir_fixos_of = False
+        if not df_fixos_hoje_of.empty:
+            st.info(f"💡 O sistema encontrou **{len(df_fixos_hoje_of)} pedidos fixos** programados para hoje ({dia_atual}).")
+            incluir_fixos_of = st.toggle("👉 INCLUIR PEDIDOS FIXOS NA CARGA OFICIAL DE HOJE", value=False, key="toggle_fixos_oficial")
+        else:
+            st.info("Nenhum pedido fixo programado para hoje.")
+
+        df_cart_of = st.session_state.df_carrinho_oficial.copy()
+
+        if incluir_fixos_of and not df_fixos_hoje_of.empty:
+            if df_cart_of.empty: df_cart_of = df_fixos_hoje_of
+            else: df_cart_of = pd.concat([df_cart_of, df_fixos_hoje_of], ignore_index=True)
+
+        if 'of_step' not in st.session_state:
+            st.session_state.of_step = 'IDLE'
+        if 'of_df_dispatch' not in st.session_state:
+            st.session_state.of_df_dispatch = pd.DataFrame()
+        if 'of_resultados_disparo' not in st.session_state:
+            st.session_state.of_resultados_disparo = {}
+        if 'of_final_metrics' not in st.session_state:
+            st.session_state.of_final_metrics = {'total': 0, 'sucesso': 0, 'falhas': 0}
+
+        def render_big_metrics_off(tot, pend, suc, fal):
+            return f"""
+            <div style="display:flex; gap:12px; text-align:center; margin-bottom: 20px;">
+                <div style="flex:1; background:#F8FAFC; border: 2px solid #E2E8F0; padding:15px; border-radius:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="font-size:13px; font-weight:800; color:#64748B; text-transform:uppercase;">Alvos Totais</div>
+                    <div style="font-size:38px; font-weight:900; color:#0F172A; line-height:1.2;">{tot}</div>
+                </div>
+                <div style="flex:1; background:#FFFBEB; border: 2px solid #FDE68A; padding:15px; border-radius:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="font-size:13px; font-weight:800; color:#D97706; text-transform:uppercase;">Pendentes</div>
+                    <div style="font-size:38px; font-weight:900; color:#B45309; line-height:1.2;">{pend}</div>
+                </div>
+                <div style="flex:1; background:#F0FDF4; border: 2px solid #A7F3D0; padding:15px; border-radius:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="font-size:13px; font-weight:800; color:#059669; text-transform:uppercase;">Sucessos (✅)</div>
+                    <div style="font-size:38px; font-weight:900; color:#047857; line-height:1.2;">{suc}</div>
+                </div>
+                <div style="flex:1; background:#FEF2F2; border: 2px solid #FECACA; padding:15px; border-radius:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="font-size:13px; font-weight:800; color:#DC2626; text-transform:uppercase;">Falhas (❌)</div>
+                    <div style="font-size:38px; font-weight:900; color:#B91C1C; line-height:1.2;">{fal}</div>
+                </div>
+            </div>
+            """
+
+        def render_current_driver_off(nom, idx, total):
+            return f"""
+            <div class="of-sticky-driver" style="background: linear-gradient(135deg, #0F172A 0%, #334155 100%); color: white; padding: 25px 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border-left: 5px solid #3B82F6;">
+                <div style="font-size: 13px; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 5px;">🚀 Transmitindo Lote ({idx}/{total})</div>
+                <div style="font-size: 36px; font-weight: 900; letter-spacing: -0.5px; color: #FFFFFF;">👤 {nom}</div>
+            </div>
+            """
+
+        if not df_cart_of.empty:
+            c_kpi1_of, c_kpi2_of = st.columns([1, 4])
+            c_kpi1_of.metric("TOTAL NO CARRINHO", len(df_cart_of))
+            resumo_tom_of = df_cart_of.groupby('TOMADOR').size().reset_index(name='QTD')
+            resumo_tom_str = " | ".join([f"{row['TOMADOR']}: {row['QTD']}" for _, row in resumo_tom_of.iterrows()])
+            c_kpi2_of.info(f"Detalhamento por Cliente: {resumo_tom_str}")
+
+            st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
+            df_editado_oficial = st.data_editor(
+                df_cart_of,
+                num_rows="dynamic",
+                use_container_width=True,
+                key="oficial_grid_master")
+
+            st.markdown("---")
+            st.markdown("### 🎛️ Mesa de Comando Oficial")
+
+            col_inj, col_disparo, col_limp = st.columns(3)
+
+            with col_inj:
+                if st.button("🚀 1. Injetar Lote no Banco", type="primary", use_container_width=True):
+                    with st.spinner("🚀 Injetando lotes no banco de dados principal e AppSheet..."):
+                        try:
+                            colunas_bd_oficiais = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO', 'ZAP_ENVIADO', 'FATURA', 'OBSERVACOES']
+                            df_to_insert = df_editado_oficial.copy()
+                            for c in colunas_bd_oficiais:
+                                if c not in df_to_insert.columns:
+                                    df_to_insert[c] = ""
+                            df_to_insert = df_to_insert[colunas_bd_oficiais].astype(str)
+
+                            aba_m = planilha_db.worksheet("Memoria_Sistema")
+                            df_up_final = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                            pedidos_existentes = df_up_final['PEDIDO'].astype(str).tolist()
+                            df_to_insert_clean = df_to_insert[~df_to_insert['PEDIDO'].astype(str).isin(pedidos_existentes)]
+
+                            if not df_to_insert_clean.empty:
+                                df_up_final = pd.concat([df_up_final, df_to_insert_clean], ignore_index=True)
+                                aba_m.clear()
+                                aba_m.update("A1", [df_up_final.columns.tolist()] + df_up_final.fillna("").astype(str).values.tolist())
+
+                                lista_app_of = []
+                                for _, r in df_to_insert_clean.iterrows():
+                                    if str(r.get('AGENTE_RAW', '')).strip():
+                                        lista_app_of.append({
+                                            'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'],
+                                            'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'],
+                                            'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'],
+                                            'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'],
+                                            'TOMADOR': r['TOMADOR'], 'OBSERVACOES': r.get('OBSERVACOES', '')
+                                        })
+                                if lista_app_of:
+                                    despachar_para_appsheet(lista_app_of)
+
+                            st.success("🎉 SUCESSO! O Lote foi injetado no C.C.O. Prossiga para a transmissão.")
+                            time.sleep(2.0)
+                            carregar_dados_completos.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao injetar: {e}")
+
+            with col_disparo:
+                if st.session_state.of_step in ['IDLE', 'CONFIRMING']:
+                    st.markdown(render_big_metrics_off(len(df_editado_oficial), 0, 0, 0), unsafe_allow_html=True)
+                    if st.session_state.of_step == 'IDLE':
+                        st.markdown("<div class='of-card'><div class='of-card-title'>Transmissão ao vivo</div><div class='of-card-subtitle'>Clique para abrir o modo monitorado com atualização de status por motorista.</div></div>", unsafe_allow_html=True)
+                        if st.button("🚀 INICIAR TRANSMISSÃO EM LOTE AGORA", type="primary", use_container_width=True):
+                            st.session_state.of_df_dispatch = df_editado_oficial.copy()
+                            st.session_state.of_step = 'CONFIRMING'
+                            st.rerun()
+                    else:
+                        st.markdown("<div style='background-color:#FEF2F2; border:2px solid #FCA5A5; border-radius:12px; padding:18px; margin-bottom:14px;'><h4 style='margin:0; color:#991B1B;'>⚠️ Confirmação de Disparo Crítico</h4><p style='margin:6px 0 0 0; color:#7F1D1D;'>Você está prestes a disparar mensagens oficiais via WhatsApp para os motoristas do lote selecionado.</p></div>", unsafe_allow_html=True)
+                        c_ok, c_cancel = st.columns(2)
+                        if c_ok.button("✔️ CONFIRMAR E DISPARAR", type="primary", use_container_width=True):
+                            st.session_state.of_step = 'PROCESSING'
+                            st.rerun()
+                        if c_cancel.button("❌ Cancelar Operação", use_container_width=True):
+                            st.session_state.of_step = 'IDLE'
+                            st.session_state.of_df_dispatch = pd.DataFrame()
+                            st.rerun()
+
+                elif st.session_state.of_step == 'PROCESSING':
+                    st.markdown("## 📡 Monitor de Transmissão Oficial")
+                    st.error("⚠️ **PROCESSO EM ANDAMENTO - NÃO ATUALIZE OU MUDE DE ABA!**")
+
+                    df_dispatch = st.session_state.of_df_dispatch.copy()
+                    if df_dispatch.empty:
+                        df_dispatch = df_editado_oficial.copy()
+                        st.session_state.of_df_dispatch = df_dispatch
+
+                    dict_tel = {}
+                    dict_nom = {}
+                    if not DF_AGENTES.empty:
+                        for _, r in DF_AGENTES.iterrows():
+                            login_ag = str(r.get('LOGIN DO AGENTE', '')).strip().lower()
+                            if login_ag:
+                                num_limpo = re.sub(r'\D', '', str(r.get('TELEFONE', '')))
+                                if num_limpo and not num_limpo.startswith('55') and len(num_limpo) <= 11:
+                                    num_limpo = '55' + num_limpo
+                                dict_tel[login_ag] = num_limpo
+                                dict_nom[login_ag] = str(r.get('NOME DO AGENTE', '')).strip()
+
+                    agentes_selecionados = df_dispatch['AGENTE_RAW'].dropna().unique()
+                    total_agentes = len(agentes_selecionados)
+                    if total_agentes == 0:
+                        st.error("Nenhum motorista válido foi encontrado para disparo.")
+                        st.session_state.of_step = 'IDLE'
+                        st.rerun()
+
+                    st.session_state.of_resultados_disparo = {}
+                    sucesso_total = 0
+                    falha_total = 0
+                    id_evento = f"OFICIAL-{datetime.now(FUSO_BR).strftime('%Y%m%d%H%M%S')}"
+
+                    col_live_of, col_side_of = st.columns([1.45, 1.25])
+
+                    with col_side_of:
+                        st.markdown("<div class='of-terminal'><div style='font-size:12px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:#93C5FD; margin-bottom:8px;'>Painel lateral fixo</div><div style='font-size:16px; font-weight:900; color:#FFFFFF; line-height:1.2; margin-bottom:8px;'>Motorista em processamento</div><div style='font-size:13px; color:#E2E8F0; line-height:1.5;'>Este bloco acompanha a execução em tempo real e ocupa uma faixa fixa da página, como no fluxo do Umove.</div></div>", unsafe_allow_html=True)
+                        driver_placeholder = st.empty()
+
+                    with col_live_of:
+                        metrics_placeholder = st.empty()
+                        progress_bar = st.progress(0)
+                        logs_placeholder = st.container(border=True)
+                        log_table_placeholder = logs_placeholder.empty()
+                        logs_df_data = []
+
+                        metrics_placeholder.markdown(render_big_metrics_off(total_agentes, total_agentes, 0, 0), unsafe_allow_html=True)
+
+                    for idx_ag, ag in enumerate(agentes_selecionados):
+                        if not str(ag).strip():
+                            continue
+
+                        try:
+                            df_ag_of = df_dispatch[df_dispatch['AGENTE_RAW'] == ag]
+                            ag_key = str(ag).strip().lower()
+                            tel = dict_tel.get(ag_key, "")
+                            nom = dict_nom.get(ag_key, str(ag).upper())
+
+                            st.session_state.of_resultados_disparo[nom] = {'total': len(df_ag_of), 'sucesso': 0, 'pedidos': df_ag_of['PEDIDO'].tolist()}
+
+                            if not tel:
+                                raise ValueError(f"Telefone não localizado no banco para {nom}.")
+
+                            driver_placeholder.markdown(render_current_driver_off(nom, idx_ag + 1, total_agentes), unsafe_allow_html=True)
+
+                            datas_na_rota = pd.to_datetime(df_ag_of['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
+                            if not datas_na_rota.empty:
+                                d_min_zap = datas_na_rota.min().strftime('%d/%m/%Y')
+                                d_max_zap = datas_na_rota.max().strftime('%d/%m/%Y')
+                                data_str = f"{d_min_zap}" if d_min_zap == d_max_zap else f"{d_min_zap} a {d_max_zap}"
+                            else:
+                                data_str = hoje_br.strftime('%d/%m/%Y')
+
+                            uf_agente_of = ""
+                            if 'UF' in df_ag_of.columns:
+                                ufs_unicos_of = df_ag_of['UF'].dropna().unique()
+                                if len(ufs_unicos_of) > 0:
+                                    uf_agente_of = str(ufs_unicos_of[0]).upper().strip()
+
+                            saudacao, fechamento = gerar_saudacao_spintax(nom, uf_agente_of)
+                            sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
+                            sep2 = random.choice(['---', '...', '===', ' '])
+                            bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
+                            lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
+
+                            msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
+                            tot_qtd = 0
+                            for cid, count in df_ag_of['CIDADE'].value_counts().items():
+                                msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}")
+                                tot_qtd += count
+                            msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
+
+                            for cid, group in df_ag_of.groupby('CIDADE'):
+                                msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
+                                items = []
+                                for _, row in group.iterrows():
+                                    item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                    obs = str(row.get('OBSERVACOES', '')).strip()
+                                    if obs and obs.upper() != 'NAN':
+                                        item_str += f"\n> 📝 Aviso: {obs}"
+                                    items.append(item_str)
+                                msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
+
+                            msg_parts.append(f"\n{fechamento}")
+
+                            INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711"
+                            TOKEN = "2321563615C4242CB6031504"
+                            CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S"
+                            try:
+                                requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                time.sleep(random.uniform(2.0, 3.0))
+                            except BaseException:
+                                pass
+
+                            resultado_msg = "✅"
+                            if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
+                                time.sleep(random.uniform(2.0, 3.0))
+
+                                if df_ag_of.empty:
+                                    raise ValueError("Lote vazio para o motorista atual.")
+
+                                if True:
+                                    try:
+                                        try:
+                                            requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                        except BaseException:
+                                            pass
+
+                                        if ag_key == 'luiz.paulo':
+                                            df_para_pdf = df_dispatch[df_dispatch['UF'] == 'RJ']
+                                            nome_arq_pdf = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.pdf"
+                                            pdf_bytes = gerar_pdf_rota_whatsapp("RJ - GERAL", data_str, df_para_pdf)
+                                        else:
+                                            df_para_pdf = df_ag_of
+                                            nome_arq_pdf = f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf"
+                                            pdf_bytes = gerar_pdf_rota_whatsapp(nom, data_str, df_para_pdf)
+
+                                        if df_para_pdf is not None and not df_para_pdf.empty and is_autorizado_pdf:
+                                            enviar_pdf_zapi(tel, pdf_bytes, nome_arq_pdf)
+                                            time.sleep(2.0)
+                                    except Exception:
+                                        resultado_msg += " (Sem PDF)"
+
+                                if True:
+                                    try:
+                                        try:
+                                            requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                        except BaseException:
+                                            pass
+                                        if ag_key == 'luiz.paulo':
+                                            df_para_xls = df_dispatch[df_dispatch['UF'] == 'RJ']
+                                            nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
+                                        else:
+                                            df_para_xls = df_ag_of
+                                            nome_arq_xls = f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx"
+                                        if df_para_xls is not None and not df_para_xls.empty and is_autorizado_xls:
+                                            enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_para_xls), nome_arq_xls)
+                                            time.sleep(2.0)
+                                    except Exception:
+                                        resultado_msg += " (Sem XLS)"
+
+                                sucesso_total += 1
+                                st.session_state.of_resultados_disparo[nom]['sucesso'] = len(df_ag_of)
+                            else:
+                                resultado_msg = "❌ Erro Z-API"
+                                falha_total += 1
+                                st.session_state.of_resultados_disparo[nom]['sucesso'] = 0
+
+                            pending = total_agentes - (idx_ag + 1)
+                            metrics_placeholder.markdown(render_big_metrics_off(total_agentes, pending, sucesso_total, falha_total), unsafe_allow_html=True)
+                            pedidos_list = df_ag_of['PEDIDO'].astype(str).tolist() if 'PEDIDO' in df_ag_of.columns else []
+                            pedidos_str = ", ".join(pedidos_list)[:200] + "..." if len(", ".join(pedidos_list)) > 200 else ", ".join(pedidos_list)
+                            logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": resultado_msg, "Motorista": nom, "Msg": f"Enviados {len(df_ag_of)} vols"})
+                            log_table_placeholder.dataframe(pd.DataFrame(logs_df_data), use_container_width=True, hide_index=True)
+                            progress_bar.progress((idx_ag + 1) / total_agentes)
+
+                            try:
+                                aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                                if 'ZAP_ENVIADO' not in df_nuvem.columns:
+                                    df_nuvem['ZAP_ENVIADO'] = ""
+                                if 'PEDIDO' in df_nuvem.columns:
+                                    df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_ag_of['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
+                                    aba_m.clear()
+                                    aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                            except BaseException:
+                                pass
+
+                        except Exception as e:
+                            falha_total += 1
+                            nom_err = nom if 'nom' in locals() else f"ID: {ag}"
+                            st.session_state.of_resultados_disparo[nom_err] = {'total': len(df_ag_of) if 'df_ag_of' in locals() else 0, 'sucesso': 0, 'pedidos': []}
+                            logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": "❌ ERRO", "Motorista": nom_err, "Msg": str(e)[:35]})
+                            log_table_placeholder.dataframe(pd.DataFrame(logs_df_data), use_container_width=True, hide_index=True)
+                            pending = total_agentes - (idx_ag + 1)
+                            metrics_placeholder.markdown(render_big_metrics_off(total_agentes, pending, sucesso_total, falha_total), unsafe_allow_html=True)
+                            progress_bar.progress((idx_ag + 1) / total_agentes)
+
+                    st.session_state.of_final_metrics = {'total': total_agentes, 'sucesso': sucesso_total, 'falhas': falha_total}
+                    st.session_state.of_step = 'COMPLETED'
+                    st.rerun()
+
+                elif st.session_state.of_step == 'COMPLETED':
+                    st.markdown("## 📊 Relatório Final da Missão")
+                    metrics = st.session_state.of_final_metrics
+                    st.markdown(render_big_metrics_off(metrics['total'], 0, metrics['sucesso'], metrics['falhas']), unsafe_allow_html=True)
+                    st.success("🎉 O disparo em lote foi finalizado! O histórico foi consolidado na nuvem.")
+
+                    if st.button("🔄 Liberar Mesa para Novo Disparo", use_container_width=True):
+                        st.session_state.of_step = 'IDLE'
+                        st.session_state.of_df_dispatch = pd.DataFrame()
+                        st.session_state.of_resultados_disparo = {}
+                        st.rerun()
+
+            with col_limp:
+                if st.button("🧹 3. Limpar Mesa e Finalizar", type="secondary", use_container_width=True):
+                    st.session_state.df_carrinho_oficial = pd.DataFrame()
+                    st.session_state.of_step = 'IDLE'
+                    st.session_state.of_df_dispatch = pd.DataFrame()
+                    if 'contador_oficial_temp' in st.session_state:
+                        del st.session_state.contador_oficial_temp
+                    st.success("Mesa limpa e pronta para o próximo lote!")
+                    time.sleep(1)
+                    st.rerun()
+        else:
+            st.info("🛒 O carrinho está vazio. Cole uma matriz acima para começar ou marque o interruptor dos pedidos fixos para adicioná-los.")
 
 # =============================================================================
 # 🔥 MÓDULO SANDBOX (PARALELO): IMPORTAÇÕES UMOVE 🔥
@@ -5333,36 +5730,26 @@ elif menu == "📥 Importações Umove":
         df_sb = st.session_state.df_sandbox_mem.copy()
 
         if not df_sb.empty:
-            st.markdown("---")
-            
-            # Dashboard de métricas em CSS Grid
             resumo_tom = df_sb.groupby('TOMADOR').size().reset_index(name='QTD')
             resumo_str = " | ".join([f"<b>{row['TOMADOR']}</b>: {row['QTD']}" for _, row in resumo_tom.iterrows()])
-            
-            st.markdown(f"""
-            <div style="display:flex; gap:12px; margin-bottom: 20px;">
-                <div style="flex:1; background:#F8FAFC; border: 2px solid #E2E8F0; padding:15px; border-radius:12px; text-align:center;">
-                    <div style="font-size:12px; font-weight:800; color:#64748B; text-transform:uppercase;">Volumes no Carrinho</div>
-                    <div style="font-size:36px; font-weight:900; color:#0F172A; line-height:1.2;">{len(df_sb)}</div>
-                </div>
-                <div style="flex:3; background:#F0FDF4; border: 2px solid #BBF7D0; padding:15px; border-radius:12px;">
-                    <div style="font-size:12px; font-weight:800; color:#166534; text-transform:uppercase; margin-bottom:5px;">Detalhamento por Conta de Cliente</div>
-                    <div style="font-size:14px; color:#14532D; font-weight:500; line-height:1.4;">{resumo_str}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
 
-            # Cabeçalho da tabela interativa com botões de ação estruturados lateralmente
-            chead1, chead2 = st.columns([3, 1], vertical_alignment="center")
-            with chead1:
-                st.markdown("#### 🕵️‍♂️ Mesa de Conferência e Modificações")
-            with chead2:
+            st.markdown("### 🛒 Carrinho de Expedição Oficial")
+            st.markdown("<p style='font-size:13px; color:#64748B; margin-top:-8px;'>Mesa cumulativa com edição direta, mantendo a injeção na própria base oficial.</p>", unsafe_allow_html=True)
+
+            col_kpi_of_1, col_kpi_of_2, col_kpi_of_3 = st.columns([1, 2, 1])
+            with col_kpi_of_1:
+                st.markdown(f"<div class='of-card' style='text-align:center;'><div class='of-card-title'>Volumes no Carrinho</div><div class='of-card-value'>{len(df_sb)}</div></div>", unsafe_allow_html=True)
+            with col_kpi_of_2:
+                st.markdown(f"<div class='of-card'><div class='of-card-title'>Detalhamento por Conta de Cliente</div><div class='of-card-subtitle'>{resumo_str}</div></div>", unsafe_allow_html=True)
+            with col_kpi_of_3:
                 if st.button("🗑️ Esvaziar Todo Carrinho", type="secondary", use_container_width=True, help="Zera completamente a memória temporária"):
                     st.session_state.df_sandbox_mem = pd.DataFrame()
                     st.session_state.umove_lote_atual_id = None
                     try: planilha_sandbox.sheet1.clear()
                     except: pass
                     st.rerun()
+
+            st.markdown("#### 🕵️‍♂️ Mesa de Conferência e Modificações")
 
             # Renderização Customizada do AgGrid Master
             gb_sb = GridOptionsBuilder.from_dataframe(df_sb)
@@ -5398,12 +5785,21 @@ elif menu == "📥 Importações Umove":
             if not df_editado_sb.empty:
                 st.session_state.sandbox_grid_master_umove = df_editado_sb
 
-            # Bloco de Exportação de Documentação Legada (Formatado em Cards)
+            # Bloco de Exportação e Central de Envio Oficial
             st.markdown("---")
-            st.markdown("### 📁 Centros de Exportação Legada")
-            st.info("Utilize os botões abaixo se necessitar exportar os arquivos de carregamento estrutural em formato `.LOC` ou `.AGD` para os sistemas corporativos legados.")
+            st.markdown("### 🚀 Central de Envio Oficial")
+            st.info("A base oficial mantém a lógica de injeção na própria grid, mas a central abaixo organiza envio, exportação e conferência em um único painel.")
             
-            col_cmd1, col_cmd2 = st.columns(2)
+            col_env1, col_env2, col_env3 = st.columns([1, 1, 1])
+
+            with col_env1:
+                st.markdown("<div class='of-card'><div class='of-card-title'>Etapa 1</div><div class='of-card-subtitle'><b>Injetar no Banco</b><br>Persistência oficial dos pedidos editados na própria planilha.</div></div>", unsafe_allow_html=True)
+            with col_env2:
+                st.markdown("<div class='of-card'><div class='of-card-title'>Etapa 2</div><div class='of-card-subtitle'><b>Disparar WhatsApp</b><br>Envio das mensagens e anexos por motorista.</div></div>", unsafe_allow_html=True)
+            with col_env3:
+                st.markdown("<div class='of-card'><div class='of-card-title'>Etapa 3</div><div class='of-card-subtitle'><b>Exportar Excel / Legados</b><br>Baixe o carrinho em XLS ou gere os arquivos `.LOC` e `.AGD`.</div></div>", unsafe_allow_html=True)
+
+            col_cmd1, col_cmd2, col_cmd3 = st.columns([1, 1, 1])
 
             def criar_arquivos_legados(df):
                 loc_lines = ["alternativeIdentifier;description;corporateName;state;city;cityNeighborhood;street;streetNumber;zipCode;CF_loc_responsavel_cliente;CF_loc_whats;CF_CNPJ;active"]
@@ -5440,6 +5836,15 @@ elif menu == "📥 Importações Umove":
                 st.download_button("💾 Baixar Arquivo de Locais (.LOC)", data=bytes_loc, file_name=f"LOC_GERAL_{hoje_br.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=lambda: st.toast("Baixando arquivo LOC...", icon="📥"))
             with col_cmd2:
                 st.download_button("💾 Baixar Arquivo de Agendas (.AGD)", data=bytes_agd, file_name=f"AGD_GERAL_{hoje_br.strftime('%d%m%y')}.csv", mime="text/csv", use_container_width=True, on_click=lambda: st.toast("Baixando arquivo AGD...", icon="📥"))
+            with col_cmd3:
+                st.download_button(
+                    "📥 Baixar o Carrinho como Excel",
+                    data=gerar_excel_memoria(df_editado_sb),
+                    file_name=f"MESA_CONFERENCIA_{hoje_br.strftime('%d%m%y')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    on_click=lambda: st.toast("Baixando XLS da Mesa de Conferência...", icon="📥")
+                )
         else:
             st.markdown("""
             <div style="text-align: center; padding: 40px; background-color: #F8FAFC; border: 2px dashed #CBD5E1; border-radius: 12px; margin-top: 20px;">
@@ -5799,7 +6204,19 @@ elif menu == "📥 Importações Umove":
                                 try:
                                     try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
                                     except: pass
-                                    enviar_pdf_zapi(tel, gerar_pdf_rota_whatsapp(nom, data_str, df_ag_sb), f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf")
+                                    
+                                    # NOVA LÓGICA: Arquivo PDF com RJ inteiro apenas para o luiz.paulo
+                                    if ag_login == 'luiz.paulo':
+                                        df_para_pdf = df_dispatch[df_dispatch['UF'] == 'RJ']
+                                        nome_arq_pdf = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.pdf"
+                                        # Passamos "RJ - GERAL" no lugar do nome dele para o cabeçalho do PDF ficar coerente
+                                        pdf_bytes = gerar_pdf_rota_whatsapp("RJ - GERAL", data_str, df_para_pdf)
+                                    else:
+                                        df_para_pdf = df_ag_sb
+                                        nome_arq_pdf = f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf"
+                                        pdf_bytes = gerar_pdf_rota_whatsapp(nom, data_str, df_para_pdf)
+                                        
+                                    enviar_pdf_zapi(tel, pdf_bytes, nome_arq_pdf)
                                     time.sleep(2.5)
                                 except Exception as e_pdf:
                                     resultado_msg += " (Sem PDF)"
@@ -6923,7 +7340,63 @@ elif menu == "🏷️ Gerador de Etiquetas":
 # =============================================================================
 # 📁 MÓDULO 4: EXPORTAR RELATÓRIOS (NOVO E INTELIGENTE)
 # =============================================================================
+
 elif menu == "📁 Relatórios":
+
+    # =========================================================================
+    # 🚀 NOVO BLOCO: RELATÓRIO DO ESTADO DO RJ NA SIDEBAR (CARRINHO UMOVE)
+    # =========================================================================
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🗺️ Consolidado RJ (Umove)")
+    
+    # 1. Verifica se existe algo no carrinho da Umove
+    if 'df_sandbox_mem' in st.session_state and not st.session_state.df_sandbox_mem.empty:
+        df_carrinho = st.session_state.df_sandbox_mem.copy()
+        
+        # 2. Filtra apenas o estado do RJ
+        df_rj_carrinho = df_carrinho[df_carrinho['UF'].astype(str).str.upper() == 'RJ'].copy()
+        
+        if not df_rj_carrinho.empty:
+            # 3. Ocultar os números dos pedidos
+            df_rj_carrinho['PEDIDO'] = "---" 
+            
+            st.sidebar.success(f"✅ {len(df_rj_carrinho)} volumes RJ")
+            
+            # --- BOTÃO PDF SIDEBAR ---
+            with st.spinner("Gerando PDF..."):
+                pdf_rj_bytes = gerar_pdf_rota_whatsapp(
+                    nome_motorista="RJ - GERAL", 
+                    data_str=hoje_br.strftime('%d/%m/%Y'), 
+                    df_agente=df_rj_carrinho
+                )
+            st.sidebar.download_button(
+                label="📥 Baixar PDF (RJ)",
+                data=pdf_rj_bytes,
+                file_name=f"COLETAS_RJ_GERAL_{hoje_br.strftime('%d%m')}.pdf",
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True
+            )
+            
+            # --- BOTÃO EXCEL SIDEBAR ---
+            with st.spinner("Gerando Excel..."):
+                xls_rj_bytes = gerar_excel_rota_whatsapp(df_rj_carrinho)
+            st.sidebar.download_button(
+                label="📥 Baixar Excel (RJ)",
+                data=xls_rj_bytes,
+                file_name=f"COLETAS_RJ_GERAL_{hoje_br.strftime('%d%m')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        else:
+            st.sidebar.warning("⚠️ Nenhum pedido do RJ no carrinho.")
+            
+    else:
+        st.sidebar.info("🛒 O carrinho Umove está vazio.")
+        
+    st.sidebar.markdown("---")
+    # =========================================================================
+
     st.markdown(
         "<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining e Exportação</h3></div>",
         unsafe_allow_html=True)
@@ -6984,11 +7457,9 @@ elif menu == "📁 Relatórios":
         df_rjjf = pd.concat([df_rj, df_jf]).drop_duplicates(subset=['PEDIDO'])
         if not df_rjjf.empty:
             col_rel1.download_button(
-                f"📥 Extrair Bloco RJ/JF ({
-                    len(df_rjjf)} col.)",
+                f"📥 Extrair Bloco RJ/JF ({len(df_rjjf)} col.)",
                 data=gerar_excel_memoria(df_rjjf),
-                file_name=f"RJ_JF_{
-                    datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx",
+                file_name=f"RJ_JF_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True)
         else:
@@ -7001,11 +7472,9 @@ elif menu == "📁 Relatórios":
             'ludmila|veloz', na=False)] if 'MOTORISTA' in df_export_base.columns else pd.DataFrame()
         if not df_lud.empty:
             col_rel2.download_button(
-                f"📥 Extrair Ludmila/Veloz ({
-                    len(df_lud)} col.)",
+                f"📥 Extrair Ludmila/Veloz ({len(df_lud)} col.)",
                 data=gerar_excel_memoria(df_lud),
-                file_name=f"Ludmila_{
-                    datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx",
+                file_name=f"Ludmila_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True)
         else:
@@ -7033,8 +7502,7 @@ elif menu == "📁 Relatórios":
         col_rel3.download_button(
             "☁️ Backup Completo (Toda a Nuvem)",
             data=gerar_excel_memoria(df_full_bkp),
-            file_name=f"BKP_COMPLETO_{
-                datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx",
+            file_name=f"BKP_COMPLETO_{datetime.now(FUSO_BR).strftime('%d%m%Y')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             type="primary",
             use_container_width=True)
