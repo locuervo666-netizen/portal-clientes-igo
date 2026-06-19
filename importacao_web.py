@@ -3129,19 +3129,177 @@ elif menu == "💰 Faturamento":
     # =========================================================================
     st.markdown("""
         <style>
-        /* Estilização Premium para Inputs (Filtros) */
-        div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div {
-                background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
-                border-radius: 10px !important;
-                border: 1px solid #cbd5e1 !important;
-                box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
-            }
-            div[data-testid="stDateInput"] > div {
-                background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
-                border-radius: 10px !important;
-                border: 1px solid #cbd5e1 !important;
-                box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
-            }
+        div[data-baseweb="tab-list"] {
+            gap: 14px;
+            margin-bottom: 16px;
+            align-items: stretch;
+        }
+        div[data-baseweb="tab"] {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid #dbe3ef !important;
+            border-radius: 12px !important;
+            color: #334155 !important;
+            font-weight: 700 !important;
+            min-height: 50px !important;
+            padding: 0 18px !important;
+            line-height: 1.25 !important;
+            letter-spacing: 0.15px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+            transition: all 0.2s ease !important;
+        }
+        button[role="tab"] {
+            padding: 0 18px !important;
+            min-height: 50px !important;
+            line-height: 1.25 !important;
+        }
+        button[role="tab"] p {
+            margin: 0 !important;
+            line-height: 1.25 !important;
+            white-space: nowrap !important;
+        }
+        div[data-baseweb="tab"]:hover {
+            border-color: #93c5fd !important;
+            color: #0f172a !important;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.10) !important;
+        }
+        button[role="tab"][aria-selected="true"] {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+            border-color: #1d4ed8 !important;
+            border-radius: 12px !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22) !important;
+            overflow: hidden !important;
+            padding: 0 20px !important;
+        }
+        button[role="tab"][aria-selected="true"] p {
+            letter-spacing: 0.2px !important;
+            line-height: 1.3 !important;
+        }
+        div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div,
+        div[data-testid="stMultiSelect"] > div[data-baseweb="select"] > div,
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stDateInput"] input,
+        div[data-testid="stDateInput"] button,
+        div[data-testid="stTextArea"] textarea {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            border-radius: 10px !important;
+            border: 1px solid #cbd5e1 !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div:focus,
+        div[data-testid="stTextInput"] input:focus,
+        div[data-testid="stDateInput"] input:focus,
+        div[data-testid="stTextArea"] textarea:focus {
+            border-color: #60a5fa !important;
+            box-shadow: 0 0 0 1px #93c5fd !important;
+        }
+        div[data-testid="stForm"],
+        div[data-testid="stExpander"],
+        div[data-testid="stDataFrame"],
+        div[data-testid="stVerticalBlockBorderWrapper"],
+        div[data-testid="stAlert"] {
+            border-radius: 14px !important;
+        }
+        div[data-testid="stExpander"] {
+            border: 1px solid #dbe3ef !important;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stFormSubmitButton"] > button,
+        div.stButton > button:not([kind="primary"]),
+        div[data-testid="stPopover"] > div > button,
+        div[data-testid="stPopover"] > button {
+            background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+            color: #0f172a !important;
+            border: 1px solid #93c5fd !important;
+            border-radius: 10px !important;
+            font-weight: 700 !important;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.10) !important;
+            min-height: 42px !important;
+            transition: all 0.2s ease !important;
+        }
+        div[data-testid="stFormSubmitButton"] > button:hover,
+        div.stButton > button:not([kind="primary"]):hover,
+        div[data-testid="stPopover"] > div > button:hover,
+        div[data-testid="stPopover"] > button:hover {
+            background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%) !important;
+            border-color: #60a5fa !important;
+            box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18) !important;
+            transform: translateY(-1px) !important;
+        }
+        div.stButton > button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"] {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+            border: 1px solid #1d4ed8 !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22) !important;
+        }
+        div.stButton > button[kind="primary"]:hover,
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"]:hover {
+            background: linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%) !important;
+            border-color: #1e40af !important;
+            color: #ffffff !important;
+        }
+        .ag-theme-alpine {
+            --ag-font-family: Inter, sans-serif;
+            --ag-font-size: 13px;
+            --ag-row-height: 40px;
+            --ag-header-height: 44px;
+            border: 1px solid #dbe3ef !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.07) !important;
+            background-color: #ffffff !important;
+        }
+        .ag-theme-alpine .ag-root-wrapper,
+        .ag-theme-alpine .ag-root-wrapper-body,
+        .ag-theme-alpine .ag-body-viewport {
+            background-color: #ffffff !important;
+        }
+        .ag-theme-alpine .ag-header {
+            background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important;
+            border-bottom: 1px solid #cbd5e1 !important;
+        }
+        .ag-theme-alpine .ag-header-cell {
+            border-right: 1px solid #dbe3ef !important;
+            padding-top: 5px !important;
+            padding-bottom: 5px !important;
+        }
+        .ag-theme-alpine .ag-header-cell-text {
+            color: #0f172a !important;
+            font-weight: 800 !important;
+            font-size: 12px !important;
+            letter-spacing: 0.35px !important;
+            text-transform: uppercase !important;
+        }
+        .ag-theme-alpine .ag-row {
+            border-bottom: 1px solid #eef2f7 !important;
+            transition: background-color 0.2s ease !important;
+        }
+        .ag-theme-alpine .ag-row:hover {
+            background-color: #dbeafe !important;
+            box-shadow: inset 3px 0 0 #2563eb !important;
+        }
+        .ag-theme-alpine .ag-row-odd {
+            background: linear-gradient(90deg, #ffffff 0%, #fcfdff 100%) !important;
+        }
+        .ag-theme-alpine .ag-row-even {
+            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%) !important;
+        }
+        .ag-theme-alpine .ag-cell {
+            display: flex !important;
+            align-items: center !important;
+            border-right: 1px solid #eef2f7 !important;
+        }
+        .ag-theme-alpine .ag-paging-panel {
+            background: #f8fafc !important;
+            border-top: 1px solid #dbe3ef !important;
+            padding: 8px 10px !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -5116,6 +5274,189 @@ elif menu == "📥 Importações Umove":
     # Garante que o AgGrid está disponível neste bloco
     from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
+    st.markdown(
+        """
+        <style>
+        div[data-baseweb="tab-list"] {
+                gap: 14px;
+            margin-bottom: 14px;
+                align-items: stretch;
+        }
+        div[data-baseweb="tab"] {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid #dbe3ef !important;
+            border-radius: 12px !important;
+            color: #334155 !important;
+            font-weight: 700 !important;
+                min-height: 50px !important;
+                padding: 0 18px !important;
+                line-height: 1.25 !important;
+                letter-spacing: 0.15px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+            transition: all 0.2s ease !important;
+        }
+            button[role="tab"] {
+                padding: 0 18px !important;
+                min-height: 50px !important;
+                line-height: 1.25 !important;
+            }
+            button[role="tab"] p {
+                margin: 0 !important;
+                line-height: 1.25 !important;
+                white-space: nowrap !important;
+            }
+        div[data-baseweb="tab"]:hover {
+            border-color: #93c5fd !important;
+            color: #0f172a !important;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.10) !important;
+        }
+        button[role="tab"][aria-selected="true"] {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+            border-color: #1d4ed8 !important;
+            border-radius: 12px !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22) !important;
+            overflow: hidden !important;
+                padding: 0 20px !important;
+        }
+            button[role="tab"][aria-selected="true"] p {
+                letter-spacing: 0.2px !important;
+                line-height: 1.3 !important;
+            }
+        div[data-testid="stVerticalBlock"] div[data-testid="stExpander"] {
+            border: 1px solid #dbe3ef !important;
+            border-radius: 14px !important;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stForm"],
+        div[data-testid="stFileUploaderDropzone"],
+        div[data-testid="stDataFrame"],
+        div[data-testid="stMarkdownContainer"] > div.of-card {
+            border-radius: 14px !important;
+        }
+        div[data-testid="stTextArea"] textarea,
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stDateInput"] input,
+        div[data-testid="stDateInput"] button,
+        div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div,
+        div[data-testid="stMultiSelect"] > div[data-baseweb="select"] > div {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stTextArea"] textarea:focus,
+        div[data-testid="stTextInput"] input:focus,
+        div[data-testid="stDateInput"] input:focus {
+            border-color: #60a5fa !important;
+            box-shadow: 0 0 0 1px #93c5fd !important;
+        }
+        div[data-testid="stFormSubmitButton"] > button,
+        div.stButton > button:not([kind="primary"]),
+        div[data-testid="stPopover"] > div > button,
+        div[data-testid="stPopover"] > button {
+            background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+            color: #0f172a !important;
+            border: 1px solid #93c5fd !important;
+            border-radius: 10px !important;
+            font-weight: 700 !important;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.10) !important;
+            min-height: 42px !important;
+            transition: all 0.2s ease !important;
+        }
+        div[data-testid="stFormSubmitButton"] > button:hover,
+        div.stButton > button:not([kind="primary"]):hover,
+        div[data-testid="stPopover"] > div > button:hover,
+        div[data-testid="stPopover"] > button:hover {
+            background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%) !important;
+            border-color: #60a5fa !important;
+            box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18) !important;
+            transform: translateY(-1px) !important;
+        }
+        div.stButton > button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"] {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+            border: 1px solid #1d4ed8 !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22) !important;
+        }
+        div.stButton > button[kind="primary"]:hover,
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"]:hover {
+            background: linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%) !important;
+            border-color: #1e40af !important;
+            color: #ffffff !important;
+        }
+        div[data-testid="stToggle"] label,
+        div[data-testid="stCheckbox"] label {
+            font-weight: 700 !important;
+            color: #334155 !important;
+        }
+        .ag-theme-alpine {
+            --ag-font-family: Inter, sans-serif;
+            --ag-font-size: 13px;
+            --ag-row-height: 40px;
+            --ag-header-height: 44px;
+            border: 1px solid #dbe3ef !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.07) !important;
+            background-color: #ffffff !important;
+        }
+        .ag-theme-alpine .ag-root-wrapper,
+        .ag-theme-alpine .ag-root-wrapper-body,
+        .ag-theme-alpine .ag-body-viewport {
+            background-color: #ffffff !important;
+        }
+        .ag-theme-alpine .ag-header {
+            background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important;
+            border-bottom: 1px solid #cbd5e1 !important;
+        }
+        .ag-theme-alpine .ag-header-cell {
+            border-right: 1px solid #dbe3ef !important;
+            padding-top: 5px !important;
+            padding-bottom: 5px !important;
+        }
+        .ag-theme-alpine .ag-header-cell-text {
+            color: #0f172a !important;
+            font-weight: 800 !important;
+            font-size: 12px !important;
+            letter-spacing: 0.35px !important;
+            text-transform: uppercase !important;
+        }
+        .ag-theme-alpine .ag-row {
+            border-bottom: 1px solid #eef2f7 !important;
+            transition: background-color 0.2s ease !important;
+        }
+        .ag-theme-alpine .ag-row:hover {
+            background-color: #dbeafe !important;
+            box-shadow: inset 3px 0 0 #2563eb !important;
+        }
+        .ag-theme-alpine .ag-row-odd {
+            background: linear-gradient(90deg, #ffffff 0%, #fcfdff 100%) !important;
+        }
+        .ag-theme-alpine .ag-row-even {
+            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%) !important;
+        }
+        .ag-theme-alpine .ag-cell {
+            display: flex !important;
+            align-items: center !important;
+            border-right: 1px solid #eef2f7 !important;
+        }
+        .ag-theme-alpine .ag-paging-panel {
+            background: #f8fafc !important;
+            border-top: 1px solid #dbe3ef !important;
+            padding: 8px 10px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # 🔥 PING SILENCIOSO (ANTI-TIMEOUT DO RENDER) 🔥
     components.html(
         """
@@ -6514,20 +6855,179 @@ elif menu == "🔬 Triagem":
         st.markdown(html, unsafe_allow_html=True)
 
     st.markdown(
-        '<style>'
-        'div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div { background-color: #f8fafc !important; border-radius: 8px !important; border: 1px solid #e2e8f0 !important; box-shadow: none !important; }'
-        'div[data-testid="stDateInput"] > div { background-color: #f8fafc !important; border-radius: 8px !important; border: 1px solid #e2e8f0 !important; box-shadow: none !important; }'
-        '</style>', 
+        """
+        <style>
+        div[data-baseweb="tab-list"] {
+            gap: 14px;
+            margin-bottom: 16px;
+            align-items: stretch;
+        }
+        div[data-baseweb="tab"] {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid #dbe3ef !important;
+            border-radius: 12px !important;
+            color: #334155 !important;
+            font-weight: 700 !important;
+            min-height: 50px !important;
+            padding: 0 18px !important;
+            line-height: 1.25 !important;
+            letter-spacing: 0.15px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+            transition: all 0.2s ease !important;
+        }
+        button[role="tab"] {
+            padding: 0 18px !important;
+            min-height: 50px !important;
+            line-height: 1.25 !important;
+        }
+        button[role="tab"] p {
+            margin: 0 !important;
+            line-height: 1.25 !important;
+            white-space: nowrap !important;
+        }
+        div[data-baseweb="tab"]:hover {
+            border-color: #93c5fd !important;
+            color: #0f172a !important;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.10) !important;
+        }
+        button[role="tab"][aria-selected="true"] {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+            border-color: #1d4ed8 !important;
+            border-radius: 12px !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22) !important;
+            overflow: hidden !important;
+            padding: 0 20px !important;
+        }
+        button[role="tab"][aria-selected="true"] p {
+            letter-spacing: 0.2px !important;
+            line-height: 1.3 !important;
+        }
+        div[data-testid="stForm"],
+        div[data-testid="stExpander"],
+        div[data-testid="stDataFrame"],
+        div[data-testid="stVerticalBlockBorderWrapper"],
+        div[data-testid="stAlert"] {
+            border-radius: 14px !important;
+        }
+        div[data-testid="stExpander"] {
+            border: 1px solid #dbe3ef !important;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stTextArea"] textarea,
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stDateInput"] input,
+        div[data-testid="stDateInput"] button,
+        div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div,
+        div[data-testid="stMultiSelect"] > div[data-baseweb="select"] > div {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stTextArea"] textarea:focus,
+        div[data-testid="stTextInput"] input:focus,
+        div[data-testid="stDateInput"] input:focus {
+            border-color: #60a5fa !important;
+            box-shadow: 0 0 0 1px #93c5fd !important;
+        }
+        div[data-testid="stFormSubmitButton"] > button,
+        div.stButton > button:not([kind="primary"]),
+        div[data-testid="stPopover"] > div > button,
+        div[data-testid="stPopover"] > button {
+            background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+            color: #0f172a !important;
+            border: 1px solid #93c5fd !important;
+            border-radius: 10px !important;
+            font-weight: 700 !important;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.10) !important;
+            min-height: 42px !important;
+            transition: all 0.2s ease !important;
+        }
+        div[data-testid="stFormSubmitButton"] > button:hover,
+        div.stButton > button:not([kind="primary"]):hover,
+        div[data-testid="stPopover"] > div > button:hover,
+        div[data-testid="stPopover"] > button:hover {
+            background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%) !important;
+            border-color: #60a5fa !important;
+            box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18) !important;
+            transform: translateY(-1px) !important;
+        }
+        div.stButton > button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"] {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+            border: 1px solid #1d4ed8 !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22) !important;
+        }
+        div.stButton > button[kind="primary"]:hover,
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"]:hover {
+            background: linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%) !important;
+            border-color: #1e40af !important;
+            color: #ffffff !important;
+        }
+        </style>
+        """,
         unsafe_allow_html=True
     )
 
     custom_css_premium = {
-        ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px", "background-color": "#ffffff !important", "border": "1px solid #e2e8f0"},
-        ".ag-header": {"background-color": "#f1f5f9 !important", "border-bottom": "2px solid #e2e8f0 !important"},
-        ".ag-header-cell-text": {"color": "#0f172a !important", "font-weight": "700 !important", "font-size": "13px !important"},
-        ".ag-row:hover": {"background-color": "#e2e8f0 !important", "cursor": "pointer", "transition": "background-color 0.2s"},
-        ".ag-row-odd": {"background-color": "#f8fafc !important"},
-        ".ag-row-even": {"background-color": "#ffffff !important"}
+        ".ag-theme-alpine": {
+            "--ag-font-family": "Inter, sans-serif",
+            "--ag-font-size": "13px",
+            "--ag-row-height": "40px",
+            "--ag-header-height": "44px",
+            "background-color": "#ffffff !important",
+            "border": "1px solid #dbe3ef",
+            "border-radius": "12px",
+            "overflow": "hidden",
+            "box-shadow": "0 8px 20px rgba(15, 23, 42, 0.07)"
+        },
+        ".ag-root-wrapper": {"background-color": "#ffffff !important"},
+        ".ag-root-wrapper-body": {"background-color": "#ffffff !important"},
+        ".ag-body-viewport": {"background-color": "#ffffff !important"},
+        ".ag-header": {
+            "background": "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important",
+            "border-bottom": "1px solid #cbd5e1 !important"
+        },
+        ".ag-header-cell": {
+            "border-right": "1px solid #dbe3ef !important",
+            "padding-top": "5px !important",
+            "padding-bottom": "5px !important"
+        },
+        ".ag-header-cell-text": {
+            "color": "#0f172a !important",
+            "font-weight": "800 !important",
+            "font-size": "12px !important",
+            "letter-spacing": "0.35px !important",
+            "text-transform": "uppercase !important"
+        },
+        ".ag-row": {
+            "border-bottom": "1px solid #eef2f7 !important",
+            "transition": "background-color 0.2s ease !important"
+        },
+        ".ag-row:hover": {
+            "background-color": "#dbeafe !important",
+            "cursor": "pointer",
+            "box-shadow": "inset 3px 0 0 #2563eb !important"
+        },
+        ".ag-row-odd": {"background": "linear-gradient(90deg, #ffffff 0%, #fcfdff 100%) !important"},
+        ".ag-row-even": {"background": "linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%) !important"},
+        ".ag-cell": {
+            "display": "flex !important",
+            "align-items": "center !important",
+            "border-right": "1px solid #eef2f7 !important"
+        },
+        ".ag-paging-panel": {
+            "background": "#f8fafc !important",
+            "border-top": "1px solid #dbe3ef !important",
+            "padding": "8px 10px !important"
+        }
     }
 
     status_jscode_tri = JsCode("""
@@ -7601,6 +8101,133 @@ elif menu == "⚙️ Rotas":
                 carregar_dados_completos.clear()
                 time.sleep(0.5)
                 st.rerun()
+
+    st.markdown(
+        """
+        <style>
+        div[data-baseweb="tab-list"] {
+            gap: 14px;
+            margin-bottom: 16px;
+            align-items: stretch;
+        }
+        div[data-baseweb="tab"] {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid #dbe3ef !important;
+            border-radius: 12px !important;
+            color: #334155 !important;
+            font-weight: 700 !important;
+            min-height: 50px !important;
+            padding: 0 18px !important;
+            line-height: 1.25 !important;
+            letter-spacing: 0.15px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+            transition: all 0.2s ease !important;
+        }
+        button[role="tab"] {
+            padding: 0 18px !important;
+            min-height: 50px !important;
+            line-height: 1.25 !important;
+        }
+        button[role="tab"] p {
+            margin: 0 !important;
+            line-height: 1.25 !important;
+            white-space: nowrap !important;
+        }
+        div[data-baseweb="tab"]:hover {
+            border-color: #93c5fd !important;
+            color: #0f172a !important;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.10) !important;
+        }
+        button[role="tab"][aria-selected="true"] {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+            border-color: #1d4ed8 !important;
+            border-radius: 12px !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22) !important;
+            overflow: hidden !important;
+            padding: 0 20px !important;
+        }
+        button[role="tab"][aria-selected="true"] p {
+            letter-spacing: 0.2px !important;
+            line-height: 1.3 !important;
+        }
+        div[data-testid="stForm"],
+        div[data-testid="stExpander"],
+        div[data-testid="stDataFrame"],
+        div[data-testid="stVerticalBlockBorderWrapper"],
+        div[data-testid="stAlert"] {
+            border-radius: 14px !important;
+        }
+        div[data-testid="stExpander"] {
+            border: 1px solid #dbe3ef !important;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stTextArea"] textarea,
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stDateInput"] input,
+        div[data-testid="stDateInput"] button,
+        div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div,
+        div[data-testid="stMultiSelect"] > div[data-baseweb="select"] > div {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stTextArea"] textarea:focus,
+        div[data-testid="stTextInput"] input:focus,
+        div[data-testid="stDateInput"] input:focus {
+            border-color: #60a5fa !important;
+            box-shadow: 0 0 0 1px #93c5fd !important;
+        }
+        div[data-testid="stFormSubmitButton"] > button,
+        div.stButton > button:not([kind="primary"]),
+        div[data-testid="stPopover"] > div > button,
+        div[data-testid="stPopover"] > button {
+            background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+            color: #0f172a !important;
+            border: 1px solid #93c5fd !important;
+            border-radius: 10px !important;
+            font-weight: 700 !important;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.10) !important;
+            min-height: 42px !important;
+            transition: all 0.2s ease !important;
+        }
+        div[data-testid="stFormSubmitButton"] > button:hover,
+        div.stButton > button:not([kind="primary"]):hover,
+        div[data-testid="stPopover"] > div > button:hover,
+        div[data-testid="stPopover"] > button:hover {
+            background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%) !important;
+            border-color: #60a5fa !important;
+            box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18) !important;
+            transform: translateY(-1px) !important;
+        }
+        div.stButton > button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"] {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+            border: 1px solid #1d4ed8 !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22) !important;
+        }
+        div.stButton > button[kind="primary"]:hover,
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"]:hover {
+            background: linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%) !important;
+            border-color: #1e40af !important;
+            color: #ffffff !important;
+        }
+        div[data-testid="stMarkdownContainer"] h4,
+        div[data-testid="stMarkdownContainer"] h5 {
+            color: #0f172a !important;
+            letter-spacing: -0.2px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # 🔄 ABAS REORGANIZADAS: 'Atrelar Rota' removida (agora 100% dentro de Gerenciar Perfil)
     tab_agente, tab_busca, tab_tabela, tab_sistema = st.tabs(
