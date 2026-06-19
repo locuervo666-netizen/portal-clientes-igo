@@ -44,25 +44,56 @@ CSS_DASHBOARD = """
     /* ── SIDEBAR ── */
     [data-testid="stSidebar"],
     [data-testid="stSidebar"] > div:first-child {
-        background-color: #ffffff !important;
-        border-right: 1px solid #e2e8f0 !important;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+        border-right: 1px solid #dbe3ef !important;
     }
     [data-testid="stSidebar"] p,
     [data-testid="stSidebar"] label,
     [data-testid="stSidebar"] h3 {
         color: #1e293b !important;
     }
+    [data-testid="stSidebar"] .sidebar-premium-shell {
+        background: linear-gradient(145deg, #0f172a 0%, #1e293b 58%, #334155 100%);
+        border-radius: 18px;
+        padding: 14px 14px 12px 14px;
+        margin-bottom: 14px;
+        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+    }
+    [data-testid="stSidebar"] .sidebar-premium-kicker {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: #93c5fd;
+        margin-bottom: 4px;
+    }
+    [data-testid="stSidebar"] .sidebar-premium-title {
+        font-size: 18px;
+        font-weight: 900;
+        color: #f8fafc;
+        line-height: 1.1;
+        margin-bottom: 4px;
+    }
+    [data-testid="stSidebar"] .sidebar-premium-subtitle {
+        font-size: 12px;
+        color: #cbd5e1;
+        line-height: 1.4;
+    }
     [data-testid="stSidebar"] [data-testid="stForm"] {
-        background-color: #f8fafc !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 12px !important;
-        padding: 15px !important;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+        border: 1px solid #dbe3ef !important;
+        border-radius: 14px !important;
+        padding: 14px !important;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05) !important;
     }
     [data-testid="stSidebar"] section > div {
-        background-color: #f8fafc !important;
-        border-radius: 12px !important;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+        border-radius: 14px !important;
         padding: 14px !important;
         margin-bottom: 10px !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04) !important;
     }
     [data-testid="stSidebar"] [data-testid="stForm"] input,
     [data-testid="stSidebar"] [data-testid="stForm"] textarea {
@@ -76,6 +107,45 @@ CSS_DASHBOARD = """
     [data-testid="stSidebar"] [data-testid="stForm"] textarea:focus {
         border-color: #3b82f6 !important;
         box-shadow: 0 0 0 1px #3b82f6 !important;
+    }
+    [data-testid="stSidebar"] .stButton > button,
+    [data-testid="stSidebar"] [data-testid="stFormSubmitButton"] > button {
+        border-radius: 10px !important;
+        border: 1px solid #93c5fd !important;
+        background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.10) !important;
+        transition: all 0.2s ease !important;
+        min-height: 42px !important;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover,
+    [data-testid="stSidebar"] [data-testid="stFormSubmitButton"] > button:hover {
+        transform: translateY(-1px) !important;
+        border-color: #60a5fa !important;
+        background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%) !important;
+        box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18) !important;
+    }
+    [data-testid="stSidebar"] .stPopover button {
+        border-radius: 10px !important;
+    }
+    [data-testid="stSidebar"] .stDateInput input,
+    [data-testid="stSidebar"] .stDateInput button,
+    [data-testid="stSidebar"] .stDateInput [role="button"] {
+        border-radius: 10px !important;
+        border: 1px solid #cbd5e1 !important;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+        color: #0f172a !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+    }
+    [data-testid="stSidebar"] .stDateInput input:focus {
+        border-color: #93c5fd !important;
+        box-shadow: 0 0 0 1px #93c5fd !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="popover"] {
+        border-radius: 14px !important;
+        overflow: hidden !important;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18) !important;
     }
 
     /* ── LAYOUT ── */
@@ -134,18 +204,20 @@ CSS_DASHBOARD = """
         align-items: center;
         gap: 6px;
         font-size: 12px;
-        color: #10b981;
+        color: #166534;
         font-weight: 600;
-        background: #f0fdf4;
-        border: 1px solid #bbf7d0;
+        background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%);
+        border: 1px solid #86efac;
         border-radius: 99px;
         padding: 5px 12px;
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.12);
     }
     .sync-dot {
         width: 7px;
         height: 7px;
         border-radius: 50%;
-        background: #10b981;
+        background: #22c55e;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
         animation: pulse 2s infinite;
     }
     @keyframes pulse {
@@ -187,55 +259,39 @@ CSS_DASHBOARD = """
     /* ── PROGRESS BLOCK SIDEBAR ── */
     .progress-block-sidebar {
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 2px solid #e2e8f0;
+        border: 1px solid #dbeafe;
         border-radius: 14px;
         padding: 16px;
         margin: 12px 0;
         overflow: hidden;
-        position: relative;
-    }
-    .progress-block-sidebar::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        background: linear-gradient(90deg, #22c55e, #86efac);
-        border-radius: 12px;
-        transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
-        opacity: 0.15;
-        z-index: 1;
+        box-shadow: 0 10px 24px rgba(37, 99, 235, 0.10);
     }
     .progress-block-sidebar-content {
         position: relative;
-        z-index: 2;
+        z-index: 1;
     }
     .progress-title-sidebar {
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 700;
-        color: #1e293b;
-        margin-bottom: 8px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
+        color: #0f172a;
+        margin-bottom: 6px;
     }
     .progress-number-sidebar {
-        font-size: 32px;
-        font-weight: 800;
-        background: linear-gradient(135deg, #22c55e, #16a34a);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin: 6px 0;
+        font-size: 28px;
+        font-weight: 900;
+        color: #0f172a;
+        line-height: 1;
+        margin: 4px 0;
     }
     .progress-bar-fill {
         height: 6px;
         border-radius: 99px;
         transition: width 0.6s ease;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 4px 12px rgba(59, 130, 246, 0.16);
     }
     .progress-text-sidebar {
         font-size: 12px;
-        color: #64748b;
+        color: #475569;
         font-weight: 500;
         margin-bottom: 4px;
     }
@@ -1380,7 +1436,7 @@ else:
                     </style>
                 """, unsafe_allow_html=True)
 
-                st.markdown("<br><br>", unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
 
                 df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
                 if not df_h.empty:
@@ -1418,7 +1474,7 @@ else:
                     st.query_params.clear() 
                     st.rerun()
 
-                col_busca, col_export = st.columns([5, 1])
+                col_busca, col_export = st.columns([6, 1], gap="small")
                 with col_busca:
                     busca = shadcn_input(placeholder="🔎 Buscar por pedido, laboratório, cidade...", key="busca_grid_input")
                 with col_export:
@@ -1617,21 +1673,60 @@ else:
 
                     custom_css = {
                         ".ag-header": {
-                            "background-color": "#f1f5f9 !important", 
-                            "border-bottom": "2px solid #e2e8f0 !important"
+                            "background": "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important",
+                            "border-bottom": "1px solid #cbd5e1 !important",
+                            "min-height": "48px !important"
                         },
                         ".ag-header-cell-text": {
-                            "color": "#0f172a !important", 
-                            "font-weight": "700 !important", 
+                            "color": "#0f172a !important",
+                            "font-weight": "800 !important",
+                            "font-size": "12px !important",
+                            "text-transform": "uppercase !important",
+                            "letter-spacing": "0.4px !important"
+                        },
+                        ".ag-header-cell": {
+                            "border-right": "1px solid #dbe3ef !important",
+                            "padding-top": "6px !important",
+                            "padding-bottom": "6px !important"
+                        },
+                        ".ag-cell": {
+                            "border-right": "1px solid #eef2f7 !important",
+                            "border-bottom": "1px solid #eef2f7 !important",
+                            "display": "flex",
+                            "align-items": "center",
                             "font-size": "13px !important"
                         },
-                        ".ag-header-cell": {"border-right": "1px solid #e2e8f0 !important"},
-                        ".ag-cell": {"border-right": "1px solid #e2e8f0 !important"},
                         ".ag-cell-focus": {"border": "none !important", "outline": "none !important"},
-                        ".ag-row:hover": {"background-color": "#e2e8f0 !important", "cursor": "pointer", "transition": "background-color 0.2s"},
-                        ".ag-row-odd": {"background-color": "#f8fafc !important"}, 
-                        ".ag-row-even": {"background-color": "#ffffff !important"}, 
-                        ".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif", "--ag-font-size": "13px"}
+                        ".ag-row:hover": {
+                            "background-color": "#dbeafe !important",
+                            "cursor": "pointer",
+                            "transition": "all 0.2s",
+                            "box-shadow": "inset 3px 0 0 #2563eb"
+                        },
+                        ".ag-row": {
+                            "transition": "background-color 0.22s ease"
+                        },
+                        ".ag-row-odd": {
+                            "background": "linear-gradient(90deg, #ffffff 0%, #fbfdff 100%) !important"
+                        },
+                        ".ag-row-even": {
+                            "background": "linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%) !important"
+                        },
+                        ".ag-paging-panel": {
+                            "border-top": "1px solid #dbe3ef !important",
+                            "background": "#f8fafc !important",
+                            "padding": "8px 12px !important"
+                        },
+                        ".ag-theme-alpine": {
+                            "--ag-font-family": "Inter, sans-serif",
+                            "--ag-font-size": "13px",
+                            "--ag-row-height": "38px",
+                            "--ag-header-height": "42px",
+                            "border": "1px solid #dbe3ef",
+                            "border-radius": "12px",
+                            "overflow": "hidden",
+                            "box-shadow": "0 8px 22px rgba(15, 23, 42, 0.08)"
+                        }
                     }
 
                     # 🔒 DETECTA FECHAMENTO DO MODAL POR X OU ESC (ANTES de renderizar a grid)
