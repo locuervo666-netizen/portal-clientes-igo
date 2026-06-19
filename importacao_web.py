@@ -2733,31 +2733,62 @@ if menu == "📊 GRID":
 
         gridOptions = gb.build()
 
-        custom_css = {".ag-theme-alpine": {"--ag-font-family": "Inter, sans-serif",
-                                           "--ag-font-size": "13px",
-                                           "background-color": "#f9fafb !important"},
-                      ".ag-root-wrapper": {"background-color": "#f9fafb !important"},
-                      ".ag-root-wrapper-body": {"background-color": "#f9fafb !important"},
-                      ".ag-body-viewport": {"background-color": "#f9fafb !important"},
-                      ".ag-header": {"background-color": "#f3f4f6 !important",
-                                     "border-bottom": "3px solid #e5e7eb !important"},
-                      ".ag-header-cell": {"border-right": "1px solid #d1d5db !important"},
-                      ".ag-header-cell-text": {"color": "#1f2937 !important",
-                                               "font-weight": "700 !important",
-                                               "font-size": "12px !important",
-                                               "letter-spacing": "0.3px !important"},
-                      ".ag-row": {"border-bottom": "1px solid #f0f1f3 !important",
-                                  "height": "40px !important"},
-                      ".ag-row:hover": {"background-color": "#eff6ff !important",
-                                        "cursor": "pointer",
-                                        "transition": "background-color 0.15s ease-in-out",
-                                        "box-shadow": "inset 0 0 0 1px #dbeafe !important"},
-                      ".ag-row-odd": {"background-color": "#ffffff !important"},
-                      ".ag-row-even": {"background-color": "#f9fafb !important"},
-                      ".ag-cell": {"display": "flex !important",
-                                   "align-items": "center !important",
-                                   "border-right": "1px solid #eeeff2 !important"},
-                      ".ag-cell-focus": {"border": "none !important"}}
+        custom_css = {
+            ".ag-theme-alpine": {
+                "--ag-font-family": "Inter, sans-serif",
+                "--ag-font-size": "13px",
+                "--ag-row-height": "40px",
+                "--ag-header-height": "44px",
+                "background-color": "#ffffff !important",
+                "border": "1px solid #dbe3ef",
+                "border-radius": "12px",
+                "overflow": "hidden",
+                "box-shadow": "0 8px 20px rgba(15, 23, 42, 0.07)"
+            },
+            ".ag-root-wrapper": {"background-color": "#ffffff !important"},
+            ".ag-root-wrapper-body": {"background-color": "#ffffff !important"},
+            ".ag-body-viewport": {"background-color": "#ffffff !important"},
+            ".ag-header": {
+                "background": "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important",
+                "border-bottom": "1px solid #cbd5e1 !important"
+            },
+            ".ag-header-cell": {
+                "border-right": "1px solid #dbe3ef !important",
+                "padding-top": "5px !important",
+                "padding-bottom": "5px !important"
+            },
+            ".ag-header-cell-text": {
+                "color": "#0f172a !important",
+                "font-weight": "800 !important",
+                "font-size": "12px !important",
+                "letter-spacing": "0.35px !important",
+                "text-transform": "uppercase !important"
+            },
+            ".ag-row": {
+                "border-bottom": "1px solid #eef2f7 !important",
+                "height": "40px !important",
+                "transition": "background-color 0.2s ease"
+            },
+            ".ag-row:hover": {
+                "background-color": "#dbeafe !important",
+                "cursor": "pointer",
+                "box-shadow": "inset 3px 0 0 #2563eb !important"
+            },
+            ".ag-row-odd": {"background": "linear-gradient(90deg, #ffffff 0%, #fcfdff 100%) !important"},
+            ".ag-row-even": {"background": "linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%) !important"},
+            ".ag-cell": {
+                "display": "flex !important",
+                "align-items": "center !important",
+                "border-right": "1px solid #eef2f7 !important",
+                "font-size": "13px !important"
+            },
+            ".ag-cell-focus": {"border": "none !important", "outline": "none !important"},
+            ".ag-paging-panel": {
+                "background": "#f8fafc !important",
+                "border-top": "1px solid #dbe3ef !important",
+                "padding": "8px 10px !important"
+            }
+        }
 
         tabela_renderizada = AgGrid(
             df_grid_final,
