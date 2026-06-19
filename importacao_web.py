@@ -400,8 +400,11 @@ CSS_DASHBOARD = """
         box-shadow: 0 10px 20px rgba(37, 99, 235, 0.30);
         transform: translateX(4px);
     }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p {
-        color: #FFFFFF;
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p,
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) span,
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) div,
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) * {
+        color: #FFFFFF !important;
         font-weight: 800;
     }
     [data-testid="stSidebar"] .stButton > button,
@@ -2081,8 +2084,11 @@ with st.sidebar:
             box-shadow: 0 10px 20px rgba(37, 99, 235, 0.35);
             transform: translateX(4px);
         }
-        [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p {
-            color: #FFFFFF;
+        [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p,
+        [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) span,
+        [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) div,
+        [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) * {
+            color: #FFFFFF !important;
             font-weight: 800;
         }
         </style>
