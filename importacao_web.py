@@ -1032,6 +1032,79 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         return False
 
 
+def substituir_pedido_appsheet(lista_pedidos_dicts):
+    if planilha_db is None or not lista_pedidos_dicts:
+        return False
+    try:
+        aba = planilha_db.worksheet("App_Tarefas")
+        dados = aba.get_all_values()
+        if not dados:
+            return False
+
+        cabecalho = dados[0]
+        linhas_atuais = dados[1:] if len(dados) > 1 else []
+
+        def normalizar(chave):
+            return str(chave).strip().upper().replace(" ", "").replace("?", "")
+
+        cab_map = {normalizar(col): idx for idx, col in enumerate(cabecalho)}
+        idx_pedido = cab_map.get("PEDIDO")
+        if idx_pedido is None:
+            return False
+
+        pedidos_alvo = {
+            str(p.get('PEDIDO', '')).strip() for p in lista_pedidos_dicts if str(p.get('PEDIDO', '')).strip()
+        }
+        if not pedidos_alvo:
+            return False
+
+        def padronizar_linha(linha):
+            return list(linha) + [""] * (len(cabecalho) - len(linha))
+
+        linhas_sem_alvo = []
+        for linha in linhas_atuais:
+            linha_pad = padronizar_linha(linha)
+            if str(linha_pad[idx_pedido]).strip() not in pedidos_alvo:
+                linhas_sem_alvo.append(linha_pad)
+
+        novas_linhas = []
+        for pedido_dict in lista_pedidos_dicts:
+            pedido = str(pedido_dict.get('PEDIDO', '')).strip()
+            if not pedido:
+                continue
+
+            mot_raw = str(pedido_dict.get('MOTORISTA', pedido_dict.get('AGENTE_RAW', '')))
+            mot_app = mot_raw.split('|')[0].strip()
+
+            linha_base = None
+            for linha in linhas_atuais:
+                linha_pad = padronizar_linha(linha)
+                if str(linha_pad[idx_pedido]).strip() == pedido:
+                    linha_base = linha_pad
+                    break
+
+            linha_final = linha_base[:] if linha_base else [""] * len(cabecalho)
+            for chave, valor in pedido_dict.items():
+                chave_norm = normalizar(chave)
+                if chave_norm in cab_map:
+                    linha_final[cab_map[chave_norm]] = str(valor)
+
+            if "MOTORISTA" in cab_map:
+                linha_final[cab_map["MOTORISTA"]] = mot_app
+            elif "AGENTERAW" in cab_map:
+                linha_final[cab_map["AGENTERAW"]] = mot_app
+
+            linha_final[idx_pedido] = pedido
+            novas_linhas.append(linha_final)
+
+        aba.clear()
+        aba.update("A1", [cabecalho] + linhas_sem_alvo + novas_linhas)
+        return True
+    except Exception as e:
+        st.error(f"🚨 ERRO APPSHEET: {e}")
+        return False
+
+
 def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
     INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711"
     TOKEN = "2321563615C4242CB6031504"
@@ -3011,7 +3084,7 @@ if menu == "📊 GRID":
                                                             'PEDIDO': pid, 'MOTORISTA': novo_mot, 'ENDERECO': l_app.get('ENDERECO', ''), 'NUMERO': l_app.get('NUMERO', ''), 'BAIRRO': l_app.get('BAIRRO', ''), 'CIDADE': l_app.get('CIDADE', ''), 'CEP': l_app.get('CEP', ''), 'LABORATORIO': l_app.get('LABORATORIO', ''), 'TOMADOR': l_app.get('TOMADOR', '')})
                                             aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                             if lista_app_troca:
-                                                despachar_para_appsheet(lista_app_troca)
+                                                substituir_pedido_appsheet(lista_app_troca)
                                         st.success("🎉 Troca realizada preservando o estado original!")
                                         time.sleep(1.5)
                                         carregar_dados_completos.clear()
