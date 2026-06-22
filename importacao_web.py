@@ -7453,7 +7453,8 @@ elif menu == "🔬 Triagem":
                             if status_atual_bip == 'COLETADO':
                                 try:
                                     # 🔥 PROTEÇÃO CONTRA TIMEOUT: Mostra spinner e aguarda sincronização com Google Sheets
-                                    with st.spinner("⏳ Sincronizando com a nuvem (Google Sheets)..."):
+                                    with st.spinner("⏳ Sincronizando com a nuvem (Google Sheets)... Aguarde até 10s"):
+                                        # 🔥 RETRY COM TIMEOUT AUMENTADO (até 3 tentativas com espera progressiva)
                                         aba = planilha_db.worksheet("Memoria_Sistema")
                                         pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
                                         headers = aba.row_values(1)
@@ -7463,19 +7464,45 @@ elif menu == "🔬 Triagem":
                                         if 'PEDIDO' in headers and 'STATUS' in headers:
                                             col_pedido = headers.index('PEDIDO') + 1
                                             col_status = headers.index('STATUS') + 1
-                                            cell = aba.find(pedido_alvo, in_column=col_pedido)
-                                            if cell:
-                                                updates = [{'range': gspread.utils.rowcol_to_a1(cell.row, col_status), 'values': [['CONFERIDO']]}]
-                                                # Registrar data e hora do bip se as colunas existirem
-                                                if 'DATA_BIP' in headers:
-                                                    col_data_bip = headers.index('DATA_BIP') + 1
-                                                    updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_data_bip), 'values': [[data_bip_str]]})
-                                                if 'HORA_BIP' in headers:
-                                                    col_hora_bip = headers.index('HORA_BIP') + 1
-                                                    updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_hora_bip), 'values': [[hora_bip_str]]})
-                                                aba.batch_update(updates)
-                                                # 🔥 DELAY AUMENTADO: 1.5s para evitar throttling do Google Sheets em bipagens rápidas
-                                                time.sleep(1.5)
+                                            
+                                            # 🔥 RETRY LOOP COM TIMEOUT PROGRESSIVO
+                                            tentativas = 0
+                                            max_tentativas = 3
+                                            sucesso_update = False
+                                            ultima_excecao = None
+                                            
+                                            while tentativas < max_tentativas and not sucesso_update:
+                                                try:
+                                                    cell = aba.find(pedido_alvo, in_column=col_pedido)
+                                                    if cell:
+                                                        updates = [{'range': gspread.utils.rowcol_to_a1(cell.row, col_status), 'values': [['CONFERIDO']]}]
+                                                        # Registrar data e hora do bip se as colunas existirem
+                                                        if 'DATA_BIP' in headers:
+                                                            col_data_bip = headers.index('DATA_BIP') + 1
+                                                            updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_data_bip), 'values': [[data_bip_str]]})
+                                                        if 'HORA_BIP' in headers:
+                                                            col_hora_bip = headers.index('HORA_BIP') + 1
+                                                            updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_hora_bip), 'values': [[hora_bip_str]]})
+                                                        
+                                                        # Update com timeout interno
+                                                        aba.batch_update(updates)
+                                                        sucesso_update = True
+                                                    else:
+                                                        raise Exception(f"Pedido {pedido_alvo} não encontrado")
+                                                except Exception as e:
+                                                    ultima_excecao = e
+                                                    tentativas += 1
+                                                    if tentativas < max_tentativas:
+                                                        # Espera progressiva: 2s, 4s, 6s
+                                                        espera = tentativas * 2
+                                                        time.sleep(espera)
+                                                        continue
+                                                    else:
+                                                        raise ultima_excecao
+                                            
+                                            if sucesso_update:
+                                                # 🔥 DELAY AUMENTADO: 2.5s para evitar throttling do Google Sheets em bipagens rápidas
+                                                time.sleep(2.5)
                                                 st.session_state.log_triagem.insert(0, {'PEDIDO': str(df_raw.at[idx, 'PEDIDO']), 'TOMADOR': str(df_raw.at[idx, 'TOMADOR']), 'LABORATORIO': str(df_raw.at[idx, 'LABORATORIO']), 'CIDADE': str(df_raw.at[idx, 'CIDADE']), 'DATA_BIP': data_bip_str, 'HORA': hora_bip_str})
                                                 st.session_state.ui_toast = {'msg': f"Pedido {pedido_alvo} VALIDADO! ✅ ({hora_bip_str})", 'icon': "✅"}
                                                 carregar_dados_completos.clear()
