@@ -2384,14 +2384,28 @@ if menu == "📊 GRID":
                                             tel_row = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE']
                                                                  == mot_final]
                                             if not tel_row.empty:
-                                                msg_zap = f"🚨 *NOVA COLETA APROVADA* 🚨\nOlá, {
-                                                    tel_row.iloc[0]['NOME DO AGENTE']}!\nUm novo pedido foi aprovado e adicionado à sua rota.\n📦 *Pedido:* {pid}\n🏢 *Cliente:* {
-                                                    l_orig.get(
-                                                        'TOMADOR',
-                                                        '')}\n📍 *Cidade:* {
-                                                    l_orig.get(
-                                                        'CIDADE',
-                                                        '')}"
+                                                data_coleta = l_orig.get('DATA', hoje_br.strftime("%d/%m/%Y"))
+                                                endereco_coleta = l_orig.get('ENDERECO', '')
+                                                numero_coleta = l_orig.get('NUMERO', '')
+                                                bairro_coleta = l_orig.get('BAIRRO', '')
+                                                complemento_coleta = l_orig.get('COMPLEMENTO', '')
+                                                telefone_cliente = l_orig.get('TELEFONE', '')
+                                                
+                                                endereco_completo = f"{endereco_coleta}"
+                                                if numero_coleta:
+                                                    endereco_completo += f", nº {numero_coleta}"
+                                                if complemento_coleta:
+                                                    endereco_completo += f" - {complemento_coleta}"
+                                                if bairro_coleta:
+                                                    endereco_completo += f", {bairro_coleta}"
+                                                
+                                                msg_zap = f"🚨 *NOVA COLETA APROVADA* 🚨\nOlá, {tel_row.iloc[0]['NOME DO AGENTE']}!\n\nUm novo pedido foi aprovado e adicionado à sua rota.\n\n📦 *Pedido:* {pid}\n🏢 *Cliente:* {l_orig.get('TOMADOR', '')}\n📅 *Data da Coleta:* {data_coleta}\n\n📍 *LOCALIZAÇÃO:*\n{endereco_completo}\n🏙️ *Cidade:* {l_orig.get('CIDADE', '')}"
+                                                
+                                                if telefone_cliente:
+                                                    msg_zap += f"\n📱 *Telefone Cliente:* {telefone_cliente}"
+                                                
+                                                msg_zap += f"\n\n✅ Atualize seu GPS e boa sorte na coleta!"
+                                                
                                                 enviar_whatsapp_zapi(
                                                     tel_row.iloc[0]['TELEFONE'], msg_zap)
 
