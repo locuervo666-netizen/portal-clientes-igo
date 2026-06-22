@@ -35,10 +35,41 @@ st.set_page_config(
 CSS_DASHBOARD = """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    :root {
+        --igo-bg-soft: #f3f7ff;
+        --igo-surface: #ffffff;
+        --igo-surface-2: #f8fbff;
+        --igo-line: #dbe3ef;
+        --igo-text: #0f172a;
+        --igo-muted: #64748b;
+        --igo-brand: #2563eb;
+        --igo-brand-2: #1d4ed8;
+        --igo-shadow-lg: 0 14px 34px rgba(15, 23, 42, 0.11);
+    }
     [data-testid="stAppViewContainer"] {
         transition: background-color 0.3s ease;
         font-family: 'Inter', sans-serif;
-        background-color: #FFFFFF !important;
+        background: #fafbfc !important;
+        padding-left: 0.3rem !important;
+        padding-right: 0.3rem !important;
+    }
+    [data-testid="stAppViewContainer"] [data-testid="stVerticalBlockBorderWrapper"] {
+        gap: 3px !important;
+    }
+    [data-testid="stAppViewContainer"] [data-testid="stColumn"] {
+        padding-left: 1px !important;
+        padding-right: 1px !important;
+    }
+    [data-testid="stAppViewContainer"] .st-gl {
+        gap: 0.3rem !important;
+    }
+    [data-testid="stAppViewContainer"] [data-testid="stElementContainer"] {
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+    }
+
+    [data-testid="stApp"] {
+        color: var(--igo-text);
     }
 
     /* ── SIDEBAR ── */
@@ -46,6 +77,10 @@ CSS_DASHBOARD = """
     [data-testid="stSidebar"] > div:first-child {
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
         border-right: 1px solid #dbe3ef !important;
+        padding: 12px 8px !important;
+    }
+    [data-testid="stSidebar"] > div:first-child > div {
+        gap: 0px !important;
     }
     [data-testid="stSidebar"] p,
     [data-testid="stSidebar"] label,
@@ -54,10 +89,10 @@ CSS_DASHBOARD = """
     }
     [data-testid="stSidebar"] .sidebar-premium-shell {
         background: linear-gradient(145deg, #0f172a 0%, #1e293b 58%, #334155 100%);
-        border-radius: 18px;
-        padding: 14px 14px 12px 14px;
-        margin-bottom: 14px;
-        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
+        border-radius: 16px;
+        padding: 12px 12px 10px 12px;
+        margin-bottom: 10px;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
         border: 1px solid rgba(148, 163, 184, 0.22);
     }
     [data-testid="stSidebar"] .sidebar-premium-kicker {
@@ -83,17 +118,17 @@ CSS_DASHBOARD = """
     [data-testid="stSidebar"] [data-testid="stForm"] {
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
         border: 1px solid #dbe3ef !important;
-        border-radius: 14px !important;
-        padding: 14px !important;
-        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05) !important;
+        border-radius: 12px !important;
+        padding: 10px !important;
+        box-shadow: 0 3px 8px rgba(15, 23, 42, 0.03) !important;
     }
     [data-testid="stSidebar"] section > div {
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
-        border-radius: 14px !important;
-        padding: 14px !important;
-        margin-bottom: 10px !important;
+        border-radius: 12px !important;
+        padding: 10px !important;
+        margin-bottom: 6px !important;
         border: 1px solid #e2e8f0 !important;
-        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04) !important;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.02) !important;
     }
     [data-testid="stSidebar"] [data-testid="stForm"] input,
     [data-testid="stSidebar"] [data-testid="stForm"] textarea {
@@ -108,16 +143,25 @@ CSS_DASHBOARD = """
         border-color: #3b82f6 !important;
         box-shadow: 0 0 0 1px #3b82f6 !important;
     }
+    [data-testid="stSidebar"] [data-testid="stContainer"] {
+        gap: 0px !important;
+    }
+    [data-testid="stSidebar"] .st-gl, [data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
+        gap: 0px !important;
+    }
+    [data-testid="stSidebar"] .stSpacer {
+        display: none !important;
+    }
     [data-testid="stSidebar"] .stButton > button,
     [data-testid="stSidebar"] [data-testid="stFormSubmitButton"] > button {
-        border-radius: 10px !important;
+        border-radius: 8px !important;
         border: 1px solid #93c5fd !important;
         background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
         color: #0f172a !important;
         font-weight: 700 !important;
-        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.10) !important;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08) !important;
         transition: all 0.2s ease !important;
-        min-height: 42px !important;
+        min-height: 36px !important;
     }
     [data-testid="stSidebar"] .stButton > button:hover,
     [data-testid="stSidebar"] [data-testid="stFormSubmitButton"] > button:hover {
@@ -153,30 +197,89 @@ CSS_DASHBOARD = """
     footer {visibility: hidden;}
     header {background-color: transparent !important;}
     .block-container {
-        padding-top: 1.2rem !important;
+        padding-top: 1rem !important;
         padding-bottom: 1rem !important;
-        padding-left: 2rem !important;
-        padding-right: 2rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
         display: block !important;
+        max-width: 100%;
+    }
+
+    .kpi-deck-shell {
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1px solid rgba(203, 213, 225, 0.6);
+        border-radius: 12px;
+        padding: 12px 12px 8px 12px;
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255,255,255,0.95);
+        margin-bottom: 3px;
+        backdrop-filter: blur(8px);
+    }
+
+    .toolbar-shell {
+        background: linear-gradient(180deg, #f9fafb 0%, #f3f4f6 100%);
+        border: 1px solid rgba(203, 213, 225, 0.5);
+        border-radius: 12px;
+        padding: 8px 10px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255,255,255,0.95);
+        margin-bottom: 3px;
+        backdrop-filter: blur(8px);
+    }
+
+    .section-kicker {
+        font-size: 10px;
+        font-weight: 800;
+        color: #64748b;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+        margin-top: 6px;
     }
 
     /* ── KPI CARDS ── */
     .kpi-card {
         border-radius: 12px;
-        padding: 16px;
+        padding: 16px 18px;
         text-align: left;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         position: relative;
         overflow: hidden;
-        height: 95px;
+        min-height: 102px;
+        backdrop-filter: blur(8px);
+        border: 1.5px solid rgba(203, 213, 225, 0.5);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+    }
+    .kpi-card::after {
+        content: "";
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        background: radial-gradient(circle at 120% -20%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 70%);
+        filter: blur(20px);
+        pointer-events: none;
+        border-radius: 12px;
+    }
+    .kpi-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.7) 50%, rgba(255,255,255,0) 100%);
+        border-radius: 12px 12px 0 0;
     }
     .kpi-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        transform: translateY(-2px);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.15), inset 0 1px 0 rgba(255,255,255,0.9);
+        transform: translateY(-6px);
+        border-color: rgba(203, 213, 225, 0.8);
+        filter: brightness(1.08) saturate(1.1);
     }
-    .kpi-card.active {
-        box-shadow: 0 0 0 2px #3b82f6;
+    .kpi-card:active {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255,255,255,0.8);
     }
 
     /* ── HEADER ── */
@@ -184,20 +287,28 @@ CSS_DASHBOARD = """
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 18px;
-        padding-bottom: 14px;
-        border-bottom: 1.5px solid #e2e8f0;
+        margin-bottom: 6px;
+        padding: 12px 14px;
+        border: 1px solid rgba(203, 213, 225, 0.6);
+        border-radius: 12px;
+        background: linear-gradient(135deg, #f0f9ff 0%, #f1f5f9 100%);
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255,255,255,0.95);
+        backdrop-filter: blur(8px);
     }
     .header-title {
         font-size: 20px;
-        font-weight: 800;
+        font-weight: 700;
         color: #0f172a;
-        letter-spacing: -0.3px;
+        letter-spacing: -0.4px;
+        margin: 0;
     }
     .header-subtitle {
-        font-size: 13px;
-        color: #64748b;
+        font-size: 11px;
+        color: var(--igo-muted);
         margin-top: 2px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
     }
     .sync-status {
         display: flex;
@@ -206,25 +317,22 @@ CSS_DASHBOARD = """
         font-size: 12px;
         color: #166534;
         font-weight: 600;
-        background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%);
-        border: 1px solid #86efac;
-        border-radius: 99px;
-        padding: 5px 12px;
-        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.12);
+        background: linear-gradient(135deg, rgba(240, 253, 244, 0.99) 0%, rgba(220, 252, 231, 0.98) 100%);
+        border: 1px solid rgba(132, 204, 22, 0.3);
+        border-radius: 8px;
+        padding: 6px 12px;
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+        backdrop-filter: blur(10px);
     }
     .sync-dot {
-        width: 7px;
-        height: 7px;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
         background: #22c55e;
-        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
-        animation: pulse 2s infinite;
+        box-shadow: none;
+        animation: none;
     }
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.4; }
-    }
-
+    
     /* ── PROGRESS BAR ── */
     .progress-block {
         background: #ffffff;
@@ -258,42 +366,101 @@ CSS_DASHBOARD = """
 
     /* ── PROGRESS BLOCK SIDEBAR ── */
     .progress-block-sidebar {
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid #dbeafe;
-        border-radius: 14px;
-        padding: 16px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 52%, #eff6ff 100%);
+        border: 1px solid #bfdbfe;
+        border-radius: 16px;
+        padding: 24px;
         margin: 12px 0;
         overflow: hidden;
-        box-shadow: 0 10px 24px rgba(37, 99, 235, 0.10);
+        box-shadow: 0 12px 26px rgba(37, 99, 235, 0.16);
     }
     .progress-block-sidebar-content {
         position: relative;
         z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
     }
     .progress-title-sidebar {
         font-size: 12px;
         font-weight: 700;
         color: #0f172a;
-        margin-bottom: 6px;
     }
     .progress-number-sidebar {
-        font-size: 28px;
+        font-size: 42px;
         font-weight: 900;
         color: #0f172a;
         line-height: 1;
-        margin: 4px 0;
     }
-    .progress-bar-fill {
-        height: 6px;
-        border-radius: 99px;
-        transition: width 0.6s ease;
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 4px 12px rgba(59, 130, 246, 0.16);
+    .progress-bars-container {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+        justify-content: center;
+        height: 120px;
     }
+    .progress-bar-wifi {
+        width: 12px;
+        border-radius: 4px 4px 0 0;
+        transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        opacity: 0.3;
+        background: #cbd5e1;
+    }
+    .progress-bar-wifi.active-1 { height: 24px; opacity: 1; background: #ef4444; }
+    .progress-bar-wifi.active-2 { height: 40px; opacity: 1; background: #f59e0b; }
+    .progress-bar-wifi.active-3 { height: 56px; opacity: 1; background: #f59e0b; }
+    .progress-bar-wifi.active-4 { height: 80px; opacity: 1; background: #22c55e; }
+    .progress-bar-wifi.active-5 { height: 100px; opacity: 1; background: #22c55e; }
     .progress-text-sidebar {
         font-size: 12px;
         color: #475569;
         font-weight: 500;
-        margin-bottom: 4px;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
+        border-radius: 14px !important;
+        border: 1px solid #dbe3ef !important;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08) !important;
+    }
+
+    [data-baseweb="tab-list"] {
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1px solid rgba(203, 213, 225, 0.6);
+        border-radius: 12px;
+        padding: 4px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255,255,255,0.95);
+        margin-bottom: 4px !important;
+        backdrop-filter: blur(8px);
+    }
+
+    button[role="tab"] {
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        min-height: 32px !important;
+        font-size: 13px !important;
+        transition: all 0.3s ease !important;
+    }
+
+    button[role="tab"][aria-selected="true"] {
+        background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%) !important;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12), inset 0 1px 0 rgba(255,255,255,0.8) !important;
+        color: #1d4ed8 !important;
+        font-weight: 700 !important;
+    }
+
+    @media (max-width: 980px) {
+        .header-container {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .kpi-card {
+            min-height: 92px;
+            padding: 14px;
+        }
     }
     </style>
 """
@@ -949,7 +1116,7 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
     # 📋 COLUNA ESQUERDA - DADOS DO PEDIDO
     with col_esquerda:
         # Container com borda cinza
-        with st.container(border=True):
+        with st.container(border=False):
             # 🏢 Tomador
             st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>🏢 Cliente (Embarcador)</p>", unsafe_allow_html=True)
             st.markdown(f"<p style='font-size:14px; font-weight:700; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin:2px 0 12px 0;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>", unsafe_allow_html=True)
@@ -1234,7 +1401,6 @@ else:
 
     # ── SIDEBAR ────────────────────────────────────────
     with st.sidebar:
-        st.markdown("<br>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 4, 1])
         with col2:
             try:
@@ -1242,10 +1408,9 @@ else:
             except Exception:
                 st.markdown(f"<h3 style='text-align:center;'>{st.session_state.cliente}</h3>", unsafe_allow_html=True)
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Filtros de Visão</p>", unsafe_allow_html=True)
+        st.markdown("<p class='section-kicker'>Filtros de Visão</p>", unsafe_allow_html=True)
         
-        with st.container(border=True):
+        with st.container(border=False):
             st.markdown("<p style='font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 5px;'>🗓️ Período de Análise</p>", unsafe_allow_html=True)
             c1_dt, c2_dt = st.columns(2)
             dt_inicio = c1_dt.date_input("De:", value=hoje_br - timedelta(days=15), format="DD/MM/YYYY")
@@ -1253,8 +1418,7 @@ else:
             datas_sel = (dt_inicio, dt_fim)
             holder_cidades = st.empty()
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("<p style='font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;'>Suporte e Relatórios</p>", unsafe_allow_html=True)
+        st.markdown("<p class='section-kicker'>Suporte e Relatórios</p>", unsafe_allow_html=True)
         
         with st.popover("🎧 Abrir Chamado ao Suporte", use_container_width=True):
             st.markdown("📄 **Novo Chamado de Atendimento**")
@@ -1431,7 +1595,8 @@ else:
                     "HOJE":       len(df_f[df_f['DATA_OBJ'] == hoje_br]),
                 }
 
-                cols_kpi = st.columns(7) 
+                st.markdown("<div class='kpi-deck-shell'>", unsafe_allow_html=True)
+                cols_kpi = st.columns(7, gap="small") 
                 for col, (filtro, label, key) in zip(cols_kpi, KPI_META):
                     is_active = st.session_state.filtro_kpi == filtro
                     dot_color = KPI_DOT_COLOR[filtro]
@@ -1470,16 +1635,15 @@ else:
                     <style>
                     div.st-key-kpi_total, div.st-key-kpi_entregue, div.st-key-kpi_frus, 
                     div.st-key-kpi_coletado, div.st-key-kpi_pend, div.st-key-kpi_aguardando, div.st-key-kpi_hoje {
-                        margin-top: -110px !important; position: relative; z-index: 999; opacity: 0 !important;
+                        margin-top: -106px !important; position: relative; z-index: 999; opacity: 0 !important;
                     }
                     div.st-key-kpi_total button, div.st-key-kpi_entregue button, div.st-key-kpi_frus button, 
                     div.st-key-kpi_coletado button, div.st-key-kpi_pend button, div.st-key-kpi_aguardando button, div.st-key-kpi_hoje button {
-                        height: 105px !important; cursor: pointer !important;
+                        height: 102px !important; cursor: pointer !important;
                     }
                     </style>
                 """, unsafe_allow_html=True)
-
-                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
                 df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
                 if not df_h.empty:
@@ -1491,37 +1655,54 @@ else:
                     n_tot = 0
                     pct = 0
 
-                if pct >= 80:
-                    bar_color = '#22c55e'
-                elif pct >= 50:
-                    bar_color = '#f59e0b'
+                # Calcular número de barrinhas ativas (1-5)
+                if pct == 0:
+                    barras_ativas = 0
+                elif pct <= 20:
+                    barras_ativas = 1
+                elif pct <= 40:
+                    barras_ativas = 2
+                elif pct <= 60:
+                    barras_ativas = 3
+                elif pct <= 80:
+                    barras_ativas = 4
                 else:
-                    bar_color = '#ef4444'
+                    barras_ativas = 5
+
+                # Gerar HTML das barrinhas
+                barras_html = ""
+                for i in range(1, 6):
+                    classe = f"active-{i}" if i <= barras_ativas else ""
+                    barras_html += f'<div class="progress-bar-wifi {classe}"></div>'
 
                 st.sidebar.markdown(f"""
                     <div class="progress-block-sidebar">
                         <div class="progress-block-sidebar-content">
-                            <div class="progress-title-sidebar">🎯 Progresso de Hoje</div>
-                            <div class="progress-number-sidebar">{pct}%</div>
-                            <div class="progress-text-sidebar">{n_fim} de {n_tot} pedidos concluídos hoje</div>
-                            <div class="progress-bar-bg">
-                                <div class="progress-bar-fill" style="width:{pct}%;background:{bar_color};"></div>
+                            <div class="progress-title-sidebar">📶 Progresso de Hoje</div>
+                            <div class="progress-bars-container">
+                                {barras_html}
                             </div>
+                            <div class="progress-number-sidebar">{pct}%</div>
+                            <div class="progress-text-sidebar">{n_fim} de {n_tot} pedidos concluídos</div>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
 
                 st.sidebar.markdown("<br>", unsafe_allow_html=True)
-                if st.sidebar.button("🚪 Sair com Segurança", use_container_width=True, type="secondary"):
+                if st.sidebar.button("🚪 Sair com Segurança", use_container_width=True, type="secondary", key="btn_logout_sidebar"):
                     st.session_state.logado = False
                     st.query_params.clear() 
                     st.rerun()
 
+
+
+                st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
                 col_busca, col_export = st.columns([6, 1], gap="small")
                 with col_busca:
                     busca = shadcn_input(placeholder="🔎 Buscar por pedido, laboratório, cidade...", key="busca_grid_input")
                 with col_export:
                     holder_download = st.empty()
+                st.markdown("</div>", unsafe_allow_html=True)
 
                 df_grid = df_f.copy()
                 
@@ -1805,6 +1986,7 @@ else:
                     # Se o modal foi fechado recentemente, ignora a seleção anterior e desativa a flag
                     if st.session_state.modal_fechado:
                         st.session_state.modal_fechado = False
+                        st.session_state.modal_aberto = False
                     elif selected_rows is not None and len(selected_rows) > 0:
                         if isinstance(selected_rows, pd.DataFrame):
                             dados_da_linha = selected_rows.iloc[0].to_dict()
@@ -1822,6 +2004,7 @@ else:
                     else:
                         # Se a Grid devolver "vazio" (porque o usuário clicou de novo na mesma linha para desmarcar)
                         # Nós limpamos a memória para permitir um novo clique!
+                        st.session_state.modal_aberto = False
                         st.session_state.pedido_modal = None
                         st.session_state.linha_clicada = None
 
@@ -1831,6 +2014,9 @@ else:
                         dados_completos_linha = df_final[df_final['PEDIDO'] == st.session_state.pedido_modal].iloc[0].to_dict()
                         st.session_state.modal_renderizado_antes = True  # Marca que o modal foi renderizado
                         modal_detalhes_pedido(dados_completos_linha, df_final)
+                        # Evita reabrir automaticamente em refresh quando o usuário fecha pelo X.
+                        # O próximo clique na grid volta a abrir normalmente.
+                        st.session_state.modal_aberto = False
 
 
                     # ── EXPORTAÇÃO CSV ────────
@@ -1899,7 +2085,7 @@ else:
                 if df_cli_locais.empty:
                     st.warning(f"Nenhum ponto de coleta cadastrado para {nome_tomador_oficial}.")
                 else:
-                    with st.container(border=True):
+                    with st.container(border=False):
                         with st.form("form_nova_coleta", clear_on_submit=True):
                             lista_labs = sorted(df_cli_locais['LABORATORIO'].unique().tolist())
                             lab_sel    = st.selectbox(
