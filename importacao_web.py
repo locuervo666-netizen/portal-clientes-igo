@@ -509,6 +509,53 @@ CSS_DASHBOARD = """
         0%, 100% { opacity: 1; }
         50% { opacity: 0.4; }
     }
+
+    /* ── BARRA DE PROGRESSO DOS PEDIDOS DO DIA ── */
+    .progress-block-main {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 52%, #eff6ff 100%);
+        border: 1px solid #bfdbfe;
+        border-radius: 16px;
+        padding: 20px;
+        margin: 12px 0 18px 0;
+        overflow: hidden;
+        box-shadow: 0 12px 26px rgba(37, 99, 235, 0.16);
+    }
+    .progress-block-content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+    }
+    .progress-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #0f172a;
+        align-self: flex-start;
+    }
+    .progress-bar-container {
+        width: 100%;
+        height: 8px;
+        background: #e2e8f0;
+        border-radius: 99px;
+        overflow: hidden;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 99px;
+        transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        background: linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #22c55e 100%);
+        box-shadow: 0 0 10px rgba(34, 197, 94, 0.6);
+    }
+    .progress-text {
+        font-size: 12px;
+        color: #475569;
+        font-weight: 500;
+        align-self: flex-start;
+    }
     </style>
 """
 
@@ -2593,6 +2640,29 @@ if menu == "📊 GRID":
         """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
+
+        # 🔥 BARRA DE PROGRESSO DOS PEDIDOS DO DIA 🔥
+        df_hoje = df_f[df_f['DATA_OBJ'] == hoje_br]
+        if not df_hoje.empty:
+            n_concluidos = len(df_hoje[df_hoje['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Recusada|Coletado|Em Transferência', case=False, na=False)])
+            n_total_hoje = len(df_hoje)
+            pct_progresso = round((n_concluidos / n_total_hoje) * 100) if n_total_hoje else 0
+        else:
+            n_concluidos = 0
+            n_total_hoje = 0
+            pct_progresso = 0
+
+        st.markdown(f"""
+            <div class="progress-block-main">
+                <div class="progress-block-content">
+                    <div class="progress-title">📶 Progresso de Hoje</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" style="width: {pct_progresso}%;"></div>
+                    </div>
+                    <div class="progress-text">{pct_progresso}% • {n_concluidos} de {n_total_hoje} pedidos concluídos</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
         busca = st.text_input(
             "🔎 Busca Rápida:",
             placeholder="Filtrar dados...")
