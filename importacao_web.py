@@ -7449,23 +7449,35 @@ elif menu == "🔬 Triagem":
                         
                         if mask.any():
                             idx = df_raw[mask].index[-1]
-                            if str(df_raw.at[idx, 'STATUS']).strip().upper() == 'COLETADO':
+                            status_atual_bip = str(df_raw.at[idx, 'STATUS']).strip().upper()
+                            if status_atual_bip == 'COLETADO':
                                 try:
                                     # 🔥 PROTEÇÃO CONTRA TIMEOUT: Mostra spinner e aguarda sincronização com Google Sheets
                                     with st.spinner("⏳ Sincronizando com a nuvem (Google Sheets)..."):
                                         aba = planilha_db.worksheet("Memoria_Sistema")
                                         pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
                                         headers = aba.row_values(1)
+                                        agora_bip = datetime.now(FUSO_BR)
+                                        data_bip_str = agora_bip.strftime('%d/%m/%Y')
+                                        hora_bip_str = agora_bip.strftime('%H:%M:%S')
                                         if 'PEDIDO' in headers and 'STATUS' in headers:
                                             col_pedido = headers.index('PEDIDO') + 1
                                             col_status = headers.index('STATUS') + 1
                                             cell = aba.find(pedido_alvo, in_column=col_pedido)
                                             if cell:
-                                                aba.update_cell(cell.row, col_status, 'CONFERIDO')
+                                                updates = [{'range': aba.rowcol_to_a1(cell.row, col_status), 'values': [['CONFERIDO']]}]
+                                                # Registrar data e hora do bip se as colunas existirem
+                                                if 'DATA_BIP' in headers:
+                                                    col_data_bip = headers.index('DATA_BIP') + 1
+                                                    updates.append({'range': aba.rowcol_to_a1(cell.row, col_data_bip), 'values': [[data_bip_str]]})
+                                                if 'HORA_BIP' in headers:
+                                                    col_hora_bip = headers.index('HORA_BIP') + 1
+                                                    updates.append({'range': aba.rowcol_to_a1(cell.row, col_hora_bip), 'values': [[hora_bip_str]]})
+                                                aba.batch_update(updates)
                                                 # 🔥 DELAY AUMENTADO: 1.5s para evitar throttling do Google Sheets em bipagens rápidas
                                                 time.sleep(1.5)
-                                                st.session_state.log_triagem.insert(0, {'PEDIDO': str(df_raw.at[idx, 'PEDIDO']), 'TOMADOR': str(df_raw.at[idx, 'TOMADOR']), 'LABORATORIO': str(df_raw.at[idx, 'LABORATORIO']), 'CIDADE': str(df_raw.at[idx, 'CIDADE']), 'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S')})
-                                                st.session_state.ui_toast = {'msg': f"Pedido {pedido_alvo} VALIDADO! ✅", 'icon': "✅"}
+                                                st.session_state.log_triagem.insert(0, {'PEDIDO': str(df_raw.at[idx, 'PEDIDO']), 'TOMADOR': str(df_raw.at[idx, 'TOMADOR']), 'LABORATORIO': str(df_raw.at[idx, 'LABORATORIO']), 'CIDADE': str(df_raw.at[idx, 'CIDADE']), 'DATA_BIP': data_bip_str, 'HORA': hora_bip_str})
+                                                st.session_state.ui_toast = {'msg': f"Pedido {pedido_alvo} VALIDADO! ✅ ({hora_bip_str})", 'icon': "✅"}
                                                 carregar_dados_completos.clear()
                                                 st.rerun()
                                             else:
@@ -7474,6 +7486,13 @@ elif menu == "🔬 Triagem":
                                             st.error("❌ Colunas PEDIDO ou STATUS não encontradas na planilha.")
                                 except Exception as e:
                                     st.error(f"⚠️ Erro de sincronização com a nuvem: {str(e)[:80]}. Aguarde alguns segundos e tente novamente.")
+                            elif status_atual_bip == 'CONFERIDO':
+                                pedido_ja_triado = str(df_raw.at[idx, 'PEDIDO'])
+                                lab_ja_triado = str(df_raw.at[idx, 'LABORATORIO'])
+                                hora_bip_anterior = str(df_raw.at[idx, 'HORA_BIP']) if 'HORA_BIP' in df_raw.columns and str(df_raw.at[idx, 'HORA_BIP']).strip() not in ['', 'nan', 'None'] else ''
+                                data_bip_anterior = str(df_raw.at[idx, 'DATA_BIP']) if 'DATA_BIP' in df_raw.columns and str(df_raw.at[idx, 'DATA_BIP']).strip() not in ['', 'nan', 'None'] else ''
+                                info_bip = f" em {data_bip_anterior} às {hora_bip_anterior}" if data_bip_anterior and hora_bip_anterior else ""
+                                st.warning(f"⚠️ **ATENÇÃO: Pedido já triado!**\n\n**{pedido_ja_triado}** — {lab_ja_triado}\n\nEste volume já foi bipado e está aguardando na **Aba 2 (Romaneio)**{info_bip}. Não é necessário bipar novamente.")
                             else:
                                 st.error("❌ Volume não está com status COLETADO. Verifique se foi coletado no app.")
                         else:
@@ -7484,8 +7503,9 @@ elif menu == "🔬 Triagem":
                 st.markdown("<p style='margin-bottom: 5px; font-weight: bold; color: #0F172A; font-size: 14px;'>⏱️ Últimos Bips (Sessão):</p>", unsafe_allow_html=True)
                 if st.session_state.log_triagem:
                     for item in st.session_state.log_triagem[:5]:
+                        data_bip_disp = item.get('DATA_BIP', hoje_br.strftime('%d/%m/%Y'))
                         st.markdown(
-                            f"<div style='font-size: 11px; color: #334155; margin-bottom: 3px;'>🟢 <b>{item['PEDIDO']}</b> - {item['LABORATORIO']} <br><span style='color: #64748B; padding-left: 15px;'>{item['TOMADOR']} | {item['CIDADE']} ({item['HORA']})</span></div>",
+                            f"<div style='font-size: 11px; color: #334155; margin-bottom: 3px;'>🟢 <b>{item['PEDIDO']}</b> - {item['LABORATORIO']} <br><span style='color: #64748B; padding-left: 15px;'>{item['TOMADOR']} | {item['CIDADE']} | 📅 {data_bip_disp} {item['HORA']}</span></div>",
                             unsafe_allow_html=True)
                 else:
                     st.markdown("<p style='font-size: 12px; color: #94A3B8;'>Nenhum volume bipado ainda.</p>", unsafe_allow_html=True)
@@ -7586,18 +7606,38 @@ elif menu == "🔬 Triagem":
             else:
                 df_conf = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'CONFERIDO'].copy()
                 if not df_conf.empty:
-                    with st.expander("🔎 Filtrar Hub de Despacho", expanded=False):
-                        tomador_filtro = st.selectbox("🏢 Hub de Destino (Filtro):", ["Todos"] + sorted(df_conf['TOMADOR'].astype(str).unique().tolist()), key="filtro_tomador_t2")
-                    
+                    # 🔥 BARRA DE BUSCA RÁPIDA + FILTRO DE HUB 🔥
+                    col_busca_rom, col_filtro_rom = st.columns([2, 1])
+                    busca_romaneio = col_busca_rom.text_input(
+                        "🔍 Localizar Pedido:",
+                        placeholder="Digite o nº do pedido, laboratório ou cidade...",
+                        key="busca_romaneio_t2"
+                    )
+                    with col_filtro_rom.expander("🏢 Filtrar Hub", expanded=False):
+                        tomador_filtro = st.selectbox("Hub de Destino:", ["Todos"] + sorted(df_conf['TOMADOR'].astype(str).unique().tolist()), key="filtro_tomador_t2", label_visibility="collapsed")
+
                     if tomador_filtro != "Todos":
                         df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
+
+                    # Aplica busca em texto sobre todas as colunas
+                    if busca_romaneio.strip():
+                        mask_busca = df_conf.apply(
+                            lambda row: row.astype(str).str.contains(busca_romaneio.strip(), case=False, na=False).any(), axis=1
+                        )
+                        df_conf_busca = df_conf[mask_busca]
+                        if df_conf_busca.empty:
+                            st.warning(f"⚠️ Nenhum pedido encontrado com '{busca_romaneio}'.")
+                        else:
+                            st.success(f"✅ {len(df_conf_busca)} pedido(s) encontrado(s) para '{busca_romaneio}'.")
+                        df_conf = df_conf_busca
 
                     renderizar_kpis([
                         (len(df_conf), "📦 Volumes Prontos p/ Embarque", "#0ea5e9", "#06b6d4"),
                         (df_conf['TOMADOR'].nunique(), "🏢 Hubs com Carga", "#6366f1", "#8b5cf6")
                     ])
 
-                    colunas_validas_conf = [c for c in ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF'] if c in df_conf.columns]
+                    # Incluir DATA_BIP e HORA_BIP se disponíveis
+                    colunas_validas_conf = [c for c in ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF', 'DATA_BIP', 'HORA_BIP'] if c in df_conf.columns]
                     df_conf_show = df_conf[colunas_validas_conf].fillna("").astype(str).copy()
                     
                     gb_conf = GridOptionsBuilder.from_dataframe(df_conf_show)
@@ -7610,6 +7650,8 @@ elif menu == "🔬 Triagem":
                     if "LABORATORIO" in df_conf_show.columns: gb_conf.configure_column("LABORATORIO", header_name="🏭 Laboratório", width=250)
                     if "CIDADE" in df_conf_show.columns: gb_conf.configure_column("CIDADE", header_name="📍 Cidade", width=150)
                     if "UF" in df_conf_show.columns: gb_conf.configure_column("UF", header_name="🗺️ UF", width=90)
+                    if "DATA_BIP" in df_conf_show.columns: gb_conf.configure_column("DATA_BIP", header_name="📅 Data Bip", width=110)
+                    if "HORA_BIP" in df_conf_show.columns: gb_conf.configure_column("HORA_BIP", header_name="⏱️ Hora Bip", width=100)
 
                     st.markdown("<p style='font-size: 13px; color: #64748b; margin-bottom: 5px;'>Selecione os pacotes na tabela para formar o lote do motorista.</p>", unsafe_allow_html=True)
                     grid_conf = AgGrid(
