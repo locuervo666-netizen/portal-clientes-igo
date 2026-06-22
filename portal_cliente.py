@@ -1588,7 +1588,7 @@ else:
                 n_vals = {
                     "TODOS":      len(df_f),
                     "ENTREGUE":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Entregue', case=False)]),
-                    "FRUSTRADA":  len(df_f[df_f['STATUS_DISPLAY'].str.contains('Frustrada', case=False)]),
+                    "FRUSTRADA":  len(df_f[df_f['STATUS_DISPLAY'].str.contains('Insucesso|Ocorrência|Cancelado|Recusado', case=False, na=False)]),
                     "COLETADO":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Coletado|Rota', case=False, na=False)]),
                     "PENDENTE":   len(df_f[df_f['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False)]),
                     "Aguardando": len(df_f[df_f['STATUS_DISPLAY'].str.contains('Aguardando', case=False)]),
@@ -1647,7 +1647,7 @@ else:
 
                 df_h = df_f[df_f['DATA_OBJ'] == hoje_br]
                 if not df_h.empty:
-                    n_fim = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Recusada|Coletado|Em Transferência', case=False)])
+                    n_fim = len(df_h[df_h['STATUS_DISPLAY'].str.contains('Entregue|Insucesso|Ocorrência|Cancelado|Recusado|Coletado|Em Transferência', case=False, na=False)])
                     n_tot  = len(df_h)
                     pct    = round((n_fim / n_tot) * 100) if n_tot else 0
                 else:
@@ -1683,7 +1683,7 @@ else:
                                 {barras_html}
                             </div>
                             <div class="progress-number-sidebar">{pct}%</div>
-                            <div class="progress-text-sidebar">{n_fim} de {n_tot} pedidos concluídos</div>
+                            <div class="progress-text-sidebar">{n_fim} de {n_tot} pedidos movimentados</div>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
@@ -1713,8 +1713,12 @@ else:
                         df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Pendente', case=False, na=False)]
                     elif st.session_state.filtro_kpi == "COLETADO":
                         df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Coletado|Rota', case=False, na=False)]
+                    elif st.session_state.filtro_kpi == "FRUSTRADA":
+                        df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Insucesso|Ocorrência|Cancelado|Recusado', case=False, na=False)]
+                    elif st.session_state.filtro_kpi == "ENTREGUE":
+                        df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains('Entregue|Conferido', case=False, na=False)]
                     else:
-                        df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False)]
+                        df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False, na=False)]
 
                 if busca:
                     df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
