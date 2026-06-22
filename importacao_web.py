@@ -7423,7 +7423,7 @@ elif menu == "🔬 Triagem":
     if 'romaneio_sucesso' not in st.session_state: st.session_state.romaneio_sucesso = False
 
     t1, t2, t3, t4 = st.tabs(["📦 1. Validação Manual & Bipar", "🚚 2. Gerar Documento de Romaneio",
-                             "🕒 3. Histórico de Varredura", "📝 4. Triagem Manual (Envelopes)"])
+                             "📦 3. Volumes Despachados", "📝 4. Triagem Manual (Envelopes)"])
 
     # =========================================================================
     # ABA 1: VALIDAÇÃO MANUAL E BIPAR
@@ -7465,14 +7465,14 @@ elif menu == "🔬 Triagem":
                                             col_status = headers.index('STATUS') + 1
                                             cell = aba.find(pedido_alvo, in_column=col_pedido)
                                             if cell:
-                                                updates = [{'range': aba.rowcol_to_a1(cell.row, col_status), 'values': [['CONFERIDO']]}]
+                                                updates = [{'range': gspread.utils.rowcol_to_a1(cell.row, col_status), 'values': [['CONFERIDO']]}]
                                                 # Registrar data e hora do bip se as colunas existirem
                                                 if 'DATA_BIP' in headers:
                                                     col_data_bip = headers.index('DATA_BIP') + 1
-                                                    updates.append({'range': aba.rowcol_to_a1(cell.row, col_data_bip), 'values': [[data_bip_str]]})
+                                                    updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_data_bip), 'values': [[data_bip_str]]})
                                                 if 'HORA_BIP' in headers:
                                                     col_hora_bip = headers.index('HORA_BIP') + 1
-                                                    updates.append({'range': aba.rowcol_to_a1(cell.row, col_hora_bip), 'values': [[hora_bip_str]]})
+                                                    updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_hora_bip), 'values': [[hora_bip_str]]})
                                                 aba.batch_update(updates)
                                                 # 🔥 DELAY AUMENTADO: 1.5s para evitar throttling do Google Sheets em bipagens rápidas
                                                 time.sleep(1.5)
@@ -7613,8 +7613,11 @@ elif menu == "🔬 Triagem":
                         placeholder="Digite o nº do pedido, laboratório ou cidade...",
                         key="busca_romaneio_t2"
                     )
-                    with col_filtro_rom.expander("🏢 Filtrar Hub", expanded=False):
-                        tomador_filtro = st.selectbox("Hub de Destino:", ["Todos"] + sorted(df_conf['TOMADOR'].astype(str).unique().tolist()), key="filtro_tomador_t2", label_visibility="collapsed")
+                    tomador_filtro = col_filtro_rom.selectbox(
+                        "🏢 Filtrar Hub:",
+                        ["Todos"] + sorted(df_conf['TOMADOR'].astype(str).unique().tolist()),
+                        key="filtro_tomador_t2"
+                    )
 
                     if tomador_filtro != "Todos":
                         df_conf = df_conf[df_conf['TOMADOR'] == tomador_filtro]
@@ -7636,9 +7639,17 @@ elif menu == "🔬 Triagem":
                         (df_conf['TOMADOR'].nunique(), "🏢 Hubs com Carga", "#6366f1", "#8b5cf6")
                     ])
 
-                    # Incluir DATA_BIP e HORA_BIP se disponíveis
-                    colunas_validas_conf = [c for c in ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF', 'DATA_BIP', 'HORA_BIP'] if c in df_conf.columns]
+                    # Incluir campos operacionais extras (bairro e motorista) quando disponíveis
+                    colunas_validas_conf = [
+                        c for c in ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'BAIRRO', 'UF', 'DATA_BIP', 'HORA_BIP']
+                        if c in df_conf.columns
+                    ]
                     df_conf_show = df_conf[colunas_validas_conf].fillna("").astype(str).copy()
+
+                    if 'MOTORISTA' in df_conf.columns:
+                        df_conf_show['MOTORISTA'] = df_conf['MOTORISTA'].fillna("").astype(str)
+                    elif 'AGENTE_RAW' in df_conf.columns:
+                        df_conf_show['MOTORISTA'] = df_conf['AGENTE_RAW'].fillna("").astype(str)
                     
                     gb_conf = GridOptionsBuilder.from_dataframe(df_conf_show)
                     gb_conf.configure_selection('multiple', use_checkbox=True, header_checkbox=True, header_checkbox_filtered_only=True)
@@ -7649,7 +7660,9 @@ elif menu == "🔬 Triagem":
                     if "TOMADOR" in df_conf_show.columns: gb_conf.configure_column("TOMADOR", header_name="🏢 Hub Destino", width=160)
                     if "LABORATORIO" in df_conf_show.columns: gb_conf.configure_column("LABORATORIO", header_name="🏭 Laboratório", width=250)
                     if "CIDADE" in df_conf_show.columns: gb_conf.configure_column("CIDADE", header_name="📍 Cidade", width=150)
+                    if "BAIRRO" in df_conf_show.columns: gb_conf.configure_column("BAIRRO", header_name="🏘️ Bairro", width=170)
                     if "UF" in df_conf_show.columns: gb_conf.configure_column("UF", header_name="🗺️ UF", width=90)
+                    if "MOTORISTA" in df_conf_show.columns: gb_conf.configure_column("MOTORISTA", header_name="👤 Motorista", width=150)
                     if "DATA_BIP" in df_conf_show.columns: gb_conf.configure_column("DATA_BIP", header_name="📅 Data Bip", width=110)
                     if "HORA_BIP" in df_conf_show.columns: gb_conf.configure_column("HORA_BIP", header_name="⏱️ Hora Bip", width=100)
 
@@ -7671,11 +7684,39 @@ elif menu == "🔬 Triagem":
                     else:
                         df_sel_conf = pd.DataFrame(columns=df_conf_show.columns)
 
+                    # Ação de reversão logo abaixo da tabela, sem empurrar para o fim da página
+                    if not df_sel_conf.empty:
+                        qtd_sel_rev = len(df_sel_conf)
+                        st.caption(f"{qtd_sel_rev} volume(s) selecionado(s) para ação reversa.")
+                        if st.button(f"↩️ Reverter Selecionados para Triagem ({qtd_sel_rev} vol.) — Desfaz Bipagem", use_container_width=True, type="secondary"):
+                            p_ids_reverter = df_sel_conf['PEDIDO'].astype(str).tolist()
+                            with st.spinner("Revertendo bipagem e devolvendo para Aba 1..."):
+                                try:
+                                    aba = planilha_db.worksheet("Memoria_Sistema")
+                                    dados_nuvem = aba.get_all_values()
+                                    df_nuvem = pd.DataFrame(dados_nuvem[1:], columns=dados_nuvem[0])
+                                    for pid in p_ids_reverter:
+                                        mask = df_nuvem['PEDIDO'] == pid
+                                        df_nuvem.loc[mask, 'STATUS'] = 'COLETADO'
+                                        if 'DATA_BIP' in df_nuvem.columns:
+                                            df_nuvem.loc[mask, 'DATA_BIP'] = ''
+                                        if 'HORA_BIP' in df_nuvem.columns:
+                                            df_nuvem.loc[mask, 'HORA_BIP'] = ''
+                                        if 'ROMANEIO' in df_nuvem.columns:
+                                            df_nuvem.loc[mask, 'ROMANEIO'] = ''
+                                    aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                                    st.session_state.ui_toast = {'msg': f"{len(p_ids_reverter)} volume(s) revertidos para Aba 1 (Triagem)!", 'icon': "↩️"}
+                                    carregar_dados_completos.clear()
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro ao reverter: {e}")
+
                     st.markdown("---")
                     st.markdown("#### 🚚 Controle de Despacho e Embarque")
-                    c_mot, c_data, c_btn = st.columns([2, 1, 2])
+                    c_mot, c_data, c_btn = st.columns([2, 1, 2], vertical_alignment="bottom")
                     motorista_escolhido = c_mot.selectbox("👤 Atribuir Motorista:", ["Selecione..."] + (sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []))
                     data_despacho = c_data.date_input("📅 Data de Embarque:", format="DD/MM/YYYY", value=hoje_br)
+
 
                     qtd_selecionados = len(df_sel_conf)
 
@@ -7721,7 +7762,7 @@ elif menu == "🔬 Triagem":
                     exibir_empty_state("🚛", "Nada para Despachar", "Todos os volumes do galpão já foram despachados ou não há itens conferidos na fila.")
 
     # =========================================================================
-    # ABA 3: HISTÓRICO DE VARREDURA
+    # ABA 3: VOLUMES DESPACHADOS
     # =========================================================================
     with t3:
         if df_raw.empty:
@@ -7810,14 +7851,34 @@ elif menu == "🔬 Triagem":
                     else:
                         st.info("Nenhum romaneio encontrado com os filtros selecionados.")
 
-                # 4. Trilha de Auditoria (AgGrid mantida intacta)
-                st.markdown("#### 📜 Trilha de Auditoria (Últimos Volumes)")
+                # 4. Trilha de Auditoria (com busca por pedido e timestamps de bipagem)
+                st.markdown("#### 📜 Trilha de Auditoria (Volumes Despachados)")
+
+                col_busca_hist, col_info_hist = st.columns([2, 1], vertical_alignment="bottom")
+                busca_hist_pedido = col_busca_hist.text_input(
+                    "🔍 Buscar Pedido na Trilha:",
+                    placeholder="Digite o número do pedido...",
+                    key="busca_hist_pedido_t3"
+                )
+
+                df_hist_audit = df_hist.copy()
+                if busca_hist_pedido.strip():
+                    mask_hist = df_hist_audit['PEDIDO'].astype(str).str.contains(busca_hist_pedido.strip(), case=False, na=False)
+                    df_hist_audit = df_hist_audit[mask_hist]
+                    if df_hist_audit.empty:
+                        st.warning(f"⚠️ Nenhum pedido encontrado com '{busca_hist_pedido}'.")
+                    else:
+                        col_info_hist.info(f"✅ {len(df_hist_audit)} pedido(s) localizado(s).")
                 
-                colunas_validas_hist = [c for c in ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO'] if c in df_hist.columns]
-                df_hist_show = df_hist[colunas_validas_hist].copy()
+                colunas_validas_hist = [c for c in ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'STATUS', 'AGENTE_RAW', 'ROMANEIO', 'DATA_BIP', 'HORA_BIP'] if c in df_hist_audit.columns]
+                df_hist_show = df_hist_audit[colunas_validas_hist].copy()
                 
                 if 'DATA' in df_hist_show.columns and 'PEDIDO' in df_hist_show.columns:
-                    df_hist_show = df_hist_show.sort_values(by=['DATA', 'PEDIDO'], ascending=[False, False])
+                    ordem_sort = ['DATA']
+                    if 'HORA_BIP' in df_hist_show.columns:
+                        ordem_sort.append('HORA_BIP')
+                    ordem_sort.append('PEDIDO')
+                    df_hist_show = df_hist_show.sort_values(by=ordem_sort, ascending=[False] * len(ordem_sort))
                 
                 gb_hist = GridOptionsBuilder.from_dataframe(df_hist_show)
                 gb_hist.configure_default_column(resizable=True, filterable=True, sortable=True)
@@ -7830,6 +7891,8 @@ elif menu == "🔬 Triagem":
                 if "STATUS" in df_hist_show.columns: gb_hist.configure_column("STATUS", header_name="🚦 Status", cellRenderer=status_jscode_tri, width=150)
                 if "AGENTE_RAW" in df_hist_show.columns: gb_hist.configure_column("AGENTE_RAW", header_name="👤 Agente", width=120)
                 if "ROMANEIO" in df_hist_show.columns: gb_hist.configure_column("ROMANEIO", header_name="🔖 Romaneio", width=130)
+                if "DATA_BIP" in df_hist_show.columns: gb_hist.configure_column("DATA_BIP", header_name="📅 Data Bip", width=110)
+                if "HORA_BIP" in df_hist_show.columns: gb_hist.configure_column("HORA_BIP", header_name="⏱️ Hora Bip", width=100)
 
                 AgGrid(
                     df_hist_show, 
