@@ -7438,8 +7438,12 @@ elif menu == "🔬 Triagem":
             with col_bip_esq:
                 with st.form("form_bip", clear_on_submit=True):
                     col_bip, col_btn = st.columns([3, 1])
-                    bip_input = col_bip.text_input("🔍 Bipar QR Code de Validação / Pedido:")
-                    if col_btn.form_submit_button("Auditar", use_container_width=True) and bip_input:
+                    # Flag para bloquear bipagem enquanto está sincronizando
+                    if 'bipagem_em_progresso' not in st.session_state:
+                        st.session_state.bipagem_em_progresso = False
+                    
+                    bip_input = col_bip.text_input("🔍 Bipar QR Code de Validação / Pedido:", disabled=st.session_state.bipagem_em_progresso)
+                    if col_btn.form_submit_button("Auditar", use_container_width=True, disabled=st.session_state.bipagem_em_progresso) and bip_input:
                         termo = re.sub(r'[^A-Z0-9]', '', bip_input.upper())
                         ped_limpo = df_raw['PEDIDO'].astype(str).str.upper().apply(lambda x: re.sub(r'[^A-Z0-9]', '', str(x)))
                         mask = (ped_limpo == termo)
@@ -7451,6 +7455,8 @@ elif menu == "🔬 Triagem":
                             idx = df_raw[mask].index[-1]
                             status_atual_bip = str(df_raw.at[idx, 'STATUS']).strip().upper()
                             if status_atual_bip == 'COLETADO':
+                                # 🔥 BLOQUEIO: Marca bipagem em progresso
+                                st.session_state.bipagem_em_progresso = True
                                 try:
                                     # 🔥 PROTEÇÃO CONTRA TIMEOUT: Mostra spinner e aguarda sincronização com Google Sheets
                                     with st.spinner("⏳ Sincronizando com a nuvem (Google Sheets)... Aguarde até 10s"):
@@ -7465,7 +7471,7 @@ elif menu == "🔬 Triagem":
                                             col_pedido = headers.index('PEDIDO') + 1
                                             col_status = headers.index('STATUS') + 1
                                             
-                                            # 🔥 RETRY LOOP COM TIMEOUT PROGRESSIVO
+                                            # 🔥 RETRY LOOP: Tenta 3 vezes com pequeno delay entre tentativas
                                             tentativas = 0
                                             max_tentativas = 3
                                             sucesso_update = False
@@ -7484,7 +7490,7 @@ elif menu == "🔬 Triagem":
                                                             col_hora_bip = headers.index('HORA_BIP') + 1
                                                             updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_hora_bip), 'values': [[hora_bip_str]]})
                                                         
-                                                        # Update com timeout interno
+                                                        # Update - aguarda resposta do Google Sheets
                                                         aba.batch_update(updates)
                                                         sucesso_update = True
                                                     else:
@@ -7493,26 +7499,30 @@ elif menu == "🔬 Triagem":
                                                     ultima_excecao = e
                                                     tentativas += 1
                                                     if tentativas < max_tentativas:
-                                                        # Espera progressiva: 2s, 4s, 6s
-                                                        espera = tentativas * 2
-                                                        time.sleep(espera)
+                                                        # Aguarda 1s antes de tentar novamente
+                                                        time.sleep(1)
                                                         continue
                                                     else:
                                                         raise ultima_excecao
                                             
                                             if sucesso_update:
-                                                # 🔥 DELAY AUMENTADO: 2.5s para evitar throttling do Google Sheets em bipagens rápidas
-                                                time.sleep(2.5)
+                                                pass  # Sem delay adicional - fluido!
                                                 st.session_state.log_triagem.insert(0, {'PEDIDO': str(df_raw.at[idx, 'PEDIDO']), 'TOMADOR': str(df_raw.at[idx, 'TOMADOR']), 'LABORATORIO': str(df_raw.at[idx, 'LABORATORIO']), 'CIDADE': str(df_raw.at[idx, 'CIDADE']), 'DATA_BIP': data_bip_str, 'HORA': hora_bip_str})
                                                 st.session_state.ui_toast = {'msg': f"Pedido {pedido_alvo} VALIDADO! ✅ ({hora_bip_str})", 'icon': "✅"}
                                                 carregar_dados_completos.clear()
+                                                # 🔥 LIBERA: Próxima bipagem pode começar
+                                                st.session_state.bipagem_em_progresso = False
                                                 st.rerun()
                                             else:
                                                 st.error("❌ Pedido não encontrado na nuvem. Verifique a digitação.")
+                                                st.session_state.bipagem_em_progresso = False
                                         else:
                                             st.error("❌ Colunas PEDIDO ou STATUS não encontradas na planilha.")
+                                            st.session_state.bipagem_em_progresso = False
                                 except Exception as e:
                                     st.error(f"⚠️ Erro de sincronização com a nuvem: {str(e)[:80]}. Aguarde alguns segundos e tente novamente.")
+                                    # 🔥 LIBERA: Permite tentar novamente
+                                    st.session_state.bipagem_em_progresso = False
                             elif status_atual_bip == 'CONFERIDO':
                                 pedido_ja_triado = str(df_raw.at[idx, 'PEDIDO'])
                                 lab_ja_triado = str(df_raw.at[idx, 'LABORATORIO'])
@@ -7520,10 +7530,13 @@ elif menu == "🔬 Triagem":
                                 data_bip_anterior = str(df_raw.at[idx, 'DATA_BIP']) if 'DATA_BIP' in df_raw.columns and str(df_raw.at[idx, 'DATA_BIP']).strip() not in ['', 'nan', 'None'] else ''
                                 info_bip = f" em {data_bip_anterior} às {hora_bip_anterior}" if data_bip_anterior and hora_bip_anterior else ""
                                 st.warning(f"⚠️ **ATENÇÃO: Pedido já triado!**\n\n**{pedido_ja_triado}** — {lab_ja_triado}\n\nEste volume já foi bipado e está aguardando na **Aba 2 (Romaneio)**{info_bip}. Não é necessário bipar novamente.")
+                                st.session_state.bipagem_em_progresso = False
                             else:
                                 st.error("❌ Volume não está com status COLETADO. Verifique se foi coletado no app.")
+                                st.session_state.bipagem_em_progresso = False
                         else:
                             st.error("❌ Assinatura ou Pedido não reconhecido. Verifique o QR Code.")
+                            st.session_state.bipagem_em_progresso = False
             
             with col_bip_dir:
                 st.markdown("<div style='border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px; background-color: #F8FAFC; height: 130px; overflow-y: auto;'>", unsafe_allow_html=True)
