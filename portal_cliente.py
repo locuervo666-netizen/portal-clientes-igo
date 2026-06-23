@@ -2331,7 +2331,7 @@ else:
                         gridOptions=gridOptions,
                         theme="alpine",
                         columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
-                        height=650,
+                        height=625,
                         allow_unsafe_jscode=True,
                         custom_css=custom_css,
                         update_mode="SELECTION_CHANGED",
