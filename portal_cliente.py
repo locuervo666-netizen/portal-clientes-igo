@@ -78,9 +78,22 @@ CSS_DASHBOARD = """
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
         border-right: 1px solid #dbe3ef !important;
         padding: 12px 8px !important;
+        overflow-y: hidden !important;
+        overflow-x: hidden !important;
+        max-height: 100vh !important;
     }
     [data-testid="stSidebar"] > div:first-child > div {
         gap: 0px !important;
+        overflow: hidden !important;
+    }
+    
+    /* Remover scrollbars da sidebar */
+    [data-testid="stSidebar"] ::-webkit-scrollbar {
+        display: none !important;
+    }
+    [data-testid="stSidebar"] * {
+        -ms-overflow-style: none !important;
+        scrollbar-width: none !important;
     }
     [data-testid="stSidebar"] p,
     [data-testid="stSidebar"] label,
@@ -2267,6 +2280,13 @@ else:
                             "border-radius": "12px",
                             "overflow": "hidden",
                             "box-shadow": "0 8px 22px rgba(15, 23, 42, 0.08)"
+                        },
+                        ".ag-body-viewport": {
+                            "overflow-y": "auto !important",
+                            "overflow-x": "hidden !important"
+                        },
+                        ".ag-body-horizontal-scroll": {
+                            "overflow-x": "auto !important"
                         }
                     }
 
@@ -2285,7 +2305,7 @@ else:
                         gridOptions=gridOptions,
                         theme="alpine",
                         columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
-                        height=550,
+                        height=800,
                         allow_unsafe_jscode=True,
                         custom_css=custom_css,
                         update_mode="SELECTION_CHANGED",
