@@ -475,6 +475,54 @@ CSS_DASHBOARD = """
             padding: 14px;
         }
     }
+
+    /* ── TRAVA DE SCROLL DA TELA E GRID DINÂMICA ── */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stAppViewMain"] {
+        overflow: hidden !important; 
+        max-height: 100vh !important;
+        height: 100vh !important;
+    }
+
+    .block-container {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding-top: 0.5rem !important; 
+        padding-bottom: 0.5rem !important;
+        overflow: hidden !important;
+    }
+
+    [data-testid="stTabs"] {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+        overflow: hidden;
+    }
+
+    [data-testid="stTabView"] {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden !important;
+        padding-bottom: 0 !important;
+    }
+
+    .ag-theme-alpine {
+        height: 100% !important;
+        min-height: 400px; 
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* ── JOGA O BOTÃO DE SAIR PARA O RODAPÉ DA SIDEBAR ── */
+    div.st-key-btn_logout_sidebar {
+        position: absolute !important;
+        bottom: 20px !important;
+        left: 15px !important;
+        right: 15px !important;
+        width: auto !important;
+    }
     </style>
 """
 
@@ -1789,19 +1837,7 @@ else:
 
         holder_exportar = st.empty()
 
-    # ── HEADER ─────────────────────────────────────────
-    agora_str = datetime.now(FUSO_BR).strftime('%H:%M')
-    st.markdown(f"""
-        <div class="header-container">
-            <div>
-                <div class="header-title">Painel de Rastreio</div>
-                <div class="header-subtitle">{st.session_state.cliente} · {hoje_br.strftime('%d/%m/%Y')}</div>
-            </div>
-            <div class="sync-status">
-                <span class="sync-dot"></span> Online · {agora_str}
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    
 
     # ── DADOS ───────────────────────────────────────────
     filtro_atual = conf["filtro"]
@@ -1981,38 +2017,28 @@ else:
                     n_tot = 0
                     pct = 0
 
-                # Calcular número de barrinhas ativas (1-5)
-                if pct == 0:
-                    barras_ativas = 0
-                elif pct <= 20:
-                    barras_ativas = 1
-                elif pct <= 40:
-                    barras_ativas = 2
-                elif pct <= 60:
-                    barras_ativas = 3
-                elif pct <= 80:
-                    barras_ativas = 4
+                # Determinar a cor dinâmica baseada no percentual (Bateria)
+                if pct <= 30:
+                    cor_bateria = "#ef4444"  # Vermelho (Baixo)
+                elif pct <= 70:
+                    cor_bateria = "#f59e0b"  # Amarelo/Laranja (Médio)
                 else:
-                    barras_ativas = 5
+                    cor_bateria = "#22c55e"  # Verde (Bom/Excelente)
 
-                # Gerar HTML das barrinhas
-                barras_html = ""
-                for i in range(1, 6):
-                    classe = f"active-{i}" if i <= barras_ativas else ""
-                    barras_html += f'<div class="progress-bar-wifi {classe}"></div>'
+                # O texto HTML não pode ter espaços no início, senão o Streamlit transforma em bloco de código!
+                bateria_html = f"""<div class="progress-block-sidebar">
+<div class="progress-block-sidebar-content">
+<div class="progress-title-sidebar">&#128267; Progresso de Hoje</div>
+<div style="position: relative; height: 110px; width: 48px; margin-top: 8px; display: flex; flex-direction: column; justify-content: flex-end;">
+<div style="position: absolute; top: -6px; left: 50%; transform: translateX(-50%); width: 18px; height: 6px; background: #cbd5e1; border-radius: 4px 4px 0 0;"></div>
+<div style="height: 100%; width: 100%; border: 3px solid #cbd5e1; border-radius: 8px; padding: 3px; background: #f8fafc; display: flex; flex-direction: column; justify-content: flex-end; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
+<div style="width: 100%; height: {pct}%; background: {cor_bateria}; border-radius: 3px; transition: all 1s ease;"></div>
+</div></div>
+<div class="progress-number-sidebar">{pct}%</div>
+<div class="progress-text-sidebar">{n_fim} de {n_tot} pedidos movimentados</div>
+</div></div>"""
 
-                st.sidebar.markdown(f"""
-                    <div class="progress-block-sidebar">
-                        <div class="progress-block-sidebar-content">
-                            <div class="progress-title-sidebar">📶 Progresso de Hoje</div>
-                            <div class="progress-bars-container">
-                                {barras_html}
-                            </div>
-                            <div class="progress-number-sidebar">{pct}%</div>
-                            <div class="progress-text-sidebar">{n_fim} de {n_tot} pedidos movimentados</div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.sidebar.markdown(bateria_html, unsafe_allow_html=True)
 
                 st.sidebar.markdown("<br>", unsafe_allow_html=True)
                 if st.sidebar.button("🚪 Sair com Segurança", use_container_width=True, type="secondary", key="btn_logout_sidebar"):
@@ -2196,7 +2222,7 @@ else:
                     """)
 
                     gb = GridOptionsBuilder.from_dataframe(df_final[colunas_visiveis])
-                    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=15)
+                    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=50)
                     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
 
                     gb.configure_selection(
@@ -2305,7 +2331,7 @@ else:
                         gridOptions=gridOptions,
                         theme="alpine",
                         columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
-                        height=800,
+                        height=650,
                         allow_unsafe_jscode=True,
                         custom_css=custom_css,
                         update_mode="SELECTION_CHANGED",
