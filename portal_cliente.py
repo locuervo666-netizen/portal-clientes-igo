@@ -531,6 +531,10 @@ def conectar_banco_seguro():
         st.warning(f"Erro ao conectar ao banco: {e}")
         return None
 
+# =======================================================
+# ✅ FOTO_COLETA e FOTO_ENTREGA são copiadas automaticamente pelo Apps Script
+# Aqui apenas lemos os valores de App_Tarefas
+
 @st.cache_data(ttl=30)
 def carregar_dados_nuvem(cliente_filtro):
     try:
@@ -643,6 +647,8 @@ def carregar_dados_nuvem(cliente_filtro):
                     if 'DATA_ENTREGA' in df_app.columns: cols_to_extract.append('DATA_ENTREGA')
                     if 'RECEBEDOR'    in df_app.columns: cols_to_extract.append('RECEBEDOR')
                     if 'HORA_STATUS'  in df_app.columns: cols_to_extract.append('HORA_STATUS')
+                    if 'HORA_COLETA'  in df_app.columns: cols_to_extract.append('HORA_COLETA')
+                    if 'HORA_ENTREGA' in df_app.columns: cols_to_extract.append('HORA_ENTREGA')
                     
                     # Identificar coluna de motorista (flexível)
                     col_mot = None
@@ -672,7 +678,9 @@ def carregar_dados_nuvem(cliente_filtro):
                         'DATA': 'A_DT',
                         'DATA_ENTREGA': 'A_DT_ENTREGA',
                         'RECEBEDOR': 'A_REC',
-                        'HORA_STATUS': 'A_HORA_STATUS'
+                        'HORA_STATUS': 'A_HORA_STATUS',
+                        'HORA_COLETA': 'A_HORA_COLETA',
+                        'HORA_ENTREGA': 'A_HORA_ENTREGA'
                     }
                     if col_nome: rename_dict[col_nome] = 'A_CONTATO'
                     if col_mot: rename_dict[col_mot] = 'A_MOTORISTA'
@@ -733,6 +741,30 @@ def carregar_dados_nuvem(cliente_filtro):
                         return h
                     df['HORA_LIMPA'] = df['HORA_APP_FINAL'].apply(extrair_hora)
 
+                    # 🕐 EXTRAÇÃO DE HORAS DE COLETA E ENTREGA
+                    def get_app_hora(row, col_hora_app, col_dt_app):
+                        """Extrai hora do campo direto ou da coluna de data completa"""
+                        h = get_app_val(row, col_hora_app)
+                        if h and h.upper() != 'NAN':
+                            return extrair_hora(h)
+                        
+                        # Se não tiver hora, tenta extrair da coluna de data
+                        dt_str = get_app_val(row, col_dt_app)
+                        if dt_str and dt_str.upper() != 'NAN' and " " in dt_str:
+                            partes = dt_str.split(" ")
+                            if len(partes) >= 2:
+                                return extrair_hora(partes[1])
+                        return ""
+
+                    df['HORA_COLETA_REAL'] = df.apply(lambda r: get_app_hora(r, 'A_HORA_COLETA', 'A_DT'), axis=1)
+                    df['HORA_ENTREGA_REAL'] = df.apply(lambda r: get_app_hora(r, 'A_HORA_ENTREGA', 'A_DT_ENTREGA'), axis=1)
+                    
+                    # Se não encontrou hora de entrega, usa HORA_LIMPA (que é extraída do A_HORA_STATUS)
+                    df['HORA_ENTREGA_REAL'] = df.apply(
+                        lambda r: r['HORA_LIMPA'] if (not r['HORA_ENTREGA_REAL'] or r['HORA_ENTREGA_REAL'] == '') else r['HORA_ENTREGA_REAL'],
+                        axis=1
+                    )
+
                     def defining_foto_prioritaria(r):
                         f_col = get_app_val(r, 'A_FOTO_COL')
                         f_ent = get_app_val(r, 'A_FOTO_ENT')
@@ -744,6 +776,20 @@ def carregar_dados_nuvem(cliente_filtro):
                         return ""
 
                     df['FOTO_FINAL'] = df.apply(defining_foto_prioritaria, axis=1)
+
+                    # 📷 FOTOS SEPARADAS DE COLETA E ENTREGA
+                    def extrair_foto_coleta(r):
+                        f_col = get_app_val(r, 'A_FOTO_COL')
+                        if f_col and f_col.upper() != 'NAN': return f_col
+                        return ""
+                    
+                    def extrair_foto_entrega(r):
+                        f_ent = get_app_val(r, 'A_FOTO_ENT')
+                        if f_ent and f_ent.upper() != 'NAN': return f_ent
+                        return ""
+
+                    df['FOTO_COLETA'] = df.apply(extrair_foto_coleta, axis=1)
+                    df['FOTO_ENTREGA'] = df.apply(extrair_foto_entrega, axis=1)
 
                     def get_true_status_portal(row):
                         s_db  = str(row.get('STATUS', '')).strip().upper()
@@ -1071,9 +1117,17 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
     if len(data_efetiva.split('/')) == 3 and len(data_efetiva.split('/')[2]) == 2:
         partes = data_efetiva.split('/')
         data_efetiva = f"{partes[0]}/{partes[1]}/20{partes[2]}"
-        
-    hora_limpa = str(pedido_data.get('HORA_LIMPA', '')).strip()
-    hora_str = f" às {hora_limpa}" if hora_limpa else ""
+    
+    # 🕐 HORAS DE COLETA E ENTREGA
+    hora_coleta = str(pedido_data.get('HORA_COLETA_REAL', '')).strip()
+    hora_entrega = str(pedido_data.get('HORA_ENTREGA_REAL', '')).strip()
+    
+    # Fallback para HORA_LIMPA se não tiver hora_entrega
+    if not hora_entrega or hora_entrega.upper() == 'NAN':
+        hora_entrega = str(pedido_data.get('HORA_LIMPA', '')).strip()
+    
+    hora_coleta_str = f" às {hora_coleta}" if hora_coleta and hora_coleta.upper() != 'NAN' else ""
+    hora_entrega_str = f" às {hora_entrega}" if hora_entrega and hora_entrega.upper() != 'NAN' else ""
     
     data_limite = str(pedido_data.get('DATA_LIMITE', '---')).strip()
     if not data_limite or data_limite.upper() == 'NAN': data_limite = "Não definida"
@@ -1098,11 +1152,11 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
             pass
 
     if any(x in status for x in ["ENTREGUE", "CONFERIDO"]):
-        timeline_html = f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}</b><br>✅ Entrega: <b>{data_efetiva}{hora_str}</b> {selo_prazo}</p>"
+        timeline_html = f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_coleta_str}</b><br>✅ Entrega: <b>{data_efetiva}{hora_entrega_str}</b> {selo_prazo}</p>"
     elif any(x in status for x in ["COLETADO", "ROTA"]):
-        timeline_html = f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_str}</b><br>⏳ Entrega: <i>Em trânsito para o destino...</i></p>"
+        timeline_html = f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_coleta_str}</b><br>⏳ Entrega: <i>Em trânsito para o destino...</i></p>"
     elif any(x in status for x in ["FRUSTRADA", "PROBLEMA"]):
-        timeline_html = f"<p style='margin:2px 0 12px 0;font-size:13px;color:#ef4444;'>❌ Tentativa: <b>{data_efetiva}{hora_str}</b></p>"
+        timeline_html = f"<p style='margin:2px 0 12px 0;font-size:13px;color:#ef4444;'>❌ Tentativa: <b>{data_efetiva}{hora_entrega_str}</b></p>"
     else:
         timeline_html = f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>⏳ Previsão de Coleta: <b>{pedido_data.get('ETA_LAB', 'Em mapeamento')}</b></p>"
 
@@ -1223,37 +1277,100 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
         else:
             st.info(f"**💬 Atualizações da Base:**\n\n{pedido_data.get('DETALHES', 'Nenhuma observação pendente.')}")
 
-    # 📷 COLUNA DIREITA - COMPROVANTE
+    # 📷 COLUNA DIREITA - COMPROVANTES (COLETA + ENTREGA)
     with col_direita:
-        foto = pedido_data.get('COMPROVANTE', '')
+        foto_coleta = pedido_data.get('FOTO_COLETA', '')
+        foto_entrega = pedido_data.get('FOTO_ENTREGA', '')
+        foto_gen = pedido_data.get('COMPROVANTE', '')
         
-        if foto and str(foto).startswith("http"):
-            st.markdown(f"<div style='background:#f8fafc; padding:16px; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 2px rgba(0,0,0,0.02);'><p style='font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0 0 12px 0;'>📸 Canhoto da Entrega</p></div>", unsafe_allow_html=True)
-            st.image(foto, use_container_width=True)
+        # Prioridade: FOTO_COLETA, FOTO_ENTREGA, COMPROVANTE genérico
+        if not foto_coleta or str(foto_coleta).strip().upper() in ['NAN', 'NONE', '']:
+            foto_coleta = ""
+        if not foto_entrega or str(foto_entrega).strip().upper() in ['NAN', 'NONE', '']:
+            foto_entrega = ""
+        if not foto_gen or str(foto_gen).strip().upper() in ['NAN', 'NONE', '']:
+            foto_gen = ""
+
+        # Se tiver foto de coleta e entrega, exibir as duas
+        if (foto_coleta and str(foto_coleta).startswith("http")) or (foto_entrega and str(foto_entrega).startswith("http")):
+            if foto_coleta and str(foto_coleta).startswith("http"):
+                st.markdown(f"<div style='background:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 2px rgba(0,0,0,0.02);'><p style='font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0 0 8px 0;'>📸 Comprovante de Coleta</p></div>", unsafe_allow_html=True)
+                st.image(foto_coleta, use_container_width=True)
+                
+                try:
+                    nome_arquivo_col = foto_coleta.split('/')[-1] if '/' in foto_coleta else f"coleta_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                    if '.' not in nome_arquivo_col:
+                        nome_arquivo_col = f"{nome_arquivo_col}.jpg"
+                except:
+                    nome_arquivo_col = f"coleta_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                
+                try:
+                    response_col = requests.get(foto_coleta, timeout=5)
+                    if response_col.status_code == 200:
+                        st.download_button(
+                            label="⬇️ Baixar Comprovante de Coleta",
+                            data=response_col.content,
+                            file_name=nome_arquivo_col,
+                            mime="image/jpeg",
+                            use_container_width=True,
+                            key="download_coleta"
+                        )
+                except:
+                    st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_coleta}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
             
-            # 🔽 BOTÃO DE DOWNLOAD
-            # Extrair nome do arquivo da URL ou usar um padrão
+            if foto_entrega and str(foto_entrega).startswith("http"):
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 2px rgba(0,0,0,0.02);'><p style='font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0 0 8px 0;'>📸 Comprovante de Entrega</p></div>", unsafe_allow_html=True)
+                st.image(foto_entrega, use_container_width=True)
+                
+                try:
+                    nome_arquivo_ent = foto_entrega.split('/')[-1] if '/' in foto_entrega else f"entrega_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                    if '.' not in nome_arquivo_ent:
+                        nome_arquivo_ent = f"{nome_arquivo_ent}.jpg"
+                except:
+                    nome_arquivo_ent = f"entrega_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                
+                try:
+                    response_ent = requests.get(foto_entrega, timeout=5)
+                    if response_ent.status_code == 200:
+                        st.download_button(
+                            label="⬇️ Baixar Comprovante de Entrega",
+                            data=response_ent.content,
+                            file_name=nome_arquivo_ent,
+                            mime="image/jpeg",
+                            use_container_width=True,
+                            key="download_entrega"
+                        )
+                except:
+                    st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_entrega}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+        
+        # Se tiver foto genérica, usar ela como fallback
+        elif foto_gen and str(foto_gen).startswith("http"):
+            st.markdown(f"<div style='background:#f8fafc; padding:16px; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 2px rgba(0,0,0,0.02);'><p style='font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0 0 12px 0;'>📸 Canhoto da Operação</p></div>", unsafe_allow_html=True)
+            st.image(foto_gen, use_container_width=True)
+            
             try:
-                nome_arquivo = foto.split('/')[-1] if '/' in foto else f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                # Se não tiver extensão, adiciona
+                nome_arquivo = foto_gen.split('/')[-1] if '/' in foto_gen else f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
                 if '.' not in nome_arquivo:
                     nome_arquivo = f"{nome_arquivo}.jpg"
             except:
                 nome_arquivo = f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
             
             try:
-                response = requests.get(foto, timeout=5)
+                response = requests.get(foto_gen, timeout=5)
                 if response.status_code == 200:
                     st.download_button(
                         label="⬇️ Baixar Canhoto",
                         data=response.content,
                         file_name=nome_arquivo,
                         mime="image/jpeg",
-                        use_container_width=True
+                        use_container_width=True,
+                        key="download_canhoto"
                     )
             except:
-                st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
-                
+                st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_gen}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+        
+        # Se não tiver nenhuma foto
         elif any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
             st.warning("📷 Nenhuma foto da ocorrência foi anexada na justificativa.")
         else:
