@@ -1049,345 +1049,541 @@ KPI_BG_COLOR = { "TODOS": "#dbeafe", "ENTREGUE": "#dcfce7", "FRUSTRADA": "#fee2e
 KPI_META = [("TODOS", "📦 Total", "kpi_total"), ("ENTREGUE", "✅ Entregues", "kpi_entregue"), ("FRUSTRADA", "❌ Insucessos", "kpi_frus"), ("COLETADO", "🚐 Coletados", "kpi_coletado"), ("PENDENTE", "⏳ Pendentes", "kpi_pend"), ("Aguardando", "🎧 Chamados", "kpi_aguardando"), ("HOJE", "📅 Hoje", "kpi_hoje")]
 
 # =======================================================
-# 🪟 FUNÇÃO DO POP-UP MEGAZORD
+# 🎨 ESTILOS E CONSTANTES DO MODAL (REFATORADO)
+# =======================================================
+MODAL_COLORS = {
+    "entregue": "#10B981",
+    "pendente": "#F59E0B",
+    "erro": "#EF4444",
+    "coletado": "#3B82F6",
+    "barra_ok": "#10b981",
+    "barra_erro": "#ef4444",
+    "barra_default": "#3b82f6",
+    "brand": "#2563eb",
+    "text": "#0f172a",
+    "muted": "#64748b",
+    "border": "#e2e8f0"
+}
+
+MODAL_STYLES = {
+    "header": "font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;",
+    "titulo": "font-size:14px; font-weight:700; margin:2px 0 12px 0;",
+    "subtitulo": "font-size:13px; color:#1e293b; margin:2px 0 12px 0; font-weight:500;",
+    "card_container": "background:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 2px rgba(0,0,0,0.02);",
+    "badge_label": "font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0 0 8px 0;",
+}
+
+# =======================================================
+# 🔧 FUNÇÕES HELPER PARA O MODAL
+# =======================================================
+def get_status_color(status_str):
+    """Retorna a cor correta baseada no status"""
+    s = str(status_str).upper()
+    if "ENTREGUE" in s:
+        return MODAL_COLORS["entregue"]
+    if any(x in s for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "ATRASADO", "RECUSA"]):
+        return MODAL_COLORS["erro"]
+    if "COLETADO" in s or "ROTA" in s:
+        return MODAL_COLORS["coletado"]
+    return MODAL_COLORS["pendente"]
+
+def get_progress_step(status_str):
+    """Retorna o passo da barra de progresso (1-4)"""
+    s = str(status_str).upper()
+    
+    if any(x in s for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "RECUSA"]):
+        if "ROTA DE COLETA" in s or "COLETADO" in s:
+            return 2
+        return 1
+    
+    if "ROTA DE COLETA" in s:
+        return 2
+    elif any(x in s for x in ["COLETADO", "ROTA DE ENTREGA", "EM ROTA", "CONFERIDO"]):
+        return 3
+    elif "ENTREGUE" in s:
+        return 4
+    return 1
+
+def limpar_valor(valor, padrao=""):
+    """Limpa e valida um valor do banco"""
+    v = str(valor).strip() if valor else ""
+    return padrao if v.upper() in ['NAN', 'NONE', ''] else v
+
+def formatar_endereco(pedido_data):
+    """Formata endereço completo"""
+    end_rua = limpar_valor(pedido_data.get('ENDERECO', ''))
+    end_num = limpar_valor(pedido_data.get('NUMERO', ''))
+    end_bairro = limpar_valor(pedido_data.get('BAIRRO', ''))
+    end_cid_uf = limpar_valor(pedido_data.get('CIDADE_UF', 'N/A'), 'N/A')
+    
+    partes = []
+    if end_rua: partes.append(end_rua)
+    if end_num: partes.append(f"nº {end_num}")
+    if end_bairro: partes.append(end_bairro)
+    
+    return ", ".join(partes) + f" — {end_cid_uf}" if partes else end_cid_uf
+
+def formatar_motorista(pedido_data, status_str):
+    """Formata dados de motorista (coleta vs entrega)"""
+    s = str(status_str).upper()
+    mot_coleta = limpar_valor(pedido_data.get('MOTORISTA_COLETA', ''), 'Equipe IGO')
+    mot_entrega = limpar_valor(pedido_data.get('MOTORISTA_ENTREGA', ''), mot_coleta)
+    
+    if any(x in s for x in ["ENTREGUE", "CONFERIDO"]) and mot_coleta != mot_entrega:
+        return {
+            "duplo": True,
+            "coleta": mot_coleta,
+            "entrega": mot_entrega
+        }
+    return {
+        "duplo": False,
+        "coleta": mot_coleta,
+        "entrega": mot_coleta
+    }
+
+# =======================================================
+# 📱 FUNÇÕES DE RENDERIZAÇÃO DO MODAL
+# =======================================================
+def render_header_status(pedido_data, status):
+    """Renderiza cabeçalho com pedido e barra de status"""
+    cor = get_status_color(status)
+    step = get_progress_step(status)
+    cor_barra = MODAL_COLORS["barra_ok"] if step == 4 else (MODAL_COLORS["barra_erro"] if step == 1 and "FRUSTRADA" in status else MODAL_COLORS["barra_default"])
+    
+    # Cabeçalho
+    c_h1, c_h2 = st.columns([3, 1])
+    c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
+    c_h2.markdown(f"<div style='text-align:center; background:{cor}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>{status}</div>", unsafe_allow_html=True)
+    
+    # Barra de Progresso
+    html_barra = f"""
+    <div style='display:flex;justify-content:space-between;position:relative;margin:15px 0 35px 0;'>
+        <div style='position:absolute;top:12px;left:0;right:0;height:4px;background:#e2e8f0;z-index:1;'></div>
+        <div style='position:absolute;top:12px;left:0;width:{(step-1)*33.3}%;height:4px;background:{cor_barra};z-index:2;transition:width 0.5s;'></div>
+        <div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 1 else "#e2e8f0"};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>✓</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{"#0f172a" if step >= 1 else "#64748b"};'>Pedido</div></div>
+        <div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 2 else "#e2e8f0"};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>{"!" if step==2 and "FRUSTRADA" in status else "🚐"}</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{"#0f172a" if step >= 2 else "#64748b"};'>Em Rota</div></div>
+        <div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 3 else "#e2e8f0"};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>📦</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{"#0f172a" if step >= 3 else "#64748b"};'>Coletado</div></div>
+        <div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 4 else "#e2e8f0"};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>✅</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{"#0f172a" if step >= 4 else "#64748b"};'>Entregue</div></div>
+    </div>
+    """
+    st.markdown(html_barra, unsafe_allow_html=True)
+
+def render_info_dados_pedido(pedido_data, status):
+    """Renderiza seção de dados do pedido (cliente, endereço, datas)"""
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🏢 Cliente (Embarcador)</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-size:14px; font-weight:700; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin:2px 0 12px 0;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>", unsafe_allow_html=True)
+    
+    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📍 Endereço de Entrega</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='" + MODAL_STYLES['subtitulo'] + "'>{formatar_endereco(pedido_data)}</p>", unsafe_allow_html=True)
+    
+    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📅 Datas da Corrida</p>", unsafe_allow_html=True)
+    timeline = render_timeline(pedido_data, status)
+    st.markdown(timeline, unsafe_allow_html=True)
+    
+    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🎯 SLA Acordado</p>", unsafe_allow_html=True)
+    data_limite = limpar_valor(pedido_data.get('DATA_LIMITE', '---'), "Não definida")
+    st.markdown(f"<p style='font-size:13px; color:#1e293b; margin:2px 0 12px 0;'>📌 Previsão: <b style='color:#2563eb;'>{data_limite}</b></p>", unsafe_allow_html=True)
+
+def render_motorista(pedido_data, status):
+    """Renderiza seção de motorista"""
+    mot_info = formatar_motorista(pedido_data, status)
+    
+    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>👤 Motorista (Entregador)</p>", unsafe_allow_html=True)
+    
+    if mot_info["duplo"]:
+        motorista_html = f"<p style='margin:2px 0 12px 0;font-size:13px;font-weight:600;color:#334155;'>📦 Coleta: <span style='color:#3b82f6;'>{mot_info['coleta']}</span><br>✅ Entrega: <span style='color:#3b82f6;'>{mot_info['entrega']}</span></p>"
+    else:
+        motorista_html = f"<p style='margin:2px 0 12px 0;font-size:14px;font-weight:700;color:#3b82f6;'>🚐 {mot_info['coleta']}</p>"
+    
+    st.markdown(motorista_html, unsafe_allow_html=True)
+    
+    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📈 Nível de Serviço (Local)</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-size:13px; color:#1e293b; margin:2px 0 0 0; font-weight:500;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')} <br> {pedido_data.get('OTD_LAB', '')}</p>", unsafe_allow_html=True)
+
+def render_timeline(pedido_data, status):
+    """Renderiza timeline de datas e horas"""
+    data_efetiva = limpar_valor(pedido_data.get('DATA_EFETIVA', '---')).replace(" 00:00:00", "")
+    hora_coleta = limpar_valor(pedido_data.get('HORA_COLETA_REAL', ''))
+    hora_entrega = limpar_valor(pedido_data.get('HORA_ENTREGA_REAL', '')) or limpar_valor(pedido_data.get('HORA_LIMPA', ''))
+    data_limite = limpar_valor(pedido_data.get('DATA_LIMITE', '---'), "Não definida")
+    
+    hora_coleta_str = f" às {hora_coleta}" if hora_coleta else ""
+    hora_entrega_str = f" às {hora_entrega}" if hora_entrega else ""
+    
+    # Calcular selo prazo
+    selo_prazo = ""
+    if any(x in status for x in ["ENTREGUE", "CONFERIDO"]) and data_limite != "Não definida" and data_efetiva and data_efetiva != "---":
+        try:
+            partes_ef = data_efetiva.split('/')
+            partes_lim = data_limite.split('/')
+            if len(partes_ef) == 3 and len(partes_lim) == 3:
+                ano_ef = int(partes_ef[2]) if int(partes_ef[2]) >= 100 else int(partes_ef[2]) + 2000
+                ano_lim = int(partes_lim[2]) if int(partes_lim[2]) >= 100 else int(partes_lim[2]) + 2000
+                dt_ef = datetime(ano_ef, int(partes_ef[1]), int(partes_ef[0])).date()
+                dt_lim = datetime(ano_lim, int(partes_lim[1]), int(partes_lim[0])).date()
+                
+                if dt_ef <= dt_lim:
+                    selo_prazo = "<span style='background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:5px;'>No Prazo</span>"
+                else:
+                    dias = (dt_ef - dt_lim).days
+                    selo_prazo = f"<span style='background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:5px;'>Atrasado {dias} dia(s)</span>"
+        except:
+            pass
+    
+    # Renderizar timeline conforme status
+    s = str(status).upper()
+    if any(x in s for x in ["ENTREGUE", "CONFERIDO"]):
+        return f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_coleta_str}</b><br>✅ Entrega: <b>{data_efetiva}{hora_entrega_str}</b> {selo_prazo}</p>"
+    elif any(x in s for x in ["COLETADO", "ROTA"]):
+        return f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_coleta_str}</b><br>⏳ Entrega: <i>Em trânsito para o destino...</i></p>"
+    elif any(x in s for x in ["FRUSTRADA", "PROBLEMA"]):
+        return f"<p style='margin:2px 0 12px 0;font-size:13px;color:#ef4444;'>❌ Tentativa: <b>{data_efetiva}{hora_entrega_str}</b></p>"
+    else:
+        return f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>⏳ Previsão de Coleta: <b>{pedido_data.get('ETA_LAB', 'Em mapeamento')}</b></p>"
+
+def render_historico_ponto(pedido_data, df_historico):
+    """Renderiza histórico do ponto de coleta"""
+    if df_historico is None or df_historico.empty:
+        return
+    
+    lab_atual = pedido_data.get('LABORATORIO', '')
+    df_lab = df_historico[df_historico['LABORATORIO'] == lab_atual].copy()
+    df_lab = df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Coletado|Recusada|Conferido', case=False, na=False)]
+    df_lab = df_lab.sort_values('DATA', ascending=False).head(5)
+    
+    if df_lab.empty:
+        return
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0;'>📋 Histórico do Ponto (Últimas 5)</p>", unsafe_allow_html=True)
+    
+    st.markdown("""
+        <style>
+        .historico-badge {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 8px;
+            white-space: nowrap;
+        }
+        .historico-badge-sucesso { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .historico-badge-frustrada { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .historico-badge-em-rota { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+        .historico-legenda { background: #f8fafc; padding: 8px; border-radius: 6px; font-size: 10px; color: #64748b; margin-top: 8px; line-height: 1.6; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    for _, row in df_lab.iterrows():
+        status_hist = str(row.get('STATUS_DISPLAY', '')).upper()
+        if 'ENTREGUE' in status_hist or 'CONFERIDO' in status_hist:
+            classe, emoji = 'historico-badge-sucesso', '✅'
+        elif any(x in status_hist for x in ['FRUSTRADA', 'PROBLEMA', 'CANCELADO', 'RECUSA']):
+            classe, emoji = 'historico-badge-frustrada', '❌'
+        else:
+            classe, emoji = 'historico-badge-em-rota', '🚐'
+        
+        st.markdown(f"<span class='historico-badge {classe}'>{emoji} {row.get('PEDIDO', 'N/A')}</span> <span style='font-size:10px; color:#64748b;'>{row.get('DATA', '')}</span>", unsafe_allow_html=True)
+    
+    st.markdown("<div class='historico-legenda'><b>Legenda:</b> ✅ Entregue | ❌ Frustrada/Cancelada | 🚐 Em Rota/Coletada</div>", unsafe_allow_html=True)
+
+def render_comprovantes(pedido_data, status):
+    """Renderiza seção de comprovantes com fotos"""
+    foto_coleta = limpar_valor(pedido_data.get('FOTO_COLETA', ''))
+    foto_entrega = limpar_valor(pedido_data.get('FOTO_ENTREGA', ''))
+    foto_gen = limpar_valor(pedido_data.get('COMPROVANTE', ''))
+    
+    # Se tiver fotos separadas
+    if (foto_coleta and foto_coleta.startswith("http")) or (foto_entrega and foto_entrega.startswith("http")):
+        if foto_coleta and foto_coleta.startswith("http"):
+            st.markdown(f"<div style='{MODAL_STYLES['card_container']}'><p style='{MODAL_STYLES['badge_label']}'>📸 Comprovante de Coleta</p></div>", unsafe_allow_html=True)
+            st.image(foto_coleta, use_container_width=True)
+            try:
+                response = requests.get(foto_coleta, timeout=5)
+                if response.status_code == 200:
+                    nome = foto_coleta.split('/')[-1] if '/' in foto_coleta else f"coleta_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                    if '.' not in nome: nome = f"{nome}.jpg"
+                    st.download_button("⬇️ Baixar Comprovante de Coleta", response.content, nome, "image/jpeg", use_container_width=True, key="download_coleta")
+            except:
+                st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_coleta}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+        
+        if foto_entrega and foto_entrega.startswith("http"):
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f"<div style='{MODAL_STYLES['card_container']}'><p style='{MODAL_STYLES['badge_label']}'>📸 Comprovante de Entrega</p></div>", unsafe_allow_html=True)
+            st.image(foto_entrega, use_container_width=True)
+            try:
+                response = requests.get(foto_entrega, timeout=5)
+                if response.status_code == 200:
+                    nome = foto_entrega.split('/')[-1] if '/' in foto_entrega else f"entrega_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                    if '.' not in nome: nome = f"{nome}.jpg"
+                    st.download_button("⬇️ Baixar Comprovante de Entrega", response.content, nome, "image/jpeg", use_container_width=True, key="download_entrega")
+            except:
+                st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_entrega}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+    
+    # Fallback para foto genérica
+    elif foto_gen and foto_gen.startswith("http"):
+        st.markdown(f"<div style='background:#f8fafc; padding:16px; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 2px rgba(0,0,0,0.02);'><p style='font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0 0 12px 0;'>📸 Canhoto da Operação</p></div>", unsafe_allow_html=True)
+        st.image(foto_gen, use_container_width=True)
+        try:
+            response = requests.get(foto_gen, timeout=5)
+            if response.status_code == 200:
+                nome = foto_gen.split('/')[-1] if '/' in foto_gen else f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                if '.' not in nome: nome = f"{nome}.jpg"
+                st.download_button("⬇️ Baixar Canhoto", response.content, nome, "image/jpeg", use_container_width=True)
+        except:
+            st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_gen}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+    
+    # Sem fotos
+    elif any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
+        st.warning("📷 Nenhuma foto da ocorrência foi anexada na justificativa.")
+    else:
+        st.info("📷 **Aguardando anexo do canhoto da operação.**")
+
+def render_observacoes(pedido_data, status):
+    """Renderiza seção de observações/justificativas"""
+    st.markdown("<br>", unsafe_allow_html=True)
+    if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
+        st.error(f"**⚠️ Motivo da Ocorrência:**\n\n{pedido_data.get('DETALHES', 'Motivo não informado no aplicativo.')}")
+    else:
+        st.info(f"**💬 Atualizações da Base:**\n\n{pedido_data.get('DETALHES', 'Nenhuma observação pendente.')}")
+
+# =======================================================
+# 📑 FUNÇÕES PARA RENDERIZAR AS ABAS
+# =======================================================
+def render_tab_dados_principais(pedido_data, status):
+    """ABA 1: Dados Principais - Cliente, Endereço, Timeline, SLA, Motorista"""
+    # Cliente e Endereço em cards lado a lado
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        with st.container(border=True):
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🏢 Cliente (Embarcador)</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:16px; font-weight:700; color:{MODAL_COLORS['brand']}; margin:10px 0;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>", unsafe_allow_html=True)
+    
+    with col2:
+        with st.container(border=True):
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📍 Endereço de Entrega</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:13px; color:#334155; margin:10px 0; font-weight:500;'>{formatar_endereco(pedido_data)}</p>", unsafe_allow_html=True)
+    
+    # Timeline visual
+    st.divider()
+    with st.container(border=True):
+        st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📅 Timeline da Operação</p>", unsafe_allow_html=True)
+        timeline = render_timeline(pedido_data, status)
+        st.markdown(timeline, unsafe_allow_html=True)
+    
+    # SLA e Motorista lado a lado
+    st.divider()
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        with st.container(border=True):
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🎯 SLA Acordado</p>", unsafe_allow_html=True)
+            data_limite = limpar_valor(pedido_data.get('DATA_LIMITE', '---'), "Não definida")
+            st.markdown(f"<p style='font-size:14px; color:{MODAL_COLORS['brand']}; font-weight:700; margin:10px 0;'>{data_limite}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:11px; color:#64748b;'>📌 Previsão de entrega conforme contrato</p>", unsafe_allow_html=True)
+    
+    with col2:
+        with st.container(border=True):
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>👤 Motorista(s)</p>", unsafe_allow_html=True)
+            mot_info = formatar_motorista(pedido_data, status)
+            
+            if mot_info["duplo"]:
+                st.markdown(f"""
+                    <p style='margin:8px 0; font-size:12px; color:#334155;'>
+                    <span style='color:{MODAL_COLORS['brand']}; font-weight:700;'>📦 Coleta:</span> {mot_info['coleta']}<br>
+                    <span style='color:{MODAL_COLORS['brand']}; font-weight:700;'>✅ Entrega:</span> {mot_info['entrega']}
+                    </p>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"<p style='font-size:14px; color:{MODAL_COLORS['brand']}; font-weight:700; margin:10px 0;'>🚐 {mot_info['coleta']}</p>", unsafe_allow_html=True)
+    
+    # Nível de Serviço
+    st.divider()
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📈 Nível de Serviço</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:13px; color:#334155;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')}</p>", unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("<p style='" + MODAL_STYLES['header'] + "'>⭐ Performance</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:13px; color:#334155;'>{pedido_data.get('OTD_LAB', 'Dados indisponíveis')}</p>", unsafe_allow_html=True)
+
+def render_tab_comprovantes(pedido_data, status):
+    """ABA 2: Comprovantes - Fotos de Coleta e Entrega"""
+    foto_coleta = limpar_valor(pedido_data.get('FOTO_COLETA', ''))
+    foto_entrega = limpar_valor(pedido_data.get('FOTO_ENTREGA', ''))
+    foto_gen = limpar_valor(pedido_data.get('COMPROVANTE', ''))
+    
+    # Se tiver fotos separadas
+    if (foto_coleta and foto_coleta.startswith("http")) or (foto_entrega and foto_entrega.startswith("http")):
+        if foto_coleta and foto_coleta.startswith("http"):
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📸 Comprovante de Coleta</p>", unsafe_allow_html=True)
+            st.image(foto_coleta, use_container_width=True, caption="Foto tirada no momento da coleta")
+            try:
+                response = requests.get(foto_coleta, timeout=5)
+                if response.status_code == 200:
+                    nome = foto_coleta.split('/')[-1] if '/' in foto_coleta else f"coleta_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                    if '.' not in nome: nome = f"{nome}.jpg"
+                    st.download_button("⬇️ Baixar Foto de Coleta", response.content, nome, "image/jpeg", use_container_width=True, key="download_coleta_aba")
+            except:
+                st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_coleta}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+        
+        if foto_entrega and foto_entrega.startswith("http"):
+            st.divider()
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📸 Comprovante de Entrega</p>", unsafe_allow_html=True)
+            st.image(foto_entrega, use_container_width=True, caption="Foto tirada no momento da entrega")
+            try:
+                response = requests.get(foto_entrega, timeout=5)
+                if response.status_code == 200:
+                    nome = foto_entrega.split('/')[-1] if '/' in foto_entrega else f"entrega_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                    if '.' not in nome: nome = f"{nome}.jpg"
+                    st.download_button("⬇️ Baixar Foto de Entrega", response.content, nome, "image/jpeg", use_container_width=True, key="download_entrega_aba")
+            except:
+                st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_entrega}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+    
+    # Fallback para foto genérica
+    elif foto_gen and foto_gen.startswith("http"):
+        st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📸 Canhoto da Operação</p>", unsafe_allow_html=True)
+        st.image(foto_gen, use_container_width=True, caption="Comprovante da operação")
+        try:
+            response = requests.get(foto_gen, timeout=5)
+            if response.status_code == 200:
+                nome = foto_gen.split('/')[-1] if '/' in foto_gen else f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                if '.' not in nome: nome = f"{nome}.jpg"
+                st.download_button("⬇️ Baixar Canhoto", response.content, nome, "image/jpeg", use_container_width=True, key="download_gen_aba")
+        except:
+            st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_gen}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+    
+    # Sem fotos
+    elif any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
+        st.warning("📷 Nenhuma foto da ocorrência foi anexada na justificativa.")
+    else:
+        st.info("📷 **Aguardando anexo do canhoto da operação.**\n\nAs fotos serão anexadas após a conclusão da operação.")
+
+def render_tab_historico(pedido_data, df_historico):
+    """ABA 3: Histórico - Últimas operações do ponto de coleta"""
+    if df_historico is None or df_historico.empty:
+        st.info("📋 Nenhum histórico disponível para este ponto de coleta.")
+        return
+    
+    lab_atual = pedido_data.get('LABORATORIO', '')
+    df_lab = df_historico[df_historico['LABORATORIO'] == lab_atual].copy()
+    df_lab = df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Coletado|Recusada|Conferido', case=False, na=False)]
+    df_lab = df_lab.sort_values('DATA', ascending=False).head(10)
+    
+    if df_lab.empty:
+        st.info("📋 Nenhum histórico encontrado para este ponto.")
+        return
+    
+    st.markdown(f"<p style='" + MODAL_STYLES['header'] + "'>📋 Últimas 10 Operações de {lab_atual}</p>", unsafe_allow_html=True)
+    
+    # Criar tabela de histórico
+    historico_dados = []
+    for _, row in df_lab.iterrows():
+        status_hist = str(row.get('STATUS_DISPLAY', '')).upper()
+        
+        if 'ENTREGUE' in status_hist or 'CONFERIDO' in status_hist:
+            emoji, cor = '✅', '#16a34a'
+        elif any(x in status_hist for x in ['FRUSTRADA', 'PROBLEMA', 'CANCELADO', 'RECUSA']):
+            emoji, cor = '❌', '#dc2626'
+        else:
+            emoji, cor = '🚐', '#0ea5e9'
+        
+        historico_dados.append({
+            "Status": f"{emoji} {status_hist}",
+            "Pedido": row.get('PEDIDO', 'N/A'),
+            "Data": row.get('DATA', ''),
+            "Motorista": limpar_valor(row.get('MOTORISTA_COLETA', ''), '---')
+        })
+    
+    # Exibir como dataframe
+    st.dataframe(
+        pd.DataFrame(historico_dados),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Status": st.column_config.TextColumn("Status", width="medium"),
+            "Pedido": st.column_config.TextColumn("Pedido", width="small"),
+            "Data": st.column_config.TextColumn("Data", width="small"),
+            "Motorista": st.column_config.TextColumn("Motorista", width="medium"),
+        }
+    )
+    
+    st.caption(f"📊 Mostrando {len(historico_dados)} operações | 📍 Ponto: {lab_atual}")
+
+def render_tab_observacoes(pedido_data, status):
+    """ABA 4: Observações - Motivos e Detalhes"""
+    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📝 Detalhes da Operação</p>", unsafe_allow_html=True)
+    
+    if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
+        with st.container(border=True):
+            st.error(f"**⚠️ Motivo da Ocorrência**\n\n{pedido_data.get('DETALHES', 'Motivo não informado no aplicativo.')}")
+    else:
+        with st.container(border=True):
+            st.info(f"**💬 Atualizações da Base**\n\n{pedido_data.get('DETALHES', 'Nenhuma observação pendente.')}")
+
+# =======================================================
+# 🪟 FUNÇÃO DO POP-UP MEGAZORD (REFATORADA COM ABAS)
 # =======================================================
 @st.dialog("📋 Detalhes da Operação", width="large")
 def modal_detalhes_pedido(pedido_data, df_historico=None):
+    """
+    🪟 MODAL REFATORADO COM ABAS - Estrutura Limpa e Organizada
+    
+    Renderiza detalhes completos de uma operação/pedido com sistema de ABAS:
+    - 📋 ABA 1: DADOS PRINCIPAIS (Cliente, Endereço, Timeline, SLA, Motorista)
+    - 📷 ABA 2: COMPROVANTES (Fotos de Coleta e Entrega)
+    - 📊 ABA 3: HISTÓRICO (Últimas operações do ponto)
+    - ⚠️ ABA 4: OBSERVAÇÕES (Motivos/Detalhes)
+    """
     status = str(pedido_data.get('STATUS_DISPLAY', '')).upper()
-    cor_etiqueta = "#10B981" if "ENTREGUE" in status else "#F59E0B"
-    if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "ATRASADO", "RECUSA"]): cor_etiqueta = "#EF4444"
-    if "COLETADO" in status or "ROTA" in status: cor_etiqueta = "#3B82F6"
-
-    # 🎯 CABEÇALHO COM PEDIDO E STATUS
-    c_h1, c_h2 = st.columns([3, 1])
-    c_h1.subheader(f"Pedido: {pedido_data.get('PEDIDO', 'N/A')}")
-    c_h2.markdown(f"<div style='text-align:center; background:{cor_etiqueta}; color:white; padding:8px; border-radius:10px; font-weight:bold; font-size:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>{status}</div>", unsafe_allow_html=True)
     
-    # 🔄 BARRA DE PROGRESSO
-    step = 1
-    cor_barra = "#3b82f6" 
-    if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO", "RECUSA"]):
-        cor_barra = "#ef4444" 
-        if "ROTA DE COLETA" in status or "COLETADO" in status: step = 2
-    else:
-        if "ROTA DE COLETA" in status: step = 2
-        elif "COLETADO" in status or "ROTA DE ENTREGA" in status or "EM ROTA" in status or "CONFERIDO" in status: step = 3
-        elif "ENTREGUE" in status: step = 4; cor_barra = "#10b981" 
-
-    html_barra = (
-        f"<div style='display:flex;justify-content:space-between;position:relative;margin:15px 0 35px 0;'>"
-        f"<div style='position:absolute;top:12px;left:0;right:0;height:4px;background:#e2e8f0;z-index:1;'></div>"
-        f"<div style='position:absolute;top:12px;left:0;width:{(step-1)*33.3}%;height:4px;background:{cor_barra};z-index:2;transition:width 0.5s;'></div>"
-        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 1 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>✓</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 1 else '#64748b'};'>Pedido</div></div>"
-        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 2 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>{'!' if step==2 and cor_barra=='#ef4444' else '🚐'}</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 2 else '#64748b'};'>Em Rota</div></div>"
-        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 3 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>📦</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 3 else '#64748b'};'>Coletado</div></div>"
-        f"<div style='z-index:3;text-align:center;width:60px;'><div style='width:28px;height:28px;background:{cor_barra if step >= 4 else '#e2e8f0'};color:white;border-radius:50%;line-height:28px;margin:0 auto;font-size:14px;box-shadow:0 2px 4px rgba(0,0,0,0.1);'>✅</div><div style='font-size:11px;margin-top:5px;font-weight:600;color:{'#0f172a' if step >= 4 else '#64748b'};'>Entregue</div></div>"
-        f"</div>"
-    )
-    st.markdown(html_barra, unsafe_allow_html=True)
-
-    # 📍 PREPARAR DADOS DE ENDEREÇO
-    end_rua = str(pedido_data.get('ENDERECO', '')).strip()
-    end_num = str(pedido_data.get('NUMERO', '')).strip()
-    end_bairro = str(pedido_data.get('BAIRRO', '')).strip()
-    end_cid_uf = str(pedido_data.get('CIDADE_UF', 'N/A')).strip()
-
-    partes_end = []
-    if end_rua and end_rua.upper() not in ['NAN', 'NONE', '']: partes_end.append(end_rua)
-    if end_num and end_num.upper() not in ['NAN', 'NONE', '']: partes_end.append(f"nº {end_num}")
-    if end_bairro and end_bairro.upper() not in ['NAN', 'NONE', '']: partes_end.append(end_bairro)
-
-    endereco_completo = ", ".join(partes_end) + f" — {end_cid_uf}" if partes_end else end_cid_uf
-
-    # 👤 PREPARAR DADOS DE MOTORISTA
-    mot_coleta = str(pedido_data.get('MOTORISTA_COLETA', '')).strip()
-    mot_entrega = str(pedido_data.get('MOTORISTA_ENTREGA', '')).strip()
-    if not mot_coleta or mot_coleta.upper() == 'NAN': mot_coleta = 'Equipe IGO'
-    if not mot_entrega or mot_entrega.upper() == 'NAN': mot_entrega = mot_coleta 
-
-    if any(x in status for x in ["ENTREGUE", "CONFERIDO"]) and mot_coleta != mot_entrega:
-        motorista_html = f"<p style='margin:2px 0 12px 0;font-size:13px;font-weight:600;color:#334155;'>📦 Coleta: <span style='color:#3b82f6;'>{mot_coleta}</span><br>✅ Entrega: <span style='color:#3b82f6;'>{mot_entrega}</span></p>"
-    else:
-        motorista_html = f"<p style='margin:2px 0 12px 0;font-size:14px;font-weight:700;color:#3b82f6;'>🚐 {mot_coleta}</p>"
-
-    # 📅 PREPARAR DADOS DE DATA E PRAZO
-    data_efetiva = str(pedido_data.get('DATA_EFETIVA', '---')).replace(" 00:00:00", "").strip()
+    # 🎯 Renderizar Cabeçalho + Barra de Progresso
+    render_header_status(pedido_data, status)
     
-    # Reconstrói a data se estiver no formato curto (da GRID) para calcular certo no Popup
-    if len(data_efetiva.split('/')) == 3 and len(data_efetiva.split('/')[2]) == 2:
-        partes = data_efetiva.split('/')
-        data_efetiva = f"{partes[0]}/{partes[1]}/20{partes[2]}"
+    # 📑 Sistema de ABAS
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📋 Dados Principais",
+        "📷 Comprovantes",
+        "📊 Histórico",
+        "⚠️ Observações"
+    ])
     
-    # 🕐 HORAS DE COLETA E ENTREGA
-    hora_coleta = str(pedido_data.get('HORA_COLETA_REAL', '')).strip()
-    hora_entrega = str(pedido_data.get('HORA_ENTREGA_REAL', '')).strip()
-    
-    # Fallback para HORA_LIMPA se não tiver hora_entrega
-    if not hora_entrega or hora_entrega.upper() == 'NAN':
-        hora_entrega = str(pedido_data.get('HORA_LIMPA', '')).strip()
-    
-    hora_coleta_str = f" às {hora_coleta}" if hora_coleta and hora_coleta.upper() != 'NAN' else ""
-    hora_entrega_str = f" às {hora_entrega}" if hora_entrega and hora_entrega.upper() != 'NAN' else ""
-    
-    data_limite = str(pedido_data.get('DATA_LIMITE', '---')).strip()
-    if not data_limite or data_limite.upper() == 'NAN': data_limite = "Não definida"
-
-    selo_prazo = ""
-    if any(x in status for x in ["ENTREGUE", "CONFERIDO"]) and data_limite != "Não definida" and data_efetiva != "---":
-        try:
-            ano_ef = int(data_efetiva.split('/')[2])
-            ano_lim = int(data_limite.split('/')[2])
-            if ano_ef < 100: ano_ef += 2000
-            if ano_lim < 100: ano_lim += 2000
-            
-            dt_ef_obj = datetime(ano_ef, int(data_efetiva.split('/')[1]), int(data_efetiva.split('/')[0])).date()
-            dt_lim_obj = datetime(ano_lim, int(data_limite.split('/')[1]), int(data_limite.split('/')[0])).date()
-            
-            if dt_ef_obj <= dt_lim_obj:
-                selo_prazo = "<span style='background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:5px;'>No Prazo</span>"
-            else:
-                dias_atraso = (dt_ef_obj - dt_lim_obj).days
-                selo_prazo = f"<span style='background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:5px;'>Atrasado {dias_atraso} dia(s)</span>"
-        except:
-            pass
-
-    if any(x in status for x in ["ENTREGUE", "CONFERIDO"]):
-        timeline_html = f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_coleta_str}</b><br>✅ Entrega: <b>{data_efetiva}{hora_entrega_str}</b> {selo_prazo}</p>"
-    elif any(x in status for x in ["COLETADO", "ROTA"]):
-        timeline_html = f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_coleta_str}</b><br>⏳ Entrega: <i>Em trânsito para o destino...</i></p>"
-    elif any(x in status for x in ["FRUSTRADA", "PROBLEMA"]):
-        timeline_html = f"<p style='margin:2px 0 12px 0;font-size:13px;color:#ef4444;'>❌ Tentativa: <b>{data_efetiva}{hora_entrega_str}</b></p>"
-    else:
-        timeline_html = f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>⏳ Previsão de Coleta: <b>{pedido_data.get('ETA_LAB', 'Em mapeamento')}</b></p>"
-
-    # =====================================
-    # 📐 LAYOUT EM 2 COLUNAS
-    # Coluna Esquerda: Dados do Pedido
-    # Coluna Direita: Comprovante com Download
-    # =====================================
-    col_esquerda, col_direita = st.columns([1, 1])
-    
-    # 📋 COLUNA ESQUERDA - DADOS DO PEDIDO
-    with col_esquerda:
-        # Container com borda cinza
-        with st.container(border=False):
-            # 🏢 Tomador
-            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>🏢 Cliente (Embarcador)</p>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:14px; font-weight:700; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin:2px 0 12px 0;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>", unsafe_allow_html=True)
-            
-            # 📍 Endereço
-            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>📍 Endereço de Entrega</p>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:13px; color:#1e293b; margin:2px 0 12px 0; font-weight:500;'>{endereco_completo}</p>", unsafe_allow_html=True)
-            
-            # 📅 Datas
-            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>📅 Datas da Corrida</p>", unsafe_allow_html=True)
-            st.markdown(timeline_html, unsafe_allow_html=True)
-            
-            # 🎯 Prazo
-            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>🎯 SLA Acordado</p>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:13px; color:#1e293b; margin:2px 0 12px 0;'>📌 Previsão: <b style='color:#2563eb;'>{data_limite}</b></p>", unsafe_allow_html=True)
-            
-            # 👤 Motorista
-            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>👤 Motorista (Entregador)</p>", unsafe_allow_html=True)
-            st.markdown(motorista_html, unsafe_allow_html=True)
-            
-            # 📈 Confiabilidade
-            st.markdown("<p style='font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; margin:0; letter-spacing:0.5px;'>📈 Nível de Serviço (Local)</p>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:13px; color:#1e293b; margin:2px 0 0 0; font-weight:500;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')} <br> {pedido_data.get('OTD_LAB', '')}</p>", unsafe_allow_html=True)
-            
-            # 📊 HISTÓRICO DO PONTO DE COLETA
-            if df_historico is not None and not df_historico.empty:
-                lab_atual = pedido_data.get('LABORATORIO', '')
-                df_lab_historico = df_historico[df_historico['LABORATORIO'] == lab_atual].copy()
-                df_lab_historico = df_lab_historico[df_lab_historico['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Coletado|Recusada|Conferido', case=False, na=False)]
-                df_lab_historico = df_lab_historico.sort_values('DATA', ascending=False).head(5)
-                
-                if not df_lab_historico.empty:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    st.markdown("<p style='font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0;'>📋 Histórico do Ponto (Últimas 5)</p>", unsafe_allow_html=True)
-                    
-                    # CSS para os badges de histórico
-                    st.markdown("""
-                        <style>
-                        .historico-badge {
-                            display: inline-block;
-                            padding: 6px 10px;
-                            border-radius: 6px;
-                            font-size: 11px;
-                            font-weight: 600;
-                            margin-right: 8px;
-                            white-space: nowrap;
-                        }
-                        .historico-badge-sucesso {
-                            background: #dcfce7;
-                            color: #166534;
-                            border: 1px solid #86efac;
-                        }
-                        .historico-badge-frustrada {
-                            background: #fee2e2;
-                            color: #991b1b;
-                            border: 1px solid #fca5a5;
-                        }
-                        .historico-badge-em-rota {
-                            background: #dbeafe;
-                            color: #1e40af;
-                            border: 1px solid #93c5fd;
-                        }
-                        .historico-legenda {
-                            background: #f8fafc;
-                            padding: 8px;
-                            border-radius: 6px;
-                            font-size: 10px;
-                            color: #64748b;
-                            margin-top: 8px;
-                            line-height: 1.6;
-                        }
-                        </style>
-                    """, unsafe_allow_html=True)
-                    
-                    # Renderiza cada item separadamente
-                    for idx, row in df_lab_historico.iterrows():
-                        pedido_hist = row.get('PEDIDO', 'N/A')
-                        status_hist = str(row.get('STATUS_DISPLAY', '')).upper()
-                        data_hist = row.get('DATA', '')
-                        
-                        if 'ENTREGUE' in status_hist or 'CONFERIDO' in status_hist:
-                            classe = 'historico-badge-sucesso'
-                            emoji = '✅'
-                        elif 'FRUSTRADA' in status_hist or 'PROBLEMA' in status_hist or 'CANCELADO' in status_hist or 'RECUSA' in status_hist:
-                            classe = 'historico-badge-frustrada'
-                            emoji = '❌'
-                        else:
-                            classe = 'historico-badge-em-rota'
-                            emoji = '🚐'
-                        
-                        st.markdown(f"<span class='historico-badge {classe}'>{emoji} {pedido_hist}</span> <span style='font-size:10px; color:#64748b;'>{data_hist}</span>", unsafe_allow_html=True)
-                    
-                    # Legenda dos ícones
-                    st.markdown("""
-                        <div class='historico-legenda'>
-                            <b>Legenda:</b> ✅ Entregue | ❌ Frustrada/Cancelada | 🚐 Em Rota/Coletada
-                        </div>
-                    """, unsafe_allow_html=True)
-        
-        # 💬 ATUALIZAÇÕES E JUSTIFICATIVAS
+    # ABA 1: Dados Principais
+    with tab1:
         st.markdown("<br>", unsafe_allow_html=True)
-        if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
-            st.error(f"**⚠️ Motivo da Ocorrência:**\n\n{pedido_data.get('DETALHES', 'Motivo não informado no aplicativo.')}")
-        else:
-            st.info(f"**💬 Atualizações da Base:**\n\n{pedido_data.get('DETALHES', 'Nenhuma observação pendente.')}")
-
-    # 📷 COLUNA DIREITA - COMPROVANTES (COLETA + ENTREGA)
-    with col_direita:
-        foto_coleta = pedido_data.get('FOTO_COLETA', '')
-        foto_entrega = pedido_data.get('FOTO_ENTREGA', '')
-        foto_gen = pedido_data.get('COMPROVANTE', '')
-        
-        # Prioridade: FOTO_COLETA, FOTO_ENTREGA, COMPROVANTE genérico
-        if not foto_coleta or str(foto_coleta).strip().upper() in ['NAN', 'NONE', '']:
-            foto_coleta = ""
-        if not foto_entrega or str(foto_entrega).strip().upper() in ['NAN', 'NONE', '']:
-            foto_entrega = ""
-        if not foto_gen or str(foto_gen).strip().upper() in ['NAN', 'NONE', '']:
-            foto_gen = ""
-
-        # Se tiver foto de coleta e entrega, exibir as duas
-        if (foto_coleta and str(foto_coleta).startswith("http")) or (foto_entrega and str(foto_entrega).startswith("http")):
-            if foto_coleta and str(foto_coleta).startswith("http"):
-                st.markdown(f"<div style='background:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 2px rgba(0,0,0,0.02);'><p style='font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0 0 8px 0;'>📸 Comprovante de Coleta</p></div>", unsafe_allow_html=True)
-                st.image(foto_coleta, use_container_width=True)
-                
-                try:
-                    nome_arquivo_col = foto_coleta.split('/')[-1] if '/' in foto_coleta else f"coleta_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                    if '.' not in nome_arquivo_col:
-                        nome_arquivo_col = f"{nome_arquivo_col}.jpg"
-                except:
-                    nome_arquivo_col = f"coleta_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                
-                try:
-                    response_col = requests.get(foto_coleta, timeout=5)
-                    if response_col.status_code == 200:
-                        st.download_button(
-                            label="⬇️ Baixar Comprovante de Coleta",
-                            data=response_col.content,
-                            file_name=nome_arquivo_col,
-                            mime="image/jpeg",
-                            use_container_width=True,
-                            key="download_coleta"
-                        )
-                except:
-                    st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_coleta}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
-            
-            if foto_entrega and str(foto_entrega).startswith("http"):
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown(f"<div style='background:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 2px rgba(0,0,0,0.02);'><p style='font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0 0 8px 0;'>📸 Comprovante de Entrega</p></div>", unsafe_allow_html=True)
-                st.image(foto_entrega, use_container_width=True)
-                
-                try:
-                    nome_arquivo_ent = foto_entrega.split('/')[-1] if '/' in foto_entrega else f"entrega_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                    if '.' not in nome_arquivo_ent:
-                        nome_arquivo_ent = f"{nome_arquivo_ent}.jpg"
-                except:
-                    nome_arquivo_ent = f"entrega_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                
-                try:
-                    response_ent = requests.get(foto_entrega, timeout=5)
-                    if response_ent.status_code == 200:
-                        st.download_button(
-                            label="⬇️ Baixar Comprovante de Entrega",
-                            data=response_ent.content,
-                            file_name=nome_arquivo_ent,
-                            mime="image/jpeg",
-                            use_container_width=True,
-                            key="download_entrega"
-                        )
-                except:
-                    st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_entrega}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
-        
-        # Se tiver foto genérica, usar ela como fallback
-        elif foto_gen and str(foto_gen).startswith("http"):
-            st.markdown(f"<div style='background:#f8fafc; padding:16px; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 2px rgba(0,0,0,0.02);'><p style='font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; margin:0 0 12px 0;'>📸 Canhoto da Operação</p></div>", unsafe_allow_html=True)
-            st.image(foto_gen, use_container_width=True)
-            
-            try:
-                nome_arquivo = foto_gen.split('/')[-1] if '/' in foto_gen else f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                if '.' not in nome_arquivo:
-                    nome_arquivo = f"{nome_arquivo}.jpg"
-            except:
-                nome_arquivo = f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-            
-            try:
-                response = requests.get(foto_gen, timeout=5)
-                if response.status_code == 200:
-                    st.download_button(
-                        label="⬇️ Baixar Canhoto",
-                        data=response.content,
-                        file_name=nome_arquivo,
-                        mime="image/jpeg",
-                        use_container_width=True,
-                        key="download_canhoto"
-                    )
-            except:
-                st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_gen}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
-        
-        # Se não tiver nenhuma foto
-        elif any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
-            st.warning("📷 Nenhuma foto da ocorrência foi anexada na justificativa.")
-        else:
-            st.info("📷 **Aguardando anexo do canhoto da operação.**")
-
+        render_tab_dados_principais(pedido_data, status)
+    
+    # ABA 2: Comprovantes
+    with tab2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        render_tab_comprovantes(pedido_data, status)
+    
+    # ABA 3: Histórico
+    with tab3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        render_tab_historico(pedido_data, df_historico)
+    
+    # ABA 4: Observações
+    with tab4:
+        st.markdown("<br>", unsafe_allow_html=True)
+        render_tab_observacoes(pedido_data, status)
+    
+    # 🔘 Botão Fechar (fora das abas)
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # 🔘 BOTÃO DE FECHAR (shadcn-ui)
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         if button("✖️ Fechar Detalhes", key="fechar_detalhes_btn", variant="secondary"):
             st.session_state.modal_aberto = False
             st.session_state.pedido_modal = None
             st.session_state.linha_clicada = None
-            st.session_state.modal_fechado = True  # Flag para ignorar a próxima seleção
-            st.session_state.ignorar_selecao_grid = True  # Ignora seleção da grid nos próximos frames
-            st.session_state.grid_key = st.session_state.get('grid_key', 0) + 1 # Força a tabela a piscar e esquecer
+            st.session_state.modal_fechado = True
+            st.session_state.ignorar_selecao_grid = True
+            st.session_state.grid_key = st.session_state.get('grid_key', 0) + 1
             st.rerun()
 
 
