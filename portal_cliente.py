@@ -1259,10 +1259,10 @@ def render_header_status(pedido_data, status):
 def render_info_dados_pedido(pedido_data, status):
     """Renderiza seção de dados do pedido (cliente, endereço, datas)"""
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🏢 Cliente (Embarcador)</p>", unsafe_allow_html=True)
+    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🏢 Cliente (Ponto de Coleta)</p>", unsafe_allow_html=True)
     st.markdown(f"<p style='font-size:14px; font-weight:700; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin:2px 0 12px 0;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>", unsafe_allow_html=True)
     
-    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📍 Endereço de Entrega</p>", unsafe_allow_html=True)
+    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📍 Endereço de Coleta</p>", unsafe_allow_html=True)
     st.markdown(f"<p style='" + MODAL_STYLES['subtitulo'] + "'>{formatar_endereco(pedido_data)}</p>", unsafe_allow_html=True)
     
     st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📅 Datas da Corrida</p>", unsafe_allow_html=True)
@@ -1296,12 +1296,18 @@ def render_timeline(pedido_data, status):
     hora_entrega = limpar_valor(pedido_data.get('HORA_ENTREGA_REAL', '')) or limpar_valor(pedido_data.get('HORA_LIMPA', ''))
     data_limite = limpar_valor(pedido_data.get('DATA_LIMITE', '---'), "Não definida")
     
+    s = str(status).upper()
+    
+    # 🔥 AJUSTE: Se a hora não foi achada de primeira, mas o status é coleta/rota, pega a última hora registrada!
+    if not hora_coleta and any(x in s for x in ["COLETADO", "ROTA"]):
+        hora_coleta = limpar_valor(pedido_data.get('HORA_LIMPA', ''))
+    
     hora_coleta_str = f" às {hora_coleta}" if hora_coleta else ""
     hora_entrega_str = f" às {hora_entrega}" if hora_entrega else ""
     
     # Calcular selo prazo
     selo_prazo = ""
-    if any(x in status for x in ["ENTREGUE", "CONFERIDO"]) and data_limite != "Não definida" and data_efetiva and data_efetiva != "---":
+    if any(x in s for x in ["ENTREGUE", "CONFERIDO"]) and data_limite != "Não definida" and data_efetiva and data_efetiva != "---":
         try:
             partes_ef = data_efetiva.split('/')
             partes_lim = data_limite.split('/')
@@ -1319,14 +1325,13 @@ def render_timeline(pedido_data, status):
         except:
             pass
     
-    # Renderizar timeline conforme status
-    s = str(status).upper()
+    # Renderizar timeline conforme status (agora com a coleta aparecendo também no insucesso)
     if any(x in s for x in ["ENTREGUE", "CONFERIDO"]):
         return f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_coleta_str}</b><br>✅ Entrega: <b>{data_efetiva}{hora_entrega_str}</b> {selo_prazo}</p>"
     elif any(x in s for x in ["COLETADO", "ROTA"]):
         return f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_coleta_str}</b><br>⏳ Entrega: <i>Em trânsito para o destino...</i></p>"
     elif any(x in s for x in ["FRUSTRADA", "PROBLEMA"]):
-        return f"<p style='margin:2px 0 12px 0;font-size:13px;color:#ef4444;'>❌ Tentativa: <b>{data_efetiva}{hora_entrega_str}</b></p>"
+        return f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_coleta_str}</b><br><span style='color:#ef4444;'>❌ Tentativa: <b>{data_efetiva}{hora_entrega_str}</b></span></p>"
     else:
         return f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>⏳ Previsão de Coleta: <b>{pedido_data.get('ETA_LAB', 'Em mapeamento')}</b></p>"
 
@@ -1469,12 +1474,12 @@ def render_tab_dados_principais(pedido_data, status):
     
     with c_cli:
         with st.container(border=True):
-            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🏢 Embarcador</p>", unsafe_allow_html=True)
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🏢 Ponto de Coleta</p>", unsafe_allow_html=True)
             st.markdown(f"<p style='font-size:14px; font-weight:700; color:#334155; margin:8px 0;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>", unsafe_allow_html=True)
             
     with c_end:
         with st.container(border=True):
-            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📍 Endereço de Entrega</p>", unsafe_allow_html=True)
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📍 Endereço de Coleta</p>", unsafe_allow_html=True)
             st.markdown(f"<p style='font-size:12px; color:#334155; margin:8px 0; font-weight:500; line-height:1.4;'>{formatar_endereco(pedido_data)}</p>", unsafe_allow_html=True)
             
     with c_mot:
@@ -1570,30 +1575,28 @@ def render_tab_historico(pedido_data, df_historico):
     df_lab = df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Coletado|Recusada|Conferido', case=False, na=False)]
     df_lab = df_lab.sort_values('DATA', ascending=False).head(10)
     
-    # ... (restante do seu código de renderização do histórico)
-    
     if df_lab.empty:
         st.info("📋 Nenhum histórico encontrado para este ponto.")
         return
     
-    st.markdown(f"<p style='" + MODAL_STYLES['header'] + "'>📋 Últimas 10 Operações de {lab_atual}</p>", unsafe_allow_html=True)
+    # ✨ AJUSTE 3: Título corrigido para puxar o nome do laboratório real
+    st.markdown(f"<p style='{MODAL_STYLES['header']}'>📋 Últimas 10 Operações de {lab_atual}</p>", unsafe_allow_html=True)
     
     # Criar tabela de histórico
     historico_dados = []
     for _, row in df_lab.iterrows():
-        status_hist = str(row.get('STATUS_DISPLAY', '')).upper()
+        # ✨ AJUSTE 1: A coluna STATUS_DISPLAY já tem o emoji de origem, então usamos ela direto!
+        status_hist = str(row.get('STATUS_DISPLAY', ''))
         
-        if 'ENTREGUE' in status_hist or 'CONFERIDO' in status_hist:
-            emoji, cor = '✅', '#16a34a'
-        elif any(x in status_hist for x in ['FRUSTRADA', 'PROBLEMA', 'CANCELADO', 'RECUSA']):
-            emoji, cor = '❌', '#dc2626'
-        else:
-            emoji, cor = '🚐', '#0ea5e9'
+        # ✨ AJUSTE 2: Resgatando a data E a hora da operação
+        data_hist = str(row.get('DATA', '')).strip()
+        hora_hist = str(row.get('HORA_LIMPA', '')).strip()
+        data_completa = f"{data_hist} às {hora_hist}" if hora_hist else data_hist
         
         historico_dados.append({
-            "Status": f"{emoji} {status_hist}",
+            "Status": status_hist,
             "Pedido": row.get('PEDIDO', 'N/A'),
-            "Data": row.get('DATA', ''),
+            "Data": data_completa,
             "Motorista": limpar_valor(row.get('MOTORISTA_COLETA', ''), '---')
         })
     
@@ -1605,7 +1608,7 @@ def render_tab_historico(pedido_data, df_historico):
         column_config={
             "Status": st.column_config.TextColumn("Status", width="medium"),
             "Pedido": st.column_config.TextColumn("Pedido", width="small"),
-            "Data": st.column_config.TextColumn("Data", width="small"),
+            "Data": st.column_config.TextColumn("Data e Hora", width="medium"),
             "Motorista": st.column_config.TextColumn("Motorista", width="medium"),
         }
     )
@@ -1613,15 +1616,19 @@ def render_tab_historico(pedido_data, df_historico):
     st.caption(f"📊 Mostrando {len(historico_dados)} operações | 📍 Ponto: {lab_atual}")
 
 def render_tab_observacoes(pedido_data, status):
-    """ABA 4: Observações - Motivos e Detalhes"""
+    """ABA 4: Observações - Motivos e Detalhes (Agora com a Hora)"""
     st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📝 Detalhes da Operação</p>", unsafe_allow_html=True)
+    
+    # Resgata a hora que o status/observação foi registrado no AppSheet
+    hora = limpar_valor(pedido_data.get('HORA_LIMPA', ''))
+    rodape_hora = f"\n\n---\n**🕒 Horário do Registro:** {hora}" if hora else ""
     
     if any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
         with st.container(border=True):
-            st.error(f"**⚠️ Motivo da Ocorrência**\n\n{pedido_data.get('DETALHES', 'Motivo não informado no aplicativo.')}")
+            st.error(f"**⚠️ Motivo da Ocorrência**\n\n{pedido_data.get('DETALHES', 'Motivo não informado no aplicativo.')}{rodape_hora}")
     else:
         with st.container(border=True):
-            st.info(f"**💬 Atualizações da Base**\n\n{pedido_data.get('DETALHES', 'Nenhuma observação pendente.')}")
+            st.info(f"**💬 Atualizações da Base**\n\n{pedido_data.get('DETALHES', 'Nenhuma observação pendente.')}{rodape_hora}")
 
 # =======================================================
 # 🪟 FUNÇÃO DO POP-UP MEGAZORD (REFATORADA COM ABAS)
@@ -1706,7 +1713,48 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
             st.session_state.ignorar_selecao_grid = True
             st.session_state.grid_key += 1 # 🔥 Limpa a seleção da grid
             st.rerun()
-
+# 🔥 ADICIONE ESTA FUNÇÃO NAS SUAS FUNÇÕES AUXILIARES
+@st.cache_data(ttl=600)
+def calcular_metricas_laboratorio(df):
+    """Calcula SLA, OTD e ETA apenas quando necessário"""
+    lab_stats = {}
+    for lab in df['LABORATORIO'].unique():
+        if not lab or pd.isna(lab): continue
+        df_lab = df[df['LABORATORIO'] == lab]
+        
+        sucessos = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)])
+        frustradas = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado|Recusa', case=False, na=False)])
+        total_finalizados = sucessos + frustradas
+        
+        # OTD (On-Time Delivery)
+        df_entregues = df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Conferido', case=False, na=False)]
+        total_entregues = len(df_entregues)
+        no_prazo = 0
+        for _, row in df_entregues.iterrows():
+            try:
+                dt_ef = pd.to_datetime(str(row.get('DATA_EFETIVA','')).replace(" 00:00:00", "").strip(), format='%d/%m/%Y').date()
+                dt_lim = pd.to_datetime(str(row.get('DATA_LIMITE','')).strip(), format='%d/%m/%Y').date()
+                if dt_ef <= dt_lim: no_prazo += 1
+            except: pass
+            
+        otd_pct = round((no_prazo / total_entregues) * 100) if total_entregues > 0 else 0
+        pct_suc = round((sucessos / total_finalizados) * 100) if total_finalizados > 0 else 0
+        pct_fru = round((frustradas / total_finalizados) * 100) if total_finalizados > 0 else 0
+        
+        # ETA (Média de horas)
+        df_hora = df_lab[df_lab['HORA_LIMPA'].str.contains(r'^\d{2}:\d{2}$', regex=True, na=False) & df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)]
+        eta_str = "Pouco histórico"
+        if len(df_hora) >= 3:
+            mins = df_hora['HORA_LIMPA'].apply(lambda x: int(x.split(':')[0])*60 + int(x.split(':')[1]))
+            med_min = int(mins.median())
+            eta_str = f"Entre {max(0, med_min-15)//60:02d}:{(max(0, med_min-15)%60):02d} e {(min(1440, med_min+15)//60):02d}:{(min(1440, med_min+15)%60):02d}"
+            
+        lab_stats[lab] = {
+            'SLA': f"🟢 {pct_suc}% Sucesso | 🔴 {pct_fru}% Frustradas" if total_finalizados >= 5 else "Em mapeamento",
+            'ETA': eta_str,
+            'OTD': f"🎯 {otd_pct}% Entregues no Prazo" if total_entregues > 0 else "Sem entregas"
+        }
+    return lab_stats
 
 # =======================================================
 # 🔐 3. TELA DE LOGIN (MODELO BLINDADO E CENTRALIZADO)
@@ -2437,7 +2485,13 @@ else:
                         # Sempre buscar na df_final inteira, pois a grid omite dados do dicionário
                         dados_completos_linha = df_final[df_final['PEDIDO'] == st.session_state.pedido_modal].iloc[0].to_dict()
                         st.session_state.modal_renderizado_antes = True  # Marca que o modal foi renderizado
-                        modal_detalhes_pedido(dados_completos_linha, df_final)
+                        
+                        # 🔥 MEGA OTIMIZAÇÃO: Filtra apenas o histórico do laboratório clicado ANTES de carregar a janela
+                        lab_alvo = dados_completos_linha.get('LABORATORIO', '')
+                        df_hist_leve = df_final[df_final['LABORATORIO'] == lab_alvo] if lab_alvo else pd.DataFrame()
+                        
+                        modal_detalhes_pedido(dados_completos_linha, df_hist_leve)
+                        
                         # Evita reabrir automaticamente em refresh quando o usuário fecha pelo X.
                         # O próximo clique na grid volta a abrir normalmente.
                         st.session_state.modal_aberto = False
