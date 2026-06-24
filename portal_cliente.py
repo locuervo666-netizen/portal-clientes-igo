@@ -1424,67 +1424,61 @@ def render_observacoes(pedido_data, status):
 # 📑 FUNÇÕES PARA RENDERIZAR AS ABAS
 # =======================================================
 def render_tab_dados_principais(pedido_data, status):
-    """ABA 1: Dados Principais - Cliente, Endereço, Timeline, SLA, Motorista"""
-    # Cliente e Endereço em cards lado a lado
-    col1, col2 = st.columns(2)
+    """ABA 1: Dados Principais - Reorganizada por Urgência e Atores"""
+    # ⏱️ LINHA 1: Urgência e Prazos (Sinais Vitais no Topo)
+    col1, col2, col3 = st.columns(3)
+    data_limite = limpar_valor(pedido_data.get('DATA_LIMITE', '---'), "Não definida")
     
     with col1:
         with st.container(border=True):
-            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🏢 Cliente (Embarcador)</p>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:16px; font-weight:700; color:{MODAL_COLORS['brand']}; margin:10px 0;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>", unsafe_allow_html=True)
-    
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🎯 Previsão / SLA</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:15px; color:{MODAL_COLORS['brand']}; font-weight:700; margin:8px 0;'>{data_limite}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:11px; color:#64748b;'>Prazo limite acordado</p>", unsafe_allow_html=True)
+            
     with col2:
         with st.container(border=True):
-            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📍 Endereço de Entrega</p>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:13px; color:#334155; margin:10px 0; font-weight:500;'>{formatar_endereco(pedido_data)}</p>", unsafe_allow_html=True)
-    
-    # Timeline visual
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📈 Nível de Serviço</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:13px; color:#334155; font-weight:600; margin:8px 0;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')}</p>", unsafe_allow_html=True)
+            
+    with col3:
+        with st.container(border=True):
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>⭐ Performance Geral</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:13px; color:#334155; font-weight:600; margin:8px 0;'>{pedido_data.get('OTD_LAB', 'Sem histórico')}</p>", unsafe_allow_html=True)
+
     st.divider()
+
+    # 🚐 LINHA 2: Atores e Logística Física (Quem, Onde e Quem Leva)
+    c_cli, c_end, c_mot = st.columns([1, 1.5, 1])
+    
+    with c_cli:
+        with st.container(border=True):
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🏢 Embarcador</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:14px; font-weight:700; color:#334155; margin:8px 0;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>", unsafe_allow_html=True)
+            
+    with c_end:
+        with st.container(border=True):
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📍 Endereço de Entrega</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:12px; color:#334155; margin:8px 0; font-weight:500; line-height:1.4;'>{formatar_endereco(pedido_data)}</p>", unsafe_allow_html=True)
+            
+    with c_mot:
+        with st.container(border=True):
+            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>👤 Motorista(s)</p>", unsafe_allow_html=True)
+            mot_info = formatar_motorista(pedido_data, status)
+            if mot_info["duplo"]:
+                st.markdown(f"<p style='margin:4px 0; font-size:11px; color:#334155;'><b>📦 Col:</b> {mot_info['coleta']}<br><b>✅ Ent:</b> {mot_info['entrega']}</p>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<p style='font-size:13px; color:#2563eb; font-weight:700; margin:8px 0;'>🚐 {mot_info['coleta']}</p>", unsafe_allow_html=True)
+
+    st.divider()
+
+    # 📅 LINHA 3: Timeline da Operação (Fatos Executados no Rodapé)
     with st.container(border=True):
         st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📅 Timeline da Operação</p>", unsafe_allow_html=True)
         timeline = render_timeline(pedido_data, status)
         st.markdown(timeline, unsafe_allow_html=True)
-    
-    # SLA e Motorista lado a lado
-    st.divider()
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        with st.container(border=True):
-            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🎯 SLA Acordado</p>", unsafe_allow_html=True)
-            data_limite = limpar_valor(pedido_data.get('DATA_LIMITE', '---'), "Não definida")
-            st.markdown(f"<p style='font-size:14px; color:{MODAL_COLORS['brand']}; font-weight:700; margin:10px 0;'>{data_limite}</p>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:11px; color:#64748b;'>📌 Previsão de entrega conforme contrato</p>", unsafe_allow_html=True)
-    
-    with col2:
-        with st.container(border=True):
-            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>👤 Motorista(s)</p>", unsafe_allow_html=True)
-            mot_info = formatar_motorista(pedido_data, status)
-            
-            if mot_info["duplo"]:
-                st.markdown(f"""
-                    <p style='margin:8px 0; font-size:12px; color:#334155;'>
-                    <span style='color:{MODAL_COLORS['brand']}; font-weight:700;'>📦 Coleta:</span> {mot_info['coleta']}<br>
-                    <span style='color:{MODAL_COLORS['brand']}; font-weight:700;'>✅ Entrega:</span> {mot_info['entrega']}
-                    </p>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"<p style='font-size:14px; color:{MODAL_COLORS['brand']}; font-weight:700; margin:10px 0;'>🚐 {mot_info['coleta']}</p>", unsafe_allow_html=True)
-    
-    # Nível de Serviço
-    st.divider()
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📈 Nível de Serviço</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='font-size:13px; color:#334155;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')}</p>", unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("<p style='" + MODAL_STYLES['header'] + "'>⭐ Performance</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='font-size:13px; color:#334155;'>{pedido_data.get('OTD_LAB', 'Dados indisponíveis')}</p>", unsafe_allow_html=True)
 
 def render_tab_comprovantes(pedido_data, status):
-    """ABA 2: Comprovantes - Fotos de Coleta e Entrega"""
+    """ABA 2: Comprovantes - Fotos de Coleta e Entrega (Layout Amigável + Ultra Rápido)"""
     foto_coleta = tratar_foto(limpar_valor(pedido_data.get('FOTO_COLETA', '')))
     foto_entrega = tratar_foto(limpar_valor(pedido_data.get('FOTO_ENTREGA', '')))
     foto_gen = limpar_valor(pedido_data.get('COMPROVANTE', ''))
@@ -1496,14 +1490,15 @@ def render_tab_comprovantes(pedido_data, status):
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
                 st.image(foto_coleta, use_container_width=True, caption="Foto tirada no momento da coleta")
-                try:
-                    response = requests.get(foto_coleta, timeout=5)
-                    if response.status_code == 200:
-                        nome = foto_coleta.split('/')[-1] if '/' in foto_coleta else f"coleta_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                        if '.' not in nome: nome = f"{nome}.jpg"
-                        st.download_button("⬇️ Baixar Foto de Coleta", response.content, nome, "image/jpeg", use_container_width=True, key="download_coleta_aba")
-                except:
-                    st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_coleta}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+                # ✨ BOTÃO HTML INSTANTÂNEO (Fim do travamento do requests.get)
+                botao_coleta_html = f"""
+                    <a href="{foto_coleta}" target="_blank" style="text-decoration: none;">
+                        <div style="width: 100%; text-align: center; padding: 8px; margin-top: 5px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            🔍 Visualizar / Salvar Coleta
+                        </div>
+                    </a>
+                """
+                st.markdown(botao_coleta_html, unsafe_allow_html=True)
         
         if foto_entrega and foto_entrega.startswith("http"):
             st.divider()
@@ -1511,14 +1506,15 @@ def render_tab_comprovantes(pedido_data, status):
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
                 st.image(foto_entrega, use_container_width=True, caption="Foto tirada no momento da entrega")
-                try:
-                    response = requests.get(foto_entrega, timeout=5)
-                    if response.status_code == 200:
-                        nome = foto_entrega.split('/')[-1] if '/' in foto_entrega else f"entrega_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                        if '.' not in nome: nome = f"{nome}.jpg"
-                        st.download_button("⬇️ Baixar Foto de Entrega", response.content, nome, "image/jpeg", use_container_width=True, key="download_entrega_aba")
-                except:
-                    st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_entrega}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+                # ✨ BOTÃO HTML INSTANTÂNEO (Fim do travamento do requests.get)
+                botao_entrega_html = f"""
+                    <a href="{foto_entrega}" target="_blank" style="text-decoration: none;">
+                        <div style="width: 100%; text-align: center; padding: 8px; margin-top: 5px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            🔍 Visualizar / Salvar Entrega
+                        </div>
+                    </a>
+                """
+                st.markdown(botao_entrega_html, unsafe_allow_html=True)
     
     # Fallback para foto genérica
     elif foto_gen and foto_gen.startswith("http"):
@@ -1526,14 +1522,15 @@ def render_tab_comprovantes(pedido_data, status):
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.image(foto_gen, use_container_width=True, caption="Comprovante da operação")
-            try:
-                response = requests.get(foto_gen, timeout=5)
-                if response.status_code == 200:
-                    nome = foto_gen.split('/')[-1] if '/' in foto_gen else f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                    if '.' not in nome: nome = f"{nome}.jpg"
-                    st.download_button("⬇️ Baixar Canhoto", response.content, nome, "image/jpeg", use_container_width=True, key="download_gen_aba")
-            except:
-                st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_gen}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+            # ✨ BOTÃO HTML INSTANTÂNEO (Fim do travamento do requests.get)
+            botao_gen_html = f"""
+                <a href="{foto_gen}" target="_blank" style="text-decoration: none;">
+                    <div style="width: 100%; text-align: center; padding: 8px; margin-top: 5px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                        🔍 Visualizar / Salvar Canhoto
+                    </div>
+                </a>
+            """
+            st.markdown(botao_gen_html, unsafe_allow_html=True)
     
     # Sem fotos
     elif any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
@@ -1542,15 +1539,21 @@ def render_tab_comprovantes(pedido_data, status):
         st.info("📷 **Aguardando anexo do canhoto da operação.**\n\nAs fotos serão anexadas após a conclusão da operação.")
 
 def render_tab_historico(pedido_data, df_historico):
-    """ABA 3: Histórico - Últimas operações do ponto de coleta"""
+    """ABA 3: Histórico - Carregado apenas quando a aba é selecionada"""
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # O processamento pesado só ocorre aqui, dentro da aba
     if df_historico is None or df_historico.empty:
-        st.info("📋 Nenhum histórico disponível para este ponto de coleta.")
+        st.info("📋 Nenhum histórico disponível.")
         return
     
     lab_atual = pedido_data.get('LABORATORIO', '')
+    # O filtro é rápido em DataFrames pequenos
     df_lab = df_historico[df_historico['LABORATORIO'] == lab_atual].copy()
     df_lab = df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Coletado|Recusada|Conferido', case=False, na=False)]
     df_lab = df_lab.sort_values('DATA', ascending=False).head(10)
+    
+    # ... (restante do seu código de renderização do histórico)
     
     if df_lab.empty:
         st.info("📋 Nenhum histórico encontrado para este ponto.")
@@ -1652,15 +1655,14 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
     
     # 🔘 Botão Fechar (fora das abas)
     st.markdown("<br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1, 1])
+    col1, col2, col3 = st.columns([3, 2, 3])
     with col2:
-        if button("✖️ Fechar Detalhes", key="fechar_detalhes_btn", variant="secondary"):
+        if st.button("✖️ Fechar Detalhes", key="fechar_detalhes_btn", type="secondary", use_container_width=True):
             st.session_state.modal_aberto = False
             st.session_state.pedido_modal = None
             st.session_state.linha_clicada = None
             st.session_state.modal_fechado = True
             st.session_state.ignorar_selecao_grid = True
-            st.session_state.grid_key = st.session_state.get('grid_key', 0) + 1
             st.rerun()
 
 
