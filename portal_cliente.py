@@ -827,24 +827,34 @@ def carregar_dados_nuvem(cliente_filtro):
                     )
 
                     def defining_foto_prioritaria(r):
-                        f_col = get_app_val(r, 'A_FOTO_COL')
-                        f_ent = get_app_val(r, 'A_FOTO_ENT')
-                        f_gen = get_app_val(r, 'A_FO')
+                        f_gen = get_app_val(r, 'A_FO')         # FOTO original (Coleta principal)
+                        f_col = get_app_val(r, 'A_FOTO_COL')   # Legacy Coleta
+                        f_ent = get_app_val(r, 'A_FOTO_ENT')   # FOTO_ENTREGA (Entrega)
                         
-                        if f_col and f_col.upper() != 'NAN': return f_col
-                        if f_ent and f_ent.upper() != 'NAN': return f_ent
+                        # Prioridade 1: Foto da Coleta (A_FO ou A_FOTO_COL)
                         if f_gen and f_gen.upper() != 'NAN': return f_gen
+                        if f_col and f_col.upper() != 'NAN': return f_col
+                        
+                        # Prioridade 2: Foto da Entrega (apenas se ainda não houver coleta)
+                        if f_ent and f_ent.upper() != 'NAN': return f_ent
+                        
                         return ""
 
                     df['FOTO_FINAL'] = df.apply(defining_foto_prioritaria, axis=1)
 
                     # 📷 FOTOS SEPARADAS DE COLETA E ENTREGA
                     def extrair_foto_coleta(r):
-                        f_col = get_app_val(r, 'A_FOTO_COL')
+                        # Agora busca na coluna FOTO original (mapeada como 'A_FO')
+                        f_col = get_app_val(r, 'A_FO')
                         if f_col and f_col.upper() != 'NAN': return f_col
+                        
+                        # Mantém o fallback caso a coluna A_FOTO_COL exista em algum histórico
+                        f_col_legacy = get_app_val(r, 'A_FOTO_COL')
+                        if f_col_legacy and f_col_legacy.upper() != 'NAN': return f_col_legacy
                         return ""
                     
                     def extrair_foto_entrega(r):
+                        # Puxa diretamente da FOTO_ENTREGA (mapeada como 'A_FOTO_ENT')
                         f_ent = get_app_val(r, 'A_FOTO_ENT')
                         if f_ent and f_ent.upper() != 'NAN': return f_ent
                         return ""
@@ -1352,8 +1362,8 @@ def render_historico_ponto(pedido_data, df_historico):
 
 def render_comprovantes(pedido_data, status):
     """Renderiza seção de comprovantes com fotos"""
-    foto_coleta = limpar_valor(pedido_data.get('FOTO_COLETA', ''))
-    foto_entrega = limpar_valor(pedido_data.get('FOTO_ENTREGA', ''))
+    foto_coleta = tratar_foto(limpar_valor(pedido_data.get('FOTO_COLETA', '')))
+    foto_entrega = tratar_foto(limpar_valor(pedido_data.get('FOTO_ENTREGA', '')))
     foto_gen = limpar_valor(pedido_data.get('COMPROVANTE', ''))
     
     # Se tiver fotos separadas
@@ -1475,8 +1485,8 @@ def render_tab_dados_principais(pedido_data, status):
 
 def render_tab_comprovantes(pedido_data, status):
     """ABA 2: Comprovantes - Fotos de Coleta e Entrega"""
-    foto_coleta = limpar_valor(pedido_data.get('FOTO_COLETA', ''))
-    foto_entrega = limpar_valor(pedido_data.get('FOTO_ENTREGA', ''))
+    foto_coleta = tratar_foto(limpar_valor(pedido_data.get('FOTO_COLETA', '')))
+    foto_entrega = tratar_foto(limpar_valor(pedido_data.get('FOTO_ENTREGA', '')))
     foto_gen = limpar_valor(pedido_data.get('COMPROVANTE', ''))
     
     # Se tiver fotos separadas
