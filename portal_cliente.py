@@ -1493,41 +1493,47 @@ def render_tab_comprovantes(pedido_data, status):
     if (foto_coleta and foto_coleta.startswith("http")) or (foto_entrega and foto_entrega.startswith("http")):
         if foto_coleta and foto_coleta.startswith("http"):
             st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📸 Comprovante de Coleta</p>", unsafe_allow_html=True)
-            st.image(foto_coleta, use_container_width=True, caption="Foto tirada no momento da coleta")
-            try:
-                response = requests.get(foto_coleta, timeout=5)
-                if response.status_code == 200:
-                    nome = foto_coleta.split('/')[-1] if '/' in foto_coleta else f"coleta_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                    if '.' not in nome: nome = f"{nome}.jpg"
-                    st.download_button("⬇️ Baixar Foto de Coleta", response.content, nome, "image/jpeg", use_container_width=True, key="download_coleta_aba")
-            except:
-                st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_coleta}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.image(foto_coleta, use_container_width=True, caption="Foto tirada no momento da coleta")
+                try:
+                    response = requests.get(foto_coleta, timeout=5)
+                    if response.status_code == 200:
+                        nome = foto_coleta.split('/')[-1] if '/' in foto_coleta else f"coleta_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                        if '.' not in nome: nome = f"{nome}.jpg"
+                        st.download_button("⬇️ Baixar Foto de Coleta", response.content, nome, "image/jpeg", use_container_width=True, key="download_coleta_aba")
+                except:
+                    st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_coleta}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
         
         if foto_entrega and foto_entrega.startswith("http"):
             st.divider()
             st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📸 Comprovante de Entrega</p>", unsafe_allow_html=True)
-            st.image(foto_entrega, use_container_width=True, caption="Foto tirada no momento da entrega")
-            try:
-                response = requests.get(foto_entrega, timeout=5)
-                if response.status_code == 200:
-                    nome = foto_entrega.split('/')[-1] if '/' in foto_entrega else f"entrega_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                    if '.' not in nome: nome = f"{nome}.jpg"
-                    st.download_button("⬇️ Baixar Foto de Entrega", response.content, nome, "image/jpeg", use_container_width=True, key="download_entrega_aba")
-            except:
-                st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_entrega}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.image(foto_entrega, use_container_width=True, caption="Foto tirada no momento da entrega")
+                try:
+                    response = requests.get(foto_entrega, timeout=5)
+                    if response.status_code == 200:
+                        nome = foto_entrega.split('/')[-1] if '/' in foto_entrega else f"entrega_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                        if '.' not in nome: nome = f"{nome}.jpg"
+                        st.download_button("⬇️ Baixar Foto de Entrega", response.content, nome, "image/jpeg", use_container_width=True, key="download_entrega_aba")
+                except:
+                    st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_entrega}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
     
     # Fallback para foto genérica
     elif foto_gen and foto_gen.startswith("http"):
         st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📸 Canhoto da Operação</p>", unsafe_allow_html=True)
-        st.image(foto_gen, use_container_width=True, caption="Comprovante da operação")
-        try:
-            response = requests.get(foto_gen, timeout=5)
-            if response.status_code == 200:
-                nome = foto_gen.split('/')[-1] if '/' in foto_gen else f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
-                if '.' not in nome: nome = f"{nome}.jpg"
-                st.download_button("⬇️ Baixar Canhoto", response.content, nome, "image/jpeg", use_container_width=True, key="download_gen_aba")
-        except:
-            st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_gen}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image(foto_gen, use_container_width=True, caption="Comprovante da operação")
+            try:
+                response = requests.get(foto_gen, timeout=5)
+                if response.status_code == 200:
+                    nome = foto_gen.split('/')[-1] if '/' in foto_gen else f"canhoto_{pedido_data.get('PEDIDO', 'pedido')}.jpg"
+                    if '.' not in nome: nome = f"{nome}.jpg"
+                    st.download_button("⬇️ Baixar Canhoto", response.content, nome, "image/jpeg", use_container_width=True, key="download_gen_aba")
+            except:
+                st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px;'>📎 <a href='{foto_gen}' target='_blank'>Abrir em nova aba</a></p>", unsafe_allow_html=True)
     
     # Sem fotos
     elif any(x in status for x in ["FRUSTRADA", "PROBLEMA", "CANCELADO"]):
