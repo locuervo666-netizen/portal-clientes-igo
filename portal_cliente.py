@@ -613,7 +613,7 @@ def conectar_banco_seguro():
 # ✅ FOTO_COLETA e FOTO_ENTREGA são copiadas automaticamente pelo Apps Script
 # Aqui apenas lemos os valores de App_Tarefas
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=180) # 🔥 Aumentado para 3 minutos: Evita baixar tudo de novo só porque o usuário demorou lendo o popup
 def carregar_dados_nuvem(cliente_filtro):
     try:
         gc = conectar_banco_seguro()
@@ -1696,6 +1696,9 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
     col1, col2, col3 = st.columns([3, 2, 3])
     with col2:
         if st.button("✖️ Fechar Detalhes", key="fechar_detalhes_btn", use_container_width=True):
+            # 🔥 Notificação instantânea tira a sensação de travamento
+            st.toast("Limpando grid e atualizando painel...", icon="💨")
+            
             st.session_state.modal_aberto = False
             st.session_state.pedido_modal = None
             st.session_state.linha_clicada = None
