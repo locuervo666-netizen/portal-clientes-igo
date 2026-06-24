@@ -523,6 +523,23 @@ CSS_DASHBOARD = """
         right: 15px !important;
         width: auto !important;
     }
+
+    /* ── BOTÃO DE FECHAR DETALHES (VERMELHO) ── */
+    .st-key-fechar_detalhes_btn button {
+        background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%) !important;
+        border: 1px solid #b91c1c !important;
+        transition: all 0.2s ease !important;
+    }
+    .st-key-fechar_detalhes_btn button p {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+    .st-key-fechar_detalhes_btn button:hover {
+        background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%) !important;
+        border-color: #7f1d1d !important;
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4) !important;
+        transform: translateY(-1px) !important;
+    }
     </style>
 """
 
@@ -1609,7 +1626,7 @@ def render_tab_observacoes(pedido_data, status):
 # =======================================================
 # 🪟 FUNÇÃO DO POP-UP MEGAZORD (REFATORADA COM ABAS)
 # =======================================================
-@st.dialog("📋 Detalhes da Operação", width="large")
+@st.dialog("📋 Detalhes da Operação", width="large", dismissible=False)
 def modal_detalhes_pedido(pedido_data, df_historico=None):
     """
     🪟 MODAL REFATORADO COM ABAS - Estrutura Limpa e Organizada
@@ -1655,14 +1672,36 @@ def modal_detalhes_pedido(pedido_data, df_historico=None):
     
     # 🔘 Botão Fechar (fora das abas)
     st.markdown("<br>", unsafe_allow_html=True)
+    
+    # 🔥 CSS específico para deixar este botão vermelho e com destaque
+    st.markdown("""
+        <style>
+        div.st-key-fechar_detalhes_btn > button {
+            background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%) !important;
+            color: #ffffff !important;
+            border: 1px solid #b91c1c !important;
+            font-weight: 700 !important;
+            transition: all 0.2s ease !important;
+        }
+        div.st-key-fechar_detalhes_btn > button:hover {
+            background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%) !important;
+            border-color: #7f1d1d !important;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4) !important;
+            transform: translateY(-1px) !important;
+            color: #ffffff !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     col1, col2, col3 = st.columns([3, 2, 3])
     with col2:
-        if st.button("✖️ Fechar Detalhes", key="fechar_detalhes_btn", type="secondary", use_container_width=True):
+        if st.button("✖️ Fechar Detalhes", key="fechar_detalhes_btn", use_container_width=True):
             st.session_state.modal_aberto = False
             st.session_state.pedido_modal = None
             st.session_state.linha_clicada = None
             st.session_state.modal_fechado = True
             st.session_state.ignorar_selecao_grid = True
+            st.session_state.grid_key += 1 # 🔥 Limpa a seleção da grid
             st.rerun()
 
 
@@ -2342,6 +2381,7 @@ else:
                         st.session_state.linha_clicada = None
                         st.session_state.ignorar_selecao_grid = True  # Ignora a seleção que está na grid
                         st.session_state.modal_renderizado_antes = False
+                        st.session_state.grid_key += 1 # 🔥 Limpa a seleção da grid
                         st.rerun()  # Força rerun para aplicar a flag ANTES de renderizar a grid
 
                     ag_response = AgGrid(
