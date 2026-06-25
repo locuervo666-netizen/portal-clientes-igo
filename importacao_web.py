@@ -2582,7 +2582,7 @@ if menu == "📊 GRID":
             value=(
                 hoje_br -
                 timedelta(
-                    days=15),
+                    days=3),
                 hoje_br),
             format="DD/MM/YYYY")
 
