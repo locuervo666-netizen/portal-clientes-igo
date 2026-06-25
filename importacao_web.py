@@ -2132,20 +2132,43 @@ if 'filtro_kpi_admin' not in st.session_state:
     st.session_state.filtro_kpi_admin = "TODOS"
 
 with st.sidebar:
-    st.markdown("<br>", unsafe_allow_html=True)
     st.image(
         "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png",
         use_container_width=True)
-    st.markdown("<br>", unsafe_allow_html=True)
 
     st.markdown("""
         <style>
+        /* Sidebar fixa no viewport com conteúdo sempre visível */
+        [data-testid="stSidebar"] {
+            height: 100vh !important;
+            overflow: hidden !important;
+            --sidebar-btn-width: 220px;
+        }
+        [data-testid="stSidebar"] > div:first-child {
+            height: 100vh !important;
+            overflow-y: hidden !important;
+            overflow-x: hidden !important;
+            padding: 8px 10px 8px !important;
+        }
+        [data-testid="stSidebar"] > div:first-child::-webkit-scrollbar {
+            width: 0 !important;
+            height: 0 !important;
+            display: none !important;
+        }
+        [data-testid="stSidebar"] .stImage {
+            margin-bottom: 6px !important;
+        }
+        [data-testid="stSidebar"] .stImage img {
+            display: block;
+            margin: 0 auto;
+            max-width: 94% !important;
+        }
         [data-testid="stSidebar"] .nav-premium-wrap {
             background: linear-gradient(140deg, #0F172A 0%, #1E293B 60%, #334155 100%);
             border: 1px solid rgba(148, 163, 184, 0.28);
             border-radius: 14px;
-            padding: 14px 12px;
-            margin-bottom: 12px;
+            padding: 10px 10px;
+            margin-bottom: 8px;
             box-shadow: 0 10px 22px rgba(15, 23, 42, 0.25);
         }
         [data-testid="stSidebar"] .nav-premium-title {
@@ -2158,20 +2181,26 @@ with st.sidebar:
         }
         [data-testid="stSidebar"] .nav-premium-subtitle {
             color: #CBD5E1;
-            font-size: 12px;
+            font-size: 11px;
             margin: 0;
         }
         [data-testid="stSidebar"] div.stRadio > div {
-            gap: 7px;
+            gap: 4px;
+            margin-top: 2px;
+            align-items: center;
+        }
+        [data-testid="stSidebar"] div[role="radiogroup"] {
+            width: var(--sidebar-btn-width);
+            margin: 0 auto;
         }
         [data-testid="stSidebar"] div[role="radiogroup"] > label {
             width: 100%;
-            min-height: 48px;
+            min-height: 38px;
             box-sizing: border-box;
             background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
             border: 1px solid #E2E8F0;
-            border-radius: 12px;
-            padding: 10px 12px;
+            border-radius: 10px;
+            padding: 6px 12px;
             margin: 0;
             display: flex;
             align-items: center;
@@ -2181,28 +2210,29 @@ with st.sidebar:
         }
         [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
             border-color: #93C5FD;
-            transform: translateX(2px);
+            transform: none;
             box-shadow: 0 6px 16px rgba(59, 130, 246, 0.14);
         }
         [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
             display: none;
         }
         [data-testid="stSidebar"] div[role="radiogroup"] > label p {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 700;
             color: #0F172A;
             margin: 0;
-            line-height: 1.15;
+            line-height: 1.05;
             text-align: center;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            width: 100%;
         }
         [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
             background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%);
             border-color: #1D4ED8;
-            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.35);
-            transform: translateX(4px);
+            box-shadow: 0 8px 16px rgba(37, 99, 235, 0.30);
+            transform: none;
         }
         [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p,
         [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) span,
@@ -2211,15 +2241,52 @@ with st.sidebar:
             color: #FFFFFF !important;
             font-weight: 800;
         }
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar {
+            width: var(--sidebar-btn-width);
+            margin: 0 auto;
+        }
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] {
+            background: #ef4444 !important;
+            border: 1px solid #dc2626 !important;
+            border-radius: 6px !important;
+            box-sizing: border-box !important;
+            box-shadow: none !important;
+            min-height: 38px !important;
+            margin-top: 4px !important;
+        }
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] p,
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] span,
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] div {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            font-size: 14px !important;
+        }
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"]:hover {
+            background: #dc2626 !important;
+            border-color: #b91c1c !important;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"]:hover p,
+        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"]:hover span {
+            color: #ffffff !important;
+        }
+        [data-testid="stSidebar"] hr {
+            width: var(--sidebar-btn-width);
+            margin: 10px auto 10px !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
     qtd_chamados_abertos = checar_chamados_pendentes(planilha_db)
     if qtd_chamados_abertos > 0:
         st.markdown(f"""
-            <div style="background-color: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px; border-radius: 4px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);">
-                <p style="color: #991B1B; font-weight: 800; font-size: 13px; margin: 0;">🚨 {qtd_chamados_abertos} Chamado(s) Aberto(s)</p>
-                <p style="color: #7F1D1D; font-size: 11px; margin: 0;">Acesse o menu Atendimento.</p>
+            <div style="background-color: #FEF2F2; border-left: 4px solid #DC2626; padding: 8px; border-radius: 4px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);">
+                <p style="color: #991B1B; font-weight: 800; font-size: 12px; margin: 0;">🚨 {qtd_chamados_abertos} Chamado(s) Aberto(s)</p>
+                <p style="color: #7F1D1D; font-size: 10px; margin: 0;">Acesse o menu Atendimento.</p>
             </div>
         """, unsafe_allow_html=True)
 
@@ -2238,45 +2305,7 @@ with st.sidebar:
         "📱 WhatsApp"
     ], index=1, label_visibility="collapsed")
 
-    st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
     st.divider()
-    
-    # 🔥 ESTILO EXCLUSIVO E DEFINITIVO PARA O BOTÃO SAIR 🔥
-    st.markdown("""
-        <style>
-        /* Botão sair simples e legível */
-        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] {
-            background: #ef4444 !important;
-            border: 1px solid #dc2626 !important;
-            border-radius: 6px !important;
-            box-shadow: none !important;
-            min-height: 42px !important;
-        }
-
-        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] p,
-        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] span,
-        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"] div {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            color: #ffffff !important;
-            font-weight: 700 !important;
-            font-size: 14px !important;
-        }
-
-        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"]:hover {
-            background: #dc2626 !important;
-            border-color: #b91c1c !important;
-            box-shadow: none !important;
-            transform: none !important;
-        }
-        
-        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"]:hover p,
-        [data-testid="stSidebar"] div.st-key-btn_sair_sidebar button[kind="primary"]:hover span {
-            color: #ffffff !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
 
     if st.button("🚪 Sair do Sistema", key="btn_sair_sidebar", use_container_width=True, type="primary"):
         st.session_state.autenticado = False
@@ -5247,59 +5276,63 @@ elif menu == "📥 Importações":
             st.markdown("---")
             st.markdown("### 🎛️ Mesa de Comando Oficial")
 
-            col_inj, col_disparo, col_limp = st.columns(3)
+            # ---------------------------------------------------------------------
+            # ESTADOS: IDLE e CONFIRMING (Exibe os botões em 3 colunas)
+            # ---------------------------------------------------------------------
+            if st.session_state.of_step in ['IDLE', 'CONFIRMING']:
+                col_inj, col_disparo, col_limp = st.columns(3)
 
-            with col_inj:
-                if st.button("🚀 1. Injetar Lote no Banco", type="primary", use_container_width=True):
-                    with st.spinner("🚀 Injetando lotes no banco de dados principal e AppSheet..."):
-                        try:
-                            colunas_bd_oficiais = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO', 'ZAP_ENVIADO', 'FATURA', 'OBSERVACOES']
-                            df_to_insert = df_editado_oficial.copy()
-                            for c in colunas_bd_oficiais:
-                                if c not in df_to_insert.columns:
-                                    df_to_insert[c] = ""
-                            df_to_insert = df_to_insert[colunas_bd_oficiais].astype(str)
+                with col_inj:
+                    if st.button("🚀 1. Injetar Lote no Banco", type="primary", use_container_width=True):
+                        with st.spinner("🚀 Injetando lotes no banco de dados principal e AppSheet..."):
+                            try:
+                                colunas_bd_oficiais = ['DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'STATUS', 'AGENTE_RAW', 'PRAZO_DIAS', 'DATA_LIMITE', 'DATA_ENTREGA', 'FOTO', 'ROMANEIO', 'ZAP_ENVIADO', 'FATURA', 'OBSERVACOES']
+                                df_to_insert = df_editado_oficial.copy()
+                                for c in colunas_bd_oficiais:
+                                    if c not in df_to_insert.columns:
+                                        df_to_insert[c] = ""
+                                df_to_insert = df_to_insert[colunas_bd_oficiais].astype(str)
 
-                            aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            df_up_final = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-                            pedidos_existentes = df_up_final['PEDIDO'].astype(str).tolist()
-                            df_to_insert_clean = df_to_insert[~df_to_insert['PEDIDO'].astype(str).isin(pedidos_existentes)]
+                                aba_m = planilha_db.worksheet("Memoria_Sistema")
+                                df_up_final = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                                pedidos_existentes = df_up_final['PEDIDO'].astype(str).tolist()
+                                df_to_insert_clean = df_to_insert[~df_to_insert['PEDIDO'].astype(str).isin(pedidos_existentes)]
 
-                            if not df_to_insert_clean.empty:
-                                df_up_final = pd.concat([df_up_final, df_to_insert_clean], ignore_index=True)
-                                aba_m.clear()
-                                aba_m.update("A1", [df_up_final.columns.tolist()] + df_up_final.fillna("").astype(str).values.tolist())
+                                if not df_to_insert_clean.empty:
+                                    df_up_final = pd.concat([df_up_final, df_to_insert_clean], ignore_index=True)
+                                    aba_m.clear()
+                                    aba_m.update("A1", [df_up_final.columns.tolist()] + df_up_final.fillna("").astype(str).values.tolist())
 
-                                lista_app_of = []
-                                for _, r in df_to_insert_clean.iterrows():
-                                    if str(r.get('AGENTE_RAW', '')).strip():
-                                        lista_app_of.append({
-                                            'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'],
-                                            'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'],
-                                            'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'],
-                                            'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'],
-                                            'TOMADOR': r['TOMADOR'], 'OBSERVACOES': r.get('OBSERVACOES', '')
-                                        })
-                                if lista_app_of:
-                                    despachar_para_appsheet(lista_app_of)
+                                    lista_app_of = []
+                                    for _, r in df_to_insert_clean.iterrows():
+                                        if str(r.get('AGENTE_RAW', '')).strip():
+                                            lista_app_of.append({
+                                                'PEDIDO': r['PEDIDO'], 'MOTORISTA': r['AGENTE_RAW'],
+                                                'ENDERECO': r['ENDERECO'], 'NUMERO': r['NUMERO'],
+                                                'BAIRRO': r['BAIRRO'], 'CIDADE': r['CIDADE'],
+                                                'CEP': r['CEP'], 'LABORATORIO': r['LABORATORIO'],
+                                                'TOMADOR': r['TOMADOR'], 'OBSERVACOES': r.get('OBSERVACOES', '')
+                                            })
+                                    if lista_app_of:
+                                        despachar_para_appsheet(lista_app_of)
 
-                            st.success("🎉 SUCESSO! O Lote foi injetado no C.C.O. Prossiga para a transmissão.")
-                            time.sleep(2.0)
-                            carregar_dados_completos.clear()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao injetar: {e}")
+                                st.success("🎉 SUCESSO! O Lote foi injetado no C.C.O. Prossiga para a transmissão.")
+                                time.sleep(2.0)
+                                carregar_dados_completos.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao injetar: {e}")
 
-            with col_disparo:
-                if st.session_state.of_step in ['IDLE', 'CONFIRMING']:
-                    st.markdown(render_big_metrics_off(len(df_editado_oficial), 0, 0, 0), unsafe_allow_html=True)
+                with col_disparo:
                     if st.session_state.of_step == 'IDLE':
+                        st.markdown(render_big_metrics_off(len(df_editado_oficial), 0, 0, 0), unsafe_allow_html=True)
                         st.markdown("<div class='of-card'><div class='of-card-title'>Transmissão ao vivo</div><div class='of-card-subtitle'>Clique para abrir o modo monitorado com atualização de status por motorista.</div></div>", unsafe_allow_html=True)
                         if st.button("🚀 INICIAR TRANSMISSÃO EM LOTE AGORA", type="primary", use_container_width=True):
                             st.session_state.of_df_dispatch = df_editado_oficial.copy()
                             st.session_state.of_step = 'CONFIRMING'
                             st.rerun()
-                    else:
+                    else: # CONFIRMING
+                        st.markdown(render_big_metrics_off(len(df_editado_oficial), 0, 0, 0), unsafe_allow_html=True)
                         st.markdown("<div style='background-color:#FEF2F2; border:2px solid #FCA5A5; border-radius:12px; padding:18px; margin-bottom:14px;'><h4 style='margin:0; color:#991B1B;'>⚠️ Confirmação de Disparo Crítico</h4><p style='margin:6px 0 0 0; color:#7F1D1D;'>Você está prestes a disparar mensagens oficiais via WhatsApp para os motoristas do lote selecionado.</p></div>", unsafe_allow_html=True)
                         c_ok, c_cancel = st.columns(2)
                         if c_ok.button("✔️ CONFIRMAR E DISPARAR", type="primary", use_container_width=True):
@@ -5310,229 +5343,225 @@ elif menu == "📥 Importações":
                             st.session_state.of_df_dispatch = pd.DataFrame()
                             st.rerun()
 
-                elif st.session_state.of_step == 'PROCESSING':
-                    st.markdown("## 📡 Monitor de Transmissão Oficial")
-                    st.error("⚠️ **PROCESSO EM ANDAMENTO - NÃO ATUALIZE OU MUDE DE ABA!**")
-
-                    df_dispatch = st.session_state.of_df_dispatch.copy()
-                    if df_dispatch.empty:
-                        df_dispatch = df_editado_oficial.copy()
-                        st.session_state.of_df_dispatch = df_dispatch
-
-                    dict_tel = {}
-                    dict_nom = {}
-                    if not DF_AGENTES.empty:
-                        for _, r in DF_AGENTES.iterrows():
-                            login_ag = str(r.get('LOGIN DO AGENTE', '')).strip().lower()
-                            if login_ag:
-                                num_limpo = re.sub(r'\D', '', str(r.get('TELEFONE', '')))
-                                if num_limpo and not num_limpo.startswith('55') and len(num_limpo) <= 11:
-                                    num_limpo = '55' + num_limpo
-                                dict_tel[login_ag] = num_limpo
-                                dict_nom[login_ag] = str(r.get('NOME DO AGENTE', '')).strip()
-
-                    agentes_selecionados = df_dispatch['AGENTE_RAW'].dropna().unique()
-                    total_agentes = len(agentes_selecionados)
-                    if total_agentes == 0:
-                        st.error("Nenhum motorista válido foi encontrado para disparo.")
-                        st.session_state.of_step = 'IDLE'
-                        st.rerun()
-
-                    st.session_state.of_resultados_disparo = {}
-                    sucesso_total = 0
-                    falha_total = 0
-                    id_evento = f"OFICIAL-{datetime.now(FUSO_BR).strftime('%Y%m%d%H%M%S')}"
-
-                    col_live_of, col_side_of = st.columns([1.45, 1.25])
-
-                    with col_side_of:
-                        st.markdown("<div class='of-terminal'><div style='font-size:12px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:#93C5FD; margin-bottom:8px;'>Painel lateral fixo</div><div style='font-size:16px; font-weight:900; color:#FFFFFF; line-height:1.2; margin-bottom:8px;'>Motorista em processamento</div><div style='font-size:13px; color:#E2E8F0; line-height:1.5;'>Este bloco acompanha a execução em tempo real e ocupa uma faixa fixa da página, como no fluxo do Umove.</div></div>", unsafe_allow_html=True)
-                        driver_placeholder = st.empty()
-
-                    with col_live_of:
-                        metrics_placeholder = st.empty()
-                        progress_bar = st.progress(0)
-                        logs_placeholder = st.container(border=True)
-                        log_table_placeholder = logs_placeholder.empty()
-                        logs_df_data = []
-
-                        metrics_placeholder.markdown(render_big_metrics_off(total_agentes, total_agentes, 0, 0), unsafe_allow_html=True)
-
-                    for idx_ag, ag in enumerate(agentes_selecionados):
-                        if not str(ag).strip():
-                            continue
-
-                        try:
-                            df_ag_of = df_dispatch[df_dispatch['AGENTE_RAW'] == ag]
-                            ag_key = str(ag).strip().lower()
-                            tel = dict_tel.get(ag_key, "")
-                            nom = dict_nom.get(ag_key, str(ag).upper())
-
-                            st.session_state.of_resultados_disparo[nom] = {'total': len(df_ag_of), 'sucesso': 0, 'pedidos': df_ag_of['PEDIDO'].tolist()}
-
-                            if not tel:
-                                raise ValueError(f"Telefone não localizado no banco para {nom}.")
-
-                            driver_placeholder.markdown(render_current_driver_off(nom, idx_ag + 1, total_agentes), unsafe_allow_html=True)
-
-                            datas_na_rota = pd.to_datetime(df_ag_of['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
-                            if not datas_na_rota.empty:
-                                d_min_zap = datas_na_rota.min().strftime('%d/%m/%Y')
-                                d_max_zap = datas_na_rota.max().strftime('%d/%m/%Y')
-                                data_str = f"{d_min_zap}" if d_min_zap == d_max_zap else f"{d_min_zap} a {d_max_zap}"
-                            else:
-                                data_str = hoje_br.strftime('%d/%m/%Y')
-
-                            uf_agente_of = ""
-                            if 'UF' in df_ag_of.columns:
-                                ufs_unicos_of = df_ag_of['UF'].dropna().unique()
-                                if len(ufs_unicos_of) > 0:
-                                    uf_agente_of = str(ufs_unicos_of[0]).upper().strip()
-
-                            saudacao, fechamento = gerar_saudacao_spintax(nom, uf_agente_of)
-                            sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
-                            sep2 = random.choice(['---', '...', '===', ' '])
-                            bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
-                            lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
-
-                            msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
-                            tot_qtd = 0
-                            for cid, count in df_ag_of['CIDADE'].value_counts().items():
-                                msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}")
-                                tot_qtd += count
-                            msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
-
-                            for cid, group in df_ag_of.groupby('CIDADE'):
-                                msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
-                                items = []
-                                for _, row in group.iterrows():
-                                    item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
-                                    obs = str(row.get('OBSERVACOES', '')).strip()
-                                    if obs and obs.upper() != 'NAN':
-                                        item_str += f"\n> 📝 Aviso: {obs}"
-                                    items.append(item_str)
-                                msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
-
-                            msg_parts.append(f"\n{fechamento}")
-
-                            INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711"
-                            TOKEN = "2321563615C4242CB6031504"
-                            CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S"
-                            try:
-                                requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
-                                time.sleep(random.uniform(2.0, 3.0))
-                            except BaseException:
-                                pass
-
-                            resultado_msg = "✅"
-                            if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
-                                time.sleep(random.uniform(2.0, 3.0))
-
-                                if df_ag_of.empty:
-                                    raise ValueError("Lote vazio para o motorista atual.")
-
-                                if True:
-                                    try:
-                                        try:
-                                            requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
-                                        except BaseException:
-                                            pass
-
-                                        if ag_key == 'luiz.paulo':
-                                            df_para_pdf = df_dispatch[df_dispatch['UF'] == 'RJ']
-                                            nome_arq_pdf = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.pdf"
-                                            pdf_bytes = gerar_pdf_rota_whatsapp("RJ - GERAL", data_str, df_para_pdf)
-                                        else:
-                                            df_para_pdf = df_ag_of
-                                            nome_arq_pdf = f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf"
-                                            pdf_bytes = gerar_pdf_rota_whatsapp(nom, data_str, df_para_pdf)
-
-                                        if df_para_pdf is not None and not df_para_pdf.empty and is_autorizado_pdf:
-                                            enviar_pdf_zapi(tel, pdf_bytes, nome_arq_pdf)
-                                            time.sleep(2.0)
-                                    except Exception:
-                                        resultado_msg += " (Sem PDF)"
-
-                                if True:
-                                    try:
-                                        try:
-                                            requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
-                                        except BaseException:
-                                            pass
-                                        if ag_key == 'luiz.paulo':
-                                            df_para_xls = df_dispatch[df_dispatch['UF'] == 'RJ']
-                                            nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
-                                        else:
-                                            df_para_xls = df_ag_of
-                                            nome_arq_xls = f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx"
-                                        if df_para_xls is not None and not df_para_xls.empty and is_autorizado_xls:
-                                            enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_para_xls), nome_arq_xls)
-                                            time.sleep(2.0)
-                                    except Exception:
-                                        resultado_msg += " (Sem XLS)"
-
-                                sucesso_total += 1
-                                st.session_state.of_resultados_disparo[nom]['sucesso'] = len(df_ag_of)
-                            else:
-                                resultado_msg = "❌ Erro Z-API"
-                                falha_total += 1
-                                st.session_state.of_resultados_disparo[nom]['sucesso'] = 0
-
-                            pending = total_agentes - (idx_ag + 1)
-                            metrics_placeholder.markdown(render_big_metrics_off(total_agentes, pending, sucesso_total, falha_total), unsafe_allow_html=True)
-                            pedidos_list = df_ag_of['PEDIDO'].astype(str).tolist() if 'PEDIDO' in df_ag_of.columns else []
-                            pedidos_str = ", ".join(pedidos_list)[:200] + "..." if len(", ".join(pedidos_list)) > 200 else ", ".join(pedidos_list)
-                            logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": resultado_msg, "Motorista": nom, "Msg": f"Enviados {len(df_ag_of)} vols"})
-                            log_table_placeholder.dataframe(pd.DataFrame(logs_df_data), use_container_width=True, hide_index=True)
-                            progress_bar.progress((idx_ag + 1) / total_agentes)
-
-                            try:
-                                aba_m = planilha_db.worksheet("Memoria_Sistema")
-                                df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-                                if 'ZAP_ENVIADO' not in df_nuvem.columns:
-                                    df_nuvem['ZAP_ENVIADO'] = ""
-                                if 'PEDIDO' in df_nuvem.columns:
-                                    df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_ag_of['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
-                                    aba_m.clear()
-                                    aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                            except BaseException:
-                                pass
-
-                        except Exception as e:
-                            falha_total += 1
-                            nom_err = nom if 'nom' in locals() else f"ID: {ag}"
-                            st.session_state.of_resultados_disparo[nom_err] = {'total': len(df_ag_of) if 'df_ag_of' in locals() else 0, 'sucesso': 0, 'pedidos': []}
-                            logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": "❌ ERRO", "Motorista": nom_err, "Msg": str(e)[:35]})
-                            log_table_placeholder.dataframe(pd.DataFrame(logs_df_data), use_container_width=True, hide_index=True)
-                            pending = total_agentes - (idx_ag + 1)
-                            metrics_placeholder.markdown(render_big_metrics_off(total_agentes, pending, sucesso_total, falha_total), unsafe_allow_html=True)
-                            progress_bar.progress((idx_ag + 1) / total_agentes)
-
-                    st.session_state.of_final_metrics = {'total': total_agentes, 'sucesso': sucesso_total, 'falhas': falha_total}
-                    st.session_state.of_step = 'COMPLETED'
-                    st.rerun()
-
-                elif st.session_state.of_step == 'COMPLETED':
-                    st.markdown("## 📊 Relatório Final da Missão")
-                    metrics = st.session_state.of_final_metrics
-                    st.markdown(render_big_metrics_off(metrics['total'], 0, metrics['sucesso'], metrics['falhas']), unsafe_allow_html=True)
-                    st.success("🎉 O disparo em lote foi finalizado! O histórico foi consolidado na nuvem.")
-
-                    if st.button("🔄 Liberar Mesa para Novo Disparo", use_container_width=True):
+                with col_limp:
+                    if st.button("🧹 3. Limpar Mesa e Finalizar", type="secondary", use_container_width=True):
+                        st.session_state.df_carrinho_oficial = pd.DataFrame()
                         st.session_state.of_step = 'IDLE'
                         st.session_state.of_df_dispatch = pd.DataFrame()
-                        st.session_state.of_resultados_disparo = {}
+                        if 'contador_oficial_temp' in st.session_state:
+                            del st.session_state.contador_oficial_temp
+                        st.success("Mesa limpa e pronta para o próximo lote!")
+                        time.sleep(1)
                         st.rerun()
 
-            with col_limp:
-                if st.button("🧹 3. Limpar Mesa e Finalizar", type="secondary", use_container_width=True):
-                    st.session_state.df_carrinho_oficial = pd.DataFrame()
+            # ---------------------------------------------------------------------
+            # ESTADO: PROCESSING (Renderizado em LARGURA TOTAL da tela)
+            # ---------------------------------------------------------------------
+            elif st.session_state.of_step == 'PROCESSING':
+                st.markdown("---")
+                st.markdown("## 📡 Monitor de Transmissão Oficial")
+                st.error("⚠️ **PROCESSO EM ANDAMENTO - NÃO ATUALIZE OU MUDE DE ABA!**")
+
+                df_dispatch = st.session_state.of_df_dispatch.copy()
+                if df_dispatch.empty:
+                    df_dispatch = df_editado_oficial.copy()
+                    st.session_state.of_df_dispatch = df_dispatch
+
+                dict_tel = {}
+                dict_nom = {}
+                if not DF_AGENTES.empty:
+                    for _, r in DF_AGENTES.iterrows():
+                        login_ag = str(r.get('LOGIN DO AGENTE', '')).strip().lower()
+                        if login_ag:
+                            num_limpo = re.sub(r'\D', '', str(r.get('TELEFONE', '')))
+                            if num_limpo and not num_limpo.startswith('55') and len(num_limpo) <= 11:
+                                num_limpo = '55' + num_limpo
+                            dict_tel[login_ag] = num_limpo
+                            dict_nom[login_ag] = str(r.get('NOME DO AGENTE', '')).strip()
+
+                agentes_selecionados = df_dispatch['AGENTE_RAW'].dropna().unique()
+                total_agentes = len(agentes_selecionados)
+                if total_agentes == 0:
+                    st.error("Nenhum motorista válido foi encontrado para disparo.")
+                    st.session_state.of_step = 'IDLE'
+                    st.rerun()
+
+                st.session_state.of_resultados_disparo = {}
+                sucesso_total = 0
+                falha_total = 0
+                id_evento = f"OFICIAL-{datetime.now(FUSO_BR).strftime('%Y%m%d%H%M%S')}"
+
+                col_live_of, col_side_of = st.columns([2, 1])
+
+                with col_side_of:
+                    st.markdown("<div class='of-terminal'><div style='font-size:12px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:#93C5FD; margin-bottom:8px;'>Painel lateral fixo</div><div style='font-size:16px; font-weight:900; color:#FFFFFF; line-height:1.2; margin-bottom:8px;'>Motorista em processamento</div><div style='font-size:13px; color:#E2E8F0; line-height:1.5;'>Este bloco acompanha a execução em tempo real e ocupa uma faixa fixa da página.</div></div>", unsafe_allow_html=True)
+                    driver_placeholder = st.empty()
+
+                with col_live_of:
+                    metrics_placeholder = st.empty()
+                    progress_bar = st.progress(0)
+                    logs_placeholder = st.container(border=True)
+                    log_table_placeholder = logs_placeholder.empty()
+                    logs_df_data = []
+
+                    metrics_placeholder.markdown(render_big_metrics_off(total_agentes, total_agentes, 0, 0), unsafe_allow_html=True)
+
+                for idx_ag, ag in enumerate(agentes_selecionados):
+                    if not str(ag).strip(): continue
+
+                    try:
+                        df_ag_of = df_dispatch[df_dispatch['AGENTE_RAW'] == ag]
+                        ag_key = str(ag).strip().lower()
+                        tel = dict_tel.get(ag_key, "")
+                        nom = dict_nom.get(ag_key, str(ag).upper())
+
+                        st.session_state.of_resultados_disparo[nom] = {'total': len(df_ag_of), 'sucesso': 0, 'pedidos': df_ag_of['PEDIDO'].tolist()}
+
+                        if not tel: raise ValueError(f"Telefone não localizado no banco para {nom}.")
+
+                        driver_placeholder.markdown(render_current_driver_off(nom, idx_ag + 1, total_agentes), unsafe_allow_html=True)
+
+                        datas_na_rota = pd.to_datetime(df_ag_of['DATA'], format='%d/%m/%Y', errors='coerce').dropna().dt.date
+                        if not datas_na_rota.empty:
+                            d_min_zap = datas_na_rota.min().strftime('%d/%m/%Y')
+                            d_max_zap = datas_na_rota.max().strftime('%d/%m/%Y')
+                            data_str = f"{d_min_zap}" if d_min_zap == d_max_zap else f"{d_min_zap} a {d_max_zap}"
+                        else:
+                            data_str = hoje_br.strftime('%d/%m/%Y')
+
+                        uf_agente_of = ""
+                        if 'UF' in df_ag_of.columns:
+                            ufs_unicos_of = df_ag_of['UF'].dropna().unique()
+                            if len(ufs_unicos_of) > 0:
+                                uf_agente_of = str(ufs_unicos_of[0]).upper().strip()
+
+                        saudacao, fechamento = gerar_saudacao_spintax(nom, uf_agente_of)
+                        sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
+                        sep2 = random.choice(['---', '...', '===', ' '])
+                        bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
+                        lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
+
+                        msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
+                        tot_qtd = 0
+                        for cid, count in df_ag_of['CIDADE'].value_counts().items():
+                            msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}")
+                            tot_qtd += count
+                        msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
+
+                        for cid, group in df_ag_of.groupby('CIDADE'):
+                            msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
+                            items = []
+                            for _, row in group.iterrows():
+                                item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                obs = str(row.get('OBSERVACOES', '')).strip()
+                                if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
+                                items.append(item_str)
+                            msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
+
+                        msg_parts.append(f"\n{fechamento}")
+
+                        INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711"
+                        TOKEN = "2321563615C4242CB6031504"
+                        CLIENT_TOKEN = "Ffaa43dcff1e14f0e985c91e92b24ed89S"
+                        
+                        try:
+                            requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                            time.sleep(random.uniform(2.0, 3.0))
+                        except BaseException: pass
+
+                        resultado_msg = "✅"
+                        if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
+                            time.sleep(random.uniform(2.0, 3.0))
+                            if df_ag_of.empty: raise ValueError("Lote vazio para o motorista atual.")
+
+                            try:
+                                try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                except BaseException: pass
+
+                                if ag_key == 'luiz.paulo':
+                                    df_para_pdf = df_dispatch[df_dispatch['UF'] == 'RJ']
+                                    nome_arq_pdf = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.pdf"
+                                    pdf_bytes = gerar_pdf_rota_whatsapp("RJ - GERAL", data_str, df_para_pdf)
+                                else:
+                                    df_para_pdf = df_ag_of
+                                    nome_arq_pdf = f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf"
+                                    pdf_bytes = gerar_pdf_rota_whatsapp(nom, data_str, df_para_pdf)
+
+                                if df_para_pdf is not None and not df_para_pdf.empty and is_autorizado_pdf:
+                                    enviar_pdf_zapi(tel, pdf_bytes, nome_arq_pdf)
+                                    time.sleep(2.0)
+                            except Exception:
+                                resultado_msg += " (Sem PDF)"
+
+                            try:
+                                try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
+                                except BaseException: pass
+                                
+                                if ag_key == 'luiz.paulo':
+                                    df_para_xls = df_dispatch[df_dispatch['UF'] == 'RJ']
+                                    nome_arq_xls = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.xlsx"
+                                else:
+                                    df_para_xls = df_ag_of
+                                    nome_arq_xls = f"ROTA_ESTRUTURADA_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.xlsx"
+                                
+                                if df_para_xls is not None and not df_para_xls.empty and is_autorizado_xls:
+                                    enviar_excel_zapi(tel, gerar_excel_rota_whatsapp(df_para_xls), nome_arq_xls)
+                                    time.sleep(2.0)
+                            except Exception:
+                                resultado_msg += " (Sem XLS)"
+
+                            sucesso_total += 1
+                            st.session_state.of_resultados_disparo[nom]['sucesso'] = len(df_ag_of)
+                        else:
+                            resultado_msg = "❌ Erro Z-API"
+                            falha_total += 1
+                            st.session_state.of_resultados_disparo[nom]['sucesso'] = 0
+
+                        pending = total_agentes - (idx_ag + 1)
+                        metrics_placeholder.markdown(render_big_metrics_off(total_agentes, pending, sucesso_total, falha_total), unsafe_allow_html=True)
+                        pedidos_list = df_ag_of['PEDIDO'].astype(str).tolist() if 'PEDIDO' in df_ag_of.columns else []
+                        logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": resultado_msg, "Motorista": nom, "Msg": f"Enviados {len(df_ag_of)} vols"})
+                        log_table_placeholder.dataframe(pd.DataFrame(logs_df_data), use_container_width=True, hide_index=True)
+                        progress_bar.progress((idx_ag + 1) / total_agentes)
+
+                        try:
+                            aba_m = planilha_db.worksheet("Memoria_Sistema")
+                            df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                            if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
+                            if 'PEDIDO' in df_nuvem.columns:
+                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_ag_of['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
+                                aba_m.clear()
+                                aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+                        except BaseException: pass
+
+                    except Exception as e:
+                        falha_total += 1
+                        nom_err = nom if 'nom' in locals() else f"ID: {ag}"
+                        st.session_state.of_resultados_disparo[nom_err] = {'total': len(df_ag_of) if 'df_ag_of' in locals() else 0, 'sucesso': 0, 'pedidos': []}
+                        logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": "❌ ERRO", "Motorista": nom_err, "Msg": str(e)[:35]})
+                        log_table_placeholder.dataframe(pd.DataFrame(logs_df_data), use_container_width=True, hide_index=True)
+                        pending = total_agentes - (idx_ag + 1)
+                        metrics_placeholder.markdown(render_big_metrics_off(total_agentes, pending, sucesso_total, falha_total), unsafe_allow_html=True)
+                        progress_bar.progress((idx_ag + 1) / total_agentes)
+
+                st.session_state.of_final_metrics = {'total': total_agentes, 'sucesso': sucesso_total, 'falhas': falha_total}
+                st.session_state.of_step = 'COMPLETED'
+                st.rerun()
+
+            # ---------------------------------------------------------------------
+            # ESTADO: COMPLETED (Também em largura total)
+            # ---------------------------------------------------------------------
+            elif st.session_state.of_step == 'COMPLETED':
+                st.markdown("---")
+                st.markdown("## 📊 Relatório Final da Missão")
+                metrics = st.session_state.of_final_metrics
+                st.markdown(render_big_metrics_off(metrics['total'], 0, metrics['sucesso'], metrics['falhas']), unsafe_allow_html=True)
+                st.success("🎉 O disparo em lote foi finalizado! O histórico foi consolidado na nuvem.")
+
+                if st.button("🔄 Liberar Mesa para Novo Disparo", use_container_width=True):
                     st.session_state.of_step = 'IDLE'
                     st.session_state.of_df_dispatch = pd.DataFrame()
-                    if 'contador_oficial_temp' in st.session_state:
-                        del st.session_state.contador_oficial_temp
-                    st.success("Mesa limpa e pronta para o próximo lote!")
-                    time.sleep(1)
+                    st.session_state.of_resultados_disparo = {}
                     st.rerun()
         else:
             st.info("🛒 O carrinho está vazio. Cole uma matriz acima para começar ou marque o interruptor dos pedidos fixos para adicioná-los.")
@@ -7500,7 +7529,7 @@ elif menu == "🔬 Triagem":
                                                     tentativas += 1
                                                     if tentativas < max_tentativas:
                                                         # Aguarda 1s antes de tentar novamente
-                                                        time.sleep(1)
+                                                        time.sleep(1)       
                                                         continue
                                                     else:
                                                         raise ultima_excecao
