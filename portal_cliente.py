@@ -1573,14 +1573,14 @@ def render_tab_historico(pedido_data, df_historico):
     # O filtro é rápido em DataFrames pequenos
     df_lab = df_historico[df_historico['LABORATORIO'] == lab_atual].copy()
     df_lab = df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Coletado|Recusada|Conferido', case=False, na=False)]
-    df_lab = df_lab.sort_values('DATA', ascending=False).head(10)
+    df_lab = df_lab.sort_values('DATA', ascending=False).head(5)
     
     if df_lab.empty:
         st.info("📋 Nenhum histórico encontrado para este ponto.")
         return
     
     # ✨ AJUSTE 3: Título corrigido para puxar o nome do laboratório real
-    st.markdown(f"<p style='{MODAL_STYLES['header']}'>📋 Últimas 10 Operações de {lab_atual}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='{MODAL_STYLES['header']}'>📋 Últimas 5 Operações de {lab_atual}</p>", unsafe_allow_html=True)
     
     # Criar tabela de histórico
     historico_dados = []
@@ -1608,7 +1608,7 @@ def render_tab_historico(pedido_data, df_historico):
         column_config={
             "Status": st.column_config.TextColumn("Status", width="medium"),
             "Pedido": st.column_config.TextColumn("Pedido", width="small"),
-            "Data": st.column_config.TextColumn("Data e Hora", width="medium"),
+            "Data": st.column_config.TextColumn("Data e Hora da Coleta", width="medium"),
             "Motorista": st.column_config.TextColumn("Motorista", width="medium"),
         }
     )
