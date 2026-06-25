@@ -613,6 +613,26 @@ def conectar_banco_seguro():
 # ✅ FOTO_COLETA e FOTO_ENTREGA são copiadas automaticamente pelo Apps Script
 # Aqui apenas lemos os valores de App_Tarefas
 
+@st.cache_data(ttl=43200) # Cache de 12 horas para a tabela de Agentes (economiza muita cota)
+def carregar_agentes_nuvem():
+    try:
+        gc = conectar_banco_seguro()
+        if not gc: return {}
+        planilha = gc.open("DB_IGO_Logistica")
+        aba_agentes = planilha.worksheet("Agentes")
+        dados_agentes = aba_agentes.get_all_values()
+        if len(dados_agentes) > 1:
+            df_ag = pd.DataFrame(dados_agentes[1:], columns=dados_agentes[0])
+            df_ag.columns = [str(c).upper().strip() for c in df_ag.columns]
+            
+            id_col = next((c for c in df_ag.columns if any(x in c for x in ['ID', 'USUARIO', 'EMAIL', 'LOGIN'])), df_ag.columns[0])
+            nome_col = next((c for c in df_ag.columns if 'NOME' in c), df_ag.columns[1])
+            
+            return dict(zip(df_ag[id_col].astype(str).str.strip().str.lower(), df_ag[nome_col].astype(str).str.strip()))
+    except Exception:
+        pass
+    return {}
+
 @st.cache_data(ttl=180) # 🔥 Aumentado para 3 minutos: Evita baixar tudo de novo só porque o usuário demorou lendo o popup
 def carregar_dados_nuvem(cliente_filtro):
     try:
@@ -622,28 +642,8 @@ def carregar_dados_nuvem(cliente_filtro):
         
         planilha = gc.open("DB_IGO_Logistica")
         
-        # 1. Carregar Agentes para mapeamento (Nomes Reais)
-        dict_agentes = {}
-        try:
-            aba_agentes = planilha.worksheet("Agentes")
-            dados_agentes = aba_agentes.get_all_values()
-            if len(dados_agentes) > 1:
-                df_ag = pd.DataFrame(dados_agentes[1:], columns=dados_agentes[0])
-                df_ag.columns = [str(c).upper().strip() for c in df_ag.columns]
-                
-                # Identifica colunas flexíveis de ID e Nome
-                id_col = None
-                nome_col = None
-                for c in df_ag.columns:
-                    if 'NOME' in c: nome_col = c
-                    elif any(x in c for x in ['ID', 'USUARIO', 'EMAIL', 'LOGIN']): id_col = c
-                
-                if not id_col: id_col = df_ag.columns[0]
-                if not nome_col: nome_col = df_ag.columns[1]
-                
-                dict_agentes = dict(zip(df_ag[id_col].astype(str).str.strip().str.lower(), df_ag[nome_col].astype(str).str.strip()))
-        except Exception as e:
-            pass # Segue sem quebrar se a aba não for encontrada
+        # 1. Carregar Agentes para mapeamento usando a função cacheada
+        dict_agentes = carregar_agentes_nuvem()
 
         aba_m = planilha.worksheet("Memoria_Sistema")
         
@@ -680,7 +680,8 @@ def carregar_dados_nuvem(cliente_filtro):
             gc.auth.refresh(request_auth)
             
             headers = {"Authorization": f"Bearer {gc.auth.token}"}
-            resposta = requests.get(url, headers=headers)
+            # Adicionado timeout de 15 segundos para evitar travamento do Streamlit
+            resposta = requests.get(url, headers=headers, timeout=15)
             
             if resposta.status_code == 200:
                 df = pd.read_csv(io.StringIO(resposta.text), dtype=str)
@@ -810,6 +811,7 @@ def carregar_dados_nuvem(cliente_filtro):
                     df['CONTATO_FINAL']   = df.apply(lambda r: get_app_val(r, 'A_CONTATO'), axis=1)
                     df['HORA_APP_FINAL']  = df.apply(lambda r: get_app_val(r, 'A_HORA_STATUS'), axis=1)
 
+                    # Restaurando a função pois o get_app_hora ainda precisa dela
                     def extrair_hora(hora_str):
                         h = str(hora_str).strip()
                         if not h or h.upper() == 'NAN': return ""
@@ -817,7 +819,12 @@ def carregar_dados_nuvem(cliente_filtro):
                         parts = h.split(":")
                         if len(parts) >= 2: return f"{parts[0].zfill(2)}:{parts[1].zfill(2)}"
                         return h
-                    df['HORA_LIMPA'] = df['HORA_APP_FINAL'].apply(extrair_hora)
+
+                    # Extração vetorizada super rápida (Regex) para HORA_LIMPA
+                    if 'A_HORA_STATUS' in df.columns:
+                        df['HORA_LIMPA'] = df['A_HORA_STATUS'].astype(str).str.extract(r'(\d{2}:\d{2})')[0].fillna("")
+                    else:
+                        df['HORA_LIMPA'] = ""
 
                     # 🕐 EXTRAÇÃO DE HORAS DE COLETA E ENTREGA
                     def get_app_hora(row, col_hora_app, col_dt_app):
@@ -843,41 +850,19 @@ def carregar_dados_nuvem(cliente_filtro):
                         axis=1
                     )
 
-                    def defining_foto_prioritaria(r):
-                        f_gen = get_app_val(r, 'A_FO')         # FOTO original (Coleta principal)
-                        f_col = get_app_val(r, 'A_FOTO_COL')   # Legacy Coleta
-                        f_ent = get_app_val(r, 'A_FOTO_ENT')   # FOTO_ENTREGA (Entrega)
-                        
-                        # Prioridade 1: Foto da Coleta (A_FO ou A_FOTO_COL)
-                        if f_gen and f_gen.upper() != 'NAN': return f_gen
-                        if f_col and f_col.upper() != 'NAN': return f_col
-                        
-                        # Prioridade 2: Foto da Entrega (apenas se ainda não houver coleta)
-                        if f_ent and f_ent.upper() != 'NAN': return f_ent
-                        
-                        return ""
+                    # Tratamento vetorizado das fotos (Instantâneo)
+                    for col_foto in ['A_FO', 'A_FOTO_COL', 'A_FOTO_ENT']:
+                        if col_foto not in df.columns:
+                            df[col_foto] = pd.NA
+                        else:
+                            df[col_foto] = df[col_foto].astype(str).replace(['NAN', 'nan', '', 'None'], pd.NA)
 
-                    df['FOTO_FINAL'] = df.apply(defining_foto_prioritaria, axis=1)
-
-                    # 📷 FOTOS SEPARADAS DE COLETA E ENTREGA
-                    def extrair_foto_coleta(r):
-                        # Agora busca na coluna FOTO original (mapeada como 'A_FO')
-                        f_col = get_app_val(r, 'A_FO')
-                        if f_col and f_col.upper() != 'NAN': return f_col
-                        
-                        # Mantém o fallback caso a coluna A_FOTO_COL exista em algum histórico
-                        f_col_legacy = get_app_val(r, 'A_FOTO_COL')
-                        if f_col_legacy and f_col_legacy.upper() != 'NAN': return f_col_legacy
-                        return ""
+                    # Foto Final (Prioridade)
+                    df['FOTO_FINAL'] = df['A_FO'].combine_first(df['A_FOTO_COL']).combine_first(df['A_FOTO_ENT']).fillna("")
                     
-                    def extrair_foto_entrega(r):
-                        # Puxa diretamente da FOTO_ENTREGA (mapeada como 'A_FOTO_ENT')
-                        f_ent = get_app_val(r, 'A_FOTO_ENT')
-                        if f_ent and f_ent.upper() != 'NAN': return f_ent
-                        return ""
-
-                    df['FOTO_COLETA'] = df.apply(extrair_foto_coleta, axis=1)
-                    df['FOTO_ENTREGA'] = df.apply(extrair_foto_entrega, axis=1)
+                    # Fotos Separadas
+                    df['FOTO_COLETA'] = df['A_FO'].combine_first(df['A_FOTO_COL']).fillna("")
+                    df['FOTO_ENTREGA'] = df['A_FOTO_ENT'].fillna("")
 
                     def get_true_status_portal(row):
                         s_db  = str(row.get('STATUS', '')).strip().upper()
@@ -927,6 +912,10 @@ def carregar_dados_nuvem(cliente_filtro):
                 df['HORA_LIMPA'] = "" 
                 df['MOTORISTA_COLETA'] = ""
                 df['MOTORISTA_ENTREGA'] = ""
+                # 🛡️ Fallback: Garante que o painel continue funcionando mesmo sem fotos
+                df['FOTO_FINAL'] = ""
+                df['FOTO_COLETA'] = ""
+                df['FOTO_ENTREGA'] = ""
 
             if 'DATA' in df.columns:
                 # 🔥 CORREÇÃO DA DATA APLICADA AQUI 🔥
@@ -1895,7 +1884,8 @@ else:
         with st.container(border=False):
             st.markdown("<p style='font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 5px;'>🗓️ Período de Análise</p>", unsafe_allow_html=True)
             c1_dt, c2_dt = st.columns(2)
-            dt_inicio = c1_dt.date_input("De:", value=hoje_br - timedelta(days=15), format="DD/MM/YYYY")
+            # Alterado de 15 para 7 dias para carregar mais rápido inicialmente
+            dt_inicio = c1_dt.date_input("De:", value=hoje_br - timedelta(days=7), format="DD/MM/YYYY")
             dt_fim    = c2_dt.date_input("Até:", value=hoje_br, format="DD/MM/YYYY")
             datas_sel = (dt_inicio, dt_fim)
             holder_cidades = st.empty()
