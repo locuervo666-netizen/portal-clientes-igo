@@ -2133,18 +2133,24 @@ else:
                 else:
                     cor_bateria = "#22c55e"  # Verde (Bom/Excelente)
 
-                # O texto HTML não pode ter espaços no início, senão o Streamlit transforma em bloco de código!
+                # Novo SVG Circular para Progresso
                 bateria_html = f"""<div class="progress-block-sidebar">
-<div class="progress-block-sidebar-content">
-<div class="progress-title-sidebar">&#128267; Progresso de Hoje</div>
-<div style="position: relative; height: 110px; width: 48px; margin-top: 8px; display: flex; flex-direction: column; justify-content: flex-end;">
-<div style="position: absolute; top: -6px; left: 50%; transform: translateX(-50%); width: 18px; height: 6px; background: #cbd5e1; border-radius: 4px 4px 0 0;"></div>
-<div style="height: 100%; width: 100%; border: 3px solid #cbd5e1; border-radius: 8px; padding: 3px; background: #f8fafc; display: flex; flex-direction: column; justify-content: flex-end; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
-<div style="width: 100%; height: {pct}%; background: {cor_bateria}; border-radius: 3px; transition: all 1s ease;"></div>
-</div></div>
-<div class="progress-number-sidebar">{pct}%</div>
-<div class="progress-text-sidebar">{n_fim} de {n_tot} pedidos movimentados</div>
-</div></div>"""
+<div class="progress-block-sidebar-content" style="text-align: center;">
+<div class="progress-title-sidebar" style="margin-bottom: 15px;">&#128267; Progresso de Hoje</div>
+<div style="position: relative; width: 130px; height: 130px; margin: 0 auto;">
+<svg viewBox="0 0 36 36" style="width: 100%; height: 100%; display: block;">
+<path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f1f5f9" stroke-width="3.5" stroke-linecap="round" />
+<path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="{cor_bateria}" stroke-width="3.5" stroke-dasharray="{pct}, 100" stroke-linecap="round" style="transition: stroke-dasharray 1s ease-out, stroke 0.5s ease;" />
+</svg>
+<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; justify-content: center;">
+<div style="font-size: 32px; font-weight: 900; color: #0f172a; line-height: 1;">{pct}%</div>
+</div>
+</div>
+<div class="progress-text-sidebar" style="margin-top: 12px; font-size: 13px; font-weight: 600; color: #64748b;">
+{n_fim} de {n_tot} pedidos movimentados
+</div>
+</div>
+</div>"""
 
                 st.sidebar.markdown(bateria_html, unsafe_allow_html=True)
 
