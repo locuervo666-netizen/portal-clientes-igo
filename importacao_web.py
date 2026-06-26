@@ -787,7 +787,8 @@ def carregar_dados_agentes(_planilha):
             "TELEFONE"])
 
 
-@st.cache_data(ttl=20)
+# 🔥 TTL Aumentado de 20s para 10 min (600s). Evita Erro 429! 🔥
+@st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_completos(_planilha):
     if not _planilha:
         return pd.DataFrame()
@@ -2343,24 +2344,21 @@ if menu == "📊 GRID":
             try:
                 aba_m = planilha_db.worksheet("Memoria_Sistema")
                 df_nuvem = pd.DataFrame(
-                    aba_m.get_all_values()[
-                        1:], columns=aba_m.get_all_values()[0])
+                    aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
 
-                for pid in df_to_sync['PEDIDO'].tolist():
-                    idx_nuvem = df_nuvem.index[df_nuvem['PEDIDO'] == str(pid)]
-                    if not idx_nuvem.empty:
-                        novo_st = df_to_sync.loc[df_to_sync['PEDIDO']
-                                                 == pid, 'STATUS'].values[0]
-                        novo_dt = df_to_sync.loc[df_to_sync['PEDIDO']
-                                                 == pid, 'DATA_ENTREGA'].values[0]
-                        df_nuvem.loc[idx_nuvem, 'STATUS'] = novo_st
-                        if str(novo_dt).strip():
-                            df_nuvem.loc[idx_nuvem,
-                                         'DATA_ENTREGA'] = str(novo_dt)
+                # Mapeia as atualizações de forma vetorizada (muito mais rápido no Pandas)
+                df_nuvem.set_index('PEDIDO', inplace=True)
+                df_to_sync.set_index('PEDIDO', inplace=True)
+                
+                df_nuvem.update(df_to_sync[['STATUS', 'DATA_ENTREGA']])
+                df_nuvem.reset_index(inplace=True)
+                df_to_sync.reset_index(inplace=True)
 
                 aba_m.clear()
                 aba_m.update("A1", [df_nuvem.columns.tolist()] +
                              df_nuvem.fillna("").astype(str).values.tolist())
+                
+                # 🔥 A mágica: só limpa o cache se REALMENTE houver sincronização pesada
                 carregar_dados_completos.clear()
                 df_raw = carregar_dados_completos(planilha_db)
             except Exception:
@@ -3294,13 +3292,12 @@ if menu == "📊 GRID":
                                     except Exception as e:
                                         st.error(f"Erro: {e}")
 
-            col_b6.button(
-                "🔄 Atualizar",
-                use_container_width=True,
-                type="secondary",
-                on_click=lambda: [
-                    carregar_dados_completos.clear(),
-                    st.rerun()])
+            if col_b6.button("🔄 Atualizar", use_container_width=True, type="secondary"):
+                    with st.spinner("Sincronizando..."):
+                        carregar_dados_completos.clear()
+                        st.toast("Dados atualizados com sucesso!", icon="🔄")
+                        time.sleep(0.5)
+                        st.rerun()
 
 # =============================================================================
 # 💰 MÓDULO 2: FATURAMENTO MASTER (LENTE DE RAIO-X E ANTI-ERROS)
@@ -5783,6 +5780,23 @@ elif menu == "📥 Importações Umove":
         st.session_state.df_preview_sb = pd.DataFrame()
 
     # --- INÍCIO: VARIÁVEIS DA MÁQUINA DE ESTADOS ---
+    if "df_sandbox_mem" not in st.session_state:
+        st.session_state.df_sandbox_mem = pd.DataFrame()
+    if "df_preview_sb" not in st.session_state:
+        st.session_state.df_preview_sb = pd.DataFrame()
+
+    @st.cache_data(ttl=600, show_spinner=False)
+    def carregar_agendamentos_fixos():
+        try:
+            aba = planilha_db.worksheet("Agendamentos_Fixos")
+            dados = aba.get_all_values()
+            if len(dados) > 1:
+                return pd.DataFrame(dados[1:], columns=dados[0])
+        except Exception:
+            pass
+        return pd.DataFrame(columns=['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS'])
+
+    # --- INÍCIO: VARIÁVEIS DA MÁQUINA DE ESTADOS ---
     if "umove_lote_atual_id" not in st.session_state:
         st.session_state.umove_lote_atual_id = None
 
@@ -5818,9 +5832,16 @@ elif menu == "📥 Importações Umove":
                 
                 if lote_id in df_hist['ID_EVENTO'].values:
                     linha_idx = df_hist.index[df_hist['ID_EVENTO'] == lote_id][0] + 2
-                    aba.update_cell(linha_idx, cabecalho.index("DADOS_JSON") + 1, json_dados)
-                    aba.update_cell(linha_idx, cabecalho.index("TOTAL_PEDIDOS") + 1, len(df_carrinho))
-                    aba.update_cell(linha_idx, cabecalho.index("STATUS_LOTE") + 1, "RASCUNHO")
+                    
+                    # Atualização em lote (Batch Update) - Uma única requisição!
+                    aba.update(
+                        f"{gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('TOTAL_PEDIDOS') + 1)}", 
+                        [[len(df_carrinho)]]
+                    )
+                    aba.update(
+                        f"{gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('STATUS_LOTE') + 1)}", 
+                        [["RASCUNHO", json_dados]]
+                    )
                 else:
                     nova_linha = {c: "" for c in cabecalho}
                     nova_linha["ID_EVENTO"] = lote_id
@@ -6123,13 +6144,10 @@ elif menu == "📥 Importações Umove":
         st.markdown("#### 🏭 Criar Novo Agendamento Fixo")
 
         cols_fixos = ['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
-        df_regras = pd.DataFrame(columns=cols_fixos)
-
+        df_regras = carregar_agendamentos_fixos()
+        
         try:
             aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
-            dados_fixos = aba_fixos.get_all_values()
-            if len(dados_fixos) > 1:
-                df_regras = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0])
         except Exception:
             try:
                 aba_fixos = planilha_db.add_worksheet("Agendamentos_Fixos", 100, 20)
