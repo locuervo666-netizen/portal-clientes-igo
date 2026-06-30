@@ -511,11 +511,13 @@ CSS_DASHBOARD = """
     }
 
     /* ── BARRA DE PROGRESSO DOS PEDIDOS DO DIA ── */
+    /* 🎯 ALTURA DO BLOCO: Altere "padding: 20px" para aumentar/diminuir espaço interno */
+    /* 🎯 ESPAÇO ENTRE ELEMENTOS: Altere "gap: 12px" para aumentar/diminuir distância entre linhas */
     .progress-block-main {
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 52%, #eff6ff 100%);
         border: 1px solid #bfdbfe;
         border-radius: 16px;
-        padding: 20px;
+        padding: 14px; /* 🔴 ALTURA INTERNA - Aumentar para 25px, 30px, etc */
         margin: 12px 0 18px 0;
         overflow: hidden;
         box-shadow: 0 12px 26px rgba(37, 99, 235, 0.16);
@@ -527,7 +529,7 @@ CSS_DASHBOARD = """
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 12px;
+        gap: 8px; /* 🔴 ESPAÇO ENTRE LINHAS - Aumentar para 14px, 16px, 18px, etc */
     }
     .progress-title {
         font-size: 12px;
@@ -535,9 +537,17 @@ CSS_DASHBOARD = """
         color: #0f172a;
         align-self: flex-start;
     }
+    /* ── PROGRESS WITH COUNTER ── */
+    /* 🎯 ALTURA DA BARRA: Altere "height: 8px" para aumentar/diminuir espessura */
+    .progress-row {
+        display: flex;
+        align-items: center;
+        gap: 10px; /* 🔴 ESPAÇO entre barra e número - Aumentar para 14px, 16px, etc */
+        width: 100%;
+    }
     .progress-bar-container {
         width: 100%;
-        height: 8px;
+        height: 6px; /* 🔴 ESPESSURA DA BARRA - Aumentar para 10px, 12px, 14px, etc */
         background: #e2e8f0;
         border-radius: 99px;
         overflow: hidden;
@@ -555,6 +565,19 @@ CSS_DASHBOARD = """
         color: #475569;
         font-weight: 500;
         align-self: flex-start;
+    }
+    
+    .progress-counter {
+        font-size: 20px;
+        font-weight: 800;
+        color: #0f172a;
+        background: #f1f5f9;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        white-space: nowrap;
+        min-width: 68px;
+        text-align: center;
     }
     </style>
 """
@@ -813,6 +836,10 @@ def carregar_dados_completos(_planilha):
                 df['CIDADE'] = df['CIDADE'].str.replace(
                     'Brodosqui', 'Brodowski', case=False).str.replace(
                     'BRODOSQUI', 'BRODOWSKI')
+                # 🔥 CORREÇÃO PARA CIDADES PROBLEMÁTICAS (FUZZY MATCHING FALSO POSITIVO) 🔥
+                # "Santo Antonio de Posse" é em MG, mas "São Sebastião do Passe" é em BA
+                df['CIDADE'] = df['CIDADE'].str.replace(
+                    'Santo Antonio de Posse', 'São Sebastião do Passe', case=False)
 
             try:
                 aba_app = _planilha.worksheet("App_Tarefas")
@@ -1024,14 +1051,26 @@ def corrigir_cidade_inteligente(cidade_suja, df_rotas):
     if pd.isna(cidade_suja) or not str(cidade_suja).strip() or df_rotas.empty:
         return padronizar_texto(cidade_suja)
     c_limpa = padronizar_texto(str(cidade_suja))
+    
+    # 🔥 MAPEAMENTO DE CIDADES PROBLEMÁTICAS (Evita Falsos Positivos) 🔥
+    CIDADES_FIXAS = {
+        'SAO SEBASTIAO DO PASSE': 'SAO SEBASTIAO DO PASSE',
+        'SANTO ANTONIO DE POSSE': 'SANTO ANTONIO DE POSSE',
+    }
+    
+    # Verifica mapeamento fixo primeiro
+    if c_limpa in CIDADES_FIXAS:
+        return CIDADES_FIXAS[c_limpa]
+    
     cidades_conhecidas = []
     for rota in df_rotas['ROTA MAPEADA'].dropna():
         cid = str(rota).split('➔')[0].split('---')[0].strip().upper()
         if cid and cid not in cidades_conhecidas:
             cidades_conhecidas.append(cid)
 
+    # 🔥 AUMENTADO CUTOFF DE 0.8 PARA 0.90 (Mais Rigoroso) 🔥
     correcoes = difflib.get_close_matches(
-        c_limpa, cidades_conhecidas, n=1, cutoff=0.8)
+        c_limpa, cidades_conhecidas, n=1, cutoff=0.90)
     if correcoes:
         return correcoes[0]
     return c_limpa
@@ -2133,29 +2172,83 @@ if 'filtro_kpi_admin' not in st.session_state:
     st.session_state.filtro_kpi_admin = "TODOS"
 
 with st.sidebar:
+    import streamlit.components.v1 as components
+
     st.image(
         "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png",
         use_container_width=True)
 
     st.markdown("""
         <style>
-        /* Sidebar fixa no viewport com conteúdo sempre visível */
-        [data-testid="stSidebar"] {
-            height: 100vh !important;
-            overflow: hidden !important;
-            --sidebar-btn-width: 220px;
-        }
-        [data-testid="stSidebar"] > div:first-child {
-            height: 100vh !important;
-            overflow-y: hidden !important;
-            overflow-x: hidden !important;
-            padding: 8px 10px 8px !important;
-        }
-        [data-testid="stSidebar"] > div:first-child::-webkit-scrollbar {
-            width: 0 !important;
-            height: 0 !important;
-            display: none !important;
-        }
+        /* 🔥 SIDEBAR: SCROLL ESTÁVEL EM CAMADA ÚNICA 🔥 */
+            section[data-testid="stSidebar"],
+            [data-testid="stSidebar"] {
+                --sidebar-btn-width: 220px;
+                /* AJUSTE MANUAL AQUI: altura total da área de rolagem */
+                --sidebar-scroll-height: 100vh;
+                /* AJUSTE MANUAL AQUI: folga superior para rolar "para cima" */
+                --sidebar-scroll-pad-top: 160px;
+                /* AJUSTE MANUAL AQUI: folga inferior para rolar "para baixo" */
+                --sidebar-scroll-pad-bottom: 260px;
+
+                height: var(--sidebar-scroll-height) !important;
+                max-height: var(--sidebar-scroll-height) !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                overscroll-behavior-y: contain !important;
+                -webkit-overflow-scrolling: touch !important;
+                pointer-events: auto !important;
+            }
+
+            /* Perfil notebook (1366x768 e similares) */
+            @media (max-height: 820px) {
+                section[data-testid="stSidebar"],
+                [data-testid="stSidebar"] {
+                    --sidebar-scroll-pad-top: 120px;
+                    --sidebar-scroll-pad-bottom: 220px;
+                }
+            }
+
+            /* Perfil telas pequenas */
+            @media (max-width: 768px), (max-height: 700px) {
+                section[data-testid="stSidebar"],
+                [data-testid="stSidebar"] {
+                    --sidebar-scroll-pad-top: 96px;
+                    --sidebar-scroll-pad-bottom: 180px;
+                }
+            }
+
+            /* Camadas internas não podem disputar o scroll */
+            section[data-testid="stSidebar"] > div:first-child,
+            [data-testid="stSidebar"] > div:first-child,
+            section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"],
+            section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
+            [data-testid="stSidebarUserContent"],
+            [data-testid="stSidebarContent"] {
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+            }
+
+            /* Barra visível para garantir percepção do scroll */
+            section[data-testid="stSidebar"]::-webkit-scrollbar,
+            [data-testid="stSidebar"]::-webkit-scrollbar {
+                width: 8px !important;
+            }
+            section[data-testid="stSidebar"]::-webkit-scrollbar-thumb,
+            [data-testid="stSidebar"]::-webkit-scrollbar-thumb {
+                background: #cbd5e1 !important;
+                border-radius: 10px !important;
+            }
+
+            /* Espaço superior/inferior para rolagem longa nos dois sentidos */
+            section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"],
+            section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
+            [data-testid="stSidebarUserContent"],
+            [data-testid="stSidebarContent"] {
+                padding: var(--sidebar-scroll-pad-top) 10px var(--sidebar-scroll-pad-bottom) !important;
+            }
+        
         [data-testid="stSidebar"] .stImage {
             margin-bottom: 6px !important;
         }
@@ -2281,6 +2374,58 @@ with st.sidebar:
         }
         </style>
     """, unsafe_allow_html=True)
+
+    components.html(
+        """
+        <script>
+        (function () {
+            function getSidebarScroller(doc) {
+                const sidebar = doc.querySelector('section[data-testid="stSidebar"], [data-testid="stSidebar"]');
+                if (!sidebar) return null;
+
+                const candidates = [
+                    sidebar,
+                    sidebar.querySelector('[data-testid="stSidebarUserContent"]'),
+                    sidebar.querySelector('[data-testid="stSidebarContent"]'),
+                    sidebar.querySelector(':scope > div:first-child')
+                ].filter(Boolean);
+
+                let best = null;
+                let bestDelta = 0;
+                for (const el of candidates) {
+                    const delta = el.scrollHeight - el.clientHeight;
+                    if (delta > bestDelta) {
+                        bestDelta = delta;
+                        best = el;
+                    }
+                }
+                return bestDelta > 0 ? best : null;
+            }
+
+            function centerSidebarIfNeeded() {
+                const doc = window.parent.document;
+                const scroller = getSidebarScroller(doc);
+                if (!scroller) return false;
+
+                // Só centraliza se estiver no topo (estado inicial)
+                if (scroller.scrollTop <= 2) {
+                    scroller.scrollTop = Math.round((scroller.scrollHeight - scroller.clientHeight) / 2);
+                }
+                return true;
+            }
+
+            let tries = 0;
+            const timer = setInterval(() => {
+                tries += 1;
+                const ok = centerSidebarIfNeeded();
+                if (ok || tries >= 40) clearInterval(timer);
+            }, 120);
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
 
     qtd_chamados_abertos = checar_chamados_pendentes(planilha_db)
     if qtd_chamados_abertos > 0:
@@ -2683,10 +2828,15 @@ if menu == "📊 GRID":
             <div class="progress-block-main">
                 <div class="progress-block-content">
                     <div class="progress-title">📶 Progresso de Hoje</div>
-                    <div class="progress-bar-container">
-                        <div class="progress-bar-fill" style="width: {pct_progresso}%;"></div>
+                    <div class="progress-row">
+                        <div style="flex: 1;">
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-fill" style="width: {pct_progresso}%;"></div>
+                            </div>
+                        </div>
+                        <div class="progress-counter">{pct_progresso}%</div>
                     </div>
-                    <div class="progress-text">{pct_progresso}% • {n_concluidos} de {n_total_hoje} pedidos concluídos</div>
+                    <div class="progress-text">{n_concluidos}/{n_total_hoje} pedidos movimentados</div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
