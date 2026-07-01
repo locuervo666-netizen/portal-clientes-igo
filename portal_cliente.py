@@ -16,7 +16,6 @@ from google.oauth2.credentials import Credentials
 # 🚀 IMPORTAÇÃO DO AGGRID E DO AUTO-REFRESH SILENCIOSO
 from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
 from streamlit_autorefresh import st_autorefresh
-from streamlit_shadcn_ui import button, input as shadcn_input
 
 FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
@@ -430,6 +429,49 @@ CSS_DASHBOARD = """
         font-size: 12px;
         color: #475569;
         font-weight: 500;
+    }
+    
+    /* ── PROGRESS STATUS BOX ── */
+    .progress-status-box {
+        padding: 16px 20px;
+        border-radius: 12px;
+        text-align: center;
+        transition: all 0.4s ease;
+        font-weight: 700;
+        margin-top: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        border: 2px solid;
+    }
+    .progress-status-box.low {
+        background: #fee2e2;
+        color: #991b1b;
+        border-color: #fca5a5;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+    }
+    .progress-status-box.medium {
+        background: #fef3c7;
+        color: #92400e;
+        border-color: #fcd34d;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+    }
+    .progress-status-box.high {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #86efac;
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
+    }
+    .progress-status-number {
+        font-size: 36px;
+        line-height: 1;
+    }
+    .progress-status-label {
+        font-size: 11px;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 
     [data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
@@ -1026,6 +1068,11 @@ if 'modal_fechado' not in st.session_state: st.session_state.modal_fechado = Fal
 if 'modal_renderizado_antes' not in st.session_state: st.session_state.modal_renderizado_antes = False
 if 'modal_foi_renderizado' not in st.session_state: st.session_state.modal_foi_renderizado = False
 if 'ignorar_selecao_grid' not in st.session_state: st.session_state.ignorar_selecao_grid = False
+if 'busca_grid_input' not in st.session_state: st.session_state.busca_grid_input = ""
+if 'busca_grid_aplicada' not in st.session_state: st.session_state.busca_grid_aplicada = ""
+
+def aplicar_busca_grid():
+    st.session_state.busca_grid_aplicada = st.session_state.busca_grid_input.strip()
 
 # =======================================================
 # ⚙️ FUNÇÕES AUXILIARES (AGORA NO LUGAR CERTO!)
@@ -1885,7 +1932,7 @@ else:
             st.markdown("<p style='font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 5px;'>🗓️ Período de Análise</p>", unsafe_allow_html=True)
             c1_dt, c2_dt = st.columns(2)
             # Alterado de 15 para 7 dias para carregar mais rápido inicialmente
-            dt_inicio = c1_dt.date_input("De:", value=hoje_br - timedelta(days=7), format="DD/MM/YYYY")
+            dt_inicio = c1_dt.date_input("De:", value=hoje_br - timedelta(days=3), format="DD/MM/YYYY")
             dt_fim    = c2_dt.date_input("Até:", value=hoje_br, format="DD/MM/YYYY")
             datas_sel = (dt_inicio, dt_fim)
             holder_cidades = st.empty()
@@ -2118,15 +2165,21 @@ else:
                 # Determinar a cor dinâmica baseada no percentual (Bateria)
                 if pct <= 30:
                     cor_bateria = "#ef4444"  # Vermelho (Baixo)
+                    status_class = "low"
+                    status_label = "⚠️ Baixo Progresso"
                 elif pct <= 70:
                     cor_bateria = "#f59e0b"  # Amarelo/Laranja (Médio)
+                    status_class = "medium"
+                    status_label = "⏳ Em Progresso"
                 else:
                     cor_bateria = "#22c55e"  # Verde (Bom/Excelente)
+                    status_class = "high"
+                    status_label = "✅ Excelente"
 
-                # Novo SVG Circular para Progresso
+                # Novo SVG Circular para Progresso com Caixa de Status
                 bateria_html = f"""<div class="progress-block-sidebar">
 <div class="progress-block-sidebar-content" style="text-align: center;">
-<div class="progress-title-sidebar" style="margin-bottom: 15px;">&#128267; Progresso de Hoje</div>
+<div class="progress-title-sidebar" style="margin-bottom: 12px;">&#128267; Progresso de Hoje</div>
 <div style="position: relative; width: 130px; height: 130px; margin: 0 auto;">
 <svg viewBox="0 0 36 36" style="width: 100%; height: 100%; display: block;">
 <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f1f5f9" stroke-width="3.5" stroke-linecap="round" />
@@ -2136,8 +2189,12 @@ else:
 <div style="font-size: 32px; font-weight: 900; color: #0f172a; line-height: 1;">{pct}%</div>
 </div>
 </div>
-<div class="progress-text-sidebar" style="margin-top: 12px; font-size: 13px; font-weight: 600; color: #64748b;">
-{n_fim} de {n_tot} pedidos movimentados
+<div class="progress-status-box {status_class}">
+<div class="progress-status-number">{n_fim}/{n_tot}</div>
+<div class="progress-status-label">{status_label}</div>
+</div>
+<div class="progress-text-sidebar" style="margin-top: 8px; font-size: 12px; font-weight: 500; color: #64748b;">
+Pedidos movimentados hoje
 </div>
 </div>
 </div>"""
@@ -2153,9 +2210,18 @@ else:
 
 
                 st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
-                col_busca, col_export = st.columns([6, 1], gap="small")
+                col_busca, col_btn_busca, col_export = st.columns([6, 1, 1], gap="small")
                 with col_busca:
-                    busca = shadcn_input(placeholder="🔎 Buscar por pedido, laboratório, cidade...", key="busca_grid_input")
+                    st.text_input(
+                        "Buscar",
+                        placeholder="🔎 Buscar por pedido, laboratório, cidade...",
+                        key="busca_grid_input",
+                        label_visibility="collapsed",
+                        on_change=aplicar_busca_grid
+                    )
+                with col_btn_busca:
+                    if st.button("🔎 Buscar", use_container_width=True, key="btn_busca_grid"):
+                        aplicar_busca_grid()
                 with col_export:
                     holder_download = st.empty()
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -2176,8 +2242,11 @@ else:
                     else:
                         df_grid = df_grid[df_grid['STATUS_DISPLAY'].str.contains(st.session_state.filtro_kpi, case=False, na=False)]
 
-                if busca:
-                    df_grid = df_grid[df_grid.astype(str).apply(lambda x: x.str.lower().str.contains(busca.lower())).any(axis=1)]
+                busca_aplicada = st.session_state.busca_grid_aplicada
+                if busca_aplicada:
+                    df_grid = df_grid[df_grid.astype(str).apply(
+                        lambda x: x.str.lower().str.contains(busca_aplicada.lower(), na=False, regex=False)
+                    ).any(axis=1)]
 
                 if not df_grid.empty:
                     df_grid['PRIORIDADE'] = df_grid['STATUS_DISPLAY'].apply(definir_prioridade_portal)
