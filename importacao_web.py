@@ -1260,15 +1260,18 @@ def enviar_excel_zapi(telefone_destino, xls_bytes, nome_arquivo):
         return False
 
 
-def obter_proximo_id(df):
+def obter_proximo_id(df, minimo_inicial=1000):
+    minimo_inicial = max(1, int(minimo_inicial))
     if df is None or df.empty or 'PEDIDO' not in df.columns:
-        return 1
+        return minimo_inicial
     try:
         nums = df['PEDIDO'].astype(str).str.extract(
             r'^(\d+)')[0].dropna().astype(int)
-        return int(nums.max() + 1) if not nums.empty else 1
+        if nums.empty:
+            return minimo_inicial
+        return max(int(nums.max() + 1), minimo_inicial)
     except BaseException:
-        return 1
+        return minimo_inicial
 
 
 def calcular_sla_dias(uf, cidade, tomador=""):
@@ -4648,6 +4651,24 @@ elif menu == "📝 Pedido Manual":
 elif menu == "📥 Importações":
     import streamlit.components.v1 as components
 
+    def obter_proximo_id_oficial_seguro(df_base):
+        # Recalcula sempre a partir da base oficial para evitar repetição entre dias/sessões.
+        proximo_db = obter_proximo_id(df_base, minimo_inicial=1000)
+        proximo_sessao = int(st.session_state.get('contador_oficial_temp', 1000))
+        proximo = max(proximo_db, proximo_sessao, 1000)
+
+        df_cart = st.session_state.get('df_carrinho_oficial', pd.DataFrame())
+        if not df_cart.empty and 'PEDIDO' in df_cart.columns:
+            try:
+                nums_cart = df_cart['PEDIDO'].astype(str).str.extract(r'^(\d+)')[0].dropna().astype(int)
+                if not nums_cart.empty:
+                    proximo = max(proximo, int(nums_cart.max() + 1))
+            except BaseException:
+                pass
+
+        st.session_state.contador_oficial_temp = proximo
+        return proximo
+
     # 🔥 PING SILENCIOSO (ANTI-TIMEOUT DO RENDER) 🔥
     components.html(
         """
@@ -5042,10 +5063,7 @@ elif menu == "📥 Importações":
                             aba_m = planilha_db.worksheet("Memoria_Sistema")
                             df_up = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
 
-                            if 'contador_oficial_temp' not in st.session_state:
-                                st.session_state.contador_oficial_temp = obter_proximo_id(df_up)
-
-                            prox_id_of = st.session_state.contador_oficial_temp
+                            prox_id_of = obter_proximo_id_oficial_seguro(df_up)
 
                             for idx, row in df_ok.iterrows():
                                 df_ok.at[idx, 'PEDIDO'] = str(prox_id_of)
@@ -5302,12 +5320,7 @@ elif menu == "📥 Importações":
                             aba_m = planilha_db.worksheet("Memoria_Sistema")
                             df_up_temp = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
 
-                            if 'contador_oficial_temp' not in st.session_state:
-                                st.session_state.contador_oficial_temp = obter_proximo_id(df_up_temp)
-
-                            prox_id_fixo = st.session_state.contador_oficial_temp
-                            if not st.session_state.df_carrinho_oficial.empty:
-                                prox_id_fixo += len(st.session_state.df_carrinho_oficial)
+                            prox_id_fixo = obter_proximo_id_oficial_seguro(df_up_temp)
 
                             novos_pedidos_fixos = []
                             for _, regra in df_alvo.iterrows():
