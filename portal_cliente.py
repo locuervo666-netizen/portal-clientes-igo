@@ -381,8 +381,8 @@ CSS_DASHBOARD = """
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 52%, #eff6ff 100%);
         border: 1px solid #bfdbfe;
         border-radius: 16px;
-        padding: 24px;
-        margin: 12px 0;
+        padding: 14px;
+        margin: 8px 0;
         overflow: hidden;
         box-shadow: 0 12px 26px rgba(37, 99, 235, 0.16);
     }
@@ -393,7 +393,7 @@ CSS_DASHBOARD = """
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 16px;
+        gap: 10px;
     }
     .progress-title-sidebar {
         font-size: 12px;
@@ -433,16 +433,16 @@ CSS_DASHBOARD = """
     
     /* ── PROGRESS STATUS BOX ── */
     .progress-status-box {
-        padding: 16px 20px;
+        padding: 10px 14px;
         border-radius: 12px;
         text-align: center;
         transition: all 0.4s ease;
         font-weight: 700;
-        margin-top: 12px;
+        margin-top: 6px;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 8px;
+        gap: 4px;
         border: 2px solid;
     }
     .progress-status-box.low {
@@ -464,11 +464,11 @@ CSS_DASHBOARD = """
         box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
     }
     .progress-status-number {
-        font-size: 36px;
+        font-size: 26px;
         line-height: 1;
     }
     .progress-status-label {
-        font-size: 11px;
+        font-size: 10px;
         opacity: 0.9;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -557,13 +557,32 @@ CSS_DASHBOARD = """
         flex-direction: column;
     }
 
-    /* ── JOGA O BOTÃO DE SAIR PARA O RODAPÉ DA SIDEBAR ── */
+    /* ── AJUSTE DE ENQUADRAMENTO DO BLOCO DE PROGRESSO + LOGOUT ── */
     div.st-key-btn_logout_sidebar {
-        position: absolute !important;
-        bottom: 20px !important;
-        left: 15px !important;
-        right: 15px !important;
-        width: auto !important;
+        position: static !important;
+        margin-top: 10px !important;
+        width: 100% !important;
+    }
+
+    /* ── BOTÕES DA BARRA DA GRID (BUSCAR + CSV) ── */
+    .st-key-btn_busca_grid button,
+    .st-key-btn_download_grid_limpo button {
+        background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%) !important;
+        border: 1px solid #2563eb !important;
+        border-radius: 10px !important;
+        transition: all 0.2s ease !important;
+    }
+    .st-key-btn_busca_grid button p,
+    .st-key-btn_download_grid_limpo button p {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+    .st-key-btn_busca_grid button:hover,
+    .st-key-btn_download_grid_limpo button:hover {
+        background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
+        border-color: #1d4ed8 !important;
+        box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28) !important;
+        transform: translateY(-1px) !important;
     }
 
     /* ── BOTÃO DE FECHAR DETALHES (VERMELHO) ── */
@@ -2180,20 +2199,20 @@ else:
                 bateria_html = f"""<div class="progress-block-sidebar">
 <div class="progress-block-sidebar-content" style="text-align: center;">
 <div class="progress-title-sidebar" style="margin-bottom: 12px;">&#128267; Progresso de Hoje</div>
-<div style="position: relative; width: 130px; height: 130px; margin: 0 auto;">
+<div style="position: relative; width: 112px; height: 112px; margin: 0 auto;">
 <svg viewBox="0 0 36 36" style="width: 100%; height: 100%; display: block;">
 <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f1f5f9" stroke-width="3.5" stroke-linecap="round" />
 <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="{cor_bateria}" stroke-width="3.5" stroke-dasharray="{pct}, 100" stroke-linecap="round" style="transition: stroke-dasharray 1s ease-out, stroke 0.5s ease;" />
 </svg>
 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; justify-content: center;">
-<div style="font-size: 32px; font-weight: 900; color: #0f172a; line-height: 1;">{pct}%</div>
+<div style="font-size: 26px; font-weight: 900; color: #0f172a; line-height: 1;">{pct}%</div>
 </div>
 </div>
 <div class="progress-status-box {status_class}">
 <div class="progress-status-number">{n_fim}/{n_tot}</div>
 <div class="progress-status-label">{status_label}</div>
 </div>
-<div class="progress-text-sidebar" style="margin-top: 8px; font-size: 12px; font-weight: 500; color: #64748b;">
+<div class="progress-text-sidebar" style="margin-top: 4px; font-size: 11px; font-weight: 500; color: #64748b;">
 Pedidos movimentados hoje
 </div>
 </div>
