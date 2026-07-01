@@ -204,6 +204,45 @@ CSS_DASHBOARD = """
         box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18) !important;
     }
 
+    .status-online-chip {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border: 1px solid #bbf7d0;
+        background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+        border-radius: 10px;
+        padding: 8px 10px;
+        margin: 4px 0 8px 0;
+    }
+    .status-online-left {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+    }
+    .status-online-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #22c55e;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+    }
+    .status-online-text {
+        font-size: 11px;
+        font-weight: 800;
+        color: #166534;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+    }
+    .status-online-time {
+        font-size: 11px;
+        font-weight: 700;
+        color: #14532d;
+        white-space: nowrap;
+    }
+
     /* ── LAYOUT ── */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -1934,6 +1973,7 @@ else:
 
     conf              = CLIENTES_CONFIG[st.session_state.cliente]
     hoje_br           = datetime.now(FUSO_BR).date()
+    hora_atual_br     = datetime.now(FUSO_BR).strftime('%H:%M:%S')
     nome_tomador_oficial = conf["filtro"] if conf["filtro"] != "TODOS" else "MATRIZ IGO"
 
     # ── SIDEBAR ────────────────────────────────────────
@@ -1944,6 +1984,19 @@ else:
                 st.image(conf["logo"], use_container_width=True)
             except Exception:
                 st.markdown(f"<h3 style='text-align:center;'>{st.session_state.cliente}</h3>", unsafe_allow_html=True)
+
+        st.markdown(
+            f"""
+            <div class="status-online-chip">
+                <div class="status-online-left">
+                    <span class="status-online-dot"></span>
+                    <span class="status-online-text">Online</span>
+                </div>
+                <span class="status-online-time">{hora_atual_br}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
         
         st.markdown("<p class='section-kicker'>Filtros de Visão</p>", unsafe_allow_html=True)
         
