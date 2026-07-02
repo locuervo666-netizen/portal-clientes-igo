@@ -2061,15 +2061,42 @@ def gerar_pdf_romaneio(
 from collections import Counter
 import unicodedata
 
-@st.cache_data(ttl=3600)
 def obter_logo_etiqueta_pil():
-    """Baixa a logo colorida oficial da IGO para usar na etiqueta"""
+    """Retorna bytes da logo da IGO com cache local e fallback de download."""
+    logo_url = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
+    logo_cache_path = os.path.join(tempfile.gettempdir(), "igo_logo_etiqueta_cache.png")
+
+    # 1) Prioriza cache local válido (evita depender da rede em toda renderização).
     try:
-        req = urllib.request.Request("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
-            return response.read()
+        if os.path.exists(logo_cache_path) and os.path.getsize(logo_cache_path) > 0:
+            with open(logo_cache_path, "rb") as f_logo:
+                return f_logo.read()
     except:
-        return None
+        pass
+
+    # 2) Tenta urllib (mais leve) e salva em cache local.
+    try:
+        req = urllib.request.Request(logo_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=8) as response:
+            logo_bytes = response.read()
+            if logo_bytes:
+                with open(logo_cache_path, "wb") as f_logo:
+                    f_logo.write(logo_bytes)
+                return logo_bytes
+    except:
+        pass
+
+    # 3) Fallback com requests (ambientes podem bloquear urllib).
+    try:
+        resp = requests.get(logo_url, timeout=8)
+        if resp.status_code == 200 and resp.content:
+            with open(logo_cache_path, "wb") as f_logo:
+                f_logo.write(resp.content)
+            return resp.content
+    except:
+        pass
+
+    return None
 
 def gerar_codigo_unico_etiqueta():
     """Gera um código único aleatório (Ex: IGO-A8X92B)"""
@@ -2161,21 +2188,33 @@ def criar_imagem_etiqueta_pil(codigo, sigla_tarja, tam_qr, tam_fonte, mostrar_lo
     logo_w_real = 0
     if mostrar_logo:
         logo_bytes = obter_logo_etiqueta_pil()
+        # Fallback: se o cache tiver salvo vazio por falha temporária de rede,
+        # tenta buscar novamente em tempo real para não "sumir" com a logo.
+        if not logo_bytes:
+            try:
+                resp = requests.get("https://i.postimg.cc/x84nnjjq/IGO-LOGO.png", timeout=8)
+                if resp.status_code == 200 and resp.content:
+                    logo_bytes = resp.content
+            except:
+                logo_bytes = None
         if logo_bytes:
-            logo_img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
-            logo_rot = logo_img.rotate(270, expand=True)
-            
-            filtro = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.ANTIALIAS
-            logo_rot.thumbnail((tam_logo, 300), filtro)
-            
-            logo_w_real = logo_rot.width + 10 
-            # Centro matemático + offset do usuário
-            pos_x_logo = largura - logo_rot.width - 10 + off_x_logo
-            pos_y_logo = int((altura - logo_rot.height) / 2) + off_y_logo
-            
-            bg_logo = Image.new("RGB", logo_rot.size, (255,255,255))
-            bg_logo.paste(logo_rot, (0,0), logo_rot)
-            img.paste(bg_logo, (pos_x_logo, pos_y_logo))
+            try:
+                logo_img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
+                logo_rot = logo_img.rotate(270, expand=True)
+
+                filtro = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.ANTIALIAS
+                logo_rot.thumbnail((tam_logo, 300), filtro)
+
+                logo_w_real = logo_rot.width + 10
+                # Centro matemático + offset do usuário
+                pos_x_logo = largura - logo_rot.width - 10 + off_x_logo
+                pos_y_logo = int((altura - logo_rot.height) / 2) + off_y_logo
+
+                bg_logo = Image.new("RGB", logo_rot.size, (255,255,255))
+                bg_logo.paste(logo_rot, (0,0), logo_rot)
+                img.paste(bg_logo, (pos_x_logo, pos_y_logo))
+            except:
+                logo_w_real = 0
 
     # 4. Gerar e Posicionar QR Code Dinâmico
     qr = qrcode.QRCode(version=1, box_size=10, border=0)
@@ -8475,6 +8514,32 @@ elif menu == "🏷️ Gerador de Etiquetas":
             st.markdown("<p style='font-size: 13px; color: #64748b;'>Movimente os blocos como peças de montar. Eixo X = Lados. Eixo Y = Cima/Baixo.</p>", unsafe_allow_html=True)
             
             with st.expander("⬛ Tarja Preta e Texto", expanded=True):
+                usar_sigla_manual = st.toggle(
+                    "✍️ Editar texto da tarja manualmente",
+                    value=bool(st.session_state.get('usar_sigla_manual_tarja', False)),
+                    key="usar_sigla_manual_tarja",
+                    help="Ative para sobrescrever a sigla automática da rota (ex.: ANC -> VIX)."
+                )
+                st.text_input(
+                    "Texto da Tarja (manual)",
+                    value=st.session_state.get('sigla_manual_tarja', sigla_inteligente),
+                    key="sigla_manual_tarja",
+                    max_chars=8,
+                    disabled=not usar_sigla_manual,
+                    help="Use letras/números curtos. Exemplo: VIX"
+                )
+
+                sigla_manual_normalizada = re.sub(
+                    r'[^A-Z0-9]',
+                    '',
+                    str(st.session_state.get('sigla_manual_tarja', '')).upper()
+                )[:8]
+                if usar_sigla_manual and not sigla_manual_normalizada:
+                    st.warning("Digite ao menos 1 letra/número para usar a sigla manual. Mantendo automática.")
+                sigla_tarja_final = sigla_manual_normalizada if (usar_sigla_manual and sigla_manual_normalizada) else sigla_inteligente
+                st.caption(f"🏷️ **Tarja em uso:** `{sigla_tarja_final}`")
+
+                st.divider()
                 c_tj1, c_tj2 = st.columns(2)
                 largura_tarja = c_tj1.slider("Largura Tarja", 50, 300, get_ci('largura_tarja', 110, 50, 300), 5)
                 altura_tarja = c_tj2.slider("Altura Tarja", 100, 500, get_ci('altura_tarja', 350, 100, 500), 5)
@@ -8539,11 +8604,11 @@ elif menu == "🏷️ Gerador de Etiquetas":
         if c_btn1.button("⚙️ PROCESSAR E RENDERIZAR LOTE", use_container_width=True): 
             with st.spinner("Processando layout vetorial..."):
                 st.session_state.pdf_etiquetas_cache = gerar_pdf_rolo_duplo_premium(
-                    st.session_state.lote_atual_uuid, sigla_inteligente, larg_pagina, alt_pagina, larg_etiq, alt_etiq,
+                    st.session_state.lote_atual_uuid, sigla_tarja_final, larg_pagina, alt_pagina, larg_etiq, alt_etiq,
                     margem_esq, gap_central, tam_qr, tam_fonte, mostrar_logo, largura_tarja, altura_tarja, tam_logo,
                     off_x_tarja, off_y_tarja, off_x_txt, off_y_txt, off_x_qr, off_y_qr, off_x_logo, off_y_logo
                 )
-                st.session_state.pdf_etiquetas_nome = f"Lote_{qtd_etiquetas}x_{sigla_inteligente}_{datetime.now().strftime('%H%M%S')}.pdf"
+                st.session_state.pdf_etiquetas_nome = f"Lote_{qtd_etiquetas}x_{sigla_tarja_final}_{datetime.now().strftime('%H%M%S')}.pdf"
                 st.rerun()
 
         if st.session_state.pdf_etiquetas_cache is not None:
@@ -8559,7 +8624,7 @@ elif menu == "🏷️ Gerador de Etiquetas":
     with col_preview:
         st.markdown("#### 👀 Preview em Tempo Real")
         img_preview_path = criar_imagem_etiqueta_pil(
-            "IGO-PREV12", sigla_inteligente, tam_qr, tam_fonte, mostrar_logo,
+            "IGO-PREV12", sigla_tarja_final, tam_qr, tam_fonte, mostrar_logo,
             largura_tarja, altura_tarja, tam_logo, off_x_tarja, off_y_tarja,
             off_x_txt, off_y_txt, off_x_qr, off_y_qr, off_x_logo, off_y_logo
         )
@@ -8591,7 +8656,7 @@ elif menu == "🏷️ Gerador de Etiquetas":
     df_lote = pd.DataFrame({
         "Nº": range(1, qtd_etiquetas + 1),
         "CÓDIGO (UUID)": st.session_state.lote_atual_uuid,
-        "TARJA REGIONAL": [sigla_inteligente] * qtd_etiquetas,
+        "TARJA REGIONAL": [sigla_tarja_final] * qtd_etiquetas,
         "STATUS": ["A IMPRIMIR 🖨️"] * qtd_etiquetas
     })
 
