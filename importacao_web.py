@@ -4433,8 +4433,10 @@ elif menu == "💰 Faturamento":
                                     carregar_tabela_precos.clear()
                                     carregar_mapa_sla_tarifas.clear()
 
-                                    st.success(f"✅ Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid_final)} - {t_uf} cadastrada com prazo de {int(t_prazo)} dia(s) util(eis)!")
-                                    time.sleep(1.5)
+                                    st.session_state.ui_toast = {
+                                        'msg': f"Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid_final)} - {t_uf} cadastrada com prazo de {int(t_prazo)} dia(s) util(eis)!",
+                                        'icon': "✅"
+                                    }
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Erro Crítico ao salvar tarifa: {e}")
@@ -4501,8 +4503,7 @@ elif menu == "💰 Faturamento":
 
                             carregar_tabela_precos.clear()
                             carregar_mapa_sla_tarifas.clear()
-                            st.success("✅ Edições salvas com sucesso!")
-                            time.sleep(1.5)
+                            st.session_state.ui_toast = {'msg': "Edições de tarifas salvas com sucesso!", 'icon': "✅"}
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao atualizar tabela: {e}")
@@ -4533,8 +4534,7 @@ elif menu == "💰 Faturamento":
 
                                 carregar_tabela_precos.clear()
                                 carregar_mapa_sla_tarifas.clear()
-                                st.success(f"✅ {len(indices_to_drop)} tarifa(s) excluída(s) com sucesso!")
-                                time.sleep(1.5)
+                                st.session_state.ui_toast = {'msg': f"{len(indices_to_drop)} tarifa(s) excluída(s) com sucesso!", 'icon': "✅"}
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Erro ao excluir as tarifas: {e}")
@@ -6028,7 +6028,8 @@ elif menu == "📥 Importações Umove":
         st.session_state.umove_lote_atual_id = None
 
     def gerenciar_estado_lote(acao, lote_id=None, df_carrinho=None, resultados=None):
-        if planilha_sandbox is None: return None
+        if planilha_sandbox is None:
+            return pd.DataFrame() if acao == "LISTAR_RASCUNHOS" else False
         try:
             try:
                 aba = planilha_sandbox.worksheet("Historico_Disparos_Umove")
@@ -6053,7 +6054,7 @@ elif menu == "📥 Importações Umove":
             
             if acao == "SALVAR_RASCUNHO":
                 if df_carrinho is None or df_carrinho.empty:
-                    return
+                    return False
                 json_dados = df_carrinho.to_json(orient='records')
                 agora = datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S')
                 
@@ -6109,8 +6110,11 @@ elif menu == "📥 Importações Umove":
                     aba.update_cell(linha_idx, cabecalho.index("FALHAS") + 1, fal)
                     aba.update_cell(linha_idx, cabecalho.index("MOTORISTA") + 1, motoristas_str)
                     aba.update_cell(linha_idx, cabecalho.index("PEDIDOS") + 1, pedidos_text)
+                else:
+                    return False
+            return True
         except Exception as e:
-            pass # Silencia o erro para não quebrar a tela de login
+            return pd.DataFrame() if acao == "LISTAR_RASCUNHOS" else False
     # --- FIM: MOTOR DE ESTADOS ---
 
     if 'cep_version_of' not in st.session_state:
@@ -6358,8 +6362,7 @@ elif menu == "📥 Importações Umove":
                             gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
 
                             st.session_state.df_preview_sb = pd.DataFrame()
-                            st.toast("🛒 Carga consolidada no Carrinho de Expedição!", icon="🚀")
-                            time.sleep(1)
+                            st.session_state.ui_toast = {'msg': "Importação concluída! Carga consolidada no Carrinho de Expedição.", 'icon': "🚀"}
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao injetar dados no carrinho: {e}")
@@ -6653,23 +6656,47 @@ elif menu == "📥 Importações Umove":
         df_sb = st.session_state.df_sandbox_mem.copy()
 
         if not df_sb.empty:
-            resumo_tom = df_sb.groupby('TOMADOR').size().reset_index(name='QTD')
-            resumo_str = " | ".join([f"<b>{row['TOMADOR']}</b>: {row['QTD']}" for _, row in resumo_tom.iterrows()])
+            resumo_tom = df_sb.groupby('TOMADOR').size().reset_index(name='QTD').sort_values(by='QTD', ascending=False)
+            total_volumes = len(df_sb)
+            clientes_unicos = int(resumo_tom['TOMADOR'].nunique())
+            top_cliente_qtd = int(resumo_tom.iloc[0]['QTD']) if not resumo_tom.empty else 0
+            top_cliente_pct = round((top_cliente_qtd / total_volumes) * 100, 1) if total_volumes else 0
+            resumo_tom_str = " | ".join([
+                f"{str(row.get('TOMADOR', '')).strip() or 'SEM TOMADOR'}: {int(row.get('QTD', 0))}"
+                for _, row in resumo_tom.iterrows()
+            ])
 
             st.markdown("### 🛒 Carrinho de Expedição Oficial")
             st.markdown("<p style='font-size:13px; color:#64748B; margin-top:-8px;'>Mesa cumulativa com edição direta, mantendo a injeção na própria base oficial.</p>", unsafe_allow_html=True)
 
-            col_kpi_of_1, col_kpi_of_2, col_kpi_of_3 = st.columns([1, 2, 1])
+            col_kpi_of_1, col_kpi_of_2, col_kpi_of_3 = st.columns([1.15, 2.35, 1])
             with col_kpi_of_1:
-                st.markdown(f"<div class='of-card' style='text-align:center;'><div class='of-card-title'>Volumes no Carrinho</div><div class='of-card-value'>{len(df_sb)}</div></div>", unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class='of-card' style='text-align:center; background:linear-gradient(135deg, #0F172A 0%, #1E293B 100%); border:1px solid #334155;'>
+                        <div style='font-size:11px; font-weight:800; color:#93C5FD; text-transform:uppercase; letter-spacing:0.7px;'>Volumes no Carrinho</div>
+                        <div style='font-size:44px; font-weight:900; color:#FFFFFF; line-height:1.05; margin-top:2px;'>{total_volumes}</div>
+                        <div style='font-size:12px; color:#CBD5E1; margin-top:4px;'>Clientes ativos: <b>{clientes_unicos}</b></div>
+                        <div style='margin-top:10px; padding-top:8px; border-top:1px solid rgba(148,163,184,0.35); font-size:11px; color:#E2E8F0;'>
+                            Maior concentração: <b>{top_cliente_pct}%</b>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
             with col_kpi_of_2:
-                st.markdown(f"<div class='of-card'><div class='of-card-title'>Detalhamento por Conta de Cliente</div><div class='of-card-subtitle'>{resumo_str}</div></div>", unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class='of-card' style='padding:14px;'>
+                        <div class='of-card-title'>Detalhamento por Conta de Cliente</div>
+                        <div style='font-size:14px; font-weight:600; color:#334155; margin:10px 0 2px 0; line-height:1.7;'>
+                            {resumo_tom_str}
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
             with col_kpi_of_3:
                 if st.button("🗑️ Esvaziar Todo Carrinho", type="secondary", use_container_width=True, help="Zera completamente a memória temporária"):
                     st.session_state.df_sandbox_mem = pd.DataFrame()
                     st.session_state.umove_lote_atual_id = None
                     try: planilha_sandbox.sheet1.clear()
                     except: pass
+                    st.session_state.ui_toast = {'msg': "Mesa limpa com sucesso!", 'icon': "🧹"}
                     st.rerun()
 
             st.markdown("#### 🕵️‍♂️ Mesa de Conferência e Modificações")
@@ -6816,6 +6843,8 @@ elif menu == "📥 Importações Umove":
         if 'umove_resultados_disparo' not in st.session_state: st.session_state.umove_resultados_disparo = {}
         if 'umove_xls_bytes' not in st.session_state: st.session_state.umove_xls_bytes = None
         if 'umove_final_metrics' not in st.session_state: st.session_state.umove_final_metrics = {'total': 0, 'sucesso': 0, 'falhas': 0}
+        if 'umove_sync_status' not in st.session_state:
+            st.session_state.umove_sync_status = {'ok': True, 'pendencias': []}
 
         # 🛡️ CORREÇÃO 1: Dicionários de mapeamento com injeção automática do DDI (55)
         dict_tel = {}
@@ -6864,7 +6893,8 @@ elif menu == "📥 Importações Umove":
         df_fonte_envio = st.session_state.df_sandbox_mem.copy()
 
         def salvar_backup_completo_umove(df_bkp, id_ev, planilha):
-            if planilha is None or df_bkp.empty: return
+            if planilha is None or df_bkp.empty:
+                return False
             try:
                 try: aba_bkp = planilha.worksheet("Backup_Umove_Rotas")
                 except:
@@ -6876,7 +6906,9 @@ elif menu == "📥 Importações Umove":
                 df_to_save.insert(0, "DATA_DISPARO", datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S'))
                 df_to_save.insert(0, "ID_EVENTO", id_ev)
                 aba_bkp.append_rows(df_to_save.fillna("").astype(str).values.tolist(), value_input_option='USER_ENTERED')
-            except: pass
+                return True
+            except:
+                return False
 
         if df_fonte_envio.empty and st.session_state.umove_step not in ['PROCESSING', 'COMPLETED']:
             st.markdown("""
@@ -7206,19 +7238,30 @@ elif menu == "📥 Importações Umove":
                         aba_logs.append_rows(logs_google_sheets_zap, value_input_option='USER_ENTERED')
                     except: pass
 
+                sync_pendencias = []
                 try:
                     if 'PEDIDO' in df_dispatch.columns:
                         aba_contador = planilha_sandbox.worksheet("Contador")
                         max_id_gerado = df_dispatch['PEDIDO'].astype(int).max()
                         aba_contador.update("A1", [[str(max_id_gerado + 1)]])
-                except: pass
+                except:
+                    sync_pendencias.append("Falha ao atualizar aba Contador")
 
                 st.session_state.umove_xls_bytes = gerar_relatorio_umove_xls(df_dispatch, st.session_state.umove_resultados_disparo)
                 
                 lote_id_final = st.session_state.umove_lote_atual_id if st.session_state.umove_lote_atual_id else id_evento
-                gerenciar_estado_lote("CONCLUIR", lote_id_final, resultados=st.session_state.umove_resultados_disparo)
+                concluiu_hist = gerenciar_estado_lote("CONCLUIR", lote_id_final, resultados=st.session_state.umove_resultados_disparo)
+                if not concluiu_hist:
+                    sync_pendencias.append("Falha ao consolidar Historico_Disparos_Umove")
                 
-                salvar_backup_completo_umove(df_dispatch, lote_id_final, planilha_sandbox)
+                backup_ok = salvar_backup_completo_umove(df_dispatch, lote_id_final, planilha_sandbox)
+                if not backup_ok:
+                    sync_pendencias.append("Falha ao salvar Backup_Umove_Rotas")
+
+                st.session_state.umove_sync_status = {
+                    'ok': len(sync_pendencias) == 0,
+                    'pendencias': sync_pendencias
+                }
                 
                 st.session_state.umove_lote_atual_id = None
                 st.session_state.umove_step = 'COMPLETED'
@@ -7229,8 +7272,15 @@ elif menu == "📥 Importações Umove":
                 
                 metrics = st.session_state.umove_final_metrics
                 st.markdown(render_big_metrics(metrics['total'], 0, metrics['sucesso'], metrics['falhas']), unsafe_allow_html=True)
-                
-                st.success("🎉 O disparo em lote foi finalizado! O histórico foi consolidado na nuvem.")
+
+                sync_ok = st.session_state.get('umove_sync_status', {}).get('ok', True)
+                pendencias = st.session_state.get('umove_sync_status', {}).get('pendencias', [])
+                if sync_ok:
+                    st.success("🎉 O disparo em lote foi finalizado! O histórico foi consolidado na nuvem.")
+                else:
+                    st.warning("⚠️ Disparo concluído, porém ainda há pendências de gravação no Sheets. A mesa permanece bloqueada até concluir a sincronização.")
+                    for p in pendencias:
+                        st.markdown(f"- {p}")
                 
                 col_rel1, col_rel2 = st.columns(2)
                 with col_rel1:
@@ -7243,10 +7293,12 @@ elif menu == "📥 Importações Umove":
                             use_container_width=True,
                             type="primary")
                 with col_rel2:
-                    if st.button("🔄 Liberar Mesa para Novo Disparo", use_container_width=True):
+                    if st.button("🔄 Liberar Mesa para Novo Disparo", use_container_width=True, disabled=not sync_ok):
                         st.session_state.umove_step = 'IDLE'
                         st.session_state.umove_xls_bytes = None
                         st.session_state.umove_resultados_disparo = {}
+                        st.session_state.umove_sync_status = {'ok': True, 'pendencias': []}
+                        st.session_state.ui_toast = {'msg': "Mesa liberada para novo disparo.", 'icon': "✅"}
                         st.rerun()
 
     # =============================================================================
