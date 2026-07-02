@@ -1580,8 +1580,9 @@ def gerar_excel_memoria(df):
                                 {'columns': [{'header': str(col)} for col in df_rep.columns],
                                     'style': 'Table Style Medium 2'})
             for i, col in enumerate(df_rep.columns):
+                tam_max_coluna = df_rep[col].map(lambda v: len(str(v)) if pd.notna(v) else 0).max()
                 worksheet.set_column(i, i, min(
-                    max(df_rep[col].astype(str).map(len).max(), len(str(col))) + 2, 40))
+                    max(tam_max_coluna, len(str(col))) + 2, 40))
     return output.getvalue()
 
 
@@ -6053,14 +6054,25 @@ elif menu == "📥 Importações Umove":
 
     @st.cache_data(ttl=600, show_spinner=False)
     def carregar_agendamentos_fixos():
+        colunas_fixos_padrao = [
+            'ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP',
+            'OBSERVACOES', 'MOTORISTA', 'SCHEDULE_TYPE', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS'
+        ]
         try:
             aba = planilha_db.worksheet("Agendamentos_Fixos")
             dados = aba.get_all_values()
             if len(dados) > 1:
-                return pd.DataFrame(dados[1:], columns=dados[0])
+                df_fixos = pd.DataFrame(dados[1:], columns=dados[0])
+                for col in colunas_fixos_padrao:
+                    if col not in df_fixos.columns:
+                        df_fixos[col] = ""
+
+                df_fixos['SCHEDULE_TYPE'] = df_fixos['SCHEDULE_TYPE'].astype(str).str.strip().str.lower()
+                df_fixos.loc[~df_fixos['SCHEDULE_TYPE'].isin(['visita_tox', 'entrega']), 'SCHEDULE_TYPE'] = 'visita_tox'
+                return df_fixos[colunas_fixos_padrao]
         except Exception:
             pass
-        return pd.DataFrame(columns=['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS'])
+        return pd.DataFrame(columns=colunas_fixos_padrao)
 
     # --- INÍCIO: VARIÁVEIS DA MÁQUINA DE ESTADOS ---
     if "umove_lote_atual_id" not in st.session_state:
@@ -6412,7 +6424,7 @@ elif menu == "📥 Importações Umove":
     with tab_fixos:
         st.markdown("#### 🏭 Criar Novo Agendamento Fixo")
 
-        cols_fixos = ['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
+        cols_fixos = ['ID_REGRA', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'MOTORISTA', 'SCHEDULE_TYPE', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'STATUS']
         df_regras = carregar_agendamentos_fixos()
         
         try:
@@ -6480,6 +6492,7 @@ elif menu == "📥 Importações Umove":
 
             logins_disp = sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []
             f_agente = st.selectbox("Motorista Fixo:", ["Automático (Por Rota)"] + logins_disp)
+            f_schedule_type = st.selectbox("Tipo no AGD para este fixo:", ["visita_tox", "entrega"], index=0)
 
             if st.form_submit_button("💾 Salvar Agendamento Fixo", type="primary"):
                 if f_tomador == "Selecione..." or not f_lab or not f_rua or not f_num or not f_bai or not f_cid:
@@ -6495,11 +6508,12 @@ elif menu == "📥 Importações Umove":
                             f"REG-{str(uuid.uuid4())[:6].upper()}", f_tomador, padronizar_texto(f_lab),
                             padronizar_texto(f_rua), padronizar_texto(f_num), padronizar_texto(f_bai),
                             padronizar_texto(f_cid), padronizar_texto(f_uf), st.session_state.get(key_dinamica, ""),
-                            str(f_obs), f_agente, "SIM" if b_seg else "NAO", "SIM" if b_ter else "NAO", "SIM" if b_qua else "NAO",
+                            str(f_obs), f_agente, f_schedule_type, "SIM" if b_seg else "NAO", "SIM" if b_ter else "NAO", "SIM" if b_qua else "NAO",
                             "SIM" if b_qui else "NAO", "SIM" if b_sex else "NAO", "SIM" if b_sab else "NAO", "ATIVO"
                         ]
                         try:
                             aba_fixos.append_row(nova_regra)
+                            carregar_agendamentos_fixos.clear()
                             st.success("✅ Regra Fixa cadastrada com sucesso!")
                             st.session_state['f_rua'] = ""
                             st.session_state['f_bai'] = ""
@@ -6527,6 +6541,7 @@ elif menu == "📥 Importações Umove":
             
             gb_fixos.configure_column("STATUS", cellEditor='agSelectCellEditor', cellEditorParams={'values': ["ATIVO", "INATIVO"]})
             gb_fixos.configure_column("MOTORISTA", cellEditor='agSelectCellEditor', cellEditorParams={'values': logins_p_tabela})
+            gb_fixos.configure_column("SCHEDULE_TYPE", cellEditor='agSelectCellEditor', cellEditorParams={'values': ["visita_tox", "entrega"]})
             
             gb_fixos.configure_selection('multiple', use_checkbox=True)
             grid_options_fixos = gb_fixos.build()
@@ -6550,11 +6565,20 @@ elif menu == "📥 Importações Umove":
             if c_btn_salvar.button("💾 Salvar Alterações na Base de Regras", type="primary", use_container_width=True):
                 with st.spinner("Atualizando banco de dados..."):
                     try:
+                        for col in cols_fixos:
+                            if col not in df_regras_edit.columns:
+                                df_regras_edit[col] = ""
+
+                        df_regras_edit = df_regras_edit[cols_fixos].copy()
+                        df_regras_edit['SCHEDULE_TYPE'] = df_regras_edit['SCHEDULE_TYPE'].astype(str).str.strip().str.lower()
+                        df_regras_edit.loc[~df_regras_edit['SCHEDULE_TYPE'].isin(['visita_tox', 'entrega']), 'SCHEDULE_TYPE'] = 'visita_tox'
+
                         aba_fixos.clear()
                         if df_regras_edit.empty:
                             aba_fixos.update("A1", [cols_fixos])
                         else:
-                            aba_fixos.update("A1", [df_regras_edit.columns.tolist()] + df_regras_edit.fillna("").astype(str).values.tolist())
+                            aba_fixos.update("A1", [cols_fixos] + df_regras_edit.fillna("").astype(str).values.tolist())
+                        carregar_agendamentos_fixos.clear()
                         st.success("✅ Regras atualizadas com sucesso!")
                         time.sleep(1.5)
                         st.rerun()
@@ -6567,12 +6591,21 @@ elif menu == "📥 Importações Umove":
                         df_selecionados = pd.DataFrame(linhas_selecionadas_fixos)
                         ids_para_remover = df_selecionados['ID_REGRA'].tolist()
                         df_regras_edit = df_regras_edit[~df_regras_edit['ID_REGRA'].isin(ids_para_remover)]
+
+                        for col in cols_fixos:
+                            if col not in df_regras_edit.columns:
+                                df_regras_edit[col] = ""
+
+                        df_regras_edit = df_regras_edit[cols_fixos].copy()
+                        df_regras_edit['SCHEDULE_TYPE'] = df_regras_edit['SCHEDULE_TYPE'].astype(str).str.strip().str.lower()
+                        df_regras_edit.loc[~df_regras_edit['SCHEDULE_TYPE'].isin(['visita_tox', 'entrega']), 'SCHEDULE_TYPE'] = 'visita_tox'
                         
                         aba_fixos.clear()
                         if df_regras_edit.empty:
                             aba_fixos.update("A1", [cols_fixos])
                         else:
-                            aba_fixos.update("A1", [df_regras_edit.columns.tolist()] + df_regras_edit.fillna("").astype(str).values.tolist())
+                            aba_fixos.update("A1", [cols_fixos] + df_regras_edit.fillna("").astype(str).values.tolist())
+                        carregar_agendamentos_fixos.clear()
                         st.success(f"✅ {len(ids_para_remover)} regras excluídas!")
                         time.sleep(1.5)
                         st.rerun()
@@ -6593,6 +6626,10 @@ elif menu == "📥 Importações Umove":
             dados_fixos = aba_fixos.get_all_values()
             if len(dados_fixos) > 1:
                 df_regras_temp = pd.DataFrame(dados_fixos[1:], columns=dados_fixos[0])
+                if 'SCHEDULE_TYPE' not in df_regras_temp.columns:
+                    df_regras_temp['SCHEDULE_TYPE'] = 'visita_tox'
+                df_regras_temp['SCHEDULE_TYPE'] = df_regras_temp['SCHEDULE_TYPE'].astype(str).str.strip().str.lower()
+                df_regras_temp.loc[~df_regras_temp['SCHEDULE_TYPE'].isin(['visita_tox', 'entrega']), 'SCHEDULE_TYPE'] = 'visita_tox'
                 mapa_dias = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
                 dia_atual = mapa_dias[hoje_br.weekday()]
 
@@ -6626,6 +6663,7 @@ elif menu == "📥 Importações Umove":
                                 'UF': regra['UF'],
                                 'CEP': regra['CEP'],
                                 'OBSERVACOES': str(regra['OBSERVACOES']) + " [FIXO]",
+                                'SCHEDULE_TYPE': str(regra.get('SCHEDULE_TYPE', 'visita_tox')).strip().lower(),
                                 'AGENTE_RAW': regra['MOTORISTA']}
                             novos_pedidos.append(novo_pedido)
                             prox_id_sb += 1
@@ -6812,7 +6850,13 @@ elif menu == "📥 Importações Umove":
                     agente_raw = str(row.get('AGENTE_RAW', ''))
                     agente_agd = agente_raw.split('|')[0].strip()
 
-                    schedule_type = "visita_tox"
+                    eh_fixo = bool(re.search(r'\[FIXO\]', str(row.get('OBSERVACOES', '')), flags=re.IGNORECASE))
+                    if eh_fixo:
+                        schedule_type = str(row.get('SCHEDULE_TYPE', 'visita_tox')).strip().lower()
+                        if schedule_type not in ['visita_tox', 'entrega']:
+                            schedule_type = 'visita_tox'
+                    else:
+                        schedule_type = "visita_tox"
                     linha_agd = f";{id_loc};{schedule_type};7;1;{hoje_br.strftime('%d/%m/%Y')};00:10;;{id_agd};{agente_agd};"
                     agd_lines.append(linha_agd)
 
