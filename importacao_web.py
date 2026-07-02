@@ -1274,9 +1274,67 @@ def obter_proximo_id(df, minimo_inicial=1000):
         return minimo_inicial
 
 
+@st.cache_data(ttl=300)
+def carregar_mapa_sla_tarifas(tomador):
+    if planilha_financeiro is None:
+        return {}
+
+    tomador_norm = str(tomador).strip().upper()
+    if not tomador_norm:
+        return {}
+
+    try:
+        buscado = tomador_norm.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB')
+        todas_abas = planilha_financeiro.worksheets()
+        mapa_abas = {aba.title.strip().upper(): aba for aba in todas_abas}
+
+        if buscado not in mapa_abas:
+            return {}
+
+        dados = mapa_abas[buscado].get_all_values()
+        if len(dados) <= 1:
+            return {}
+
+        df_prazos = pd.DataFrame(dados[1:], columns=dados[0])
+        if 'CIDADE' not in df_prazos.columns or 'PRAZO_DIAS_UTEIS' not in df_prazos.columns:
+            return {}
+
+        df_prazos['CIDADE'] = df_prazos['CIDADE'].apply(padronizar_texto)
+        df_prazos['PRAZO_DIAS_UTEIS'] = pd.to_numeric(df_prazos['PRAZO_DIAS_UTEIS'], errors='coerce')
+        df_prazos = df_prazos.dropna(subset=['PRAZO_DIAS_UTEIS'])
+        df_prazos = df_prazos[df_prazos['PRAZO_DIAS_UTEIS'] > 0]
+        if df_prazos.empty:
+            return {}
+
+        # Mantem apenas um prazo por cidade (primeira ocorrencia valida).
+        df_prazos = df_prazos.drop_duplicates(subset=['CIDADE'], keep='first')
+        return {
+            str(r['CIDADE']): int(r['PRAZO_DIAS_UTEIS'])
+            for _, r in df_prazos.iterrows()
+            if str(r.get('CIDADE', '')).strip()
+        }
+    except Exception:
+        return {}
+
+
+def obter_prazo_sla_tabela(tomador, cidade):
+    tomador_norm = str(tomador).strip().upper()
+    cidade_norm = padronizar_texto(cidade)
+    if not tomador_norm or not cidade_norm:
+        return None
+
+    mapa_sla = carregar_mapa_sla_tarifas(tomador_norm)
+    prazo = mapa_sla.get(cidade_norm)
+    return int(prazo) if prazo else None
+
+
 def calcular_sla_dias(uf, cidade, tomador=""):
     uf, cidade = str(uf).upper().strip(), padronizar_texto(cidade)
     tomador = str(tomador).upper().strip()
+
+    prazo_tabela = obter_prazo_sla_tabela(tomador, cidade)
+    if prazo_tabela:
+        return prazo_tabela
 
     if "SOUZA CRUZ" in tomador:
         if uf == 'SP' or cidade == 'DUQUE DE CAXIAS':
@@ -3757,7 +3815,7 @@ elif menu == "💰 Faturamento":
                 dados = aba.get_all_values()
                 if len(dados) > 1:
                     df_p = pd.DataFrame(dados[1:], columns=dados[0])
-                    for col in ['VALOR_CHEIO', 'MULT_FRUSTRADA']:
+                    for col in ['VALOR_CHEIO', 'MULT_FRUSTRADA', 'PRAZO_DIAS_UTEIS']:
                         if col in df_p.columns:
                             df_p[col] = df_p[col].astype(str).str.replace(',', '.').str.replace('R$', '').str.strip()
                             df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0.0)
@@ -4326,6 +4384,7 @@ elif menu == "💰 Faturamento":
                     col_t5, col_t6 = st.columns(2)
                     t_valor = col_t5.number_input("Valor da Entrega (R$) *", min_value=0.0, step=0.5, format="%.2f")
                     t_multa = col_t6.number_input("Multiplicador p/ Frustrada *", min_value=0.0, max_value=1.0, value=0.5, step=0.1, help="Ex: 0.5 cobra 50% do valor caso seja frustrada.")
+                    t_prazo = st.number_input("Prazo SLA (dias uteis) *", min_value=1, max_value=30, value=1, step=1, help="Prazo padrao para esta cidade no calculo de DATA_LIMITE.")
 
                     submit_tarifa = st.form_submit_button("💾 Cadastrar Nova Tarifa no Banco", type="primary", use_container_width=True)
 
@@ -4345,11 +4404,11 @@ elif menu == "💰 Faturamento":
                                     try: aba_cli = planilha_financeiro.worksheet(buscado)
                                     except BaseException:
                                         aba_cli = planilha_financeiro.add_worksheet(title=buscado, rows="100", cols="10")
-                                        aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]])
+                                        aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "PRAZO_DIAS_UTEIS", "UF"]])
 
                                     cabecalhos_atuais = aba_cli.row_values(1)
                                     if not cabecalhos_atuais:
-                                        cabecalhos_atuais = ["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]
+                                        cabecalhos_atuais = ["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "PRAZO_DIAS_UTEIS", "UF"]
                                         aba_cli.update("A1", [cabecalhos_atuais])
 
                                     dicionario_nova_tarifa = {
@@ -4357,6 +4416,7 @@ elif menu == "💰 Faturamento":
                                         "ENDERECO": padronizar_texto(t_rua), "CEP": re.sub(r'\D', '', t_cep),
                                         "VALOR_CHEIO": f"{t_valor:.2f}".replace(".", ","),
                                         "MULT_FRUSTRADA": f"{t_multa:.2f}".replace(".", ","),
+                                        "PRAZO_DIAS_UTEIS": str(int(t_prazo)),
                                         "UF": t_uf}
 
                                     precisa_atualizar_cab = False
@@ -4371,8 +4431,9 @@ elif menu == "💰 Faturamento":
                                     nova_linha_ordenada = [dicionario_nova_tarifa.get(col, "") for col in cabecalhos_atuais]
                                     aba_cli.append_row(nova_linha_ordenada)
                                     carregar_tabela_precos.clear()
+                                    carregar_mapa_sla_tarifas.clear()
 
-                                    st.success(f"✅ Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid_final)} - {t_uf} cadastrada!")
+                                    st.success(f"✅ Tarifa de R$ {t_valor:.2f} para {padronizar_texto(t_cid_final)} - {t_uf} cadastrada com prazo de {int(t_prazo)} dia(s) util(eis)!")
                                     time.sleep(1.5)
                                     st.rerun()
                                 except Exception as e:
@@ -4397,6 +4458,7 @@ elif menu == "💰 Faturamento":
                 # Formatando as colunas pra não ficarem feias
                 gb_tar.configure_column("VALOR_CHEIO", header_name="💰 Valor (R$)", type=["numericColumn", "numberColumnFilter"])
                 gb_tar.configure_column("MULT_FRUSTRADA", header_name="✖️ Mult. Frustrada", type=["numericColumn"])
+                gb_tar.configure_column("PRAZO_DIAS_UTEIS", header_name="⏱️ SLA (dias uteis)", type=["numericColumn", "numberColumnFilter"])
                 gb_tar.configure_column("CIDADE", header_name="📍 Cidade")
                 gb_tar.configure_column("BAIRRO", header_name="🏘️ Bairro")
                 gb_tar.configure_column("ENDERECO", header_name="🛣️ Endereço")
@@ -4435,9 +4497,10 @@ elif menu == "💰 Faturamento":
                             if not df_final_save.empty:
                                 aba_cli.update("A1", [df_final_save.columns.tolist()] + df_final_save.fillna("").astype(str).values.tolist())
                             else:
-                                aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]])
+                                aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "PRAZO_DIAS_UTEIS", "UF"]])
 
                             carregar_tabela_precos.clear()
+                            carregar_mapa_sla_tarifas.clear()
                             st.success("✅ Edições salvas com sucesso!")
                             time.sleep(1.5)
                             st.rerun()
@@ -4466,9 +4529,10 @@ elif menu == "💰 Faturamento":
                                 if not df_final_save.empty:
                                     aba_cli.update("A1", [df_final_save.columns.tolist()] + df_final_save.fillna("").astype(str).values.tolist())
                                 else:
-                                    aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "UF"]])
+                                    aba_cli.update("A1", [["CIDADE", "BAIRRO", "ENDERECO", "CEP", "VALOR_CHEIO", "MULT_FRUSTRADA", "PRAZO_DIAS_UTEIS", "UF"]])
 
                                 carregar_tabela_precos.clear()
+                                carregar_mapa_sla_tarifas.clear()
                                 st.success(f"✅ {len(indices_to_drop)} tarifa(s) excluída(s) com sucesso!")
                                 time.sleep(1.5)
                                 st.rerun()
