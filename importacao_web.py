@@ -37,8 +37,9 @@ AGENTES_XLS_AUTORIZADOS = [
     'robson.melo',
     'william.bertoldo',
     'ludmila',
-    'helio.frade']
-AGENTES_PDF_AUTORIZADOS = ['veloz.express', 'francisco.gru', 'adilson.lima']
+    'helio.frade',
+    'domingos.ssa']
+AGENTES_PDF_AUTORIZADOS = ['veloz.express', 'francisco.gru', 'adilson.lima','domingos.ssa']
 
 
 def gerar_saudacao_spintax(nome, uf=""):
