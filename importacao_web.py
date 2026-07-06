@@ -441,6 +441,17 @@ CSS_DASHBOARD = """
     [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
         display: none;
     }
+    [data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"] {
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        accent-color: transparent !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        opacity: 0 !important;
+        position: absolute !important;
+        pointer-events: none !important;
+    }
     [data-testid="stSidebar"] div[role="radiogroup"] > label p {
         font-size: 14px;
         font-weight: 700;
@@ -2469,6 +2480,17 @@ with st.sidebar:
         }
         [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
             display: none;
+        }
+        [data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"] {
+            appearance: none !important;
+            -webkit-appearance: none !important;
+            accent-color: transparent !important;
+            width: 0 !important;
+            height: 0 !important;
+            margin: 0 !important;
+            opacity: 0 !important;
+            position: absolute !important;
+            pointer-events: none !important;
         }
         [data-testid="stSidebar"] div[role="radiogroup"] > label p {
             font-size: 12px;
