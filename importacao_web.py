@@ -42,6 +42,58 @@ AGENTES_XLS_AUTORIZADOS = [
 AGENTES_PDF_AUTORIZADOS = ['veloz.express', 'francisco.gru', 'adilson.lima','domingos.ssa']
 
 
+def normalizar_modo_disparo_whatsapp(valor):
+    texto = unicodedata.normalize('NFKD', str(valor).strip()).encode('ASCII', 'ignore').decode('utf-8').upper()
+    if not texto or texto in {'NAN', 'NONE'}:
+        return ''
+    if 'PDF' in texto and 'XLS' in texto:
+        return 'PDF_XLS'
+    if 'PDF' in texto:
+        return 'PDF'
+    if 'XLS' in texto:
+        return 'XLS'
+    return 'NOTIFICACAO'
+
+
+def obter_modo_disparo_whatsapp_legacy(login_agente):
+    login = str(login_agente).strip().lower()
+    login_base = login.split('|')[0].split('/')[0].strip()
+    is_pdf = login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
+    is_xls = login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
+    if is_pdf and is_xls:
+        return 'PDF_XLS'
+    if is_pdf:
+        return 'PDF'
+    if is_xls:
+        return 'XLS'
+    return 'NOTIFICACAO'
+
+
+def obter_modo_disparo_whatsapp(login_agente):
+    login = str(login_agente).strip().lower()
+    login_base = login.split('|')[0].split('/')[0].strip()
+
+    if not DF_AGENTES.empty and 'TIPO_DISPARO_WHATSAPP' in DF_AGENTES.columns:
+        df_match = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'].astype(str).str.strip().str.lower() == login]
+        if df_match.empty and login_base != login:
+            df_match = DF_AGENTES[DF_AGENTES['LOGIN DO AGENTE'].astype(str).str.strip().str.lower() == login_base]
+        if not df_match.empty:
+            modo = normalizar_modo_disparo_whatsapp(df_match.iloc[0].get('TIPO_DISPARO_WHATSAPP', ''))
+            if modo:
+                return modo
+
+    return obter_modo_disparo_whatsapp_legacy(login)
+
+
+def etiqueta_modo_disparo_whatsapp(modo):
+    return {
+        'NOTIFICACAO': 'Somente notificação',
+        'PDF': 'Notificação + PDF',
+        'XLS': 'Notificação + XLS',
+        'PDF_XLS': 'Notificação + PDF + XLS',
+    }.get(modo, 'Somente notificação')
+
+
 def gerar_saudacao_spintax(nome, uf=""):
     """
     🔥 GERADOR DE SAUDAÇÕES INTELIGENTE COM REGIONALIZAÇÃO POR ESTADO
@@ -800,7 +852,12 @@ def carregar_dados_agentes(_planilha):
         aba = _planilha.worksheet("Agentes")
         dados = aba.get_all_values()
         if len(dados) > 1:
-            return pd.DataFrame(dados[1:], columns=dados[0])
+            df_ag = pd.DataFrame(dados[1:], columns=dados[0])
+            if 'TIPO_DISPARO_WHATSAPP' not in df_ag.columns:
+                df_ag['TIPO_DISPARO_WHATSAPP'] = df_ag['LOGIN DO AGENTE'].apply(obter_modo_disparo_whatsapp_legacy)
+            else:
+                df_ag['TIPO_DISPARO_WHATSAPP'] = df_ag['TIPO_DISPARO_WHATSAPP'].apply(normalizar_modo_disparo_whatsapp)
+            return df_ag
     except Exception:
         pass
     return pd.DataFrame(
@@ -808,7 +865,8 @@ def carregar_dados_agentes(_planilha):
             "ROTA MAPEADA",
             "LOGIN DO AGENTE",
             "NOME DO AGENTE",
-            "TELEFONE"])
+            "TELEFONE",
+            "TIPO_DISPARO_WHATSAPP"])
 
 
 # 🔥 TTL Aumentado de 20s para 10 min (600s). Evita Erro 429! 🔥
@@ -7173,10 +7231,9 @@ elif menu == "📥 Importações Umove":
                         nom = dict_nom.get(ag_key, str(ag).upper())
                         
                         ag_login = ag_key
-                        login_base = ag_login.split('|')[0].split('/')[0].strip()
-                        
-                        is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
-                        is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
+                        modo_disparo = obter_modo_disparo_whatsapp(ag_login)
+                        is_autorizado_pdf = modo_disparo in ['PDF', 'PDF_XLS']
+                        is_autorizado_xls = modo_disparo in ['XLS', 'PDF_XLS']
 
                         st.session_state.umove_resultados_disparo[nom] = {'total': len(df_ag_sb), 'sucesso': 0, 'pedidos': df_ag_sb['PEDIDO'].tolist()}
 
@@ -9166,6 +9223,9 @@ elif menu == "⚙️ Rotas":
             dados_atuais_ag = df_ag_filtrado.iloc[0]
             rotas_validas = [r for r in df_ag_filtrado['ROTA MAPEADA'].tolist() if str(r).strip() != "SEM ROTA DEFINIDA"]
             qtd_rotas = len(rotas_validas)
+            modo_disparo_atual = obter_modo_disparo_whatsapp(agente_filtro)
+            opcoes_modo_disparo = ['NOTIFICACAO', 'PDF', 'XLS', 'PDF_XLS']
+            labels_modo_disparo = {item: etiqueta_modo_disparo_whatsapp(item) for item in opcoes_modo_disparo}
             
             # 🔥 HEADER DO PERFIL (VISUAL APP MODERNO) 🔥
             st.markdown(f"""
@@ -9204,6 +9264,12 @@ elif menu == "⚙️ Rotas":
                     with st.form(f"form_edit_{agente_filtro}"):
                         edit_nome = st.text_input("Nome Amigável", value=dados_atuais_ag['NOME DO AGENTE'])
                         edit_tel = st.text_input("WhatsApp com DDD", value=dados_atuais_ag['TELEFONE'])
+                        edit_modo_disparo = st.selectbox(
+                            "Disparo no WhatsApp",
+                            options=opcoes_modo_disparo,
+                            index=opcoes_modo_disparo.index(modo_disparo_atual) if modo_disparo_atual in opcoes_modo_disparo else 0,
+                            format_func=lambda x: labels_modo_disparo.get(x, x)
+                        )
                         
                         if st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True):
                             if not edit_nome or not edit_tel:
@@ -9213,6 +9279,7 @@ elif menu == "⚙️ Rotas":
                                 mask_edit = df_ag_edit['LOGIN DO AGENTE'] == agente_filtro
                                 df_ag_edit.loc[mask_edit, 'NOME DO AGENTE'] = edit_nome.upper().strip()
                                 df_ag_edit.loc[mask_edit, 'TELEFONE'] = re.sub(r'\D', '', edit_tel)
+                                df_ag_edit.loc[mask_edit, 'TIPO_DISPARO_WHATSAPP'] = edit_modo_disparo
                                 try:
                                     aba_ag = planilha_db.worksheet("Agentes")
                                     aba_ag.clear()
@@ -9242,7 +9309,8 @@ elif menu == "⚙️ Rotas":
                                                      pd.DataFrame([{"ROTA MAPEADA": rota_str,
                                                                     "LOGIN DO AGENTE": agente_filtro,
                                                                     "NOME DO AGENTE": dados_atuais_ag['NOME DO AGENTE'],
-                                                                    "TELEFONE": dados_atuais_ag['TELEFONE']}])],
+                                                                    "TELEFONE": dados_atuais_ag['TELEFONE'],
+                                                                    "TIPO_DISPARO_WHATSAPP": dados_atuais_ag.get('TIPO_DISPARO_WHATSAPP', modo_disparo_atual)}])],
                                                     ignore_index=True)
                                 try:
                                     planilha_db.worksheet("Agentes").clear()
@@ -9321,7 +9389,8 @@ elif menu == "⚙️ Rotas":
                                                 "ROTA MAPEADA": "SEM ROTA DEFINIDA",
                                                 "LOGIN DO AGENTE": agente_filtro,
                                                 "NOME DO AGENTE": dados_agente_original['NOME DO AGENTE'],
-                                                "TELEFONE": dados_agente_original['TELEFONE']
+                                                    "TELEFONE": dados_agente_original['TELEFONE'],
+                                                    "TIPO_DISPARO_WHATSAPP": dados_agente_original.get('TIPO_DISPARO_WHATSAPP', modo_disparo_atual)
                                             }])
                                         ], ignore_index=True)
                                     
@@ -9391,7 +9460,8 @@ elif menu == "⚙️ Rotas":
                                                         "ROTA MAPEADA": "SEM ROTA DEFINIDA",
                                                         "LOGIN DO AGENTE": agente_filtro,
                                                         "NOME DO AGENTE": dados_agente_original['NOME DO AGENTE'],
-                                                        "TELEFONE": dados_agente_original['TELEFONE']
+                                                        "TELEFONE": dados_agente_original['TELEFONE'],
+                                                        "TIPO_DISPARO_WHATSAPP": dados_agente_original.get('TIPO_DISPARO_WHATSAPP', modo_disparo_atual)
                                                     }])
                                                 ], ignore_index=True)
                                             
@@ -9730,10 +9800,9 @@ elif menu == "📱 WhatsApp":
 
                             # Limpeza do Login para Catraca
                             ag_login = str(agente).strip().lower()
-                            login_base = ag_login.split(
-                                '|')[0].split('/')[0].strip()
-                            is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
-                            is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
+                            modo_disparo = obter_modo_disparo_whatsapp(ag_login)
+                            is_autorizado_pdf = modo_disparo in ['PDF', 'PDF_XLS']
+                            is_autorizado_xls = modo_disparo in ['XLS', 'PDF_XLS']
 
                             if telefone:
                                 status_text.markdown(
@@ -9871,11 +9940,11 @@ elif menu == "📱 WhatsApp":
                         lambda x: str(x).startswith('SIM')).all()
 
                     ag_login = str(agente).strip().lower()
-                    login_base = ag_login.split('|')[0].split('/')[0].strip()
-                    is_autorizado_xls = ag_login in AGENTES_XLS_AUTORIZADOS or login_base in AGENTES_XLS_AUTORIZADOS
+                    modo_disparo = obter_modo_disparo_whatsapp(ag_login)
+                    is_autorizado_xls = modo_disparo in ['XLS', 'PDF_XLS']
 
                     selo_status = '✅ ENVIADO' if enviado else '⏳ PENDENTE'
-                    selo_vip = ' 🌟 [RECEBE EXCEL]' if is_autorizado_xls else ''
+                    selo_vip = f" 🌟 [{etiqueta_modo_disparo_whatsapp(modo_disparo)}]" if modo_disparo != 'NOTIFICACAO' else ''
 
                     with st.expander(f"{selo_status} | 👤 {nome_ag}{selo_vip} | Coletas: {len(df_agente)}", expanded=not enviado):
                         st.dataframe(
@@ -9887,7 +9956,8 @@ elif menu == "📱 WhatsApp":
                             if not tel_ag:
                                 st.error("Sem telefone.")
                             else:
-                                is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
+                                modo_disparo = obter_modo_disparo_whatsapp(ag_login)
+                                is_autorizado_pdf = modo_disparo in ['PDF', 'PDF_XLS']
                                 
                                 # 🔥 Extrai UF para personalização regional
                                 uf_agente_individual = ""
@@ -10060,9 +10130,8 @@ elif menu == "📱 WhatsApp":
                         if telefone:
                             # A CATRACA DE ARQUIVOS
                             ag_login = str(ag).strip().lower()
-                            login_base = ag_login.split(
-                                '|')[0].split('/')[0].strip()
-                            is_autorizado_pdf = ag_login in AGENTES_PDF_AUTORIZADOS or login_base in AGENTES_PDF_AUTORIZADOS
+                            modo_disparo = obter_modo_disparo_whatsapp(ag_login)
+                            is_autorizado_pdf = modo_disparo in ['PDF', 'PDF_XLS']
 
                             # 🔥 Extrai UF para personalização regional
                             uf_agente_romaneio = ""
