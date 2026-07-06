@@ -9226,6 +9226,9 @@ elif menu == "⚙️ Rotas":
             modo_disparo_atual = obter_modo_disparo_whatsapp(agente_filtro)
             opcoes_modo_disparo = ['NOTIFICACAO', 'PDF', 'XLS', 'PDF_XLS']
             labels_modo_disparo = {item: etiqueta_modo_disparo_whatsapp(item) for item in opcoes_modo_disparo}
+            chave_modo_disparo = f"modo_disparo_{agente_filtro}"
+            if chave_modo_disparo not in st.session_state:
+                st.session_state[chave_modo_disparo] = modo_disparo_atual
             
             # 🔥 HEADER DO PERFIL (VISUAL APP MODERNO) 🔥
             st.markdown(f"""
@@ -9261,34 +9264,41 @@ elif menu == "⚙️ Rotas":
             with col_dados:
                 st.markdown("##### ✏️ Editar Informações")
                 with st.container(border=True):
-                    with st.form(f"form_edit_{agente_filtro}"):
-                        edit_nome = st.text_input("Nome Amigável", value=dados_atuais_ag['NOME DO AGENTE'])
-                        edit_tel = st.text_input("WhatsApp com DDD", value=dados_atuais_ag['TELEFONE'])
-                        edit_modo_disparo = st.selectbox(
-                            "Disparo no WhatsApp",
-                            options=opcoes_modo_disparo,
-                            index=opcoes_modo_disparo.index(modo_disparo_atual) if modo_disparo_atual in opcoes_modo_disparo else 0,
-                            format_func=lambda x: labels_modo_disparo.get(x, x)
-                        )
-                        
-                        if st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True):
-                            if not edit_nome or not edit_tel:
-                                st.error("Preencha todos os campos!")
-                            else:
-                                df_ag_edit = DF_AGENTES.copy()
-                                mask_edit = df_ag_edit['LOGIN DO AGENTE'] == agente_filtro
-                                df_ag_edit.loc[mask_edit, 'NOME DO AGENTE'] = edit_nome.upper().strip()
-                                df_ag_edit.loc[mask_edit, 'TELEFONE'] = re.sub(r'\D', '', edit_tel)
-                                df_ag_edit.loc[mask_edit, 'TIPO_DISPARO_WHATSAPP'] = edit_modo_disparo
-                                try:
-                                    aba_ag = planilha_db.worksheet("Agentes")
-                                    aba_ag.clear()
-                                    aba_ag.update("A1", [df_ag_edit.columns.tolist()] + df_ag_edit.fillna("").astype(str).values.tolist())
-                                    st.session_state.ui_toast = {'msg': "Cadastro atualizado com sucesso!", 'icon': "✅"}
-                                    carregar_dados_agentes.clear()
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Erro ao editar: {e}")
+                    edit_nome = st.text_input("Nome Amigável", value=dados_atuais_ag['NOME DO AGENTE'])
+                    edit_tel = st.text_input("WhatsApp com DDD", value=dados_atuais_ag['TELEFONE'])
+                    st.markdown("**Disparo no WhatsApp**")
+                    btn_cols = st.columns(4, gap="small")
+                    for idx_modo, modo_item in enumerate(opcoes_modo_disparo):
+                        is_ativo = st.session_state[chave_modo_disparo] == modo_item
+                        if btn_cols[idx_modo].button(
+                            labels_modo_disparo.get(modo_item, modo_item),
+                            key=f"btn_{chave_modo_disparo}_{modo_item}",
+                            use_container_width=True,
+                            type="primary" if is_ativo else "secondary"
+                        ):
+                            st.session_state[chave_modo_disparo] = modo_item
+                            st.rerun()
+                    st.caption(f"Seleção atual: {labels_modo_disparo.get(st.session_state[chave_modo_disparo], st.session_state[chave_modo_disparo])}")
+                    edit_modo_disparo = st.session_state[chave_modo_disparo]
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("💾 Salvar Alterações", type="primary", use_container_width=True):
+                        if not edit_nome or not edit_tel:
+                            st.error("Preencha todos os campos!")
+                        else:
+                            df_ag_edit = DF_AGENTES.copy()
+                            mask_edit = df_ag_edit['LOGIN DO AGENTE'] == agente_filtro
+                            df_ag_edit.loc[mask_edit, 'NOME DO AGENTE'] = edit_nome.upper().strip()
+                            df_ag_edit.loc[mask_edit, 'TELEFONE'] = re.sub(r'\D', '', edit_tel)
+                            df_ag_edit.loc[mask_edit, 'TIPO_DISPARO_WHATSAPP'] = edit_modo_disparo
+                            try:
+                                aba_ag = planilha_db.worksheet("Agentes")
+                                aba_ag.clear()
+                                aba_ag.update("A1", [df_ag_edit.columns.tolist()] + df_ag_edit.fillna("").astype(str).values.tolist())
+                                st.session_state.ui_toast = {'msg': "Cadastro atualizado com sucesso!", 'icon': "✅"}
+                                carregar_dados_agentes.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao editar: {e}")
 
                 st.markdown("<br>", unsafe_allow_html=True)
                 
