@@ -11,6 +11,8 @@ import urllib.parse
 import urllib.request
 import requests
 import time
+import json
+import hashlib
 from datetime import datetime, timedelta, timezone
 import random
 import gspread
@@ -40,6 +42,76 @@ AGENTES_XLS_AUTORIZADOS = [
     'helio.frade',
     'domingos.ssa']
 AGENTES_PDF_AUTORIZADOS = ['veloz.express', 'francisco.gru', 'adilson.lima','domingos.ssa']
+ARQUIVO_USUARIOS_LOGIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "usuarios_login.json")
+
+
+def normalizar_usuario_login(usuario):
+    return str(usuario).strip().upper()
+
+
+def gerar_hash_senha(senha):
+    return hashlib.sha256(str(senha).encode('utf-8')).hexdigest()
+
+
+def verificar_senha(senha_digitada, senha_hash):
+    if not senha_hash:
+        return False
+    return gerar_hash_senha(senha_digitada) == str(senha_hash)
+
+
+def usuarios_padrao_login():
+    return {
+        "ROBSON.MELO": {
+            "senha_hash": gerar_hash_senha("123"),
+            "admin": True,
+        },
+        "WILLIAM.BERTOLDO": {
+            "senha_hash": gerar_hash_senha("123"),
+            "admin": True,
+        },
+    }
+
+
+def carregar_usuarios_login():
+    usuarios = {}
+
+    if os.path.exists(ARQUIVO_USUARIOS_LOGIN):
+        try:
+            with open(ARQUIVO_USUARIOS_LOGIN, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+
+            if isinstance(dados, dict):
+                for usuario, info in dados.items():
+                    user_norm = normalizar_usuario_login(usuario)
+                    if not user_norm:
+                        continue
+
+                    if isinstance(info, dict):
+                        senha_hash = str(info.get("senha_hash", "")).strip()
+                        admin = bool(info.get("admin", False))
+                    else:
+                        # Compatibilidade com formato antigo: {"USUARIO": "senha_em_texto"}
+                        senha_hash = gerar_hash_senha(str(info))
+                        admin = False
+
+                    if senha_hash:
+                        usuarios[user_norm] = {
+                            "senha_hash": senha_hash,
+                            "admin": admin,
+                        }
+        except Exception:
+            usuarios = {}
+
+    if not usuarios:
+        usuarios = usuarios_padrao_login()
+        salvar_usuarios_login(usuarios)
+
+    return usuarios
+
+
+def salvar_usuarios_login(usuarios):
+    with open(ARQUIVO_USUARIOS_LOGIN, "w", encoding="utf-8") as f:
+        json.dump(usuarios, f, ensure_ascii=False, indent=2)
 
 
 def normalizar_modo_disparo_whatsapp(valor):
@@ -649,6 +721,12 @@ CSS_DASHBOARD = """
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
+if 'usuario_logado' not in st.session_state:
+    st.session_state.usuario_logado = None
+
+if 'usuarios_login' not in st.session_state:
+    st.session_state.usuarios_login = carregar_usuarios_login()
+
 if 'log_triagem' not in st.session_state:
     st.session_state.log_triagem = []
 
@@ -701,17 +779,18 @@ if not st.session_state.autenticado:
                         
             st.markdown('<div class="login-title">CONTROLE OPERACIONAL</div>', unsafe_allow_html=True)
 
-            usuario = st.text_input("👤 Usuário").upper().strip()
+            usuario = normalizar_usuario_login(st.text_input("👤 Usuário"))
             senha = st.text_input("🔑 Senha", type="password")
                     
             st.markdown("<br>", unsafe_allow_html=True)
 
             if st.form_submit_button("🚀 ACESSAR SISTEMA", type="primary", use_container_width=True):
-                logins_autorizados = {
-                    "ROBSON.MELO": "123",
-                    "WILLIAM.BERTOLDO": "123"}
-                if usuario in logins_autorizados and logins_autorizados[usuario] == senha:
+                usuarios_login = st.session_state.usuarios_login
+                info_usuario = usuarios_login.get(usuario)
+
+                if info_usuario and verificar_senha(senha, info_usuario.get("senha_hash", "")):
                     st.session_state.autenticado = True
+                    st.session_state.usuario_logado = usuario
                     st.rerun()
                 else:
                     st.error("❌ Credenciais inválidas.")
@@ -2618,7 +2697,10 @@ with st.sidebar:
             </div>
         """, unsafe_allow_html=True)
 
-    menu = st.radio("Navegação Operacional:", [
+    if st.session_state.usuario_logado:
+        st.caption(f"Usuário logado: {st.session_state.usuario_logado}")
+
+    menu_opcoes = [
         "📈 Dashboard",
         "📊 GRID",
         "💰 Faturamento",
@@ -2631,12 +2713,19 @@ with st.sidebar:
         "🔬 Triagem",
         "🎧 Atendimento",
         "📱 WhatsApp"
-    ], index=1, label_visibility="collapsed")
+    ]
+
+    usuario_atual = st.session_state.usuarios_login.get(st.session_state.usuario_logado or "", {})
+    if usuario_atual.get("admin", False):
+        menu_opcoes.append("👥 Cadastro de Usuários")
+
+    menu = st.radio("Navegação Operacional:", menu_opcoes, index=1, label_visibility="collapsed")
 
     st.divider()
 
     if st.button("🚪 Sair do Sistema", key="btn_sair_sidebar", use_container_width=True, type="primary"):
         st.session_state.autenticado = False
+        st.session_state.usuario_logado = None
         st.rerun()
 
 # ✅ AUTO-REFRESH SÓ NA GRID!
@@ -10754,6 +10843,81 @@ elif menu == "📱 WhatsApp":
                                 st.rerun()
                         else:
                             st.error(f"⚠️ Telefone não cadastrado.")
+
+# =============================================================================
+# 👥 MÓDULO: CADASTRO DE USUÁRIOS
+# =============================================================================
+elif menu == "👥 Cadastro de Usuários":
+    st.markdown("### 👥 Cadastro de Usuários")
+    st.caption("Gerencie os usuários de acesso ao sistema (cadastrar, trocar senha e remover).")
+
+    usuarios_login = st.session_state.usuarios_login
+
+    usuarios_lista = []
+    for usuario, info in sorted(usuarios_login.items()):
+        usuarios_lista.append({
+            "Usuário": usuario,
+            "Perfil": "Administrador" if info.get("admin", False) else "Operacional",
+        })
+
+    if usuarios_lista:
+        st.dataframe(pd.DataFrame(usuarios_lista), use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.markdown("#### ➕ Novo usuário")
+    with st.form("form_novo_usuario", clear_on_submit=True):
+        novo_usuario = normalizar_usuario_login(st.text_input("Usuário"))
+        nova_senha = st.text_input("Senha", type="password")
+        novo_admin = st.checkbox("Administrador", value=False)
+        cadastrar_usuario = st.form_submit_button("Cadastrar usuário", type="primary", use_container_width=True)
+
+        if cadastrar_usuario:
+            if not novo_usuario or not nova_senha:
+                st.error("Preencha usuário e senha para cadastrar.")
+            elif novo_usuario in usuarios_login:
+                st.error("Este usuário já existe.")
+            else:
+                usuarios_login[novo_usuario] = {
+                    "senha_hash": gerar_hash_senha(nova_senha),
+                    "admin": novo_admin,
+                }
+                salvar_usuarios_login(usuarios_login)
+                st.session_state.usuarios_login = carregar_usuarios_login()
+                st.success(f"Usuário {novo_usuario} cadastrado com sucesso.")
+                st.rerun()
+
+    st.divider()
+    st.markdown("#### 🔑 Alterar senha")
+    lista_usuarios = sorted(usuarios_login.keys())
+    if lista_usuarios:
+        usuario_edicao = st.selectbox("Selecione o usuário", lista_usuarios, key="sel_usuario_edicao_login")
+        nova_senha_usuario = st.text_input("Nova senha", type="password", key="txt_nova_senha_usuario_login")
+        if st.button("Salvar nova senha", use_container_width=True):
+            if not nova_senha_usuario:
+                st.error("Informe a nova senha.")
+            else:
+                usuarios_login[usuario_edicao]["senha_hash"] = gerar_hash_senha(nova_senha_usuario)
+                salvar_usuarios_login(usuarios_login)
+                st.session_state.usuarios_login = carregar_usuarios_login()
+                st.success(f"Senha do usuário {usuario_edicao} atualizada.")
+
+    st.divider()
+    st.markdown("#### 🗑️ Remover usuário")
+    usuarios_remocao = [u for u in sorted(usuarios_login.keys()) if u != st.session_state.usuario_logado]
+    if usuarios_remocao:
+        usuario_remover = st.selectbox("Usuário para remover", usuarios_remocao, key="sel_usuario_remover_login")
+        if st.button("Remover usuário", type="secondary", use_container_width=True):
+            qtd_admins = sum(1 for _, info in usuarios_login.items() if info.get("admin", False))
+            if usuarios_login.get(usuario_remover, {}).get("admin", False) and qtd_admins <= 1:
+                st.error("Não é possível remover o último administrador do sistema.")
+            else:
+                usuarios_login.pop(usuario_remover, None)
+                salvar_usuarios_login(usuarios_login)
+                st.session_state.usuarios_login = carregar_usuarios_login()
+                st.success(f"Usuário {usuario_remover} removido com sucesso.")
+                st.rerun()
+    else:
+        st.info("Não há usuários disponíveis para remoção.")
 
 # =============================================================================
 # 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN REAL - TV - PROGRESSO + ANÁLISE 30D)
