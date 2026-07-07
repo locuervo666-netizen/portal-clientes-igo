@@ -3926,24 +3926,147 @@ elif menu == "💰 Faturamento":
         if planilha_financeiro is None:
             return pd.DataFrame()
         try:
+            def _normalizar_coluna(valor):
+                txt = unicodedata.normalize('NFKD', str(valor)).encode('ASCII', 'ignore').decode('utf-8').upper()
+                txt = re.sub(r'[^A-Z0-9]+', '_', txt)
+                return re.sub(r'_+', '_', txt).strip('_')
+
+            def _normalizar_chave_tomador(valor):
+                txt = unicodedata.normalize('NFKD', str(valor)).encode('ASCII', 'ignore').decode('utf-8').upper()
+                txt = re.sub(r'[^A-Z0-9]+', ' ', txt)
+                return re.sub(r'\s+', ' ', txt).strip()
+
+            def _normalizar_df_tarifas(df_p):
+                if df_p.empty:
+                    return df_p
+
+                # Padroniza nomes de colunas para suportar layouts diferentes da tabela master.
+                df_p.columns = [_normalizar_coluna(c) for c in df_p.columns]
+
+                aliases = {
+                    'CIDADE': ['CIDADE_DESTINO', 'MUNICIPIO', 'MUNICIPIO_DESTINO'],
+                    'BAIRRO': ['BAIRRO_DESTINO'],
+                    'ENDERECO': ['ENDERECO_DESTINO', 'LOGRADOURO', 'RUA'],
+                    'VALOR_CHEIO': ['VALOR', 'VALOR_R', 'VALOR_BASE', 'VALOR_UNITARIO'],
+                    'MULT_FRUSTRADA': ['MULTIPLICADOR_FRUSTRADA', 'MULT_FRUSTRADA', 'PERC_FRUSTRADA', 'PERCENTUAL_FRUSTRADA'],
+                    'PRAZO_DIAS_UTEIS': ['PRAZO_DIAS', 'SLA_DIAS', 'PRAZO_SLA', 'SLA']
+                }
+                for col_padrao, candidatos in aliases.items():
+                    if col_padrao not in df_p.columns:
+                        for cand in candidatos:
+                            if cand in df_p.columns:
+                                df_p[col_padrao] = df_p[cand]
+                                break
+
+                for col in ['VALOR_CHEIO', 'MULT_FRUSTRADA', 'PRAZO_DIAS_UTEIS']:
+                    if col in df_p.columns:
+                        df_p[col] = df_p[col].astype(str).str.replace(',', '.').str.replace('R$', '').str.strip()
+                        df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0.0)
+                    else:
+                        # Garante colunas mínimas para o cálculo não quebrar.
+                        df_p[col] = 0.0
+
+                for col in ['CIDADE', 'BAIRRO', 'ENDERECO']:
+                    if col in df_p.columns:
+                        df_p[col] = df_p[col].apply(padronizar_texto)
+                    else:
+                        df_p[col] = ""
+
+                # Chave simplificada para casar cidades com pequenas variações de escrita.
+                df_p['CIDADE_KEY'] = df_p['CIDADE'].astype(str).apply(lambda x: re.sub(r'[^A-Z0-9]+', '', x))
+
+                return df_p
+
             buscado = tomador.replace('CAEP', 'SYNVIA').replace('CUNHA', 'GRALAB') if tomador in ['CAEP', 'CUNHA', 'SYNVIA', 'GRALAB'] else tomador
             buscado = buscado.strip().upper()
+            buscado_norm = _normalizar_chave_tomador(buscado)
+            aliases_tomador = {buscado_norm}
+            if buscado_norm == 'SOUZA CRUZ':
+                aliases_tomador.update({'SOUZA CRUZ SA', 'SOUZA CRUZ S A', 'SOUZA CRUZ BRASIL'})
+
             todas_abas = planilha_financeiro.worksheets()
             mapa_abas = {aba.title.strip().upper(): aba for aba in todas_abas}
+            mapa_abas_norm = {_normalizar_chave_tomador(aba.title): aba for aba in todas_abas}
 
+            # 1) Modo legado: uma aba por cliente (comportamento atual)
             if buscado in mapa_abas:
-                aba = mapa_abas[buscado]
-                dados = aba.get_all_values()
+                aba_cli = mapa_abas[buscado]
+                dados = aba_cli.get_all_values()
                 if len(dados) > 1:
-                    df_p = pd.DataFrame(dados[1:], columns=dados[0])
-                    for col in ['VALOR_CHEIO', 'MULT_FRUSTRADA', 'PRAZO_DIAS_UTEIS']:
-                        if col in df_p.columns:
-                            df_p[col] = df_p[col].astype(str).str.replace(',', '.').str.replace('R$', '').str.strip()
-                            df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0.0)
-                    for col in ['CIDADE', 'BAIRRO', 'ENDERECO']:
-                        if col in df_p.columns:
-                            df_p[col] = df_p[col].apply(padronizar_texto)
-                    return df_p
+                    return _normalizar_df_tarifas(pd.DataFrame(dados[1:], columns=dados[0]))
+            elif buscado_norm in mapa_abas_norm:
+                aba_cli = mapa_abas_norm[buscado_norm]
+                dados = aba_cli.get_all_values()
+                if len(dados) > 1:
+                    return _normalizar_df_tarifas(pd.DataFrame(dados[1:], columns=dados[0]))
+
+            # 1.1) Candidatos explícitos para estruturas como Faturamento_Log.
+            candidatos_por_tomador = {
+                'SOUZA CRUZ': ['SOUZA CRUZ', 'SOUZA_CRUZ', 'SOUZACRUZ', 'SOUZA CRUZ SA', 'FATURAMENTO_LOG', 'FATURAMENTO LOG']
+            }
+            for nome_cand in candidatos_por_tomador.get(buscado_norm, []):
+                nome_cand_norm = _normalizar_chave_tomador(nome_cand)
+                if nome_cand_norm in mapa_abas_norm:
+                    aba_cand = mapa_abas_norm[nome_cand_norm]
+                    dados_cand = aba_cand.get_all_values()
+                    if len(dados_cand) > 1:
+                        return _normalizar_df_tarifas(pd.DataFrame(dados_cand[1:], columns=dados_cand[0]))
+
+            # 2) Modo novo: tabela centralizada (Faturamento Master / Tarifas Master)
+            abas_master = [
+                'FATURAMENTO MASTER',
+                'FATURAMENTO_MASTER',
+                'TARIFAS_MASTER',
+                'TABELA_TARIFAS_MASTER',
+                'TABELA DE TARIFAS'
+            ]
+            aba_master = None
+            for nome_aba in abas_master:
+                if nome_aba in mapa_abas:
+                    aba_master = mapa_abas[nome_aba]
+                    break
+
+            if aba_master is not None:
+                dados_master = aba_master.get_all_values()
+                if len(dados_master) > 1:
+                    df_master = pd.DataFrame(dados_master[1:], columns=dados_master[0])
+                    df_master.columns = [_normalizar_coluna(c) for c in df_master.columns]
+
+                    # Mapeia o nome da coluna de cliente/tomador para filtrar corretamente.
+                    col_tomador = None
+                    for c in ['TOMADOR', 'CLIENTE', 'CONTRATANTE', 'EMPRESA', 'EMPRESA_CLIENTE', 'TOMADOR_CLIENTE']:
+                        if c in df_master.columns:
+                            col_tomador = c
+                            break
+
+                    if col_tomador:
+                        col_tomador_vals = df_master[col_tomador].astype(str)
+                        col_tomador_norm = col_tomador_vals.apply(_normalizar_chave_tomador)
+                        mask_exata = col_tomador_norm.isin(aliases_tomador)
+                        mask_contida = pd.Series(False, index=df_master.index)
+                        for alias in aliases_tomador:
+                            if len(alias) >= 4:
+                                mask_contida = mask_contida | col_tomador_norm.str.contains(alias, na=False)
+                        df_filtrado = df_master[mask_exata | mask_contida].copy()
+                        if not df_filtrado.empty:
+                            return _normalizar_df_tarifas(df_filtrado)
+                    else:
+                        # Alguns layouts master não trazem tomador por linha; usa tabela inteira.
+                        return _normalizar_df_tarifas(df_master)
+
+            # 3) Fallback final: procura qualquer aba com estrutura de tarifa (CIDADE + VALOR).
+            for aba in todas_abas:
+                try:
+                    dados_gen = aba.get_all_values()
+                    if len(dados_gen) <= 1:
+                        continue
+                    df_gen = pd.DataFrame(dados_gen[1:], columns=dados_gen[0])
+                    cols_norm = {_normalizar_coluna(c) for c in df_gen.columns}
+                    if ('CIDADE' in cols_norm or 'MUNICIPIO' in cols_norm or 'CIDADE_DESTINO' in cols_norm) and ('VALOR_CHEIO' in cols_norm or 'VALOR' in cols_norm or 'VALOR_BASE' in cols_norm):
+                        return _normalizar_df_tarifas(df_gen)
+                except Exception:
+                    continue
+
             return pd.DataFrame()
         except Exception:
             return pd.DataFrame()
@@ -3957,6 +4080,17 @@ elif menu == "💰 Faturamento":
             match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == b) & (df_p['ENDERECO'] == "")]
         if match.empty:
             match = df_p[(df_p['CIDADE'] == c) & (df_p['BAIRRO'] == "") & (df_p['ENDERECO'] == "")]
+        if match.empty:
+            # Fallback para tabelas mais genéricas: cidade sem bairro/endereço detalhado.
+            match = df_p[df_p['CIDADE'] == c]
+        if match.empty:
+            c_key = re.sub(r'[^A-Z0-9]+', '', c)
+            if c_key and 'CIDADE_KEY' in df_p.columns:
+                match = df_p[
+                    (df_p['CIDADE_KEY'] == c_key) |
+                    (df_p['CIDADE_KEY'].str.contains(c_key, na=False)) |
+                    (pd.Series([c_key] * len(df_p)).str.contains(df_p['CIDADE_KEY'], regex=False, na=False))
+                ]
         if not match.empty:
             v_base = float(match.iloc[0]['VALOR_CHEIO'])
             mult = float(match.iloc[0]['MULT_FRUSTRADA'])
@@ -4132,6 +4266,15 @@ elif menu == "💰 Faturamento":
                             else:
                                 df_fin['VALOR (R$)'] = df_fin.apply(
                                     lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO', ''), r.get('ENDERECO', ''), r['STATUS_DISPLAY'], df_p), axis=1)
+
+                                total_periodo = float(df_fin['VALOR (R$)'].sum()) if not df_fin.empty else 0.0
+                                qtd_periodo = int(len(df_fin))
+                                qtd_com_valor = int((pd.to_numeric(df_fin['VALOR (R$)'], errors='coerce') > 0).sum()) if not df_fin.empty else 0
+
+                                kpi_p1, kpi_p2, kpi_p3 = st.columns(3)
+                                kpi_p1.metric("💰 Faturado no Período", f"R$ {total_periodo:,.2f}")
+                                kpi_p2.metric("📦 Pedidos no Período", f"{qtd_periodo}")
+                                kpi_p3.metric("✅ Pedidos com Tarifa", f"{qtd_com_valor}")
                                         
                                 df_show = df_fin[['DT_FILTRO', 'DATA', 'DATA_ENTREGA', 'PEDIDO', 'LABORATORIO', 'CIDADE', 'STATUS_DISPLAY', 'VALOR (R$)']].copy()
                                 df_show.rename(columns={'STATUS_DISPLAY': 'STATUS'}, inplace=True)
@@ -7617,12 +7760,12 @@ elif menu == "🔬 Triagem":
     st.markdown(
         """
         <style>
-        div[data-baseweb="tab-list"] {
+        div[data-testid="stTabs"] div[data-baseweb="tab-list"] {
             gap: 14px;
             margin-bottom: 16px;
             align-items: stretch;
         }
-        div[data-baseweb="tab"] {
+        div[data-testid="stTabs"] button[role="tab"] {
             background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
             border: 1px solid #dbe3ef !important;
             border-radius: 12px !important;
@@ -7638,23 +7781,23 @@ elif menu == "🔬 Triagem":
             box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
             transition: all 0.2s ease !important;
         }
-        button[role="tab"] {
+        div[data-testid="stTabs"] button[role="tab"] {
             padding: 0 18px !important;
             min-height: 50px !important;
             line-height: 1.25 !important;
         }
-        button[role="tab"] p {
+        div[data-testid="stTabs"] button[role="tab"] p {
             margin: 0 !important;
             line-height: 1.25 !important;
             white-space: nowrap !important;
         }
-        div[data-baseweb="tab"]:hover {
+        div[data-testid="stTabs"] button[role="tab"]:hover {
             border-color: #93c5fd !important;
             color: #0f172a !important;
             transform: translateY(-1px);
             box-shadow: 0 6px 16px rgba(37, 99, 235, 0.10) !important;
         }
-        button[role="tab"][aria-selected="true"] {
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
             background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
             border-color: #1d4ed8 !important;
             border-radius: 12px !important;
@@ -7663,7 +7806,7 @@ elif menu == "🔬 Triagem":
             overflow: hidden !important;
             padding: 0 20px !important;
         }
-        button[role="tab"][aria-selected="true"] p {
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] p {
             letter-spacing: 0.2px !important;
             line-height: 1.3 !important;
         }
@@ -8811,60 +8954,6 @@ elif menu == "🏷️ Gerador de Etiquetas":
 
 elif menu == "📁 Relatórios":
 
-    # =========================================================================
-    # 🚀 NOVO BLOCO: RELATÓRIO DO ESTADO DO RJ NA SIDEBAR (CARRINHO UMOVE)
-    # =========================================================================
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🗺️ Consolidado RJ (Umove)")
-            
-    # 1. Verifica se existe algo no carrinho da Umove
-    if 'df_sandbox_mem' in st.session_state and not st.session_state.df_sandbox_mem.empty:
-        df_carrinho = st.session_state.df_sandbox_mem.copy()
-                
-        # 2. Filtra apenas o estado do RJ
-        df_rj_carrinho = df_carrinho[df_carrinho['UF'].astype(str).str.upper() == 'RJ'].copy()
-                
-        if not df_rj_carrinho.empty:
-            # 3. Ocultar os números dos pedidos
-            df_rj_carrinho['PEDIDO'] = "---" 
-                    
-            st.sidebar.success(f"✅ {len(df_rj_carrinho)} volumes RJ")
-                    
-            # --- BOTÃO PDF SIDEBAR ---
-            with st.spinner("Gerando PDF..."):
-                pdf_rj_bytes = gerar_pdf_rota_whatsapp(
-                    nome_motorista="RJ - GERAL", 
-                    data_str=hoje_br.strftime('%d/%m/%Y'), 
-                    df_agente=df_rj_carrinho
-                )
-            st.sidebar.download_button(
-                label="📥 Baixar PDF (RJ)",
-                data=pdf_rj_bytes,
-                file_name=f"COLETAS_RJ_GERAL_{hoje_br.strftime('%d%m')}.pdf",
-                mime="application/pdf",
-                type="primary",
-                use_container_width=True
-            )
-                    
-            # --- BOTÃO EXCEL SIDEBAR ---
-            with st.spinner("Gerando Excel..."):
-                xls_rj_bytes = gerar_excel_rota_whatsapp(df_rj_carrinho)
-            st.sidebar.download_button(
-                label="📥 Baixar Excel (RJ)",
-                data=xls_rj_bytes,
-                file_name=f"COLETAS_RJ_GERAL_{hoje_br.strftime('%d%m')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-        else:
-            st.sidebar.warning("⚠️ Nenhum pedido do RJ no carrinho.")
-                    
-    else:
-        st.sidebar.info("🛒 O carrinho Umove está vazio.")
-                
-    st.sidebar.markdown("---")
-    # =========================================================================
-
     st.markdown(
         "<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>📥 Central de Datamining e Exportação</h3></div>",
         unsafe_allow_html=True)
@@ -9010,6 +9099,452 @@ elif menu == "📁 Relatórios":
                 else:
                     st.warning(
                         "Nenhum dado encontrado para os filtros e período selecionados.")
+
+        st.markdown("---")
+        st.markdown("#### 🧠 4. Relatório Executivo Premium (Base Importação Web)")
+        st.caption("Visão analítica com filtros, indicadores, gráficos e exportação consolidada usando a própria base da Importação Web.")
+
+        import plotly.express as px
+        import plotly.graph_objects as go
+
+        df_exec = df_filtered.copy()
+        if 'AGENTE_RAW' in df_exec.columns and 'MOTORISTA' not in df_exec.columns:
+            df_exec['MOTORISTA'] = df_exec['AGENTE_RAW']
+        if 'STATUS_DISPLAY' not in df_exec.columns:
+            df_exec['STATUS_DISPLAY'] = df_exec.apply(calc_status_display, axis=1)
+
+        if 'DATA' in df_exec.columns:
+            df_exec['DATA_TS_EXEC'] = pd.to_datetime(df_exec['DATA'], dayfirst=True, errors='coerce')
+        else:
+            df_exec['DATA_TS_EXEC'] = pd.to_datetime(df_exec.get('DATA_OBJ'), errors='coerce')
+
+        with st.expander("⚙️ Filtros Avançados do Relatório Executivo", expanded=False):
+            f1, f2, f3, f4 = st.columns(4)
+            op_uf = sorted(df_exec['UF'].dropna().astype(str).str.upper().unique().tolist()) if 'UF' in df_exec.columns else []
+            op_cid = sorted(df_exec['CIDADE'].dropna().astype(str).str.upper().unique().tolist()) if 'CIDADE' in df_exec.columns else []
+            op_tom = sorted(df_exec['TOMADOR'].dropna().astype(str).str.upper().unique().tolist()) if 'TOMADOR' in df_exec.columns else []
+            op_mot = sorted(df_exec['MOTORISTA'].dropna().astype(str).str.upper().unique().tolist()) if 'MOTORISTA' in df_exec.columns else []
+
+            filtro_uf = f1.multiselect("UF", options=op_uf)
+            filtro_cid = f2.multiselect("Cidade", options=op_cid)
+            filtro_tom = f3.multiselect("Tomador", options=op_tom)
+            filtro_mot = f4.multiselect("Motorista", options=op_mot)
+
+        if filtro_uf and 'UF' in df_exec.columns:
+            df_exec = df_exec[df_exec['UF'].astype(str).str.upper().isin(filtro_uf)]
+        if filtro_cid and 'CIDADE' in df_exec.columns:
+            df_exec = df_exec[df_exec['CIDADE'].astype(str).str.upper().isin(filtro_cid)]
+        if filtro_tom and 'TOMADOR' in df_exec.columns:
+            df_exec = df_exec[df_exec['TOMADOR'].astype(str).str.upper().isin(filtro_tom)]
+        if filtro_mot and 'MOTORISTA' in df_exec.columns:
+            df_exec = df_exec[df_exec['MOTORISTA'].astype(str).str.upper().isin(filtro_mot)]
+
+        if df_exec.empty:
+            st.warning("Nenhum registro encontrado no relatório executivo com os filtros aplicados.")
+        else:
+            mask_entregues = df_exec['STATUS_DISPLAY'].astype(str).str.contains('Entregue|Coletado|Conferido', case=False, na=False)
+            mask_pendentes = df_exec['STATUS_DISPLAY'].astype(str).str.contains('Pendente|Rota', case=False, na=False)
+            mask_falhas = df_exec['STATUS_DISPLAY'].astype(str).str.contains('Frustrada|Problema|Cancelado', case=False, na=False)
+            mask_atrasados = df_exec['STATUS_DISPLAY'].astype(str).str.contains('ATRASADO', case=False, na=False)
+
+            vol_total_exec = len(df_exec)
+            entregues_exec = int(mask_entregues.sum())
+            pendentes_exec = int(mask_pendentes.sum())
+            falhas_exec = int(mask_falhas.sum())
+            atrasados_exec = int(mask_atrasados.sum())
+            taxa_exec = (entregues_exec / vol_total_exec * 100) if vol_total_exec else 0
+
+            k1, k2, k3, k4, k5, k6 = st.columns(6)
+            k1.metric("Volumes", f"{vol_total_exec}")
+            k2.metric("Entregues/Coletados", f"{entregues_exec}")
+            k3.metric("Pendentes", f"{pendentes_exec}")
+            k4.metric("Falhas", f"{falhas_exec}")
+            k5.metric("Atrasados", f"{atrasados_exec}")
+            k6.metric("Taxa Sucesso", f"{taxa_exec:.1f}%")
+
+            df_diario = df_exec.dropna(subset=['DATA_TS_EXEC']).groupby(df_exec['DATA_TS_EXEC'].dt.date).size().reset_index(name='VOLUMES')
+            df_diario.rename(columns={'DATA_TS_EXEC': 'DATA'}, inplace=True)
+
+            df_status = df_exec.groupby('STATUS_DISPLAY').size().reset_index(name='QTD').sort_values('QTD', ascending=False)
+            df_cidades = df_exec.groupby('CIDADE').size().reset_index(name='VOLUMES').sort_values('VOLUMES', ascending=False).head(15) if 'CIDADE' in df_exec.columns else pd.DataFrame()
+            df_tomadores = df_exec.groupby('TOMADOR').size().reset_index(name='VOLUMES').sort_values('VOLUMES', ascending=False).head(15) if 'TOMADOR' in df_exec.columns else pd.DataFrame()
+
+            df_mensal = df_exec.dropna(subset=['DATA_TS_EXEC']).copy()
+            if not df_mensal.empty:
+                df_mensal['MES_REF'] = df_mensal['DATA_TS_EXEC'].dt.to_period('M').dt.to_timestamp()
+                df_mensal = df_mensal.groupby('MES_REF').size().reset_index(name='VOLUMES').sort_values('MES_REF')
+                df_mensal['MES'] = df_mensal['MES_REF'].dt.strftime('%m/%Y')
+
+            col_g1, col_g2 = st.columns(2)
+            with col_g1:
+                if not df_diario.empty:
+                    fig_diario = px.line(df_diario, x='DATA', y='VOLUMES', markers=True, title='Evolução Diária de Volumes')
+                    fig_diario.update_layout(height=320, margin=dict(l=8, r=8, t=45, b=8))
+                    st.plotly_chart(fig_diario, use_container_width=True)
+            with col_g2:
+                if not df_status.empty:
+                    fig_status = px.pie(df_status, names='STATUS_DISPLAY', values='QTD', hole=0.5, title='Distribuição por Status')
+                    fig_status.update_layout(height=320, margin=dict(l=8, r=8, t=45, b=8))
+                    st.plotly_chart(fig_status, use_container_width=True)
+
+            col_g3, col_g4 = st.columns(2)
+            with col_g3:
+                if not df_cidades.empty:
+                    fig_cid = px.bar(df_cidades.sort_values('VOLUMES'), x='VOLUMES', y='CIDADE', orientation='h', title='Top Cidades por Volume')
+                    fig_cid.update_layout(height=420, margin=dict(l=8, r=8, t=45, b=8))
+                    st.plotly_chart(fig_cid, use_container_width=True)
+            with col_g4:
+                if not df_tomadores.empty:
+                    fig_tom = px.bar(df_tomadores.sort_values('VOLUMES'), x='VOLUMES', y='TOMADOR', orientation='h', title='Top Tomadores por Volume')
+                    fig_tom.update_layout(height=420, margin=dict(l=8, r=8, t=45, b=8))
+                    st.plotly_chart(fig_tom, use_container_width=True)
+
+            if 'df_mensal' in locals() and not df_mensal.empty:
+                fig_mes = px.bar(
+                    df_mensal,
+                    x='MES',
+                    y='VOLUMES',
+                    text='VOLUMES',
+                    title='Pedidos Mês a Mês'
+                )
+                fig_mes.update_traces(textposition='outside', marker_color='#1f77b4')
+                fig_mes.update_layout(
+                    height=360,
+                    margin=dict(l=8, r=8, t=45, b=8),
+                    xaxis_title='Mês',
+                    yaxis_title='Pedidos',
+                    uniformtext_minsize=8,
+                    uniformtext_mode='hide'
+                )
+                st.plotly_chart(fig_mes, use_container_width=True)
+
+            st.markdown("##### 🧭 Matriz Cidade x Tomador")
+            if 'CIDADE' in df_exec.columns and 'TOMADOR' in df_exec.columns:
+                top_cid = df_exec['CIDADE'].value_counts().head(12).index
+                top_tom = df_exec['TOMADOR'].value_counts().head(10).index
+                df_matrix = pd.crosstab(df_exec['CIDADE'], df_exec['TOMADOR'])
+                df_matrix = df_matrix.reindex(index=top_cid, columns=top_tom, fill_value=0)
+                st.dataframe(df_matrix, use_container_width=True)
+            else:
+                df_matrix = pd.DataFrame()
+                st.info("Não foi possível montar a matriz (colunas CIDADE/TOMADOR ausentes).")
+
+            st.markdown("##### 🚨 Inatividade Geográfica")
+            if 'CIDADE' in df_exec.columns:
+                data_ref = periodo_rel[1] if isinstance(periodo_rel, (tuple, list)) and len(periodo_rel) == 2 else hoje_br
+                df_inatividade = df_exec.dropna(subset=['DATA_TS_EXEC']).groupby('CIDADE')['DATA_TS_EXEC'].max().reset_index()
+                df_inatividade['ULTIMO_MOVIMENTO'] = df_inatividade['DATA_TS_EXEC'].dt.date
+                df_inatividade['DIAS_INATIVO'] = df_inatividade['ULTIMO_MOVIMENTO'].apply(lambda d: (data_ref - d).days if pd.notna(d) else 999)
+                df_inatividade = df_inatividade[['CIDADE', 'ULTIMO_MOVIMENTO', 'DIAS_INATIVO']].sort_values('DIAS_INATIVO', ascending=False)
+                st.dataframe(df_inatividade.head(50), use_container_width=True)
+            else:
+                df_inatividade = pd.DataFrame()
+
+            def gerar_relatorio_executivo_importacao_web():
+                output = io.BytesIO()
+                kpi_df = pd.DataFrame([
+                    {'INDICADOR': 'Volumes', 'VALOR': vol_total_exec},
+                    {'INDICADOR': 'Entregues/Coletados', 'VALOR': entregues_exec},
+                    {'INDICADOR': 'Pendentes', 'VALOR': pendentes_exec},
+                    {'INDICADOR': 'Falhas', 'VALOR': falhas_exec},
+                    {'INDICADOR': 'Atrasados', 'VALOR': atrasados_exec},
+                    {'INDICADOR': 'Taxa de Sucesso (%)', 'VALOR': round(taxa_exec, 2)},
+                ])
+
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    df_exec.to_excel(writer, sheet_name='Base_Filtrada', index=False)
+                    kpi_df.to_excel(writer, sheet_name='KPIs', index=False)
+                    df_status.to_excel(writer, sheet_name='Status', index=False)
+                    if not df_cidades.empty:
+                        df_cidades.to_excel(writer, sheet_name='Top_Cidades', index=False)
+                    if not df_tomadores.empty:
+                        df_tomadores.to_excel(writer, sheet_name='Top_Tomadores', index=False)
+                    if not df_diario.empty:
+                        df_diario.to_excel(writer, sheet_name='Evolucao_Diaria', index=False)
+                    if 'df_mensal' in locals() and not df_mensal.empty:
+                        df_mensal.to_excel(writer, sheet_name='Evolucao_Mensal', index=False)
+                    if not df_matrix.empty:
+                        df_matrix.reset_index().to_excel(writer, sheet_name='Matriz_Cid_Tom', index=False)
+                    if not df_inatividade.empty:
+                        df_inatividade.to_excel(writer, sheet_name='Inatividade', index=False)
+                return output.getvalue()
+
+            def gerar_relatorio_executivo_html_importacao_web():
+                periodo_ini = periodo_rel[0].strftime('%d/%m/%Y') if isinstance(periodo_rel, (tuple, list)) and len(periodo_rel) == 2 else hoje_br.strftime('%d/%m/%Y')
+                periodo_fim = periodo_rel[1].strftime('%d/%m/%Y') if isinstance(periodo_rel, (tuple, list)) and len(periodo_rel) == 2 else hoje_br.strftime('%d/%m/%Y')
+
+                media_dia_exec = (vol_total_exec / max(1, len(df_diario))) if not df_diario.empty else float(vol_total_exec)
+                ticket_exec = 0.0
+
+                # Embute a logo no HTML para funcionar mesmo offline/sem bloqueio externo.
+                logo_src = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
+                try:
+                    logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_html_cache.png")
+                    if not os.path.exists(logo_path) or os.path.getsize(logo_path) == 0:
+                        req_logo = urllib.request.Request(logo_src, headers={'User-Agent': 'Mozilla/5.0'})
+                        with urllib.request.urlopen(req_logo, timeout=8) as response, open(logo_path, 'wb') as out_file:
+                            out_file.write(response.read())
+
+                    with open(logo_path, 'rb') as f_logo:
+                        logo_b64 = base64.b64encode(f_logo.read()).decode('ascii')
+                        logo_src = f"data:image/png;base64,{logo_b64}"
+                except Exception:
+                    pass
+
+                html_evol = fig_diario.to_html(full_html=False, include_plotlyjs='cdn') if 'fig_diario' in locals() else "<div style='padding:20px;'>Sem dados de evolução.</div>"
+                html_status = fig_status.to_html(full_html=False, include_plotlyjs=False) if 'fig_status' in locals() else "<div style='padding:20px;'>Sem dados de status.</div>"
+                html_cidades = fig_cid.to_html(full_html=False, include_plotlyjs=False) if 'fig_cid' in locals() else "<div style='padding:20px;'>Sem dados de cidades.</div>"
+                html_tom = fig_tom.to_html(full_html=False, include_plotlyjs=False) if 'fig_tom' in locals() else "<div style='padding:20px;'>Sem dados de tomadores.</div>"
+                html_mes = fig_mes.to_html(full_html=False, include_plotlyjs=False) if 'fig_mes' in locals() else "<div style='padding:20px;'>Sem dados mensais.</div>"
+
+                df_top_tom_html = df_tomadores.copy() if not df_tomadores.empty else pd.DataFrame(columns=['TOMADOR', 'VOLUMES'])
+                df_top_tom_html['MOM'] = 0.0
+
+                matriz_vol = pd.DataFrame()
+                matriz_fin = pd.DataFrame()
+                if not df_exec.dropna(subset=['DATA_TS_EXEC']).empty and 'CIDADE' in df_exec.columns:
+                    df_aux_m = df_exec.dropna(subset=['DATA_TS_EXEC']).copy()
+                    df_aux_m['MES_NUM'] = df_aux_m['DATA_TS_EXEC'].dt.month
+                    matriz_vol = df_aux_m.groupby(['CIDADE', 'MES_NUM']).size().unstack(fill_value=0).reindex(columns=range(1, 13), fill_value=0).reset_index()
+                    matriz_vol['VOL'] = matriz_vol[[m for m in range(1, 13)]].sum(axis=1)
+                    matriz_vol['MED_DIA'] = (matriz_vol['VOL'] / max(1, len(df_diario))).round(1)
+                    matriz_vol['TKT'] = 0.0
+                    matriz_vol = matriz_vol.sort_values('VOL', ascending=False).head(40)
+
+                    matriz_fin = matriz_vol[['CIDADE'] + [m for m in range(1, 13)] + ['VOL']].copy()
+                    matriz_fin.rename(columns={'VOL': 'FAT'}, inplace=True)
+
+                tabela_status_html = df_status.to_html(index=False, classes='') if not df_status.empty else "<p>Sem dados.</p>"
+                tabela_matrix_html = df_matrix.reset_index().to_html(index=False, classes='') if not df_matrix.empty else "<p>Sem dados.</p>"
+                tabela_inat_html = df_inatividade.to_html(index=False, classes='') if not df_inatividade.empty else "<p>Sem dados.</p>"
+                tabela_tom_html = df_top_tom_html.to_html(index=False, classes='') if not df_top_tom_html.empty else "<p>Sem dados.</p>"
+                tabela_matriz_vol_html = matriz_vol.to_html(index=False, classes='') if not matriz_vol.empty else "<p>Sem dados.</p>"
+                tabela_matriz_fin_html = matriz_fin.to_html(index=False, classes='') if not matriz_fin.empty else "<p>Sem dados.</p>"
+
+                html_template = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Operacional IGO</title>
+    <style>
+body {
+    font-family: 'Montserrat', 'Segoe UI', sans-serif;
+    background-color: #f4f7fa;
+    color: #0b1426;
+    margin: 0;
+    padding: 30px;
+}
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 34px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+.header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    border-bottom: 3px solid #C5A059;
+    padding-bottom: 16px;
+    margin-bottom: 26px;
+}
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.logo-igo {
+    height: 52px;
+    width: auto;
+    object-fit: contain;
+}
+.header-title h1 {
+    color: #0b1426;
+    margin: 0 0 5px 0;
+    font-size: 24px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.header-title p {
+    color: #7f8c8d;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+}
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+}
+.kpi-card {
+    background: linear-gradient(135deg, #0b1426, #16294d);
+    border-radius: 8px;
+    padding: 14px;
+    color: white;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(11, 20, 38, 0.2);
+    border-bottom: 4px solid #C5A059;
+}
+.kpi-card h3 { margin: 0 0 8px 0; font-size: 10px; font-weight: 600; color: #d0d7e6; text-transform: uppercase; }
+.kpi-card h2 { margin: 0; font-size: 20px; color: #C5A059; font-weight: 800; }
+.chart-container { display: flex; gap: 16px; margin-bottom: 10px; }
+.chart-box {
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e1e8ed;
+    padding: 12px;
+    flex: 1;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+    text-align: center;
+    overflow: hidden;
+}
+.chart-box.full { width: 100%; flex: unset; }
+.section-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #5b9bd5;
+    margin-bottom: 14px;
+    margin-top: 28px;
+    text-transform: uppercase;
+    border-left: 4px solid #C5A059;
+    padding-left: 10px;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 24px;
+    font-size: 11px;
+    background: #fff;
+}
+th {
+    background-color: #0b1426;
+    color: #fff;
+    font-weight: 600;
+    padding: 9px;
+    text-align: center;
+    border: 1px solid #16294d;
+}
+td { padding: 7px 9px; border: 1px solid #e1e8ed; text-align: center; color: #2c3e50; }
+tr:nth-child(even) { background-color: #f8f9fa; }
+.page-break { page-break-before: always; margin-top: 20px; }
+@media print {
+    body { background-color: #fff; padding: 0; }
+    .container { box-shadow: none; padding: 0; max-width: 100%; }
+    @page { margin: 1cm; size: A4 landscape; }
+}
+@media (max-width: 1100px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .chart-container { flex-direction: column; }
+}
+    </style>
+</head>
+<body>
+    <div class="container">
+<div class="header">
+    <div class="header-brand">
+        <img class="logo-igo" src="__LOGO_SRC__" alt="Logo IGO">
+        <div class="header-title">
+            <h1>Dashboard Operacional IGO</h1>
+            <p>Operação Global | __PERIODO__</p>
+        </div>
+    </div>
+    <div class="header-title">
+        <p>Gerado em __GERADO__</p>
+    </div>
+</div>
+
+<div class="kpi-grid">
+    <div class="kpi-card"><h3>Volume Total</h3><h2>__VOL__</h2></div>
+    <div class="kpi-card"><h3>Média / Dia</h3><h2>__MEDIA__</h2></div>
+    <div class="kpi-card"><h3>Ticket Médio</h3><h2>R$ __TKT__</h2></div>
+    <div class="kpi-card"><h3>Entregues</h3><h2>__ENT__</h2></div>
+    <div class="kpi-card"><h3>Pendentes</h3><h2>__PEND__</h2></div>
+    <div class="kpi-card"><h3>Taxa Sucesso</h3><h2>__TAXA__</h2></div>
+</div>
+
+<div class="chart-container">
+    <div class="chart-box">__CHART_EVOL__</div>
+    <div class="chart-box">__CHART_STATUS__</div>
+</div>
+
+<div class="section-title">Análise Geográfica e Representatividade</div>
+<div class="chart-container">
+    <div class="chart-box">__CHART_CIDADES__</div>
+    <div class="chart-box">__CHART_TOMADORES__</div>
+</div>
+
+<div class="chart-box full">__CHART_MES__</div>
+
+<div class="page-break"></div>
+
+<div class="section-title">Resumo por Status</div>
+__TABELA_STATUS__
+
+<div class="section-title">Matriz Cidade x Tomador</div>
+__TABELA_MATRIZ__
+
+<div class="section-title">Análise de Performance por Tomador (Cliente)</div>
+__TABELA_TOM__
+
+<div class="page-break"></div>
+
+<div class="section-title">Matriz de Volumetria Mês a Mês</div>
+__TABELA_MATRIZ_VOL__
+
+<div class="section-title">Matriz de Faturamento Mês a Mês (R$)</div>
+__TABELA_MATRIZ_FIN__
+
+<div class="section-title">Alerta Executivo: Inatividade Geográfica</div>
+__TABELA_INATIVIDADE__
+    </div>
+</body>
+</html>
+"""
+
+                html_pronto = (
+                    html_template
+                    .replace('__PERIODO__', f'{periodo_ini} a {periodo_fim}')
+                    .replace('__GERADO__', datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M'))
+                    .replace('__VOL__', str(vol_total_exec))
+                    .replace('__MEDIA__', f'{media_dia_exec:.1f}')
+                    .replace('__TKT__', f'{ticket_exec:.2f}'.replace('.', ','))
+                    .replace('__ENT__', str(entregues_exec))
+                    .replace('__PEND__', str(pendentes_exec))
+                    .replace('__TAXA__', f'{taxa_exec:.1f}%')
+                    .replace('__LOGO_SRC__', logo_src)
+                    .replace('__CHART_EVOL__', html_evol)
+                    .replace('__CHART_STATUS__', html_status)
+                    .replace('__CHART_CIDADES__', html_cidades)
+                    .replace('__CHART_TOMADORES__', html_tom)
+                    .replace('__CHART_MES__', html_mes)
+                    .replace('__TABELA_STATUS__', tabela_status_html)
+                    .replace('__TABELA_MATRIZ__', tabela_matrix_html)
+                    .replace('__TABELA_TOM__', tabela_tom_html)
+                    .replace('__TABELA_MATRIZ_VOL__', tabela_matriz_vol_html)
+                    .replace('__TABELA_MATRIZ_FIN__', tabela_matriz_fin_html)
+                    .replace('__TABELA_INATIVIDADE__', tabela_inat_html)
+                )
+                return html_pronto.encode('utf-8')
+
+            col_down_xls, col_down_html = st.columns(2)
+            col_down_xls.download_button(
+                "📥 Baixar Relatório Executivo Premium (Excel)",
+                data=gerar_relatorio_executivo_importacao_web(),
+                file_name=f"Relatorio_Executivo_ImportacaoWeb_{datetime.now(FUSO_BR).strftime('%d%m%Y_%H%M')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary",
+                use_container_width=True)
+            col_down_html.download_button(
+                "🌐 Baixar Dashboard Premium (HTML)",
+                data=gerar_relatorio_executivo_html_importacao_web(),
+                file_name=f"Dashboard_Executivo_ImportacaoWeb_{datetime.now(FUSO_BR).strftime('%d%m%Y_%H%M')}.html",
+                mime="text/html",
+                use_container_width=True)
     else:
         st.warning("O banco de dados está vazio.")
 
