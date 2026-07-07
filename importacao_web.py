@@ -45,6 +45,9 @@ AGENTES_XLS_AUTORIZADOS = [
 AGENTES_PDF_AUTORIZADOS = ['veloz.express', 'francisco.gru', 'adilson.lima','domingos.ssa']
 ARQUIVO_USUARIOS_LOGIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "usuarios_login.json")
 ARQUIVO_PORTAL_CLIENTE_LOGIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "portal_cliente_login.json")
+NOME_PLANILHA_LOGIN_PORTAL = "DB_IGO_Logistica"
+NOME_ABA_LOGIN_PORTAL = "Usuarios_Portal_Cliente"
+SCOPES_GOOGLE_LOGIN = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
 
 def normalizar_usuario_login(usuario):
@@ -59,6 +62,74 @@ def verificar_senha(senha_digitada, senha_hash):
     if not senha_hash:
         return False
     return gerar_hash_senha(senha_digitada) == str(senha_hash)
+
+
+def normalizar_tomador_portal(tomador):
+    tomador_norm = str(tomador).strip().upper() or "TODOS"
+    return tomador_norm.replace("CAEP", "SYNVIA").replace("CUNHA", "GRALAB")
+
+
+def obter_token_google_login():
+    token_str = os.environ.get("google_token_json")
+    if not token_str:
+        try:
+            token_str = st.secrets.get("google_token_json")
+        except Exception:
+            token_str = None
+    return token_str
+
+
+def abrir_planilha_login_portal():
+    planilha_existente = globals().get("planilha_db")
+    if planilha_existente is not None:
+        return planilha_existente
+
+    token_str = obter_token_google_login()
+    if not token_str:
+        return None
+    try:
+        from google.oauth2.credentials import Credentials
+        token_info = json.loads(token_str)
+        creds = Credentials.from_authorized_user_info(token_info, scopes=SCOPES_GOOGLE_LOGIN)
+        gc = gspread.authorize(creds)
+        return gc.open(NOME_PLANILHA_LOGIN_PORTAL)
+    except Exception:
+        return None
+
+
+def montar_config_portal_cliente(senha_hash, tomador):
+    tomador_norm = normalizar_tomador_portal(tomador)
+    return {
+        "senha_hash": str(senha_hash).strip(),
+        "logo": LOGO_IGO,
+        "filtro": tomador_norm,
+        "tomador": tomador_norm,
+    }
+
+
+def salvar_portal_clientes_login_nuvem(usuarios):
+    planilha = abrir_planilha_login_portal()
+    if not planilha:
+        return False
+    try:
+        try:
+            aba = planilha.worksheet(NOME_ABA_LOGIN_PORTAL)
+        except Exception:
+            aba = planilha.add_worksheet(title=NOME_ABA_LOGIN_PORTAL, rows="200", cols="5")
+
+        linhas = [["USUARIO", "SENHA_HASH", "TOMADOR"]]
+        for usuario, info in sorted(usuarios.items()):
+            linhas.append([
+                normalizar_usuario_login(usuario),
+                str(info.get("senha_hash", "")).strip(),
+                normalizar_tomador_portal(info.get("tomador", info.get("filtro", "TODOS"))),
+            ])
+
+        aba.clear()
+        aba.update("A1", linhas)
+        return True
+    except Exception:
+        return False
 
 
 def usuarios_padrao_login():
@@ -160,7 +231,27 @@ def usuarios_padrao_portal_cliente():
 def carregar_portal_clientes_login():
     usuarios = {}
 
-    if os.path.exists(ARQUIVO_PORTAL_CLIENTE_LOGIN):
+    planilha = abrir_planilha_login_portal()
+    if planilha:
+        try:
+            aba = planilha.worksheet(NOME_ABA_LOGIN_PORTAL)
+            dados = aba.get_all_values()
+            if len(dados) > 1:
+                cabecalhos = [str(c).strip().upper() for c in dados[0]]
+                idx_usuario = cabecalhos.index("USUARIO")
+                idx_senha = cabecalhos.index("SENHA_HASH")
+                idx_tomador = cabecalhos.index("TOMADOR")
+
+                for linha in dados[1:]:
+                    usuario = normalizar_usuario_login(linha[idx_usuario] if idx_usuario < len(linha) else "")
+                    senha_hash = str(linha[idx_senha] if idx_senha < len(linha) else "").strip()
+                    tomador = normalizar_tomador_portal(linha[idx_tomador] if idx_tomador < len(linha) else "TODOS")
+                    if usuario and senha_hash:
+                        usuarios[usuario] = montar_config_portal_cliente(senha_hash, tomador)
+        except Exception:
+            usuarios = {}
+
+    if not usuarios and os.path.exists(ARQUIVO_PORTAL_CLIENTE_LOGIN):
         try:
             with open(ARQUIVO_PORTAL_CLIENTE_LOGIN, "r", encoding="utf-8") as f:
                 dados = json.load(f)
@@ -183,12 +274,7 @@ def carregar_portal_clientes_login():
                         tomador = "TODOS"
 
                     if senha_hash:
-                        usuarios[user_norm] = {
-                            "senha_hash": senha_hash,
-                            "logo": logo or "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png",
-                            "filtro": filtro,
-                            "tomador": tomador,
-                        }
+                        usuarios[user_norm] = montar_config_portal_cliente(senha_hash, tomador)
         except Exception:
             usuarios = {}
 
@@ -200,8 +286,17 @@ def carregar_portal_clientes_login():
 
 
 def salvar_portal_clientes_login(usuarios):
+    salvou_nuvem = salvar_portal_clientes_login_nuvem(usuarios)
     with open(ARQUIVO_PORTAL_CLIENTE_LOGIN, "w", encoding="utf-8") as f:
         json.dump(usuarios, f, ensure_ascii=False, indent=2)
+    return salvou_nuvem
+
+
+def persistir_e_recarregar_portal_clientes(usuarios):
+    salvou_nuvem = salvar_portal_clientes_login(usuarios)
+    recarregado = carregar_portal_clientes_login()
+    st.session_state.portal_clientes_login = recarregado
+    return salvou_nuvem, recarregado
 
 
 def normalizar_modo_disparo_whatsapp(valor):
@@ -11094,10 +11189,15 @@ elif menu == "👥 Cadastro de Usuários":
                                     "filtro": novo_filtro,
                                     "tomador": novo_tomador,
                                 }
-                                salvar_portal_clientes_login(portal_clientes)
-                                st.session_state.portal_clientes_login = carregar_portal_clientes_login()
-                                st.success(f"Usuário {novo_usuario} cadastrado no Portal do Cliente.")
-                                st.rerun()
+                                salvou_nuvem, recarregado = persistir_e_recarregar_portal_clientes(portal_clientes)
+                                if novo_usuario in recarregado:
+                                    if salvou_nuvem:
+                                        st.success(f"Usuário {novo_usuario} cadastrado no Portal do Cliente.")
+                                    else:
+                                        st.warning(f"Usuário {novo_usuario} salvo apenas localmente. Verifique a conexão com a planilha no Render antes de testar o login no portal.")
+                                    st.rerun()
+                                else:
+                                    st.error("O cadastro não foi persistido. Verifique a conexão com a planilha de login do portal.")
 
     with tab_editar:
         with st.container(border=True):
@@ -11134,9 +11234,14 @@ elif menu == "👥 Cadastro de Usuários":
                             portal_clientes[usuario_edicao_portal]["senha_hash"] = gerar_hash_senha(nova_senha_portal)
                             portal_clientes[usuario_edicao_portal]["tomador"] = novo_tomador_portal
                             portal_clientes[usuario_edicao_portal]["filtro"] = novo_tomador_portal
-                            salvar_portal_clientes_login(portal_clientes)
-                            st.session_state.portal_clientes_login = carregar_portal_clientes_login()
-                            st.success(f"Usuário {usuario_edicao_portal} atualizado no Portal do Cliente.")
+                            salvou_nuvem, recarregado = persistir_e_recarregar_portal_clientes(portal_clientes)
+                            if usuario_edicao_portal in recarregado:
+                                if salvou_nuvem:
+                                    st.success(f"Usuário {usuario_edicao_portal} atualizado no Portal do Cliente.")
+                                else:
+                                    st.warning(f"Usuário {usuario_edicao_portal} atualizado apenas localmente. Verifique a conexão com a planilha no Render antes de testar o login no portal.")
+                            else:
+                                st.error("A alteração não foi persistida na base de login do portal.")
                 else:
                     st.info("Não há usuários cadastrados no Portal do Cliente.")
 
@@ -11167,10 +11272,15 @@ elif menu == "👥 Cadastro de Usuários":
                     usuario_remover_portal = portal_label_remover.split(" | ", 1)[0].strip()
                     if st.button("Remover usuário do portal", type="secondary", use_container_width=True):
                         portal_clientes.pop(usuario_remover_portal, None)
-                        salvar_portal_clientes_login(portal_clientes)
-                        st.session_state.portal_clientes_login = carregar_portal_clientes_login()
-                        st.success(f"Usuário {usuario_remover_portal} removido do Portal do Cliente.")
-                        st.rerun()
+                        salvou_nuvem, recarregado = persistir_e_recarregar_portal_clientes(portal_clientes)
+                        if usuario_remover_portal not in recarregado:
+                            if salvou_nuvem:
+                                st.success(f"Usuário {usuario_remover_portal} removido do Portal do Cliente.")
+                            else:
+                                st.warning(f"Usuário {usuario_remover_portal} removido apenas localmente. Verifique a conexão com a planilha no Render.")
+                            st.rerun()
+                        else:
+                            st.error("A remoção não foi persistida na base de login do portal.")
                 else:
                     st.info("Não há usuários disponíveis para remoção no Portal do Cliente.")
 
