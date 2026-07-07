@@ -107,6 +107,13 @@ def montar_config_portal_cliente(senha_hash, tomador):
     }
 
 
+def registrar_feedback_cadastro_usuario(tipo, mensagem):
+    st.session_state.cadastro_usuario_feedback = {
+        "tipo": tipo,
+        "mensagem": mensagem,
+    }
+
+
 def salvar_portal_clientes_login_nuvem(usuarios):
     planilha = abrir_planilha_login_portal()
     if not planilha:
@@ -11039,6 +11046,19 @@ elif menu == "👥 Cadastro de Usuários":
     st.markdown("### 👥 Cadastro de Usuários")
     st.caption("Gerencie os usuários de acesso ao sistema (cadastrar, trocar senha e remover).")
 
+    feedback_cadastro = st.session_state.pop("cadastro_usuario_feedback", None)
+    if feedback_cadastro:
+        tipo_feedback = feedback_cadastro.get("tipo", "info")
+        mensagem_feedback = feedback_cadastro.get("mensagem", "")
+        if tipo_feedback == "success":
+            st.success(mensagem_feedback)
+        elif tipo_feedback == "warning":
+            st.warning(mensagem_feedback)
+        elif tipo_feedback == "error":
+            st.error(mensagem_feedback)
+        else:
+            st.info(mensagem_feedback)
+
     usuarios_login = st.session_state.usuarios_login
 
     portal_clientes = st.session_state.portal_clientes_login
@@ -11147,6 +11167,8 @@ elif menu == "👥 Cadastro de Usuários":
         with st.container(border=True):
             st.markdown("#### ➕ Novo usuário")
             sistema_alvo = st.selectbox("Sistema alvo", ["Sistema interno", "Portal do Cliente"], key="sel_sistema_alvo_usuario")
+            if sistema_alvo == "Portal do Cliente":
+                st.info("A senha do Portal do Cliente e salva na planilha como SENHA_HASH. O codigo que aparece la e esperado e representa a senha protegida, nao a senha em texto puro.")
             with st.form("form_novo_usuario", clear_on_submit=True):
                 novo_usuario = normalizar_usuario_login(st.text_input("Usuário"))
                 nova_senha = st.text_input("Senha", type="password")
@@ -11176,7 +11198,7 @@ elif menu == "👥 Cadastro de Usuários":
                                 }
                                 salvar_usuarios_login(usuarios_login)
                                 st.session_state.usuarios_login = carregar_usuarios_login()
-                                st.success(f"Usuário {novo_usuario} cadastrado no sistema interno.")
+                                registrar_feedback_cadastro_usuario("success", f"Usuario {novo_usuario} cadastrado no sistema interno com sucesso.")
                                 st.rerun()
                         else:
                             portal_clientes = st.session_state.portal_clientes_login
@@ -11192,9 +11214,9 @@ elif menu == "👥 Cadastro de Usuários":
                                 salvou_nuvem, recarregado = persistir_e_recarregar_portal_clientes(portal_clientes)
                                 if novo_usuario in recarregado:
                                     if salvou_nuvem:
-                                        st.success(f"Usuário {novo_usuario} cadastrado no Portal do Cliente.")
+                                        registrar_feedback_cadastro_usuario("success", f"Usuario {novo_usuario} cadastrado no Portal do Cliente com sucesso. A senha foi salva na planilha como SENHA_HASH.")
                                     else:
-                                        st.warning(f"Usuário {novo_usuario} salvo apenas localmente. Verifique a conexão com a planilha no Render antes de testar o login no portal.")
+                                        registrar_feedback_cadastro_usuario("warning", f"Usuario {novo_usuario} salvo apenas localmente. Verifique a conexao com a planilha no Render antes de testar o login no portal.")
                                     st.rerun()
                                 else:
                                     st.error("O cadastro não foi persistido. Verifique a conexão com a planilha de login do portal.")
@@ -11215,7 +11237,8 @@ elif menu == "👥 Cadastro de Usuários":
                             usuarios_login[usuario_edicao]["senha_hash"] = gerar_hash_senha(nova_senha_usuario)
                             salvar_usuarios_login(usuarios_login)
                             st.session_state.usuarios_login = carregar_usuarios_login()
-                            st.success(f"Senha do usuário {usuario_edicao} atualizada.")
+                            registrar_feedback_cadastro_usuario("success", f"Senha do usuario {usuario_edicao} atualizada com sucesso.")
+                            st.rerun()
                 else:
                     st.info("Não há usuários cadastrados no sistema interno.")
             else:
@@ -11237,9 +11260,10 @@ elif menu == "👥 Cadastro de Usuários":
                             salvou_nuvem, recarregado = persistir_e_recarregar_portal_clientes(portal_clientes)
                             if usuario_edicao_portal in recarregado:
                                 if salvou_nuvem:
-                                    st.success(f"Usuário {usuario_edicao_portal} atualizado no Portal do Cliente.")
+                                    registrar_feedback_cadastro_usuario("success", f"Usuario {usuario_edicao_portal} atualizado no Portal do Cliente. A planilha mostra SENHA_HASH, nao a senha em texto puro.")
                                 else:
-                                    st.warning(f"Usuário {usuario_edicao_portal} atualizado apenas localmente. Verifique a conexão com a planilha no Render antes de testar o login no portal.")
+                                    registrar_feedback_cadastro_usuario("warning", f"Usuario {usuario_edicao_portal} atualizado apenas localmente. Verifique a conexao com a planilha no Render antes de testar o login no portal.")
+                                st.rerun()
                             else:
                                 st.error("A alteração não foi persistida na base de login do portal.")
                 else:
@@ -11261,7 +11285,7 @@ elif menu == "👥 Cadastro de Usuários":
                             usuarios_login.pop(usuario_remover, None)
                             salvar_usuarios_login(usuarios_login)
                             st.session_state.usuarios_login = carregar_usuarios_login()
-                            st.success(f"Usuário {usuario_remover} removido com sucesso.")
+                            registrar_feedback_cadastro_usuario("success", f"Usuario {usuario_remover} removido com sucesso.")
                             st.rerun()
                 else:
                     st.info("Não há usuários disponíveis para remoção.")
@@ -11275,9 +11299,9 @@ elif menu == "👥 Cadastro de Usuários":
                         salvou_nuvem, recarregado = persistir_e_recarregar_portal_clientes(portal_clientes)
                         if usuario_remover_portal not in recarregado:
                             if salvou_nuvem:
-                                st.success(f"Usuário {usuario_remover_portal} removido do Portal do Cliente.")
+                                registrar_feedback_cadastro_usuario("success", f"Usuario {usuario_remover_portal} removido do Portal do Cliente com sucesso.")
                             else:
-                                st.warning(f"Usuário {usuario_remover_portal} removido apenas localmente. Verifique a conexão com a planilha no Render.")
+                                registrar_feedback_cadastro_usuario("warning", f"Usuario {usuario_remover_portal} removido apenas localmente. Verifique a conexao com a planilha no Render.")
                             st.rerun()
                         else:
                             st.error("A remoção não foi persistida na base de login do portal.")
