@@ -8,6 +8,8 @@ import requests
 import re
 import random
 import io
+import json
+import hashlib
 import google.auth.transport.requests
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta, timezone
@@ -19,6 +21,118 @@ from streamlit_autorefresh import st_autorefresh
 
 FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
+ARQUIVO_PORTAL_CLIENTE_LOGIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "portal_cliente_login.json")
+LOGOS_POR_TOMADOR = {
+    "GRALAB": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png",
+    "IGO_LOGISTICA": LOGO_IGO,
+    "LABEST": "logo_labest.png",
+    "DANILO.DUARTE": "logo_labest.png",
+    "SYNVIA": LOGO_IGO,
+    "SOUZA CRUZ": "souza cruz.png",
+}
+
+
+def normalizar_usuario_login(usuario):
+    return str(usuario).strip().upper()
+
+
+def gerar_hash_senha(senha):
+    return hashlib.sha256(str(senha).encode('utf-8')).hexdigest()
+
+
+def verificar_senha(senha_digitada, senha_hash):
+    if not senha_hash:
+        return False
+    return gerar_hash_senha(senha_digitada) == str(senha_hash)
+
+
+def usuarios_padrao_portal_cliente():
+    return {
+        "GRALAB": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png",
+            "filtro": "GRALAB",
+            "tomador": "GRALAB"
+        },
+        "IGO_LOGISTICA": {
+            "senha_hash": gerar_hash_senha("admin"),
+            "logo": LOGO_IGO,
+            "filtro": "TODOS",
+            "tomador": "TODOS"
+        },
+        "LOGISTICA.LABEST": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": "logo_labest.png",
+            "filtro": "LABEST",
+            "tomador": "LABEST"
+        },
+        "DANILO.DUARTE": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": "logo_labest.png",
+            "filtro": "LABEST",
+            "tomador": "LABEST"
+        },
+        "SYNVIA": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": LOGO_IGO,
+            "filtro": "SYNVIA",
+            "tomador": "SYNVIA"
+        },
+        "LOGISTICA.BAT": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": "souza cruz.png",
+            "filtro": "SOUZA CRUZ",
+            "tomador": "SOUZA CRUZ"
+        }
+    }
+
+
+def carregar_usuarios_portal_cliente():
+    usuarios = {}
+    if os.path.exists(ARQUIVO_PORTAL_CLIENTE_LOGIN):
+        try:
+            with open(ARQUIVO_PORTAL_CLIENTE_LOGIN, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+            if isinstance(dados, dict):
+                for usuario, info in dados.items():
+                    user_norm = normalizar_usuario_login(usuario)
+                    if not user_norm:
+                        continue
+                    if isinstance(info, dict):
+                        senha_hash = str(info.get("senha_hash", "")).strip()
+                        logo = str(info.get("logo", LOGO_IGO)).strip() or LOGO_IGO
+                        filtro = str(info.get("filtro", "TODOS")).strip().upper() or "TODOS"
+                        tomador = str(info.get("tomador", filtro)).strip().upper() or filtro
+                    else:
+                        senha_hash = gerar_hash_senha(str(info))
+                        logo = LOGO_IGO
+                        filtro = "TODOS"
+                        tomador = "TODOS"
+                    if senha_hash:
+                        usuarios[user_norm] = {
+                            "senha_hash": senha_hash,
+                            "logo": logo,
+                            "filtro": filtro,
+                            "tomador": tomador,
+                        }
+        except Exception:
+            usuarios = {}
+    if not usuarios:
+        usuarios = usuarios_padrao_portal_cliente()
+        with open(ARQUIVO_PORTAL_CLIENTE_LOGIN, "w", encoding="utf-8") as f:
+            json.dump(usuarios, f, ensure_ascii=False, indent=2)
+    return usuarios
+
+
+def salvar_usuarios_portal_cliente(usuarios):
+    with open(ARQUIVO_PORTAL_CLIENTE_LOGIN, "w", encoding="utf-8") as f:
+        json.dump(usuarios, f, ensure_ascii=False, indent=2)
+
+
+def obter_logo_por_tomador(tomador):
+    tomador_norm = str(tomador).strip().upper()
+    tomador_norm = tomador_norm.replace("CAEP", "SYNVIA").replace("CUNHA", "GRALAB")
+    return LOGOS_POR_TOMADOR.get(tomador_norm, LOGO_IGO)
 
 # =======================================================
 # 🎨 1. CONFIGURAÇÃO DA PÁGINA E CSS BASE DO DASHBOARD
@@ -624,6 +738,23 @@ CSS_DASHBOARD = """
         transform: translateY(-1px) !important;
     }
 
+    .st-key-btn_refresh_grid button {
+        background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 999px !important;
+        color: #475569 !important;
+        font-weight: 800 !important;
+        min-height: 38px !important;
+        transition: all 0.2s ease !important;
+    }
+    .st-key-btn_refresh_grid button:hover {
+        background: linear-gradient(180deg, #eef2f7 0%, #dbe3ef 100%) !important;
+        border-color: #94a3b8 !important;
+        color: #334155 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12) !important;
+    }
+
     /* ── BOTÃO DE FECHAR DETALHES (VERMELHO) ── */
     .st-key-fechar_detalhes_btn button {
         background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%) !important;
@@ -643,38 +774,7 @@ CSS_DASHBOARD = """
     </style>
 """
 
-CLIENTES_CONFIG = {
-    "GRALAB": {
-        "senha": "123",
-        "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png",
-        "filtro": "GRALAB"
-    },
-    "IGO_LOGISTICA": {
-        "senha": "admin",
-        "logo": LOGO_IGO,
-        "filtro": "TODOS"
-    },
-    "LOGISTICA.LABEST": {
-        "senha": "123",
-        "logo": "logo_labest.png",
-        "filtro": "LABEST"
-    },
-    "DANILO.DUARTE": {
-        "senha": "123",
-        "logo": "logo_labest.png",
-        "filtro": "LABEST"
-    },
-    "SYNVIA": {
-        "senha": "123",
-        "logo": LOGO_IGO,
-        "filtro": "SYNVIA"
-    },
-    "LOGISTICA.BAT": {
-        "senha": "123",
-        "logo": "souza cruz.png",
-        "filtro": "SOUZA CRUZ"
-    }
-}
+CLIENTES_CONFIG = carregar_usuarios_portal_cliente()
 
 
 def normalizar_chave_cliente(valor):
@@ -1927,7 +2027,8 @@ if not st.session_state.logado:
             submit = st.form_submit_button("🚀 Entrar no Painel")
             
             if submit:
-                if u in CLIENTES_CONFIG and s == CLIENTES_CONFIG[u]["senha"]:
+                conf_usuario = CLIENTES_CONFIG.get(u)
+                if conf_usuario and verificar_senha(s, conf_usuario.get("senha_hash", "")):
                     st.session_state.logado = True
                     st.session_state.cliente = u
                     st.query_params["token_cli"] = u
@@ -1975,13 +2076,14 @@ else:
     hoje_br           = datetime.now(FUSO_BR).date()
     hora_atual_br     = datetime.now(FUSO_BR).strftime('%H:%M:%S')
     nome_tomador_oficial = conf["filtro"] if conf["filtro"] != "TODOS" else "MATRIZ IGO"
+    logo_tomador = obter_logo_por_tomador(conf.get("tomador", conf.get("filtro", "TODOS")))
 
     # ── SIDEBAR ────────────────────────────────────────
     with st.sidebar:
         col1, col2, col3 = st.columns([1, 4, 1])
         with col2:
             try:
-                st.image(conf["logo"], use_container_width=True)
+                st.image(logo_tomador, use_container_width=True)
             except Exception:
                 st.markdown(f"<h3 style='text-align:center;'>{st.session_state.cliente}</h3>", unsafe_allow_html=True)
 
@@ -2282,7 +2384,7 @@ Pedidos movimentados hoje
 
 
                 st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
-                col_busca, col_btn_busca, col_export = st.columns([6, 1, 1], gap="small")
+                col_busca, col_btn_refresh, col_btn_busca, col_export = st.columns([6, 0.55, 1, 1], gap="small")
                 with col_busca:
                     st.text_input(
                         "Buscar",
@@ -2291,6 +2393,10 @@ Pedidos movimentados hoje
                         label_visibility="collapsed",
                         on_change=aplicar_busca_grid
                     )
+                with col_btn_refresh:
+                    if st.button("⟳", use_container_width=True, key="btn_refresh_grid", help="Atualizar dados"):
+                        carregar_dados_nuvem.clear()
+                        st.rerun()
                 with col_btn_busca:
                     if st.button("🔎 Buscar", use_container_width=True, key="btn_busca_grid"):
                         aplicar_busca_grid()
