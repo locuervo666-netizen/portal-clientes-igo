@@ -22,6 +22,9 @@ from streamlit_autorefresh import st_autorefresh
 FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
 ARQUIVO_PORTAL_CLIENTE_LOGIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "portal_cliente_login.json")
+NOME_PLANILHA_LOGIN_PORTAL = "DB_IGO_Logistica"
+NOME_ABA_LOGIN_PORTAL = "Usuarios_Portal_Cliente"
+SCOPES_GOOGLE_LOGIN = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 LOGOS_POR_TOMADOR = {
     "GRALAB": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png",
     "IGO_LOGISTICA": LOGO_IGO,
@@ -44,6 +47,34 @@ def verificar_senha(senha_digitada, senha_hash):
     if not senha_hash:
         return False
     return gerar_hash_senha(senha_digitada) == str(senha_hash)
+
+
+def normalizar_tomador_portal(tomador):
+    tomador_norm = str(tomador).strip().upper() or "TODOS"
+    return tomador_norm.replace("CAEP", "SYNVIA").replace("CUNHA", "GRALAB")
+
+
+def obter_token_google_login():
+    token_str = os.environ.get("google_token_json")
+    if not token_str:
+        try:
+            token_str = st.secrets.get("google_token_json")
+        except Exception:
+            token_str = None
+    return token_str
+
+
+def abrir_planilha_login_portal():
+    token_str = obter_token_google_login()
+    if not token_str:
+        return None
+    try:
+        token_info = json.loads(token_str)
+        creds = Credentials.from_authorized_user_info(token_info, scopes=SCOPES_GOOGLE_LOGIN)
+        gc = gspread.authorize(creds)
+        return gc.open(NOME_PLANILHA_LOGIN_PORTAL)
+    except Exception:
+        return None
 
 
 def usuarios_padrao_portal_cliente():
@@ -87,9 +118,40 @@ def usuarios_padrao_portal_cliente():
     }
 
 
+def montar_config_portal_cliente(senha_hash, tomador):
+    tomador_norm = normalizar_tomador_portal(tomador)
+    return {
+        "senha_hash": str(senha_hash).strip(),
+        "logo": obter_logo_por_tomador(tomador_norm),
+        "filtro": tomador_norm,
+        "tomador": tomador_norm,
+    }
+
+
 def carregar_usuarios_portal_cliente():
     usuarios = {}
-    if os.path.exists(ARQUIVO_PORTAL_CLIENTE_LOGIN):
+
+    planilha = abrir_planilha_login_portal()
+    if planilha:
+        try:
+            aba = planilha.worksheet(NOME_ABA_LOGIN_PORTAL)
+            dados = aba.get_all_values()
+            if len(dados) > 1:
+                cabecalhos = [str(c).strip().upper() for c in dados[0]]
+                idx_usuario = cabecalhos.index("USUARIO")
+                idx_senha = cabecalhos.index("SENHA_HASH")
+                idx_tomador = cabecalhos.index("TOMADOR")
+
+                for linha in dados[1:]:
+                    usuario = normalizar_usuario_login(linha[idx_usuario] if idx_usuario < len(linha) else "")
+                    senha_hash = str(linha[idx_senha] if idx_senha < len(linha) else "").strip()
+                    tomador = normalizar_tomador_portal(linha[idx_tomador] if idx_tomador < len(linha) else "TODOS")
+                    if usuario and senha_hash:
+                        usuarios[usuario] = montar_config_portal_cliente(senha_hash, tomador)
+        except Exception:
+            usuarios = {}
+
+    if not usuarios and os.path.exists(ARQUIVO_PORTAL_CLIENTE_LOGIN):
         try:
             with open(ARQUIVO_PORTAL_CLIENTE_LOGIN, "r", encoding="utf-8") as f:
                 dados = json.load(f)
@@ -109,12 +171,7 @@ def carregar_usuarios_portal_cliente():
                         filtro = "TODOS"
                         tomador = "TODOS"
                     if senha_hash:
-                        usuarios[user_norm] = {
-                            "senha_hash": senha_hash,
-                            "logo": logo,
-                            "filtro": filtro,
-                            "tomador": tomador,
-                        }
+                        usuarios[user_norm] = montar_config_portal_cliente(senha_hash, tomador)
         except Exception:
             usuarios = {}
     if not usuarios:
