@@ -31,6 +31,7 @@ import string
 from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
+LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
 # =============================================================================
 # ⚙️ CONFIGURAÇÕES GERAIS DO SISTEMA
 # =============================================================================
@@ -43,6 +44,7 @@ AGENTES_XLS_AUTORIZADOS = [
     'domingos.ssa']
 AGENTES_PDF_AUTORIZADOS = ['veloz.express', 'francisco.gru', 'adilson.lima','domingos.ssa']
 ARQUIVO_USUARIOS_LOGIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "usuarios_login.json")
+ARQUIVO_PORTAL_CLIENTE_LOGIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "portal_cliente_login.json")
 
 
 def normalizar_usuario_login(usuario):
@@ -111,6 +113,94 @@ def carregar_usuarios_login():
 
 def salvar_usuarios_login(usuarios):
     with open(ARQUIVO_USUARIOS_LOGIN, "w", encoding="utf-8") as f:
+        json.dump(usuarios, f, ensure_ascii=False, indent=2)
+
+
+def usuarios_padrao_portal_cliente():
+    return {
+        "GRALAB": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": "https://cdn.awsli.com.br/2702/2702264/logo/gralab-rbuogsxve7.png",
+            "filtro": "GRALAB",
+            "tomador": "GRALAB",
+        },
+        "IGO_LOGISTICA": {
+            "senha_hash": gerar_hash_senha("admin"),
+            "logo": "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png",
+            "filtro": "TODOS",
+            "tomador": "TODOS",
+        },
+        "LOGISTICA.LABEST": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": "logo_labest.png",
+            "filtro": "LABEST",
+            "tomador": "LABEST",
+        },
+        "DANILO.DUARTE": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": "logo_labest.png",
+            "filtro": "LABEST",
+            "tomador": "LABEST",
+        },
+        "SYNVIA": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png",
+            "filtro": "SYNVIA",
+            "tomador": "SYNVIA",
+        },
+        "LOGISTICA.BAT": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": "souza cruz.png",
+            "filtro": "SOUZA CRUZ",
+            "tomador": "SOUZA CRUZ",
+        },
+    }
+
+
+def carregar_portal_clientes_login():
+    usuarios = {}
+
+    if os.path.exists(ARQUIVO_PORTAL_CLIENTE_LOGIN):
+        try:
+            with open(ARQUIVO_PORTAL_CLIENTE_LOGIN, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+
+            if isinstance(dados, dict):
+                for usuario, info in dados.items():
+                    user_norm = normalizar_usuario_login(usuario)
+                    if not user_norm:
+                        continue
+
+                    if isinstance(info, dict):
+                        senha_hash = str(info.get("senha_hash", "")).strip()
+                        logo = str(info.get("logo", "")).strip()
+                        filtro = str(info.get("filtro", "TODOS")).strip().upper() or "TODOS"
+                        tomador = str(info.get("tomador", filtro)).strip().upper() or filtro
+                    else:
+                        senha_hash = gerar_hash_senha(str(info))
+                        logo = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
+                        filtro = "TODOS"
+                        tomador = "TODOS"
+
+                    if senha_hash:
+                        usuarios[user_norm] = {
+                            "senha_hash": senha_hash,
+                            "logo": logo or "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png",
+                            "filtro": filtro,
+                            "tomador": tomador,
+                        }
+        except Exception:
+            usuarios = {}
+
+    if not usuarios:
+        usuarios = usuarios_padrao_portal_cliente()
+        salvar_portal_clientes_login(usuarios)
+
+    return usuarios
+
+
+def salvar_portal_clientes_login(usuarios):
+    with open(ARQUIVO_PORTAL_CLIENTE_LOGIN, "w", encoding="utf-8") as f:
         json.dump(usuarios, f, ensure_ascii=False, indent=2)
 
 
@@ -726,6 +816,9 @@ if 'usuario_logado' not in st.session_state:
 
 if 'usuarios_login' not in st.session_state:
     st.session_state.usuarios_login = carregar_usuarios_login()
+
+if 'portal_clientes_login' not in st.session_state:
+    st.session_state.portal_clientes_login = carregar_portal_clientes_login()
 
 if 'log_triagem' not in st.session_state:
     st.session_state.log_triagem = []
@@ -10853,71 +10946,233 @@ elif menu == "👥 Cadastro de Usuários":
 
     usuarios_login = st.session_state.usuarios_login
 
-    usuarios_lista = []
-    for usuario, info in sorted(usuarios_login.items()):
-        usuarios_lista.append({
+    portal_clientes = st.session_state.portal_clientes_login
+    tomadores_portal_disponiveis = ["TODOS"] + sorted(list(set(CLIENTES_AUTORIZADOS)))
+
+    usuarios_lista = [
+        {
             "Usuário": usuario,
             "Perfil": "Administrador" if info.get("admin", False) else "Operacional",
-        })
+        }
+        for usuario, info in sorted(usuarios_login.items())
+    ]
+    portal_lista = [
+        {
+            "Usuário": usuario,
+            "Tomador": str(info.get("tomador", info.get("filtro", "TODOS"))),
+        }
+        for usuario, info in sorted(portal_clientes.items())
+    ]
 
-    if usuarios_lista:
-        st.dataframe(pd.DataFrame(usuarios_lista), use_container_width=True, hide_index=True)
+    def rotular_usuario_portal(usuario, info):
+        tomador = str(info.get("tomador", info.get("filtro", "TODOS"))).strip() or "TODOS"
+        return f"{usuario} | Tomador: {tomador}"
 
-    st.divider()
-    st.markdown("#### ➕ Novo usuário")
-    with st.form("form_novo_usuario", clear_on_submit=True):
-        novo_usuario = normalizar_usuario_login(st.text_input("Usuário"))
-        nova_senha = st.text_input("Senha", type="password")
-        novo_admin = st.checkbox("Administrador", value=False)
-        cadastrar_usuario = st.form_submit_button("Cadastrar usuário", type="primary", use_container_width=True)
+    st.markdown(
+        f"""
+        <style>
+        .cadastro-premium-shell {{
+            background: linear-gradient(145deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 18px;
+            padding: 16px 18px 14px 18px;
+            margin-bottom: 12px;
+            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.18);
+        }}
+        .cadastro-premium-kicker {{
+            color: #93c5fd;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }}
+        .cadastro-premium-title {{
+            color: #f8fafc;
+            font-size: 22px;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 4px;
+        }}
+        .cadastro-premium-subtitle {{
+            color: #cbd5e1;
+            font-size: 12px;
+            line-height: 1.45;
+            margin: 0;
+        }}
+        .cadastro-stat {{
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #dbe3ef;
+            border-radius: 14px;
+            padding: 12px 14px;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+            min-height: 76px;
+        }}
+        .cadastro-stat-label {{
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }}
+        .cadastro-stat-value {{
+            color: #0f172a;
+            font-size: 26px;
+            font-weight: 900;
+            line-height: 1;
+        }}
+        .cadastro-stat-hint {{
+            color: #475569;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 4px;
+        }}
+        </style>
+        <div class="cadastro-premium-shell">
+            <div class="cadastro-premium-kicker">Administração de Acessos</div>
+            <div class="cadastro-premium-title">Cadastro de Usuários</div>
+            <p class="cadastro-premium-subtitle">Controle usuários internos e usuários do Portal do Cliente com tomador vinculado. Use as listas suspensas para localizar e editar rapidamente quando a base crescer.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-        if cadastrar_usuario:
-            if not novo_usuario or not nova_senha:
-                st.error("Preencha usuário e senha para cadastrar.")
-            elif novo_usuario in usuarios_login:
-                st.error("Este usuário já existe.")
+    stat1, stat2, stat3 = st.columns(3)
+    with stat1:
+        st.markdown(f"<div class='cadastro-stat'><div class='cadastro-stat-label'>Usuários internos</div><div class='cadastro-stat-value'>{len(usuarios_login)}</div><div class='cadastro-stat-hint'>Acesso ao sistema operacional</div></div>", unsafe_allow_html=True)
+    with stat2:
+        st.markdown(f"<div class='cadastro-stat'><div class='cadastro-stat-label'>Usuários do portal</div><div class='cadastro-stat-value'>{len(portal_clientes)}</div><div class='cadastro-stat-hint'>Com tomador já definido no cadastro</div></div>", unsafe_allow_html=True)
+    with stat3:
+        st.markdown(f"<div class='cadastro-stat'><div class='cadastro-stat-label'>Tomadores disponíveis</div><div class='cadastro-stat-value'>{len(tomadores_portal_disponiveis)}</div><div class='cadastro-stat-hint'>Lista usada no dropdown do portal</div></div>", unsafe_allow_html=True)
+
+    tab_novo, tab_editar, tab_remover = st.tabs(["➕ Novo", "🔑 Editar", "🗑️ Remover"])
+
+    with tab_novo:
+        with st.container(border=True):
+            st.markdown("#### ➕ Novo usuário")
+            sistema_alvo = st.selectbox("Sistema alvo", ["Sistema interno", "Portal do Cliente"], key="sel_sistema_alvo_usuario")
+            with st.form("form_novo_usuario", clear_on_submit=True):
+                novo_usuario = normalizar_usuario_login(st.text_input("Usuário"))
+                nova_senha = st.text_input("Senha", type="password")
+                if sistema_alvo == "Sistema interno":
+                    novo_admin = st.checkbox("Administrador", value=False)
+                    novo_logo = ""
+                    novo_filtro = ""
+                    novo_tomador = ""
+                else:
+                    novo_admin = False
+                    novo_logo = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
+                    novo_tomador = st.selectbox("Tomador autorizado", tomadores_portal_disponiveis, index=0, key="sel_tomador_portal_novo")
+                    novo_filtro = novo_tomador
+                cadastrar_usuario = st.form_submit_button("Cadastrar usuário", type="primary", use_container_width=True)
+
+                if cadastrar_usuario:
+                    if not novo_usuario or not nova_senha:
+                        st.error("Preencha usuário e senha para cadastrar.")
+                    else:
+                        if sistema_alvo == "Sistema interno":
+                            if novo_usuario in usuarios_login:
+                                st.error("Este usuário já existe.")
+                            else:
+                                usuarios_login[novo_usuario] = {
+                                    "senha_hash": gerar_hash_senha(nova_senha),
+                                    "admin": novo_admin,
+                                }
+                                salvar_usuarios_login(usuarios_login)
+                                st.session_state.usuarios_login = carregar_usuarios_login()
+                                st.success(f"Usuário {novo_usuario} cadastrado no sistema interno.")
+                                st.rerun()
+                        else:
+                            portal_clientes = st.session_state.portal_clientes_login
+                            if novo_usuario in portal_clientes:
+                                st.error("Este usuário já existe no Portal do Cliente.")
+                            else:
+                                portal_clientes[novo_usuario] = {
+                                    "senha_hash": gerar_hash_senha(nova_senha),
+                                    "logo": novo_logo,
+                                    "filtro": novo_filtro,
+                                    "tomador": novo_tomador,
+                                }
+                                salvar_portal_clientes_login(portal_clientes)
+                                st.session_state.portal_clientes_login = carregar_portal_clientes_login()
+                                st.success(f"Usuário {novo_usuario} cadastrado no Portal do Cliente.")
+                                st.rerun()
+
+    with tab_editar:
+        with st.container(border=True):
+            st.markdown("#### 🔑 Alterar senha")
+            alvo_edicao = st.selectbox("Sistema para editar", ["Sistema interno", "Portal do Cliente"], key="sel_sistema_edicao_usuario")
+            if alvo_edicao == "Sistema interno":
+                lista_usuarios = sorted(usuarios_login.keys())
+                if lista_usuarios:
+                    usuario_edicao = st.selectbox("Selecione o usuário", lista_usuarios, key="sel_usuario_edicao_login")
+                    nova_senha_usuario = st.text_input("Nova senha", type="password", key="txt_nova_senha_usuario_login")
+                    if st.button("Salvar nova senha", use_container_width=True):
+                        if not nova_senha_usuario:
+                            st.error("Informe a nova senha.")
+                        else:
+                            usuarios_login[usuario_edicao]["senha_hash"] = gerar_hash_senha(nova_senha_usuario)
+                            salvar_usuarios_login(usuarios_login)
+                            st.session_state.usuarios_login = carregar_usuarios_login()
+                            st.success(f"Senha do usuário {usuario_edicao} atualizada.")
+                else:
+                    st.info("Não há usuários cadastrados no sistema interno.")
             else:
-                usuarios_login[novo_usuario] = {
-                    "senha_hash": gerar_hash_senha(nova_senha),
-                    "admin": novo_admin,
-                }
-                salvar_usuarios_login(usuarios_login)
-                st.session_state.usuarios_login = carregar_usuarios_login()
-                st.success(f"Usuário {novo_usuario} cadastrado com sucesso.")
-                st.rerun()
+                if portal_lista:
+                    portal_labels = [rotular_usuario_portal(u["Usuário"], portal_clientes[u["Usuário"]]) for u in portal_lista]
+                    portal_label_selecionado = st.selectbox("Selecione o usuário", portal_labels, key="sel_usuario_edicao_portal_login")
+                    usuario_edicao_portal = portal_label_selecionado.split(" | ", 1)[0].strip()
+                    nova_senha_portal = st.text_input("Nova senha do portal", type="password", key="txt_nova_senha_portal_login")
+                    tomador_atual_portal = str(portal_clientes[usuario_edicao_portal].get("tomador", portal_clientes[usuario_edicao_portal].get("filtro", "TODOS"))).upper().strip() or "TODOS"
+                    indice_tomador_atual = tomadores_portal_disponiveis.index(tomador_atual_portal) if tomador_atual_portal in tomadores_portal_disponiveis else 0
+                    novo_tomador_portal = st.selectbox("Tomador autorizado", tomadores_portal_disponiveis, index=indice_tomador_atual, key="sel_tomador_portal_edicao")
+                    if st.button("Salvar alterações do portal", use_container_width=True):
+                        if not nova_senha_portal:
+                            st.error("Informe a nova senha do portal.")
+                        else:
+                            portal_clientes[usuario_edicao_portal]["senha_hash"] = gerar_hash_senha(nova_senha_portal)
+                            portal_clientes[usuario_edicao_portal]["tomador"] = novo_tomador_portal
+                            portal_clientes[usuario_edicao_portal]["filtro"] = novo_tomador_portal
+                            salvar_portal_clientes_login(portal_clientes)
+                            st.session_state.portal_clientes_login = carregar_portal_clientes_login()
+                            st.success(f"Usuário {usuario_edicao_portal} atualizado no Portal do Cliente.")
+                else:
+                    st.info("Não há usuários cadastrados no Portal do Cliente.")
 
-    st.divider()
-    st.markdown("#### 🔑 Alterar senha")
-    lista_usuarios = sorted(usuarios_login.keys())
-    if lista_usuarios:
-        usuario_edicao = st.selectbox("Selecione o usuário", lista_usuarios, key="sel_usuario_edicao_login")
-        nova_senha_usuario = st.text_input("Nova senha", type="password", key="txt_nova_senha_usuario_login")
-        if st.button("Salvar nova senha", use_container_width=True):
-            if not nova_senha_usuario:
-                st.error("Informe a nova senha.")
+    with tab_remover:
+        with st.container(border=True):
+            st.markdown("#### 🗑️ Remover usuário")
+            alvo_remocao = st.selectbox("Sistema para remover", ["Sistema interno", "Portal do Cliente"], key="sel_sistema_remocao_usuario")
+            if alvo_remocao == "Sistema interno":
+                usuarios_remocao = [u for u in sorted(usuarios_login.keys()) if u != st.session_state.usuario_logado]
+                if usuarios_remocao:
+                    usuario_remover = st.selectbox("Usuário para remover", usuarios_remocao, key="sel_usuario_remover_login")
+                    if st.button("Remover usuário", type="secondary", use_container_width=True):
+                        qtd_admins = sum(1 for _, info in usuarios_login.items() if info.get("admin", False))
+                        if usuarios_login.get(usuario_remover, {}).get("admin", False) and qtd_admins <= 1:
+                            st.error("Não é possível remover o último administrador do sistema.")
+                        else:
+                            usuarios_login.pop(usuario_remover, None)
+                            salvar_usuarios_login(usuarios_login)
+                            st.session_state.usuarios_login = carregar_usuarios_login()
+                            st.success(f"Usuário {usuario_remover} removido com sucesso.")
+                            st.rerun()
+                else:
+                    st.info("Não há usuários disponíveis para remoção.")
             else:
-                usuarios_login[usuario_edicao]["senha_hash"] = gerar_hash_senha(nova_senha_usuario)
-                salvar_usuarios_login(usuarios_login)
-                st.session_state.usuarios_login = carregar_usuarios_login()
-                st.success(f"Senha do usuário {usuario_edicao} atualizada.")
-
-    st.divider()
-    st.markdown("#### 🗑️ Remover usuário")
-    usuarios_remocao = [u for u in sorted(usuarios_login.keys()) if u != st.session_state.usuario_logado]
-    if usuarios_remocao:
-        usuario_remover = st.selectbox("Usuário para remover", usuarios_remocao, key="sel_usuario_remover_login")
-        if st.button("Remover usuário", type="secondary", use_container_width=True):
-            qtd_admins = sum(1 for _, info in usuarios_login.items() if info.get("admin", False))
-            if usuarios_login.get(usuario_remover, {}).get("admin", False) and qtd_admins <= 1:
-                st.error("Não é possível remover o último administrador do sistema.")
-            else:
-                usuarios_login.pop(usuario_remover, None)
-                salvar_usuarios_login(usuarios_login)
-                st.session_state.usuarios_login = carregar_usuarios_login()
-                st.success(f"Usuário {usuario_remover} removido com sucesso.")
-                st.rerun()
-    else:
-        st.info("Não há usuários disponíveis para remoção.")
+                if portal_lista:
+                    portal_labels_rem = [rotular_usuario_portal(u["Usuário"], portal_clientes[u["Usuário"]]) for u in portal_lista]
+                    portal_label_remover = st.selectbox("Usuário do portal para remover", portal_labels_rem, key="sel_usuario_remover_portal_login")
+                    usuario_remover_portal = portal_label_remover.split(" | ", 1)[0].strip()
+                    if st.button("Remover usuário do portal", type="secondary", use_container_width=True):
+                        portal_clientes.pop(usuario_remover_portal, None)
+                        salvar_portal_clientes_login(portal_clientes)
+                        st.session_state.portal_clientes_login = carregar_portal_clientes_login()
+                        st.success(f"Usuário {usuario_remover_portal} removido do Portal do Cliente.")
+                        st.rerun()
+                else:
+                    st.info("Não há usuários disponíveis para remoção no Portal do Cliente.")
 
 # =============================================================================
 # 📈 MÓDULO: DASHBOARD EXECUTIVO (MODO CNN REAL - TV - PROGRESSO + ANÁLISE 30D)
