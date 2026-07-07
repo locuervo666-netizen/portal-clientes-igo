@@ -6065,12 +6065,12 @@ elif menu == "📥 Importações Umove":
     st.markdown(
         """
         <style>
-        div[data-baseweb="tab-list"] {
+        div[data-testid="stTabs"] div[data-baseweb="tab-list"] {
                 gap: 14px;
             margin-bottom: 14px;
                 align-items: stretch;
         }
-        div[data-baseweb="tab"] {
+        div[data-testid="stTabs"] button[role="tab"] {
             background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
             border: 1px solid #dbe3ef !important;
             border-radius: 12px !important;
@@ -6086,23 +6086,23 @@ elif menu == "📥 Importações Umove":
             box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
             transition: all 0.2s ease !important;
         }
-            button[role="tab"] {
+            div[data-testid="stTabs"] button[role="tab"] {
                 padding: 0 18px !important;
                 min-height: 50px !important;
                 line-height: 1.25 !important;
             }
-            button[role="tab"] p {
+            div[data-testid="stTabs"] button[role="tab"] p {
                 margin: 0 !important;
                 line-height: 1.25 !important;
                 white-space: nowrap !important;
             }
-        div[data-baseweb="tab"]:hover {
+        div[data-testid="stTabs"] button[role="tab"]:hover {
             border-color: #93c5fd !important;
             color: #0f172a !important;
             transform: translateY(-1px);
             box-shadow: 0 6px 16px rgba(37, 99, 235, 0.10) !important;
         }
-        button[role="tab"][aria-selected="true"] {
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
             background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
             border-color: #1d4ed8 !important;
             border-radius: 12px !important;
@@ -6111,7 +6111,7 @@ elif menu == "📥 Importações Umove":
             overflow: hidden !important;
                 padding: 0 20px !important;
         }
-            button[role="tab"][aria-selected="true"] p {
+            div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] p {
                 letter-spacing: 0.2px !important;
                 line-height: 1.3 !important;
             }
