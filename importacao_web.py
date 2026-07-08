@@ -3617,11 +3617,26 @@ if menu == "📊 GRID":
             str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
 
+        colunas_exportar_csv = [
+            c for c in df_grid_final.columns if c in linhas_selecionadas.columns]
+        df_csv_export = linhas_selecionadas[colunas_exportar_csv].copy(
+        ) if tem_sel else pd.DataFrame(columns=df_grid_final.columns)
+        csv_grid_bytes = df_csv_export.to_csv(
+            index=False,
+            sep=';'
+        ).encode('utf-8-sig') if tem_sel else b""
+        nome_csv_grid = (
+            f"grid_pedidos_selecionados_{len(df_csv_export)}_{datetime.now(FUSO_BR).strftime('%Y%m%d_%H%M%S')}.csv"
+            if tem_sel
+            else f"grid_pedidos_selecionados_{datetime.now(FUSO_BR).strftime('%Y%m%d_%H%M%S')}.csv"
+        )
+
         # 🔥 PREENCHENDO A BARRA DE AÇÕES NO TOPO DA TELA 🔥
         st.markdown("""
             <style>
                 /* 1. Padroniza TODOS os botões nativos e popovers para a paleta azul da sidebar */
                 div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"],
+                div.stDownloadButton > button,
                 div[data-testid="stPopover"] > div > button,
                 div[data-testid="stPopover"] > button {
                     background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
@@ -3637,6 +3652,7 @@ if menu == "📊 GRID":
                         
                 /* Efeito ao passar o mouse */
                 div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"]:hover,
+                div.stDownloadButton > button:hover,
                 div[data-testid="stPopover"] > div > button:hover,
                 div[data-testid="stPopover"] > button:hover {
                     background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%) !important;
@@ -3647,6 +3663,7 @@ if menu == "📊 GRID":
                 }
                         
                 div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"]:active,
+                div.stDownloadButton > button:active,
                 div[data-testid="stPopover"] > div > button:active,
                 div[data-testid="stPopover"] > button:active {
                     transform: translateY(0px) !important;
@@ -3678,9 +3695,9 @@ if menu == "📊 GRID":
                 }
             </style>
         """, unsafe_allow_html=True)
-                
+
         with box_botoes.container():
-            col_b0, col_b1, col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns(7)
+            col_b0, col_b1, col_b2, col_b3, col_b4, col_b5, col_b6, col_b7 = st.columns(8)
 
             with col_b0:
                 # O BOTÃO AGORA ABRE A TELA DIRETAMENTE, SEM USAR A MEMÓRIA DO SISTEMA
@@ -3908,7 +3925,18 @@ if menu == "📊 GRID":
                                     except Exception as e:
                                         st.error(f"Erro: {e}")
 
-            if col_b6.button("🔄 Atualizar", use_container_width=True, type="secondary"):
+            with col_b6:
+                st.download_button(
+                    "📥 CSV Seleção",
+                    data=csv_grid_bytes,
+                    file_name=nome_csv_grid,
+                    mime="text/csv",
+                    use_container_width=True,
+                    type="secondary",
+                    disabled=not tem_sel
+                )
+
+            if col_b7.button("🔄 Atualizar", use_container_width=True, type="secondary"):
                     with st.spinner("Sincronizando..."):
                         carregar_dados_completos.clear()
                         st.toast("Dados atualizados com sucesso!", icon="🔄")
