@@ -826,6 +826,34 @@ CSS_DASHBOARD = """
         border-radius: 99px;
         padding: 5px 12px;
     }
+    .sync-status-last {
+        color: #0f766e;
+        background: #ecfeff;
+        border: 1px solid #99f6e4;
+    }
+    .sync-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .user-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #0f172a;
+        font-weight: 700;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 99px;
+        padding: 5px 12px;
+        max-width: 340px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
     .sync-dot {
         width: 7px;
         height: 7px;
@@ -924,6 +952,9 @@ if 'portal_clientes_login' not in st.session_state:
 
 if 'log_triagem' not in st.session_state:
     st.session_state.log_triagem = []
+
+if 'ultima_sincronizacao' not in st.session_state:
+    st.session_state.ultima_sincronizacao = None
 
 # TELA DE LOGIN BLINDADA
 if not st.session_state.autenticado:
@@ -1372,10 +1403,123 @@ def carregar_dados_completos(_planilha):
             if 'DATA' in df.columns:
                 df['DATA_OBJ'] = pd.to_datetime(
                     df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+            st.session_state.ultima_sincronizacao = datetime.now(FUSO_BR)
             return df
     except Exception as e:
         st.error(f"Erro Crítico ao carregar a Memoria_Sistema: {e}")
     return pd.DataFrame()
+
+
+def _normalizar_colunas_upper(df):
+    if df is None or df.empty:
+        return df
+    df.columns = [str(c).strip().upper() for c in df.columns]
+    return df
+
+
+def _snapshot_incremental_df(df_base):
+    df_tmp = df_base.copy() if isinstance(df_base, pd.DataFrame) else pd.DataFrame()
+    if df_tmp.empty:
+        return {}
+    df_tmp = _normalizar_colunas_upper(df_tmp)
+    if 'PEDIDO' not in df_tmp.columns or 'UPDATED_AT' not in df_tmp.columns:
+        return {}
+    df_tmp['PEDIDO'] = df_tmp['PEDIDO'].astype(str).str.strip()
+    df_tmp['UPDATED_AT'] = df_tmp['UPDATED_AT'].astype(str).str.strip()
+    df_tmp = df_tmp[df_tmp['PEDIDO'] != ""]
+    if df_tmp.empty:
+        return {}
+    return dict(zip(df_tmp['PEDIDO'], df_tmp['UPDATED_AT']))
+
+
+def carregar_snapshot_memoria_incremental(_planilha):
+    if not _planilha:
+        return {}, False
+    try:
+        aba_m = _planilha.worksheet("Memoria_Sistema")
+        headers = [str(h).strip().upper() for h in aba_m.row_values(1)]
+        if not headers:
+            return {}, False
+
+        if 'PEDIDO' not in headers or 'UPDATED_AT' not in headers:
+            return {}, False
+
+        idx_pedido = headers.index('PEDIDO') + 1
+        idx_updated = headers.index('UPDATED_AT') + 1
+
+        pedidos = aba_m.col_values(idx_pedido)[1:]
+        updated_vals = aba_m.col_values(idx_updated)[1:]
+
+        snap = {}
+        max_len = max(len(pedidos), len(updated_vals))
+        for i in range(max_len):
+            pedido = str(pedidos[i]).strip() if i < len(pedidos) else ""
+            updated = str(updated_vals[i]).strip() if i < len(updated_vals) else ""
+            if pedido:
+                snap[pedido] = updated
+
+        return snap, True
+    except Exception:
+        return {}, False
+
+
+def obter_dados_grid_incremental(_planilha, forcar_full=False):
+    if 'df_grid_cache' not in st.session_state:
+        st.session_state.df_grid_cache = None
+    if 'df_grid_snapshot' not in st.session_state:
+        st.session_state.df_grid_snapshot = {}
+    if 'df_grid_incremental_suportado' not in st.session_state:
+        st.session_state.df_grid_incremental_suportado = False
+
+    cache_df = st.session_state.df_grid_cache
+    sem_cache = not isinstance(cache_df, pd.DataFrame) or cache_df.empty
+
+    if forcar_full or sem_cache:
+        df_full = carregar_dados_completos(_planilha)
+        st.session_state.df_grid_cache = df_full
+        st.session_state.df_grid_snapshot = _snapshot_incremental_df(df_full)
+        st.session_state.df_grid_incremental_suportado = bool(st.session_state.df_grid_snapshot)
+        return df_full
+
+    snap_atual, suporta_incremental = carregar_snapshot_memoria_incremental(_planilha)
+    st.session_state.df_grid_incremental_suportado = suporta_incremental
+
+    if not suporta_incremental:
+        # Sem UPDATED_AT na base, mantém compatibilidade atual.
+        return cache_df
+
+    if snap_atual == st.session_state.df_grid_snapshot:
+        return cache_df
+
+    carregar_dados_completos.clear()
+    df_full = carregar_dados_completos(_planilha)
+    st.session_state.df_grid_cache = df_full
+    st.session_state.df_grid_snapshot = _snapshot_incremental_df(df_full)
+    return df_full
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def carregar_indice_memoria_sistema(_planilha):
+    if not _planilha:
+        return {}, []
+    try:
+        aba = _planilha.worksheet("Memoria_Sistema")
+        headers = [str(h).strip().upper() for h in aba.row_values(1)]
+        if not headers or 'PEDIDO' not in headers:
+            return {}, headers
+
+        col_pedido = headers.index('PEDIDO') + 1
+        pedidos = aba.col_values(col_pedido)[1:]
+
+        mapa_linhas = {}
+        for idx, pedido in enumerate(pedidos, start=2):
+            pedido_key = str(pedido).strip()
+            if pedido_key and pedido_key not in mapa_linhas:
+                mapa_linhas[pedido_key] = idx
+
+        return mapa_linhas, headers
+    except Exception:
+        return {}, []
 
 
 DF_AGENTES = carregar_dados_agentes(planilha_db)
@@ -2892,9 +3036,6 @@ with st.sidebar:
             </div>
         """, unsafe_allow_html=True)
 
-    if st.session_state.usuario_logado:
-        st.caption(f"Usuário logado: {st.session_state.usuario_logado}")
-
     menu_opcoes = [
         "📈 Dashboard",
         "📊 GRID",
@@ -2928,13 +3069,21 @@ if menu == "📊 GRID":
     st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 if menu != "📈 Dashboard":
+    usuario_online = str(st.session_state.usuario_logado or "").strip()
+    chip_usuario_html = f"<div class='user-status'>👤 {usuario_online}</div>" if usuario_online else ""
+    ultima_sync = st.session_state.get("ultima_sincronizacao")
+    ultima_sync_txt = ultima_sync.strftime('%H:%M:%S') if isinstance(ultima_sync, datetime) else "--:--:--"
     st.markdown(f"""
         <div class="header-container">
             <div>
                 <div class="header-title">CONTROLE OPERACIONAL</div>
             </div>
-            <div class="sync-status">
-                <span class="sync-dot"></span> Online: {datetime.now(FUSO_BR).strftime('%H:%M')}
+            <div class="sync-meta">
+                <div class="sync-status">
+                    <span class="sync-dot"></span> Online: {datetime.now(FUSO_BR).strftime('%H:%M')}
+                </div>
+                <div class="sync-status sync-status-last">⟳ Última sync: {ultima_sync_txt}</div>
+                {chip_usuario_html}
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -2943,7 +3092,9 @@ if menu != "📈 Dashboard":
 # 📊 MÓDULO GRID
 # =============================================================================
 if menu == "📊 GRID":
-    df_raw = carregar_dados_completos(planilha_db)
+    recarga_forcada_grid = bool(st.session_state.get('forcar_full_refresh_grid', False))
+    df_raw = obter_dados_grid_incremental(planilha_db, forcar_full=recarga_forcada_grid)
+    st.session_state.forcar_full_refresh_grid = False
 
     # 🔥 AUTO-SYNC SILENCIOSO (A MÁGICA INVISÍVEL) 🔥
     if not df_raw.empty and 'STATUS_DB_ORIGINAL' in df_raw.columns:
@@ -3926,18 +4077,22 @@ if menu == "📊 GRID":
                                         st.error(f"Erro: {e}")
 
             with col_b6:
-                st.download_button(
-                    "📥 CSV Seleção",
-                    data=csv_grid_bytes,
-                    file_name=nome_csv_grid,
-                    mime="text/csv",
-                    use_container_width=True,
-                    type="secondary",
-                    disabled=not tem_sel
-                )
+                if tem_sel:
+                    st.download_button(
+                        "📥 CSV Seleção",
+                        data=csv_grid_bytes,
+                        file_name=nome_csv_grid,
+                        mime="text/csv",
+                        use_container_width=True,
+                        type="secondary"
+                    )
+                else:
+                    if st.button("📥 CSV Seleção", use_container_width=True, type="secondary"):
+                        st.toast("Selecione ao menos 1 pedido para baixar o CSV.", icon="⚠️")
 
             if col_b7.button("🔄 Atualizar", use_container_width=True, type="secondary"):
                     with st.spinner("Sincronizando..."):
+                        st.session_state.forcar_full_refresh_grid = True
                         carregar_dados_completos.clear()
                         st.toast("Dados atualizados com sucesso!", icon="🔄")
                         time.sleep(0.5)
@@ -8402,58 +8557,47 @@ elif menu == "🔬 Triagem":
                                 # 🔥 BLOQUEIO: Marca bipagem em progresso
                                 st.session_state.bipagem_em_progresso = True
                                 try:
-                                    # 🔥 PROTEÇÃO CONTRA TIMEOUT: Mostra spinner e aguarda sincronização com Google Sheets
-                                    with st.spinner("⏳ Sincronizando com a nuvem (Google Sheets)... Aguarde até 10s"):
-                                        # 🔥 RETRY COM TIMEOUT AUMENTADO (até 3 tentativas com espera progressiva)
+                                    # Atualiza apenas as celulas-alvo (sem varredura por find), reduzindo latencia por bip.
+                                    with st.spinner("⏳ Sincronizando bipagem..."):
                                         aba = planilha_db.worksheet("Memoria_Sistema")
                                         pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
-                                        headers = aba.row_values(1)
+                                        mapa_linhas, headers = carregar_indice_memoria_sistema(planilha_db)
                                         agora_bip = datetime.now(FUSO_BR)
                                         data_bip_str = agora_bip.strftime('%d/%m/%Y')
                                         hora_bip_str = agora_bip.strftime('%H:%M:%S')
-                                        if 'PEDIDO' in headers and 'STATUS' in headers:
-                                            col_pedido = headers.index('PEDIDO') + 1
+                                        if 'STATUS' in headers:
                                             col_status = headers.index('STATUS') + 1
-                                                    
-                                            # 🔥 RETRY LOOP: Tenta 3 vezes com pequeno delay entre tentativas
-                                            tentativas = 0
-                                            max_tentativas = 3
+                                            row_alvo = mapa_linhas.get(pedido_alvo)
                                             sucesso_update = False
-                                            ultima_excecao = None
-                                                    
-                                            while tentativas < max_tentativas and not sucesso_update:
-                                                try:
-                                                    cell = aba.find(pedido_alvo, in_column=col_pedido)
-                                                    if cell:
-                                                        updates = [{'range': gspread.utils.rowcol_to_a1(cell.row, col_status), 'values': [['CONFERIDO']]}]
-                                                        # Registrar data e hora do bip se as colunas existirem
-                                                        if 'DATA_BIP' in headers:
-                                                            col_data_bip = headers.index('DATA_BIP') + 1
-                                                            updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_data_bip), 'values': [[data_bip_str]]})
-                                                        if 'HORA_BIP' in headers:
-                                                            col_hora_bip = headers.index('HORA_BIP') + 1
-                                                            updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_hora_bip), 'values': [[hora_bip_str]]})
-                                                                
-                                                        # Update - aguarda resposta do Google Sheets
-                                                        aba.batch_update(updates)
+                                            if row_alvo:
+                                                updates = [{'range': gspread.utils.rowcol_to_a1(row_alvo, col_status), 'values': [['CONFERIDO']]}]
+                                                if 'DATA_BIP' in headers:
+                                                    col_data_bip = headers.index('DATA_BIP') + 1
+                                                    updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_data_bip), 'values': [[data_bip_str]]})
+                                                if 'HORA_BIP' in headers:
+                                                    col_hora_bip = headers.index('HORA_BIP') + 1
+                                                    updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_hora_bip), 'values': [[hora_bip_str]]})
+                                                if 'UPDATED_AT' in headers:
+                                                    col_updated_at = headers.index('UPDATED_AT') + 1
+                                                    updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_updated_at), 'values': [[agora_bip.strftime('%Y-%m-%d %H:%M:%S')]]})
+
+                                                ultima_excecao = None
+                                                for _ in range(2):
+                                                    try:
+                                                        aba.batch_update(updates, value_input_option='USER_ENTERED')
                                                         sucesso_update = True
-                                                    else:
-                                                        raise Exception(f"Pedido {pedido_alvo} não encontrado")
-                                                except Exception as e:
-                                                    ultima_excecao = e
-                                                    tentativas += 1
-                                                    if tentativas < max_tentativas:
-                                                        # Aguarda 1s antes de tentar novamente
-                                                        time.sleep(1)       
-                                                        continue
-                                                    else:
-                                                        raise ultima_excecao
-                                                    
+                                                        break
+                                                    except Exception as e:
+                                                        ultima_excecao = e
+                                                        time.sleep(0.25)
+                                                if not sucesso_update and ultima_excecao:
+                                                    raise ultima_excecao
+
                                             if sucesso_update:
-                                                pass  # Sem delay adicional - fluido!
                                                 st.session_state.log_triagem.insert(0, {'PEDIDO': str(df_raw.at[idx, 'PEDIDO']), 'TOMADOR': str(df_raw.at[idx, 'TOMADOR']), 'LABORATORIO': str(df_raw.at[idx, 'LABORATORIO']), 'CIDADE': str(df_raw.at[idx, 'CIDADE']), 'DATA_BIP': data_bip_str, 'HORA': hora_bip_str})
                                                 st.session_state.ui_toast = {'msg': f"Pedido {pedido_alvo} VALIDADO! ✅ ({hora_bip_str})", 'icon': "✅"}
                                                 carregar_dados_completos.clear()
+                                                carregar_indice_memoria_sistema.clear()
                                                 # 🔥 LIBERA: Próxima bipagem pode começar
                                                 st.session_state.bipagem_em_progresso = False
                                                 st.rerun()
@@ -8551,14 +8695,39 @@ elif menu == "🔬 Triagem":
                             p_ids = df_sel_fila['PEDIDO'].astype(str).tolist()
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
-                                dados_nuvem = aba.get_all_values()
-                                df_nuvem = pd.DataFrame(dados_nuvem[1:], columns=dados_nuvem[0])
-                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'STATUS'] = 'CONFERIDO'
-                                aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                st.session_state.ui_toast = {'msg': f"{len(p_ids)} volumes liberados!", 'icon': "🎉"}
-                                time.sleep(1.0)
-                                carregar_dados_completos.clear()
-                                st.rerun()
+                                mapa_linhas, headers = carregar_indice_memoria_sistema(planilha_db)
+                                if 'STATUS' not in headers:
+                                    st.error("❌ Coluna STATUS não encontrada na planilha.")
+                                else:
+                                    col_status = headers.index('STATUS') + 1
+                                    agora_bip = datetime.now(FUSO_BR)
+                                    data_bip_str = agora_bip.strftime('%d/%m/%Y')
+                                    hora_bip_str = agora_bip.strftime('%H:%M:%S')
+                                    updates = []
+
+                                    for pid in p_ids:
+                                        row_alvo = mapa_linhas.get(str(pid).strip())
+                                        if not row_alvo:
+                                            continue
+                                        updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_status), 'values': [['CONFERIDO']]})
+                                        if 'DATA_BIP' in headers:
+                                            col_data_bip = headers.index('DATA_BIP') + 1
+                                            updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_data_bip), 'values': [[data_bip_str]]})
+                                        if 'HORA_BIP' in headers:
+                                            col_hora_bip = headers.index('HORA_BIP') + 1
+                                            updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_hora_bip), 'values': [[hora_bip_str]]})
+                                        if 'UPDATED_AT' in headers:
+                                            col_updated_at = headers.index('UPDATED_AT') + 1
+                                            updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_updated_at), 'values': [[agora_bip.strftime('%Y-%m-%d %H:%M:%S')]]})
+
+                                    if not updates:
+                                        st.warning("Nenhum pedido selecionado foi encontrado na base para atualização.")
+                                    else:
+                                        aba.batch_update(updates, value_input_option='USER_ENTERED')
+                                        st.session_state.ui_toast = {'msg': f"{len(p_ids)} volumes liberados!", 'icon': "🎉"}
+                                        carregar_dados_completos.clear()
+                                        carregar_indice_memoria_sistema.clear()
+                                        st.rerun()
                             except Exception as e:
                                 st.error(f"Erro: {e}")
             else:
