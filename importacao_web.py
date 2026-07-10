@@ -11631,8 +11631,9 @@ elif menu == "📈 Dashboard":
             "#64748B", "#F8FAFC")
 
         # Injeção da taxa de sucesso + Variação do Volume Total Seco
-        texto_badge_realizados = f"{
-            int(taxa_sucesso_h)}% Conc. | Vol: {s_tot}{v_tot_str}"
+        texto_badge_realizados = (
+            f"{int(taxa_sucesso_h)}% Conc. | Vol: {s_tot}{v_tot_str}"
+        )
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -11958,33 +11959,68 @@ elif menu == "📈 Dashboard":
             if len(frota_ordenada) >= 1:
                 rf1.markdown(
                     podio_ui(
-                        "1", "🥇", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{
-                            frota_ordenada[0][1]['conc']}/{
-                            frota_ordenada[0][1]['total']}", "#10B981", "#F0FDF4"), unsafe_allow_html=True)
+                        "1",
+                        "🥇",
+                        frota_ordenada[0][0],
+                        frota_ordenada[0][1]['perc'],
+                        f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}",
+                        "#10B981",
+                        "#F0FDF4",
+                    ),
+                    unsafe_allow_html=True,
+                )
             if len(frota_ordenada) >= 2:
                 rf2.markdown(
                     podio_ui(
-                        "2", "🥈", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{
-                            frota_ordenada[1][1]['conc']}/{
-                            frota_ordenada[1][1]['total']}", "#64748B", "#FFFFFF"), unsafe_allow_html=True)
+                        "2",
+                        "🥈",
+                        frota_ordenada[1][0],
+                        frota_ordenada[1][1]['perc'],
+                        f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}",
+                        "#64748B",
+                        "#FFFFFF",
+                    ),
+                    unsafe_allow_html=True,
+                )
             if len(frota_ordenada) >= 3:
                 rf3.markdown(
                     podio_ui(
-                        "3", "🥉", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{
-                            frota_ordenada[2][1]['conc']}/{
-                            frota_ordenada[2][1]['total']}", "#F59E0B", "#FFFBEB"), unsafe_allow_html=True)
+                        "3",
+                        "🥉",
+                        frota_ordenada[2][0],
+                        frota_ordenada[2][1]['perc'],
+                        f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}",
+                        "#F59E0B",
+                        "#FFFBEB",
+                    ),
+                    unsafe_allow_html=True,
+                )
             if len(frota_ordenada) >= 4:
                 rf4.markdown(
                     podio_ui(
-                        "4", "🎖️", frota_ordenada[3][0], frota_ordenada[3][1]['perc'], f"{
-                            frota_ordenada[3][1]['conc']}/{
-                            frota_ordenada[3][1]['total']}", "#8B5CF6", "#F5F3FF"), unsafe_allow_html=True)
+                        "4",
+                        "🎖️",
+                        frota_ordenada[3][0],
+                        frota_ordenada[3][1]['perc'],
+                        f"{frota_ordenada[3][1]['conc']}/{frota_ordenada[3][1]['total']}",
+                        "#8B5CF6",
+                        "#F5F3FF",
+                    ),
+                    unsafe_allow_html=True,
+                )
             if len(frota_ordenada) >= 5:
                 rf5.markdown(
                     podio_ui(
-                        "5", "🎖️", frota_ordenada[4][0], frota_ordenada[4][1]['perc'], f"{
-                            frota_ordenada[4][1]['conc']}/{
-                            frota_ordenada[4][1]['total']}", "#06B6D4", "#ECFEFF"), unsafe_allow_html=True)
+                        "5",
+                        "🎖️",
+                        frota_ordenada[4][0],
+                        frota_ordenada[4][1]['perc'],
+                        f"{frota_ordenada[4][1]['conc']}/{frota_ordenada[4][1]['total']}",
+                        "#06B6D4",
+                        "#ECFEFF",
+                    ),
+                    unsafe_allow_html=True,
+                )
         else:
             st.info(
                 "Aguardando finalizações da frota no dia de hoje para compor o pódio.")
