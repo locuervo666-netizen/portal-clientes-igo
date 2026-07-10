@@ -5265,9 +5265,9 @@ elif menu == "📥 Importações":
 
     def obter_proximo_id_oficial_seguro(df_base):
         # Recalcula sempre a partir da base oficial para evitar repetição entre dias/sessões.
-        proximo_db = obter_proximo_id(df_base, minimo_inicial=1000)
-        proximo_sessao = int(st.session_state.get('contador_oficial_temp', 1000))
-        proximo = max(proximo_db, proximo_sessao, 1000)
+        proximo_db = obter_proximo_id(df_base, minimo_inicial=2000)
+        proximo_sessao = int(st.session_state.get('contador_oficial_temp', 2000))
+        proximo = max(proximo_db, proximo_sessao, 2000)
 
         df_cart = st.session_state.get('df_carrinho_oficial', pd.DataFrame())
         if not df_cart.empty and 'PEDIDO' in df_cart.columns:
@@ -6346,6 +6346,8 @@ elif menu == "📥 Importações Umove":
     # Garante que o AgGrid está disponível neste bloco
     from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
+    UMOVE_PEDIDO_INICIAL = 800000
+
     st.markdown(
         """
         <style>
@@ -6878,21 +6880,21 @@ elif menu == "📥 Importações Umove":
                             except Exception:
                                 try:
                                     aba_contador = planilha_sandbox.add_worksheet(title="Contador", rows=10, cols=10)
-                                    aba_contador.update("A1", [["700020"]])
+                                    aba_contador.update("A1", [[str(UMOVE_PEDIDO_INICIAL)]])
                                 except Exception:
                                     try: aba_contador = planilha_sandbox.worksheet("Contador")
                                     except: pass
 
-                            prox_id_sb = 700020
+                            prox_id_sb = UMOVE_PEDIDO_INICIAL
                                     
                             if aba_contador:
                                 try:
                                     val = aba_contador.acell('A1').value
-                                    if val and str(val).isdigit(): prox_id_sb = int(val)
+                                    if val and str(val).isdigit(): prox_id_sb = max(int(val), UMOVE_PEDIDO_INICIAL)
                                 except: pass
                                     
                             if 'contador_temp' in st.session_state:
-                                prox_id_sb = st.session_state.contador_temp
+                                prox_id_sb = max(st.session_state.contador_temp, UMOVE_PEDIDO_INICIAL)
                                     
                             if not st.session_state.df_sandbox_mem.empty and 'PEDIDO' in st.session_state.df_sandbox_mem.columns:
                                 try:
@@ -7128,7 +7130,7 @@ elif menu == "📥 Importações Umove":
     with tab_carrinho:
         # --- BLOCAGEM DE PROCESSAMENTO: AGENDAMENTOS FIXOS ---
         df_fixos_hoje = pd.DataFrame()
-        prox_id_sb = 700020
+        prox_id_sb = UMOVE_PEDIDO_INICIAL
         try:
             aba_fixos = planilha_db.worksheet("Agendamentos_Fixos")
             dados_fixos = aba_fixos.get_all_values()
@@ -7149,9 +7151,9 @@ elif menu == "📥 Importações Umove":
 
                         if aba_contador:
                             val = aba_contador.acell('A1').value
-                            if val and str(val).isdigit(): prox_id_sb = int(val)
+                            if val and str(val).isdigit(): prox_id_sb = max(int(val), UMOVE_PEDIDO_INICIAL)
                         elif 'contador_temp' in st.session_state:
-                            prox_id_sb = st.session_state.contador_temp
+                            prox_id_sb = max(st.session_state.contador_temp, UMOVE_PEDIDO_INICIAL)
 
                         # Incrementa com base nos registros já presentes em memória para não chocar IDs
                         prox_id_sb += len(st.session_state.df_sandbox_mem)
