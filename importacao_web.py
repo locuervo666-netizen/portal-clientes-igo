@@ -1555,8 +1555,7 @@ def corrigir_cidade_inteligente(cidade_suja, df_rotas):
             
     cidades_conhecidas = []
     for rota in df_rotas['ROTA MAPEADA'].dropna():
-        rota_norm = str(rota).replace(" -> ", "---").replace("➔", "---")
-        cid = padronizar_texto(rota_norm.split('---')[0])
+        cid = str(rota).split('➔')[0].split('---')[0].strip().upper()
         if cid and cid not in cidades_conhecidas:
             cidades_conhecidas.append(cid)
 
@@ -2033,29 +2032,8 @@ def obter_login_agente(
         base_rotas_df=pd.DataFrame()):
     if base_rotas_df.empty:
         return ""
-
-    def normalizar_rota_mapeada(rota):
-        rota_txt = padronizar_texto(str(rota))
-        rota_txt = re.sub(r'\s*(➔|->|---)\s*', '---', rota_txt)
-        return re.sub(r'-{3,}', '---', rota_txt).strip('- ')
-
-    df_rotas = base_rotas_df.copy()
-    if 'ROTA MAPEADA' not in df_rotas.columns or 'LOGIN DO AGENTE' not in df_rotas.columns:
-        return ""
-
-    df_rotas['ROTA_NORM'] = df_rotas['ROTA MAPEADA'].apply(normalizar_rota_mapeada)
-    df_rotas['LOGIN_NORM'] = df_rotas['LOGIN DO AGENTE'].astype(str).str.lower().str.strip()
-    df_rotas = df_rotas[(df_rotas['ROTA_NORM'] != "") & (df_rotas['LOGIN_NORM'] != "")]
-    if df_rotas.empty:
-        return ""
-
-    rotas_dict = {}
-    for _, row in df_rotas.iterrows():
-        rota_key = str(row['ROTA_NORM'])
-        login_val = str(row['LOGIN_NORM'])
-        if rota_key not in rotas_dict:
-            rotas_dict[rota_key] = login_val
-
+    rotas_dict = {padronizar_texto(str(row['ROTA MAPEADA']).upper().replace(" ➔ ", "---").replace(
+        " -> ", "---")): str(row['LOGIN DO AGENTE']).lower().strip() for _, row in base_rotas_df.iterrows()}
     cid = limpar_nome_local_rota(cidade)
     bai = limpar_nome_local_rota(bairro)
     lab = tratar_texto_global(laboratorio)
@@ -2069,25 +2047,6 @@ def obter_login_agente(
             cid]:
         if c in rotas_dict:
             return rotas_dict[c]
-
-    # Fallback resiliente: quando a rota cadastrada tem mais segmentos,
-    # mas cidade+bairro (ou cidade+laboratorio) batem exatamente.
-    if cid:
-        candidatas = df_rotas[df_rotas['ROTA_NORM'].str.startswith(f"{cid}---", na=False)]
-        if not candidatas.empty:
-            if bai:
-                match_bairro = candidatas[candidatas['ROTA_NORM'].str.contains(f"---{bai}(---|$)", regex=True, na=False)]
-                if not match_bairro.empty:
-                    return str(match_bairro.iloc[0]['LOGIN_NORM'])
-            if lab:
-                match_lab = candidatas[candidatas['ROTA_NORM'].str.contains(f"---{lab}(---|$)", regex=True, na=False)]
-                if not match_lab.empty:
-                    return str(match_lab.iloc[0]['LOGIN_NORM'])
-            # Ultimo recurso: se houver apenas um login para a cidade, usa ele.
-            logins_cidade = candidatas['LOGIN_NORM'].dropna().astype(str).str.strip()
-            logins_unicos = sorted({l for l in logins_cidade if l})
-            if len(logins_unicos) == 1:
-                return logins_unicos[0]
     return ""
 
 
@@ -5492,19 +5451,6 @@ elif menu == "📝 Pedido Manual":
 elif menu == "📥 Importações":
     import streamlit.components.v1 as components
 
-    def carregar_memoria_para_ids(_planilha):
-        """Carrega Memoria_Sistema uma vez, com fallback leve para evitar travamentos de rede."""
-        if _planilha is None:
-            return pd.DataFrame(columns=['PEDIDO'])
-        try:
-            aba_m = _planilha.worksheet("Memoria_Sistema")
-            dados = aba_m.get_all_values()
-            if len(dados) > 1:
-                return pd.DataFrame(dados[1:], columns=dados[0])
-        except Exception:
-            pass
-        return pd.DataFrame(columns=['PEDIDO'])
-
     def obter_proximo_id_oficial_seguro(df_base):
         # Recalcula sempre a partir da base oficial para evitar repetição entre dias/sessões.
         proximo_db = obter_proximo_id(df_base, minimo_inicial=1000)
@@ -5914,7 +5860,8 @@ elif menu == "📥 Importações":
                 if st.button("➕ Adicionar ao Carrinho Oficial (Cumulativo)", type="primary", key="add_carrinho_oficial"):
                     with st.spinner("Gerando IDs sequenciais e adicionando ao carrinho..."):
                         try:
-                            df_up = carregar_memoria_para_ids(planilha_db)
+                            aba_m = planilha_db.worksheet("Memoria_Sistema")
+                            df_up = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
 
                             prox_id_of = obter_proximo_id_oficial_seguro(df_up)
 
@@ -6826,8 +6773,6 @@ elif menu == "📥 Importações Umove":
     # --- INÍCIO: VARIÁVEIS DA MÁQUINA DE ESTADOS ---
     if "umove_lote_atual_id" not in st.session_state:
         st.session_state.umove_lote_atual_id = None
-    if "umove_rascunho_payload_grande" not in st.session_state:
-        st.session_state.umove_rascunho_payload_grande = False
 
     def gerenciar_estado_lote(acao, lote_id=None, df_carrinho=None, resultados=None):
         if planilha_sandbox is None:
@@ -6857,26 +6802,21 @@ elif menu == "📥 Importações Umove":
             if acao == "SALVAR_RASCUNHO":
                 if df_carrinho is None or df_carrinho.empty:
                     return False
-                # Evita payload muito grande no Google Sheets (causa lentidao/travamento em cargas cumulativas).
                 json_dados = df_carrinho.to_json(orient='records')
-                max_chars_json = 45000
-                payload_grande = len(json_dados) > max_chars_json
-                if payload_grande:
-                    json_dados = "[]"
-                st.session_state.umove_rascunho_payload_grande = payload_grande
                 agora = datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S')
                         
                 if lote_id in df_hist['ID_EVENTO'].values:
                     linha_idx = df_hist.index[df_hist['ID_EVENTO'] == lote_id][0] + 2
                             
                     # Atualização em lote (Batch Update) - Uma única requisição!
-                    a1_total = gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('TOTAL_PEDIDOS') + 1)
-                    a1_status = gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('STATUS_LOTE') + 1)
-                    a1_json = gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('DADOS_JSON') + 1)
-                    aba.batch_update([
-                        {"range": a1_total, "values": [[len(df_carrinho)]]},
-                        {"range": f"{a1_status}:{a1_json}", "values": [["RASCUNHO", json_dados]]}
-                    ])
+                    aba.update(
+                        f"{gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('TOTAL_PEDIDOS') + 1)}", 
+                        [[len(df_carrinho)]]
+                    )
+                    aba.update(
+                        f"{gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('STATUS_LOTE') + 1)}", 
+                        [["RASCUNHO", json_dados]]
+                    )
                 else:
                     nova_linha = {c: "" for c in cabecalho}
                     nova_linha["ID_EVENTO"] = lote_id
@@ -7180,15 +7120,10 @@ elif menu == "📥 Importações Umove":
 
                             if st.session_state.umove_lote_atual_id is None:
                                 st.session_state.umove_lote_atual_id = f"LOTE-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
-                            salvou_rascunho = gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
+                            gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
 
                             st.session_state.df_preview_sb = pd.DataFrame()
-                            if not salvou_rascunho:
-                                st.session_state.ui_toast = {'msg': "Carga adicionada, mas o rascunho nao foi salvo no Drive. Verifique conexao/permissoes.", 'icon': "⚠️"}
-                            elif st.session_state.get("umove_rascunho_payload_grande", False):
-                                st.session_state.ui_toast = {'msg': "Carga adicionada! Rascunho salvo sem JSON completo para evitar travamento.", 'icon': "ℹ️"}
-                            else:
-                                st.session_state.ui_toast = {'msg': "Importação concluída! Carga consolidada no Carrinho de Expedição.", 'icon': "🚀"}
+                            st.session_state.ui_toast = {'msg': "Importação concluída! Carga consolidada no Carrinho de Expedição.", 'icon': "🚀"}
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao injetar dados no carrinho: {e}")
