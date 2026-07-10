@@ -1,7 +1,7 @@
 streamlit==1.35.0
 pandas==2.1.4
 gspread==6.1.2
-streamlit-autorefresh==1.0.3
+streamlit-autorefresh==1.0.1
 streamlit-aggrid==0.3.4.post3
 fpdf==1.7.2
 holidays==0.52
