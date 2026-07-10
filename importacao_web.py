@@ -1555,7 +1555,8 @@ def corrigir_cidade_inteligente(cidade_suja, df_rotas):
             
     cidades_conhecidas = []
     for rota in df_rotas['ROTA MAPEADA'].dropna():
-        cid = str(rota).split('➔')[0].split('---')[0].strip().upper()
+        rota_norm = str(rota).replace(" -> ", "---").replace("➔", "---")
+        cid = padronizar_texto(rota_norm.split('---')[0])
         if cid and cid not in cidades_conhecidas:
             cidades_conhecidas.append(cid)
 
@@ -2032,8 +2033,29 @@ def obter_login_agente(
         base_rotas_df=pd.DataFrame()):
     if base_rotas_df.empty:
         return ""
-    rotas_dict = {padronizar_texto(str(row['ROTA MAPEADA']).upper().replace(" ➔ ", "---").replace(
-        " -> ", "---")): str(row['LOGIN DO AGENTE']).lower().strip() for _, row in base_rotas_df.iterrows()}
+
+    def normalizar_rota_mapeada(rota):
+        rota_txt = padronizar_texto(str(rota))
+        rota_txt = re.sub(r'\s*(➔|->|---)\s*', '---', rota_txt)
+        return re.sub(r'-{3,}', '---', rota_txt).strip('- ')
+
+    df_rotas = base_rotas_df.copy()
+    if 'ROTA MAPEADA' not in df_rotas.columns or 'LOGIN DO AGENTE' not in df_rotas.columns:
+        return ""
+
+    df_rotas['ROTA_NORM'] = df_rotas['ROTA MAPEADA'].apply(normalizar_rota_mapeada)
+    df_rotas['LOGIN_NORM'] = df_rotas['LOGIN DO AGENTE'].astype(str).str.lower().str.strip()
+    df_rotas = df_rotas[(df_rotas['ROTA_NORM'] != "") & (df_rotas['LOGIN_NORM'] != "")]
+    if df_rotas.empty:
+        return ""
+
+    rotas_dict = {}
+    for _, row in df_rotas.iterrows():
+        rota_key = str(row['ROTA_NORM'])
+        login_val = str(row['LOGIN_NORM'])
+        if rota_key not in rotas_dict:
+            rotas_dict[rota_key] = login_val
+
     cid = limpar_nome_local_rota(cidade)
     bai = limpar_nome_local_rota(bairro)
     lab = tratar_texto_global(laboratorio)
@@ -2047,6 +2069,25 @@ def obter_login_agente(
             cid]:
         if c in rotas_dict:
             return rotas_dict[c]
+
+    # Fallback resiliente: quando a rota cadastrada tem mais segmentos,
+    # mas cidade+bairro (ou cidade+laboratorio) batem exatamente.
+    if cid:
+        candidatas = df_rotas[df_rotas['ROTA_NORM'].str.startswith(f"{cid}---", na=False)]
+        if not candidatas.empty:
+            if bai:
+                match_bairro = candidatas[candidatas['ROTA_NORM'].str.contains(f"---{bai}(---|$)", regex=True, na=False)]
+                if not match_bairro.empty:
+                    return str(match_bairro.iloc[0]['LOGIN_NORM'])
+            if lab:
+                match_lab = candidatas[candidatas['ROTA_NORM'].str.contains(f"---{lab}(---|$)", regex=True, na=False)]
+                if not match_lab.empty:
+                    return str(match_lab.iloc[0]['LOGIN_NORM'])
+            # Ultimo recurso: se houver apenas um login para a cidade, usa ele.
+            logins_cidade = candidatas['LOGIN_NORM'].dropna().astype(str).str.strip()
+            logins_unicos = sorted({l for l in logins_cidade if l})
+            if len(logins_unicos) == 1:
+                return logins_unicos[0]
     return ""
 
 
@@ -5451,6 +5492,19 @@ elif menu == "📝 Pedido Manual":
 elif menu == "📥 Importações":
     import streamlit.components.v1 as components
 
+    def carregar_memoria_para_ids(_planilha):
+        """Carrega Memoria_Sistema uma vez, com fallback leve para evitar travamentos de rede."""
+        if _planilha is None:
+            return pd.DataFrame(columns=['PEDIDO'])
+        try:
+            aba_m = _planilha.worksheet("Memoria_Sistema")
+            dados = aba_m.get_all_values()
+            if len(dados) > 1:
+                return pd.DataFrame(dados[1:], columns=dados[0])
+        except Exception:
+            pass
+        return pd.DataFrame(columns=['PEDIDO'])
+
     def obter_proximo_id_oficial_seguro(df_base):
         # Recalcula sempre a partir da base oficial para evitar repetição entre dias/sessões.
         proximo_db = obter_proximo_id(df_base, minimo_inicial=1000)
@@ -5860,8 +5914,7 @@ elif menu == "📥 Importações":
                 if st.button("➕ Adicionar ao Carrinho Oficial (Cumulativo)", type="primary", key="add_carrinho_oficial"):
                     with st.spinner("Gerando IDs sequenciais e adicionando ao carrinho..."):
                         try:
-                            aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            df_up = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                            df_up = carregar_memoria_para_ids(planilha_db)
 
                             prox_id_of = obter_proximo_id_oficial_seguro(df_up)
 
