@@ -826,6 +826,34 @@ CSS_DASHBOARD = """
         border-radius: 99px;
         padding: 5px 12px;
     }
+    .sync-status-last {
+        color: #0f766e;
+        background: #ecfeff;
+        border: 1px solid #99f6e4;
+    }
+    .sync-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .user-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #0f172a;
+        font-weight: 700;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 99px;
+        padding: 5px 12px;
+        max-width: 340px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
     .sync-dot {
         width: 7px;
         height: 7px;
@@ -924,6 +952,9 @@ if 'portal_clientes_login' not in st.session_state:
 
 if 'log_triagem' not in st.session_state:
     st.session_state.log_triagem = []
+
+if 'ultima_sincronizacao' not in st.session_state:
+    st.session_state.ultima_sincronizacao = None
 
 # TELA DE LOGIN BLINDADA
 if not st.session_state.autenticado:
@@ -1372,10 +1403,123 @@ def carregar_dados_completos(_planilha):
             if 'DATA' in df.columns:
                 df['DATA_OBJ'] = pd.to_datetime(
                     df['DATA'], format='%d/%m/%Y', errors='coerce').dt.date
+            st.session_state.ultima_sincronizacao = datetime.now(FUSO_BR)
             return df
     except Exception as e:
         st.error(f"Erro Crítico ao carregar a Memoria_Sistema: {e}")
     return pd.DataFrame()
+
+
+def _normalizar_colunas_upper(df):
+    if df is None or df.empty:
+        return df
+    df.columns = [str(c).strip().upper() for c in df.columns]
+    return df
+
+
+def _snapshot_incremental_df(df_base):
+    df_tmp = df_base.copy() if isinstance(df_base, pd.DataFrame) else pd.DataFrame()
+    if df_tmp.empty:
+        return {}
+    df_tmp = _normalizar_colunas_upper(df_tmp)
+    if 'PEDIDO' not in df_tmp.columns or 'UPDATED_AT' not in df_tmp.columns:
+        return {}
+    df_tmp['PEDIDO'] = df_tmp['PEDIDO'].astype(str).str.strip()
+    df_tmp['UPDATED_AT'] = df_tmp['UPDATED_AT'].astype(str).str.strip()
+    df_tmp = df_tmp[df_tmp['PEDIDO'] != ""]
+    if df_tmp.empty:
+        return {}
+    return dict(zip(df_tmp['PEDIDO'], df_tmp['UPDATED_AT']))
+
+
+def carregar_snapshot_memoria_incremental(_planilha):
+    if not _planilha:
+        return {}, False
+    try:
+        aba_m = _planilha.worksheet("Memoria_Sistema")
+        headers = [str(h).strip().upper() for h in aba_m.row_values(1)]
+        if not headers:
+            return {}, False
+
+        if 'PEDIDO' not in headers or 'UPDATED_AT' not in headers:
+            return {}, False
+
+        idx_pedido = headers.index('PEDIDO') + 1
+        idx_updated = headers.index('UPDATED_AT') + 1
+
+        pedidos = aba_m.col_values(idx_pedido)[1:]
+        updated_vals = aba_m.col_values(idx_updated)[1:]
+
+        snap = {}
+        max_len = max(len(pedidos), len(updated_vals))
+        for i in range(max_len):
+            pedido = str(pedidos[i]).strip() if i < len(pedidos) else ""
+            updated = str(updated_vals[i]).strip() if i < len(updated_vals) else ""
+            if pedido:
+                snap[pedido] = updated
+
+        return snap, True
+    except Exception:
+        return {}, False
+
+
+def obter_dados_grid_incremental(_planilha, forcar_full=False):
+    if 'df_grid_cache' not in st.session_state:
+        st.session_state.df_grid_cache = None
+    if 'df_grid_snapshot' not in st.session_state:
+        st.session_state.df_grid_snapshot = {}
+    if 'df_grid_incremental_suportado' not in st.session_state:
+        st.session_state.df_grid_incremental_suportado = False
+
+    cache_df = st.session_state.df_grid_cache
+    sem_cache = not isinstance(cache_df, pd.DataFrame) or cache_df.empty
+
+    if forcar_full or sem_cache:
+        df_full = carregar_dados_completos(_planilha)
+        st.session_state.df_grid_cache = df_full
+        st.session_state.df_grid_snapshot = _snapshot_incremental_df(df_full)
+        st.session_state.df_grid_incremental_suportado = bool(st.session_state.df_grid_snapshot)
+        return df_full
+
+    snap_atual, suporta_incremental = carregar_snapshot_memoria_incremental(_planilha)
+    st.session_state.df_grid_incremental_suportado = suporta_incremental
+
+    if not suporta_incremental:
+        # Sem UPDATED_AT na base, mantém compatibilidade atual.
+        return cache_df
+
+    if snap_atual == st.session_state.df_grid_snapshot:
+        return cache_df
+
+    carregar_dados_completos.clear()
+    df_full = carregar_dados_completos(_planilha)
+    st.session_state.df_grid_cache = df_full
+    st.session_state.df_grid_snapshot = _snapshot_incremental_df(df_full)
+    return df_full
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def carregar_indice_memoria_sistema(_planilha):
+    if not _planilha:
+        return {}, []
+    try:
+        aba = _planilha.worksheet("Memoria_Sistema")
+        headers = [str(h).strip().upper() for h in aba.row_values(1)]
+        if not headers or 'PEDIDO' not in headers:
+            return {}, headers
+
+        col_pedido = headers.index('PEDIDO') + 1
+        pedidos = aba.col_values(col_pedido)[1:]
+
+        mapa_linhas = {}
+        for idx, pedido in enumerate(pedidos, start=2):
+            pedido_key = str(pedido).strip()
+            if pedido_key and pedido_key not in mapa_linhas:
+                mapa_linhas[pedido_key] = idx
+
+        return mapa_linhas, headers
+    except Exception:
+        return {}, []
 
 
 DF_AGENTES = carregar_dados_agentes(planilha_db)
@@ -1794,17 +1938,10 @@ def modal_detalhes_pedido(pedido_data):
     )
     st.markdown(html_barra, unsafe_allow_html=True)
 
-    endereco_completo = f"{
-        pedido_data.get(
-            'ENDERECO', '')}, nº {
-        pedido_data.get(
-            'NUMERO', '')}, {
-        pedido_data.get(
-            'BAIRRO', '')} — {
-        pedido_data.get(
-            'CIDADE', '')}/{
-        pedido_data.get(
-            'UF', '')}"
+    endereco_completo = (
+        f"{pedido_data.get('ENDERECO', '')}, nº {pedido_data.get('NUMERO', '')}, "
+        f"{pedido_data.get('BAIRRO', '')} — {pedido_data.get('CIDADE', '')}/{pedido_data.get('UF', '')}"
+    )
     agente_nome = str(
         pedido_data.get(
             'AGENTE_RAW',
@@ -2892,9 +3029,6 @@ with st.sidebar:
             </div>
         """, unsafe_allow_html=True)
 
-    if st.session_state.usuario_logado:
-        st.caption(f"Usuário logado: {st.session_state.usuario_logado}")
-
     menu_opcoes = [
         "📈 Dashboard",
         "📊 GRID",
@@ -2928,13 +3062,21 @@ if menu == "📊 GRID":
     st_autorefresh(interval=120000, limit=None, key="refresh_timer")
 
 if menu != "📈 Dashboard":
+    usuario_online = str(st.session_state.usuario_logado or "").strip()
+    ultima_sync = st.session_state.get("ultima_sincronizacao")
+    ultima_sync_txt = ultima_sync.strftime('%H:%M:%S') if isinstance(ultima_sync, datetime) else "--:--:--"
+    usuario_logado_html = f"<div class='user-status'>👤 Usuário logado: <strong>{usuario_online}</strong></div>" if usuario_online else ""
     st.markdown(f"""
         <div class="header-container">
             <div>
                 <div class="header-title">CONTROLE OPERACIONAL</div>
             </div>
-            <div class="sync-status">
-                <span class="sync-dot"></span> Online: {datetime.now(FUSO_BR).strftime('%H:%M')}
+            <div class="sync-meta">
+                <div class="sync-status">
+                    <span class="sync-dot"></span> Online: {datetime.now(FUSO_BR).strftime('%H:%M')}
+                </div>
+                <div class="sync-status sync-status-last">⟳ Última sync: {ultima_sync_txt}</div>
+                {usuario_logado_html}
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -2943,7 +3085,9 @@ if menu != "📈 Dashboard":
 # 📊 MÓDULO GRID
 # =============================================================================
 if menu == "📊 GRID":
-    df_raw = carregar_dados_completos(planilha_db)
+    recarga_forcada_grid = bool(st.session_state.get('forcar_full_refresh_grid', False))
+    df_raw = obter_dados_grid_incremental(planilha_db, forcar_full=recarga_forcada_grid)
+    st.session_state.forcar_full_refresh_grid = False
 
     # 🔥 AUTO-SYNC SILENCIOSO (A MÁGICA INVISÍVEL) 🔥
     if not df_raw.empty and 'STATUS_DB_ORIGINAL' in df_raw.columns:
@@ -3617,11 +3761,26 @@ if menu == "📊 GRID":
             str).tolist() if not linhas_selecionadas.empty else []
         tem_sel = len(p_ids) > 0
 
+        colunas_exportar_csv = [
+            c for c in df_grid_final.columns if c in linhas_selecionadas.columns]
+        df_csv_export = linhas_selecionadas[colunas_exportar_csv].copy(
+        ) if tem_sel else pd.DataFrame(columns=df_grid_final.columns)
+        csv_grid_bytes = df_csv_export.to_csv(
+            index=False,
+            sep=';'
+        ).encode('utf-8-sig') if tem_sel else b""
+        nome_csv_grid = (
+            f"grid_pedidos_selecionados_{len(df_csv_export)}_{datetime.now(FUSO_BR).strftime('%Y%m%d_%H%M%S')}.csv"
+            if tem_sel
+            else f"grid_pedidos_selecionados_{datetime.now(FUSO_BR).strftime('%Y%m%d_%H%M%S')}.csv"
+        )
+
         # 🔥 PREENCHENDO A BARRA DE AÇÕES NO TOPO DA TELA 🔥
         st.markdown("""
             <style>
                 /* 1. Padroniza TODOS os botões nativos e popovers para a paleta azul da sidebar */
                 div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"],
+                div.stDownloadButton > button,
                 div[data-testid="stPopover"] > div > button,
                 div[data-testid="stPopover"] > button {
                     background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
@@ -3637,6 +3796,7 @@ if menu == "📊 GRID":
                         
                 /* Efeito ao passar o mouse */
                 div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"]:hover,
+                div.stDownloadButton > button:hover,
                 div[data-testid="stPopover"] > div > button:hover,
                 div[data-testid="stPopover"] > button:hover {
                     background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%) !important;
@@ -3647,6 +3807,7 @@ if menu == "📊 GRID":
                 }
                         
                 div.stButton:not([class*="st-key-kpi"]):not([class*="st-key-btn_chamados"]):not([class*="st-key-btn_sair_sidebar"]) > button[kind="secondary"]:active,
+                div.stDownloadButton > button:active,
                 div[data-testid="stPopover"] > div > button:active,
                 div[data-testid="stPopover"] > button:active {
                     transform: translateY(0px) !important;
@@ -3678,9 +3839,9 @@ if menu == "📊 GRID":
                 }
             </style>
         """, unsafe_allow_html=True)
-                
+
         with box_botoes.container():
-            col_b0, col_b1, col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns(7)
+            col_b0, col_b1, col_b2, col_b3, col_b4, col_b5, col_b6, col_b7 = st.columns(8)
 
             with col_b0:
                 # O BOTÃO AGORA ABRE A TELA DIRETAMENTE, SEM USAR A MEMÓRIA DO SISTEMA
@@ -3908,8 +4069,23 @@ if menu == "📊 GRID":
                                     except Exception as e:
                                         st.error(f"Erro: {e}")
 
-            if col_b6.button("🔄 Atualizar", use_container_width=True, type="secondary"):
+            with col_b6:
+                if tem_sel:
+                    st.download_button(
+                        "📥 CSV Seleção",
+                        data=csv_grid_bytes,
+                        file_name=nome_csv_grid,
+                        mime="text/csv",
+                        use_container_width=True,
+                        type="secondary"
+                    )
+                else:
+                    if st.button("📥 CSV Seleção", use_container_width=True, type="secondary"):
+                        st.toast("Selecione ao menos 1 pedido para baixar o CSV.", icon="⚠️")
+
+            if col_b7.button("🔄 Atualizar", use_container_width=True, type="secondary"):
                     with st.spinner("Sincronizando..."):
+                        st.session_state.forcar_full_refresh_grid = True
                         carregar_dados_completos.clear()
                         st.toast("Dados atualizados com sucesso!", icon="🔄")
                         time.sleep(0.5)
@@ -6787,7 +6963,18 @@ elif menu == "📥 Importações Umove":
                             df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
 
                             df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
+                            df_limpo_sb['LABORATORIO_ORIGEM'] = df_limpo_sb['LABORATORIO']
                             df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
+
+                            grupos_lab = df_limpo_sb.groupby(['CNPJ', 'LABORATORIO_ORIGEM'])['BAIRRO'].transform('size') > 1
+                            bairro_disp = df_limpo_sb['BAIRRO'].fillna('').astype(str).str.strip()
+                            df_limpo_sb['LABORATORIO'] = df_limpo_sb['LABORATORIO_ORIGEM']
+                            df_limpo_sb.loc[grupos_lab & bairro_disp.ne(''), 'LABORATORIO'] = (
+                                df_limpo_sb.loc[grupos_lab & bairro_disp.ne(''), 'LABORATORIO_ORIGEM']
+                                + ' ('
+                                + bairro_disp[grupos_lab & bairro_disp.ne('')]
+                                + ')'
+                            )
 
                             df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
 
@@ -8374,58 +8561,47 @@ elif menu == "🔬 Triagem":
                                 # 🔥 BLOQUEIO: Marca bipagem em progresso
                                 st.session_state.bipagem_em_progresso = True
                                 try:
-                                    # 🔥 PROTEÇÃO CONTRA TIMEOUT: Mostra spinner e aguarda sincronização com Google Sheets
-                                    with st.spinner("⏳ Sincronizando com a nuvem (Google Sheets)... Aguarde até 10s"):
-                                        # 🔥 RETRY COM TIMEOUT AUMENTADO (até 3 tentativas com espera progressiva)
+                                    # Atualiza apenas as celulas-alvo (sem varredura por find), reduzindo latencia por bip.
+                                    with st.spinner("⏳ Sincronizando bipagem..."):
                                         aba = planilha_db.worksheet("Memoria_Sistema")
                                         pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
-                                        headers = aba.row_values(1)
+                                        mapa_linhas, headers = carregar_indice_memoria_sistema(planilha_db)
                                         agora_bip = datetime.now(FUSO_BR)
                                         data_bip_str = agora_bip.strftime('%d/%m/%Y')
                                         hora_bip_str = agora_bip.strftime('%H:%M:%S')
-                                        if 'PEDIDO' in headers and 'STATUS' in headers:
-                                            col_pedido = headers.index('PEDIDO') + 1
+                                        if 'STATUS' in headers:
                                             col_status = headers.index('STATUS') + 1
-                                                    
-                                            # 🔥 RETRY LOOP: Tenta 3 vezes com pequeno delay entre tentativas
-                                            tentativas = 0
-                                            max_tentativas = 3
+                                            row_alvo = mapa_linhas.get(pedido_alvo)
                                             sucesso_update = False
-                                            ultima_excecao = None
-                                                    
-                                            while tentativas < max_tentativas and not sucesso_update:
-                                                try:
-                                                    cell = aba.find(pedido_alvo, in_column=col_pedido)
-                                                    if cell:
-                                                        updates = [{'range': gspread.utils.rowcol_to_a1(cell.row, col_status), 'values': [['CONFERIDO']]}]
-                                                        # Registrar data e hora do bip se as colunas existirem
-                                                        if 'DATA_BIP' in headers:
-                                                            col_data_bip = headers.index('DATA_BIP') + 1
-                                                            updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_data_bip), 'values': [[data_bip_str]]})
-                                                        if 'HORA_BIP' in headers:
-                                                            col_hora_bip = headers.index('HORA_BIP') + 1
-                                                            updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_hora_bip), 'values': [[hora_bip_str]]})
-                                                                
-                                                        # Update - aguarda resposta do Google Sheets
-                                                        aba.batch_update(updates)
+                                            if row_alvo:
+                                                updates = [{'range': gspread.utils.rowcol_to_a1(row_alvo, col_status), 'values': [['CONFERIDO']]}]
+                                                if 'DATA_BIP' in headers:
+                                                    col_data_bip = headers.index('DATA_BIP') + 1
+                                                    updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_data_bip), 'values': [[data_bip_str]]})
+                                                if 'HORA_BIP' in headers:
+                                                    col_hora_bip = headers.index('HORA_BIP') + 1
+                                                    updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_hora_bip), 'values': [[hora_bip_str]]})
+                                                if 'UPDATED_AT' in headers:
+                                                    col_updated_at = headers.index('UPDATED_AT') + 1
+                                                    updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_updated_at), 'values': [[agora_bip.strftime('%Y-%m-%d %H:%M:%S')]]})
+
+                                                ultima_excecao = None
+                                                for _ in range(2):
+                                                    try:
+                                                        aba.batch_update(updates, value_input_option='USER_ENTERED')
                                                         sucesso_update = True
-                                                    else:
-                                                        raise Exception(f"Pedido {pedido_alvo} não encontrado")
-                                                except Exception as e:
-                                                    ultima_excecao = e
-                                                    tentativas += 1
-                                                    if tentativas < max_tentativas:
-                                                        # Aguarda 1s antes de tentar novamente
-                                                        time.sleep(1)       
-                                                        continue
-                                                    else:
-                                                        raise ultima_excecao
-                                                    
+                                                        break
+                                                    except Exception as e:
+                                                        ultima_excecao = e
+                                                        time.sleep(0.25)
+                                                if not sucesso_update and ultima_excecao:
+                                                    raise ultima_excecao
+
                                             if sucesso_update:
-                                                pass  # Sem delay adicional - fluido!
                                                 st.session_state.log_triagem.insert(0, {'PEDIDO': str(df_raw.at[idx, 'PEDIDO']), 'TOMADOR': str(df_raw.at[idx, 'TOMADOR']), 'LABORATORIO': str(df_raw.at[idx, 'LABORATORIO']), 'CIDADE': str(df_raw.at[idx, 'CIDADE']), 'DATA_BIP': data_bip_str, 'HORA': hora_bip_str})
                                                 st.session_state.ui_toast = {'msg': f"Pedido {pedido_alvo} VALIDADO! ✅ ({hora_bip_str})", 'icon': "✅"}
                                                 carregar_dados_completos.clear()
+                                                carregar_indice_memoria_sistema.clear()
                                                 # 🔥 LIBERA: Próxima bipagem pode começar
                                                 st.session_state.bipagem_em_progresso = False
                                                 st.rerun()
@@ -8523,14 +8699,39 @@ elif menu == "🔬 Triagem":
                             p_ids = df_sel_fila['PEDIDO'].astype(str).tolist()
                             try:
                                 aba = planilha_db.worksheet("Memoria_Sistema")
-                                dados_nuvem = aba.get_all_values()
-                                df_nuvem = pd.DataFrame(dados_nuvem[1:], columns=dados_nuvem[0])
-                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'STATUS'] = 'CONFERIDO'
-                                aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                st.session_state.ui_toast = {'msg': f"{len(p_ids)} volumes liberados!", 'icon': "🎉"}
-                                time.sleep(1.0)
-                                carregar_dados_completos.clear()
-                                st.rerun()
+                                mapa_linhas, headers = carregar_indice_memoria_sistema(planilha_db)
+                                if 'STATUS' not in headers:
+                                    st.error("❌ Coluna STATUS não encontrada na planilha.")
+                                else:
+                                    col_status = headers.index('STATUS') + 1
+                                    agora_bip = datetime.now(FUSO_BR)
+                                    data_bip_str = agora_bip.strftime('%d/%m/%Y')
+                                    hora_bip_str = agora_bip.strftime('%H:%M:%S')
+                                    updates = []
+
+                                    for pid in p_ids:
+                                        row_alvo = mapa_linhas.get(str(pid).strip())
+                                        if not row_alvo:
+                                            continue
+                                        updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_status), 'values': [['CONFERIDO']]})
+                                        if 'DATA_BIP' in headers:
+                                            col_data_bip = headers.index('DATA_BIP') + 1
+                                            updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_data_bip), 'values': [[data_bip_str]]})
+                                        if 'HORA_BIP' in headers:
+                                            col_hora_bip = headers.index('HORA_BIP') + 1
+                                            updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_hora_bip), 'values': [[hora_bip_str]]})
+                                        if 'UPDATED_AT' in headers:
+                                            col_updated_at = headers.index('UPDATED_AT') + 1
+                                            updates.append({'range': gspread.utils.rowcol_to_a1(row_alvo, col_updated_at), 'values': [[agora_bip.strftime('%Y-%m-%d %H:%M:%S')]]})
+
+                                    if not updates:
+                                        st.warning("Nenhum pedido selecionado foi encontrado na base para atualização.")
+                                    else:
+                                        aba.batch_update(updates, value_input_option='USER_ENTERED')
+                                        st.session_state.ui_toast = {'msg': f"{len(p_ids)} volumes liberados!", 'icon': "🎉"}
+                                        carregar_dados_completos.clear()
+                                        carregar_indice_memoria_sistema.clear()
+                                        st.rerun()
                             except Exception as e:
                                 st.error(f"Erro: {e}")
             else:
@@ -11441,8 +11642,9 @@ elif menu == "📈 Dashboard":
             "#64748B", "#F8FAFC")
 
         # Injeção da taxa de sucesso + Variação do Volume Total Seco
-        texto_badge_realizados = f"{
-            int(taxa_sucesso_h)}% Conc. | Vol: {s_tot}{v_tot_str}"
+        texto_badge_realizados = (
+            f"{int(taxa_sucesso_h)}% Conc. | Vol: {s_tot}{v_tot_str}"
+        )
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -11768,33 +11970,68 @@ elif menu == "📈 Dashboard":
             if len(frota_ordenada) >= 1:
                 rf1.markdown(
                     podio_ui(
-                        "1", "🥇", frota_ordenada[0][0], frota_ordenada[0][1]['perc'], f"{
-                            frota_ordenada[0][1]['conc']}/{
-                            frota_ordenada[0][1]['total']}", "#10B981", "#F0FDF4"), unsafe_allow_html=True)
+                        "1",
+                        "🥇",
+                        frota_ordenada[0][0],
+                        frota_ordenada[0][1]['perc'],
+                        f"{frota_ordenada[0][1]['conc']}/{frota_ordenada[0][1]['total']}",
+                        "#10B981",
+                        "#F0FDF4",
+                    ),
+                    unsafe_allow_html=True,
+                )
             if len(frota_ordenada) >= 2:
                 rf2.markdown(
                     podio_ui(
-                        "2", "🥈", frota_ordenada[1][0], frota_ordenada[1][1]['perc'], f"{
-                            frota_ordenada[1][1]['conc']}/{
-                            frota_ordenada[1][1]['total']}", "#64748B", "#FFFFFF"), unsafe_allow_html=True)
+                        "2",
+                        "🥈",
+                        frota_ordenada[1][0],
+                        frota_ordenada[1][1]['perc'],
+                        f"{frota_ordenada[1][1]['conc']}/{frota_ordenada[1][1]['total']}",
+                        "#64748B",
+                        "#FFFFFF",
+                    ),
+                    unsafe_allow_html=True,
+                )
             if len(frota_ordenada) >= 3:
                 rf3.markdown(
                     podio_ui(
-                        "3", "🥉", frota_ordenada[2][0], frota_ordenada[2][1]['perc'], f"{
-                            frota_ordenada[2][1]['conc']}/{
-                            frota_ordenada[2][1]['total']}", "#F59E0B", "#FFFBEB"), unsafe_allow_html=True)
+                        "3",
+                        "🥉",
+                        frota_ordenada[2][0],
+                        frota_ordenada[2][1]['perc'],
+                        f"{frota_ordenada[2][1]['conc']}/{frota_ordenada[2][1]['total']}",
+                        "#F59E0B",
+                        "#FFFBEB",
+                    ),
+                    unsafe_allow_html=True,
+                )
             if len(frota_ordenada) >= 4:
                 rf4.markdown(
                     podio_ui(
-                        "4", "🎖️", frota_ordenada[3][0], frota_ordenada[3][1]['perc'], f"{
-                            frota_ordenada[3][1]['conc']}/{
-                            frota_ordenada[3][1]['total']}", "#8B5CF6", "#F5F3FF"), unsafe_allow_html=True)
+                        "4",
+                        "🎖️",
+                        frota_ordenada[3][0],
+                        frota_ordenada[3][1]['perc'],
+                        f"{frota_ordenada[3][1]['conc']}/{frota_ordenada[3][1]['total']}",
+                        "#8B5CF6",
+                        "#F5F3FF",
+                    ),
+                    unsafe_allow_html=True,
+                )
             if len(frota_ordenada) >= 5:
                 rf5.markdown(
                     podio_ui(
-                        "5", "🎖️", frota_ordenada[4][0], frota_ordenada[4][1]['perc'], f"{
-                            frota_ordenada[4][1]['conc']}/{
-                            frota_ordenada[4][1]['total']}", "#06B6D4", "#ECFEFF"), unsafe_allow_html=True)
+                        "5",
+                        "🎖️",
+                        frota_ordenada[4][0],
+                        frota_ordenada[4][1]['perc'],
+                        f"{frota_ordenada[4][1]['conc']}/{frota_ordenada[4][1]['total']}",
+                        "#06B6D4",
+                        "#ECFEFF",
+                    ),
+                    unsafe_allow_html=True,
+                )
         else:
             st.info(
                 "Aguardando finalizações da frota no dia de hoje para compor o pódio.")
