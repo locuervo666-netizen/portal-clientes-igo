@@ -1938,17 +1938,10 @@ def modal_detalhes_pedido(pedido_data):
     )
     st.markdown(html_barra, unsafe_allow_html=True)
 
-    endereco_completo = f"{
-        pedido_data.get(
-            'ENDERECO', '')}, nº {
-        pedido_data.get(
-            'NUMERO', '')}, {
-        pedido_data.get(
-            'BAIRRO', '')} — {
-        pedido_data.get(
-            'CIDADE', '')}/{
-        pedido_data.get(
-            'UF', '')}"
+    endereco_completo = (
+        f"{pedido_data.get('ENDERECO', '')}, nº {pedido_data.get('NUMERO', '')}, "
+        f"{pedido_data.get('BAIRRO', '')} — {pedido_data.get('CIDADE', '')}/{pedido_data.get('UF', '')}"
+    )
     agente_nome = str(
         pedido_data.get(
             'AGENTE_RAW',
