@@ -6773,6 +6773,8 @@ elif menu == "📥 Importações Umove":
     # --- INÍCIO: VARIÁVEIS DA MÁQUINA DE ESTADOS ---
     if "umove_lote_atual_id" not in st.session_state:
         st.session_state.umove_lote_atual_id = None
+    if "umove_rascunho_payload_grande" not in st.session_state:
+        st.session_state.umove_rascunho_payload_grande = False
 
     def gerenciar_estado_lote(acao, lote_id=None, df_carrinho=None, resultados=None):
         if planilha_sandbox is None:
@@ -6802,21 +6804,26 @@ elif menu == "📥 Importações Umove":
             if acao == "SALVAR_RASCUNHO":
                 if df_carrinho is None or df_carrinho.empty:
                     return False
+                # Evita payload muito grande no Google Sheets (causa lentidao/travamento em cargas cumulativas).
                 json_dados = df_carrinho.to_json(orient='records')
+                max_chars_json = 45000
+                payload_grande = len(json_dados) > max_chars_json
+                if payload_grande:
+                    json_dados = "[]"
+                st.session_state.umove_rascunho_payload_grande = payload_grande
                 agora = datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S')
                         
                 if lote_id in df_hist['ID_EVENTO'].values:
                     linha_idx = df_hist.index[df_hist['ID_EVENTO'] == lote_id][0] + 2
                             
                     # Atualização em lote (Batch Update) - Uma única requisição!
-                    aba.update(
-                        f"{gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('TOTAL_PEDIDOS') + 1)}", 
-                        [[len(df_carrinho)]]
-                    )
-                    aba.update(
-                        f"{gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('STATUS_LOTE') + 1)}", 
-                        [["RASCUNHO", json_dados]]
-                    )
+                    a1_total = gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('TOTAL_PEDIDOS') + 1)
+                    a1_status = gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('STATUS_LOTE') + 1)
+                    a1_json = gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('DADOS_JSON') + 1)
+                    aba.batch_update([
+                        {"range": a1_total, "values": [[len(df_carrinho)]]},
+                        {"range": f"{a1_status}:{a1_json}", "values": [["RASCUNHO", json_dados]]}
+                    ])
                 else:
                     nova_linha = {c: "" for c in cabecalho}
                     nova_linha["ID_EVENTO"] = lote_id
@@ -7120,10 +7127,15 @@ elif menu == "📥 Importações Umove":
 
                             if st.session_state.umove_lote_atual_id is None:
                                 st.session_state.umove_lote_atual_id = f"LOTE-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
-                            gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
+                            salvou_rascunho = gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
 
                             st.session_state.df_preview_sb = pd.DataFrame()
-                            st.session_state.ui_toast = {'msg': "Importação concluída! Carga consolidada no Carrinho de Expedição.", 'icon': "🚀"}
+                            if not salvou_rascunho:
+                                st.session_state.ui_toast = {'msg': "Carga adicionada, mas o rascunho nao foi salvo no Drive. Verifique conexao/permissoes.", 'icon': "⚠️"}
+                            elif st.session_state.get("umove_rascunho_payload_grande", False):
+                                st.session_state.ui_toast = {'msg': "Carga adicionada! Rascunho salvo sem JSON completo para evitar travamento.", 'icon': "ℹ️"}
+                            else:
+                                st.session_state.ui_toast = {'msg': "Importação concluída! Carga consolidada no Carrinho de Expedição.", 'icon': "🚀"}
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao injetar dados no carrinho: {e}")
