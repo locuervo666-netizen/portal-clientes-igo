@@ -956,9 +956,6 @@ if 'log_triagem' not in st.session_state:
 if 'ultima_sincronizacao' not in st.session_state:
     st.session_state.ultima_sincronizacao = None
 
-if 'expander_aprovacao_aberto' not in st.session_state:
-    st.session_state.expander_aprovacao_aberto = True
-
 # TELA DE LOGIN BLINDADA
 if not st.session_state.autenticado:
     st.markdown("""
@@ -3142,7 +3139,7 @@ if menu == "📊 GRID":
             st.error(
                 f"🚨 **Atenção:** Existem {
                     len(df_aprovacao)} solicitação(ões) de coleta do Portal do Cliente aguardando aprovação!")
-            with st.expander("🔔 INBOX: Analisar e Aprovar Coletas", expanded=st.session_state.expander_aprovacao_aberto):
+            with st.expander("🔔 INBOX: Analisar e Aprovar Coletas", expanded=True):
                 if 'OBSERVACOES' not in df_aprovacao.columns:
                     df_aprovacao['OBSERVACOES'] = ""
                 colunas_reais = [
@@ -3256,7 +3253,6 @@ if menu == "📊 GRID":
                                     despachar_para_appsheet(lista_para_app)
                                         
                                 st.session_state.ui_toast = {'msg': "Solicitações aprovadas!", 'icon': "🎉"}
-                                st.session_state.expander_aprovacao_aberto = False
                                 carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e:
@@ -3279,7 +3275,6 @@ if menu == "📊 GRID":
                                     "A1", [
                                         df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
                                 st.success("Recusadas!")
-                                st.session_state.expander_aprovacao_aberto = False
                                 time.sleep(2)
                                 carregar_dados_completos.clear()
                                 st.rerun()
@@ -6976,20 +6971,6 @@ elif menu == "📥 Importações Umove":
 
                             df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
                             df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
-
-                            # Desambigua laboratorios repetidos na mesma carga (mesmo CNPJ + mesmo nome).
-                            # Regra: quando repetir, acrescenta o bairro apos o nome entre parenteses.
-                            df_limpo_sb['LABORATORIO_BASE'] = df_limpo_sb['LABORATORIO'].astype(str).str.strip()
-                            df_limpo_sb['CNPJ_BASE'] = df_limpo_sb['CNPJ'].astype(str).str.strip()
-                            mask_chave_dup = (
-                                (df_limpo_sb['LABORATORIO_BASE'] != "")
-                                & (df_limpo_sb['CNPJ_BASE'] != "")
-                                & df_limpo_sb.duplicated(subset=['LABORATORIO_BASE', 'CNPJ_BASE'], keep=False)
-                            )
-                            if mask_chave_dup.any():
-                                bairro_fmt = df_limpo_sb['BAIRRO'].astype(str).str.strip()
-                                df_limpo_sb.loc[mask_chave_dup, 'LABORATORIO'] = df_limpo_sb.loc[mask_chave_dup, 'LABORATORIO_BASE'] + bairro_fmt.loc[mask_chave_dup].apply(lambda b: f" ({b})" if b else "")
-                            df_limpo_sb.drop(columns=['LABORATORIO_BASE', 'CNPJ_BASE'], inplace=True)
 
                             df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
 
