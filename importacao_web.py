@@ -3202,7 +3202,7 @@ if menu == "📊 GRID":
             value=(
                 hoje_br -
                 timedelta(
-                    days=3),
+                    days=30),
                 hoje_br),
             format="DD/MM/YYYY")
 
@@ -3419,6 +3419,11 @@ if menu == "📊 GRID":
 
         df_grid_final = df_grid_final.reset_index(drop=True)
 
+        if df_grid_final.empty:
+            st.warning(
+                f"Nenhum pedido encontrado com os filtros atuais. Total carregado: {len(df_raw)} | Após filtros: {len(df_f)}."
+            )
+
         st.markdown(
             f"<p style='color:#64748B; font-size:13px; margin-bottom: 5px;'>Selecione as caixas na tabela para libertar as ações no topo. Marque a caixa e use o botão 'Ver Detalhes' para abrir o pop-up da linha.</p>",
             unsafe_allow_html=True)
@@ -3506,6 +3511,13 @@ if menu == "📊 GRID":
         gb.configure_pagination(
             paginationAutoPageSize=False,
             paginationPageSize=15)
+        gb.configure_grid_options(
+            pagination=True,
+            suppressPaginationPanel=False,
+            domLayout='normal',
+            alwaysShowVerticalScroll=True,
+            alwaysShowHorizontalScroll=True
+        )
         gb.configure_default_column(
             resizable=True, filterable=True, sortable=True)
 
