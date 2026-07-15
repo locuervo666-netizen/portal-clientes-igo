@@ -248,22 +248,18 @@ CSS_DASHBOARD = """
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
         border-right: 1px solid #dbe3ef !important;
         padding: 12px 8px !important;
-        overflow-y: hidden !important;
+        overflow-y: auto !important;
         overflow-x: hidden !important;
         max-height: 100vh !important;
     }
     [data-testid="stSidebar"] > div:first-child > div {
         gap: 0px !important;
-        overflow: hidden !important;
+        overflow: visible !important;
     }
-    
-    /* Remover scrollbars da sidebar */
-    [data-testid="stSidebar"] ::-webkit-scrollbar {
-        display: none !important;
-    }
-    [data-testid="stSidebar"] * {
-        -ms-overflow-style: none !important;
-        scrollbar-width: none !important;
+
+    /* Sidebar com rolagem vertical visivel */
+    [data-testid="stSidebar"] {
+        scrollbar-width: auto !important;
     }
     [data-testid="stSidebar"] p,
     [data-testid="stSidebar"] label,
@@ -728,21 +724,23 @@ CSS_DASHBOARD = """
         }
     }
 
-    /* ── TRAVA DE SCROLL DA TELA E GRID DINÂMICA ── */
+    /* ── SCROLL NATURAL DA TELA ── */
     html, body, [data-testid="stAppViewContainer"], [data-testid="stAppViewMain"] {
-        overflow: hidden !important; 
-        max-height: 100vh !important;
-        height: 100vh !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        max-height: none !important;
+        height: auto !important;
     }
 
     .block-container {
-        height: 100vh !important;
-        max-height: 100vh !important;
+        min-height: 100vh !important;
+        height: auto !important;
+        max-height: none !important;
         display: flex !important;
         flex-direction: column !important;
         padding-top: 0.5rem !important; 
         padding-bottom: 0.5rem !important;
-        overflow: hidden !important;
+        overflow: visible !important;
     }
 
     [data-testid="stTabs"] {
