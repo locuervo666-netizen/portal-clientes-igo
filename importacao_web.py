@@ -5304,6 +5304,26 @@ elif menu == "📥 Importações":
         st.session_state.contador_oficial_temp = proximo
         return proximo
 
+    def gsheets_call(op_name, fn, *args, **kwargs):
+        """Executa chamadas do Google Sheets com retry/backoff para reduzir bloqueios por excesso de requests."""
+        max_tentativas = int(os.environ.get("IGO_GS_MAX_RETRIES", "5"))
+        base_delay = float(os.environ.get("IGO_GS_BACKOFF_BASE", "0.6"))
+        retry_tokens = [
+            "429", "RATE LIMIT", "RESOURCE_EXHAUSTED", "QUOTA", "TIMED OUT",
+            "DEADLINE", "503", "502", "UNAVAILABLE", "TRY AGAIN"
+        ]
+
+        for tentativa in range(1, max_tentativas + 1):
+            try:
+                return fn(*args, **kwargs)
+            except Exception as e:
+                msg = str(e).upper()
+                deve_tentar = any(token in msg for token in retry_tokens)
+                if tentativa >= max_tentativas or not deve_tentar:
+                    raise
+                espera = base_delay * (2 ** (tentativa - 1)) + random.uniform(0.05, 0.35)
+                time.sleep(espera)
+
     # 🔥 PING SILENCIOSO (ANTI-TIMEOUT DO RENDER) 🔥
     components.html(
         """
@@ -6089,14 +6109,23 @@ elif menu == "📥 Importações":
                                 df_to_insert = df_to_insert[colunas_bd_oficiais].astype(str)
 
                                 aba_m = planilha_db.worksheet("Memoria_Sistema")
-                                df_up_final = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                                dados_m = gsheets_call("leitura Memoria_Sistema", aba_m.get_all_values)
+                                if len(dados_m) > 1:
+                                    df_up_final = pd.DataFrame(dados_m[1:], columns=dados_m[0])
+                                else:
+                                    df_up_final = pd.DataFrame(columns=dados_m[0] if dados_m else colunas_bd_oficiais)
                                 pedidos_existentes = df_up_final['PEDIDO'].astype(str).tolist()
                                 df_to_insert_clean = df_to_insert[~df_to_insert['PEDIDO'].astype(str).isin(pedidos_existentes)]
 
                                 if not df_to_insert_clean.empty:
                                     df_up_final = pd.concat([df_up_final, df_to_insert_clean], ignore_index=True)
-                                    aba_m.clear()
-                                    aba_m.update("A1", [df_up_final.columns.tolist()] + df_up_final.fillna("").astype(str).values.tolist())
+                                    gsheets_call("limpeza Memoria_Sistema", aba_m.clear)
+                                    gsheets_call(
+                                        "atualizacao Memoria_Sistema",
+                                        aba_m.update,
+                                        "A1",
+                                        [df_up_final.columns.tolist()] + df_up_final.fillna("").astype(str).values.tolist()
+                                    )
 
                                     lista_app_of = []
                                     for _, r in df_to_insert_clean.iterrows():
@@ -6200,6 +6229,20 @@ elif menu == "📥 Importações":
                     logs_df_data = []
 
                     metrics_placeholder.markdown(render_big_metrics_off(total_agentes, total_agentes, 0, 0), unsafe_allow_html=True)
+
+                # Carrega a memória uma única vez e grava em lote no final do processamento.
+                aba_m_status = None
+                df_nuvem_status = pd.DataFrame()
+                pedidos_marcacao_zap = []
+                try:
+                    aba_m_status = planilha_db.worksheet("Memoria_Sistema")
+                    dados_status = gsheets_call("leitura status Memoria_Sistema", aba_m_status.get_all_values)
+                    if len(dados_status) > 1:
+                        df_nuvem_status = pd.DataFrame(dados_status[1:], columns=dados_status[0])
+                    elif len(dados_status) == 1:
+                        df_nuvem_status = pd.DataFrame(columns=dados_status[0])
+                except Exception:
+                    aba_m_status = None
 
                 for idx_ag, ag in enumerate(agentes_selecionados):
                     if not str(ag).strip(): continue
@@ -6319,15 +6362,7 @@ elif menu == "📥 Importações":
                         log_table_placeholder.dataframe(pd.DataFrame(logs_df_data), use_container_width=True, hide_index=True)
                         progress_bar.progress((idx_ag + 1) / total_agentes)
 
-                        try:
-                            aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            df_nuvem = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
-                            if 'ZAP_ENVIADO' not in df_nuvem.columns: df_nuvem['ZAP_ENVIADO'] = ""
-                            if 'PEDIDO' in df_nuvem.columns:
-                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(df_ag_of['PEDIDO'].tolist()), 'ZAP_ENVIADO'] = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
-                                aba_m.clear()
-                                aba_m.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                        except BaseException: pass
+                        pedidos_marcacao_zap.extend([str(p).strip() for p in df_ag_of['PEDIDO'].tolist() if str(p).strip()])
 
                     except Exception as e:
                         falha_total += 1
@@ -6338,6 +6373,28 @@ elif menu == "📥 Importações":
                         pending = total_agentes - (idx_ag + 1)
                         metrics_placeholder.markdown(render_big_metrics_off(total_agentes, pending, sucesso_total, falha_total), unsafe_allow_html=True)
                         progress_bar.progress((idx_ag + 1) / total_agentes)
+
+                # Persistencia unica na nuvem para reduzir requests e risco de bloqueio.
+                if aba_m_status is not None and not df_nuvem_status.empty and pedidos_marcacao_zap:
+                    try:
+                        pedidos_unicos = list(dict.fromkeys(pedidos_marcacao_zap))
+                        if 'ZAP_ENVIADO' not in df_nuvem_status.columns:
+                            df_nuvem_status['ZAP_ENVIADO'] = ""
+                        if 'PEDIDO' in df_nuvem_status.columns:
+                            carimbo = f"SIM|{datetime.now(FUSO_BR).strftime('%H:%M')}"
+                            df_nuvem_status.loc[
+                                df_nuvem_status['PEDIDO'].astype(str).isin(pedidos_unicos),
+                                'ZAP_ENVIADO'
+                            ] = carimbo
+                            gsheets_call("limpeza status Memoria_Sistema", aba_m_status.clear)
+                            gsheets_call(
+                                "atualizacao status Memoria_Sistema",
+                                aba_m_status.update,
+                                "A1",
+                                [df_nuvem_status.columns.tolist()] + df_nuvem_status.fillna("").astype(str).values.tolist()
+                            )
+                    except Exception:
+                        pass
 
                 st.session_state.of_final_metrics = {'total': total_agentes, 'sucesso': sucesso_total, 'falhas': falha_total}
                 st.session_state.of_step = 'COMPLETED'
@@ -7151,6 +7208,41 @@ elif menu == "📥 Importações Umove":
     # ABA 3: CARRINHO & ARQUIVOS (Layout Premium + Toggle Blindado)
     # -------------------------------------------------------------------------
     with tab_carrinho:
+        def obter_proximo_id_umove_seguro():
+            candidatos = []
+
+            if not st.session_state.df_sandbox_mem.empty and 'PEDIDO' in st.session_state.df_sandbox_mem.columns:
+                candidatos.append(st.session_state.df_sandbox_mem[['PEDIDO']].copy())
+
+            try:
+                df_rascunhos = gerenciar_estado_lote("LISTAR_RASCUNHOS")
+                if df_rascunhos is not None and not df_rascunhos.empty and 'DADOS_JSON' in df_rascunhos.columns:
+                    for dados_json in df_rascunhos['DADOS_JSON'].dropna().astype(str):
+                        try:
+                            df_rasc = pd.read_json(io.StringIO(dados_json), orient='records')
+                            if not df_rasc.empty and 'PEDIDO' in df_rasc.columns:
+                                candidatos.append(df_rasc[['PEDIDO']].copy())
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+            df_base_ids = pd.concat(candidatos, ignore_index=True) if candidatos else pd.DataFrame(columns=['PEDIDO'])
+            proximo_base = obter_proximo_id(df_base_ids, minimo_inicial=UMOVE_PEDIDO_INICIAL)
+
+            try:
+                aba_contador = planilha_sandbox.worksheet("Contador")
+                val = aba_contador.acell('A1').value
+                if val and str(val).isdigit():
+                    proximo_base = max(proximo_base, int(val))
+            except Exception:
+                pass
+
+            if 'contador_temp' in st.session_state:
+                proximo_base = max(proximo_base, int(st.session_state.contador_temp))
+
+            return max(proximo_base, UMOVE_PEDIDO_INICIAL)
+
         # --- BLOCAGEM DE PROCESSAMENTO: AGENDAMENTOS FIXOS ---
         df_fixos_hoje = pd.DataFrame()
         prox_id_sb = UMOVE_PEDIDO_INICIAL
@@ -7169,17 +7261,7 @@ elif menu == "📥 Importações Umove":
                 if dia_atual != 'DOM':
                     df_alvo = df_regras_temp[(df_regras_temp[dia_atual] == "SIM") & (df_regras_temp['STATUS'] == "ATIVO")].copy()
                     if not df_alvo.empty:
-                        try: aba_contador = planilha_sandbox.worksheet("Contador")
-                        except: aba_contador = None
-
-                        if aba_contador:
-                            val = aba_contador.acell('A1').value
-                            if val and str(val).isdigit(): prox_id_sb = max(int(val), UMOVE_PEDIDO_INICIAL)
-                        elif 'contador_temp' in st.session_state:
-                            prox_id_sb = max(st.session_state.contador_temp, UMOVE_PEDIDO_INICIAL)
-
-                        # Incrementa com base nos registros já presentes em memória para não chocar IDs
-                        prox_id_sb += len(st.session_state.df_sandbox_mem)
+                        prox_id_sb = obter_proximo_id_umove_seguro()
 
                         novos_pedidos = []
                         for _, regra in df_alvo.iterrows():
