@@ -5362,6 +5362,34 @@ elif menu == "📥 Importações":
                 espera = base_delay * (2 ** (tentativa - 1)) + random.uniform(0.05, 0.35)
                 time.sleep(espera)
 
+    def worksheet_values_to_df(valores, fallback_cols=None):
+        """Converte get_all_values() em DataFrame sem gerar nova leitura da API."""
+        if valores and len(valores) > 1:
+            return pd.DataFrame(valores[1:], columns=valores[0])
+        if valores and len(valores) == 1:
+            return pd.DataFrame(columns=valores[0])
+        return pd.DataFrame(columns=fallback_cols or [])
+
+    def obter_df_memoria_oficial_cache(refresh=False):
+        """Cache curto em sessão para reduzir leituras repetidas da aba Memoria_Sistema."""
+        ttl_seg = int(os.environ.get("IGO_GS_CACHE_TTL_OFICIAL", "25"))
+        cache_key_df = "of_memoria_cache_df"
+        cache_key_ts = "of_memoria_cache_ts"
+        agora = time.time()
+
+        if not refresh:
+            ts_cache = float(st.session_state.get(cache_key_ts, 0))
+            df_cache = st.session_state.get(cache_key_df)
+            if df_cache is not None and (agora - ts_cache) <= ttl_seg:
+                return df_cache.copy()
+
+        aba_m = planilha_db.worksheet("Memoria_Sistema")
+        dados_m = gsheets_call("leitura Memoria_Sistema", aba_m.get_all_values)
+        df_m = worksheet_values_to_df(dados_m)
+        st.session_state[cache_key_df] = df_m
+        st.session_state[cache_key_ts] = agora
+        return df_m.copy()
+
     # 🔥 PING SILENCIOSO (ANTI-TIMEOUT DO RENDER) 🔥
     components.html(
         """
@@ -5753,32 +5781,46 @@ elif menu == "📥 Importações":
                 if st.button("➕ Adicionar ao Carrinho Oficial (Cumulativo)", type="primary", key="add_carrinho_oficial"):
                     with st.spinner("Gerando IDs sequenciais e adicionando ao carrinho..."):
                         try:
-                            aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            df_up = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                            agora_click = time.time()
+                            ultimo_click = float(st.session_state.get('of_add_carrinho_last_click_ts', 0))
+                            if (agora_click - ultimo_click) < 1.5:
+                                st.warning("Aguarde 2 segundos antes de clicar novamente para evitar excesso de leitura no Google Sheets.")
+                                st.stop()
+
+                            st.session_state.of_add_carrinho_last_click_ts = agora_click
+
+                            df_ok_add = df_ok.copy()
+
+                            # Busca na nuvem apenas para semear o contador na primeira carga da sessão.
+                            precisa_seed_remoto = int(st.session_state.get('contador_oficial_temp', 2000)) <= 2000
+                            if precisa_seed_remoto:
+                                df_up = obter_df_memoria_oficial_cache(refresh=False)
+                            else:
+                                df_up = pd.DataFrame(columns=['PEDIDO'])
 
                             prox_id_of = obter_proximo_id_oficial_seguro(df_up)
 
-                            for idx, row in df_ok.iterrows():
-                                df_ok.at[idx, 'PEDIDO'] = str(prox_id_of)
+                            for idx, row in df_ok_add.iterrows():
+                                df_ok_add.at[idx, 'PEDIDO'] = str(prox_id_of)
                                 prox_id_of += 1
 
                             st.session_state.contador_oficial_temp = prox_id_of
 
-                            df_ok['PRAZO_DIAS'] = df_ok.apply(lambda r: str(calcular_sla_dias(r['UF'], r['CIDADE'], r['TOMADOR'])), axis=1)
-                            df_ok['DATA_LIMITE'] = df_ok.apply(lambda r: str(calcular_data_limite(r['DATA'], int(r['PRAZO_DIAS']))), axis=1)
-                            df_ok['STATUS'] = 'PENDENTE'
-                            df_ok['DATA_ENTREGA'] = ''
-                            df_ok['FOTO'] = ''
-                            df_ok['ROMANEIO'] = ''
-                            df_ok['ZAP_ENVIADO'] = ''
-                            df_ok['FATURA'] = ''
+                            df_ok_add['PRAZO_DIAS'] = df_ok_add.apply(lambda r: str(calcular_sla_dias(r['UF'], r['CIDADE'], r['TOMADOR'])), axis=1)
+                            df_ok_add['DATA_LIMITE'] = df_ok_add.apply(lambda r: str(calcular_data_limite(r['DATA'], int(r['PRAZO_DIAS']))), axis=1)
+                            df_ok_add['STATUS'] = 'PENDENTE'
+                            df_ok_add['DATA_ENTREGA'] = ''
+                            df_ok_add['FOTO'] = ''
+                            df_ok_add['ROMANEIO'] = ''
+                            df_ok_add['ZAP_ENVIADO'] = ''
+                            df_ok_add['FATURA'] = ''
 
-                            df_ok = df_ok.astype(str)
+                            df_ok_add = df_ok_add.astype(str)
 
                             if st.session_state.df_carrinho_oficial.empty:
-                                st.session_state.df_carrinho_oficial = df_ok
+                                st.session_state.df_carrinho_oficial = df_ok_add
                             else:
-                                st.session_state.df_carrinho_oficial = pd.concat([st.session_state.df_carrinho_oficial, df_ok], ignore_index=True)
+                                st.session_state.df_carrinho_oficial = pd.concat([st.session_state.df_carrinho_oficial, df_ok_add], ignore_index=True)
 
                             st.session_state.df_preview_oficial = pd.DataFrame()
                             st.session_state.ui_toast = {'msg': "Pedidos adicionados ao carrinho com sucesso!", 'icon': "🛒"}
@@ -6010,8 +6052,7 @@ elif menu == "📥 Importações":
 
                     if not df_alvo.empty:
                         try:
-                            aba_m = planilha_db.worksheet("Memoria_Sistema")
-                            df_up_temp = pd.DataFrame(aba_m.get_all_values()[1:], columns=aba_m.get_all_values()[0])
+                            df_up_temp = obter_df_memoria_oficial_cache(refresh=False)
 
                             prox_id_fixo = obter_proximo_id_oficial_seguro(df_up_temp)
 
