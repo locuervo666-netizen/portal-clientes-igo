@@ -32,7 +32,6 @@ from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode, JsCode
 
 FUSO_BR = timezone(timedelta(hours=-3))
 LOGO_IGO = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
-GIF_ARGENTINA_MESSI = "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExZzBmNDZ0c3poOXY2Y3FkYnJlODhjNnBmeDV1MDBvZ3lrdGtjeHlxOSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/yHHdp1rjytjRa2jlao/giphy.gif"
 # =============================================================================
 # ⚙️ CONFIGURAÇÕES GERAIS DO SISTEMA
 # =============================================================================
@@ -660,54 +659,6 @@ def gerar_saudacao_spintax(nome, uf=""):
     ]
 
     inicio = random.choice(saudacoes_escolhidas)
-    fim = random.choice(fechamentos)
-    return inicio, fim
-
-
-def gerar_saudacao_especial_leandro(nome, data_ref=None):
-    """
-    Saudacao especial para login `leandro.zs`.
-    Mantem variacoes no estilo Selecao Argentina, 100% em espanhol.
-    """
-
-    if data_ref is None:
-        data_ref = datetime.now(FUSO_BR)
-
-    try:
-        idx_dia = int(data_ref.weekday())
-    except Exception:
-        idx_dia = datetime.now(FUSO_BR).weekday()
-
-    temas_partido = {
-        0: "lunes de enfoque total, jugando simple y efectivo",
-        1: "martes de intensidad alta, con presion y orden",
-        2: "miercoles de ritmo firme, sin perder la precision",
-        3: "jueves de disciplina tactica, paso a paso",
-        4: "viernes para cerrar fuerte, con actitud ganadora",
-        5: "sabado de concentracion, manteniendo el nivel",
-        6: "domingo de cabeza fria y ejecucion inteligente",
-    }
-
-    chamadas_argentina = [
-        "Vamos Argentina, mentalidad campeona en cada jugada.",
-        "Modo albiceleste activado: garra, tecnica y concentracion.",
-        "Hoy se juega con orden, sacrificio y espiritu de equipo.",
-        "Ritmo de seleccion: intensidad alta y cero distracciones.",
-        "Con energia argentina: foco total para ganar el dia.",
-        "Con la calma de Messi y precision total, vamos por una gran jornada.",
-        "Hoy toca jugarla como Messi: cabeza fria, talento y definicion.",
-    ]
-
-    fechamentos = [
-        "Importante: guarda nuestro numero y responde con 'OK' para confirmar la recepcion. Vamos Argentina.",
-        "Por favor, agrega este contacto y confirma con 'OK'. Gracias y buena ruta.",
-        "Para mantener la comunicacion activa, guarda el numero y responde 'OK'. Exitos.",
-        "Cierre oficial: guarda el contacto IGO y confirma con 'OK'. A dejar todo en la cancha.",
-        "Como diria el 10: paso a paso, con humildad y foco. Guarda el contacto y confirma con 'OK'.",
-    ]
-
-    tema_dia = temas_partido.get(idx_dia, "dia de enfoque total y juego colectivo")
-    inicio = f"Hola {nome}. {random.choice(chamadas_argentina)} Hoy es {tema_dia}, te comparto la "
     fim = random.choice(fechamentos)
     return inicio, fim
 
@@ -6360,19 +6311,13 @@ elif menu == "📥 Importações":
                             if len(ufs_unicos_of) > 0:
                                 uf_agente_of = str(ufs_unicos_of[0]).upper().strip()
 
-                        ag_login_base = str(ag).strip().lower().split('|')[0].split('/')[0].strip()
-                        is_leandro_especial = ag_login_base == 'leandro.zs'
-                        if is_leandro_especial:
-                            saudacao, fechamento = gerar_saudacao_especial_leandro(nom, hoje_br)
-                        else:
-                            saudacao, fechamento = gerar_saudacao_spintax(nom, uf_agente_of)
+                        saudacao, fechamento = gerar_saudacao_spintax(nom, uf_agente_of)
                         sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
                         sep2 = random.choice(['---', '...', '===', ' '])
                         bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
                         lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
 
-                        prefixo_leandro = "🇦🇷 " if is_leandro_especial else ""
-                        msg_parts = [f"{prefixo_leandro}{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
+                        msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
                         tot_qtd = 0
                         for cid, count in df_ag_of['CIDADE'].value_counts().items():
                             msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}")
@@ -6404,13 +6349,6 @@ elif menu == "📥 Importações":
                         if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
                             time.sleep(random.uniform(2.0, 3.0))
                             if df_ag_of.empty: raise ValueError("Lote vazio para o motorista atual.")
-
-                            if is_leandro_especial:
-                                try:
-                                    enviar_gif_zapi(tel, GIF_ARGENTINA_MESSI, "🇦🇷 Vamos Argentina, crack!")
-                                    time.sleep(1.5)
-                                except Exception:
-                                    resultado_msg += " (Sem GIF)"
 
                             try:
                                 try: requests.post(f"https://api.z-api.io/instances/{INSTANCIA}/token/{TOKEN}/presence", json={"phone": tel, "presence": "composing"}, headers={"Client-Token": CLIENT_TOKEN}, timeout=2)
@@ -7913,20 +7851,14 @@ elif menu == "📥 Importações Umove":
                             if len(ufs_unicos_sb) > 0:
                                 uf_agente_sb = str(ufs_unicos_sb[0]).upper().strip()
                                 
-                        ag_login_base = ag_login.split('|')[0].split('/')[0].strip()
-                        is_leandro_especial = ag_login_base == 'leandro.zs'
-                        if is_leandro_especial:
-                            saudacao, fechamento = gerar_saudacao_especial_leandro(nom, hoje_br)
-                        else:
-                            saudacao, fechamento = gerar_saudacao_spintax(nom, uf_agente_sb)
+                        saudacao, fechamento = gerar_saudacao_spintax(nom, uf_agente_sb)
                                 
                         sep1 = random.choice(['-------------------------------', '...............................', '=========================', '〰️〰️〰️〰️〰️〰️〰️〰️〰️'])
                         sep2 = random.choice(['---', '...', '===', ' '])
                         bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
                         lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
 
-                        prefixo_leandro = "🇦🇷 " if is_leandro_especial else ""
-                        msg_parts = [f"{prefixo_leandro}{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
+                        msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
                         tot_qtd = 0
                         for cid, count in df_ag_sb['CIDADE'].value_counts().items():
                             msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}")
@@ -7956,13 +7888,6 @@ elif menu == "📥 Importações Umove":
                         # Executa o envio principal do zap
                         if enviar_whatsapp_zapi(tel, "\n".join(msg_parts)):
                             time.sleep(random.uniform(2.0, 3.0))
-
-                            if is_leandro_especial:
-                                try:
-                                    enviar_gif_zapi(tel, GIF_ARGENTINA_MESSI, "🇦🇷 Vamos Argentina, crack!")
-                                    time.sleep(1.5)
-                                except Exception:
-                                    resultado_msg += " (Sem GIF)"
 
                             # 🛡️ CORREÇÃO 2: Isolamento de falhas nos anexos. Se o PDF falhar, não derruba o sucesso da mensagem.
                             if is_autorizado_pdf:
