@@ -1103,6 +1103,7 @@ planilha_financeiro = conectar_financeiro()
 CLIENTES_AUTORIZADOS = sorted(["CAEP",
                             "MB_CAEP",
                             "CUNHA",
+                            "CONTRAPROVA",
                             "SAPIENS",
                             "GRALAB",
                             "SYNVIA",
