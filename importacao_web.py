@@ -6506,7 +6506,7 @@ elif menu == "📥 Importações Umove":
     # Garante que o AgGrid está disponível neste bloco
     from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
-    UMOVE_PEDIDO_INICIAL = 800000
+    UMOVE_PEDIDO_INICIAL = 900000
 
     st.markdown(
         """
@@ -6836,6 +6836,44 @@ elif menu == "📥 Importações Umove":
             return True
         except Exception as e:
             return pd.DataFrame() if acao == "LISTAR_RASCUNHOS" else False
+
+    def obter_proximo_id_umove_seguro_global():
+        candidatos = []
+
+        if not st.session_state.df_sandbox_mem.empty and 'PEDIDO' in st.session_state.df_sandbox_mem.columns:
+            candidatos.append(st.session_state.df_sandbox_mem[['PEDIDO']].copy())
+
+        if not st.session_state.df_preview_sb.empty and 'PEDIDO' in st.session_state.df_preview_sb.columns:
+            candidatos.append(st.session_state.df_preview_sb[['PEDIDO']].copy())
+
+        try:
+            df_rascunhos = gerenciar_estado_lote("LISTAR_RASCUNHOS")
+            if df_rascunhos is not None and not df_rascunhos.empty and 'DADOS_JSON' in df_rascunhos.columns:
+                for dados_json in df_rascunhos['DADOS_JSON'].dropna().astype(str):
+                    try:
+                        df_rasc = pd.read_json(io.StringIO(dados_json), orient='records')
+                        if not df_rasc.empty and 'PEDIDO' in df_rasc.columns:
+                            candidatos.append(df_rasc[['PEDIDO']].copy())
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        df_base_ids = pd.concat(candidatos, ignore_index=True) if candidatos else pd.DataFrame(columns=['PEDIDO'])
+        proximo_base = obter_proximo_id(df_base_ids, minimo_inicial=UMOVE_PEDIDO_INICIAL)
+
+        try:
+            aba_contador = planilha_sandbox.worksheet("Contador")
+            val = aba_contador.acell('A1').value
+            if val and str(val).isdigit():
+                proximo_base = max(proximo_base, int(val))
+        except Exception:
+            pass
+
+        if 'contador_temp' in st.session_state:
+            proximo_base = max(proximo_base, int(st.session_state.contador_temp))
+
+        return max(proximo_base, UMOVE_PEDIDO_INICIAL)
     # --- FIM: MOTOR DE ESTADOS ---
 
     if 'cep_version_of' not in st.session_state:
@@ -7033,35 +7071,20 @@ elif menu == "📥 Importações Umove":
                 if st.button("➕ ADICIONAR TUDO AO CARRINHO DE EXPEDIÇÃO", type="primary", use_container_width=True, key="add_carrinho_sb"):
                     with st.spinner("Registrando identificadores de controle (IDs) blindados..."):
                         try:
-                            # 🛡️ PROTEÇÃO BLINDADA DO CONTADOR (FAIL-SAFE) MANTIDA
+                            prox_id_sb = obter_proximo_id_umove_seguro_global()
+
                             aba_contador = None
                             try:
                                 aba_contador = planilha_sandbox.worksheet("Contador")
                             except Exception:
                                 try:
                                     aba_contador = planilha_sandbox.add_worksheet(title="Contador", rows=10, cols=10)
-                                    aba_contador.update("A1", [[str(UMOVE_PEDIDO_INICIAL)]])
+                                    aba_contador.update("A1", [[str(prox_id_sb)]])
                                 except Exception:
-                                    try: aba_contador = planilha_sandbox.worksheet("Contador")
-                                    except: pass
-
-                            prox_id_sb = UMOVE_PEDIDO_INICIAL
-                                    
-                            if aba_contador:
-                                try:
-                                    val = aba_contador.acell('A1').value
-                                    if val and str(val).isdigit(): prox_id_sb = max(int(val), UMOVE_PEDIDO_INICIAL)
-                                except: pass
-                                    
-                            if 'contador_temp' in st.session_state:
-                                prox_id_sb = max(st.session_state.contador_temp, UMOVE_PEDIDO_INICIAL)
-                                    
-                            if not st.session_state.df_sandbox_mem.empty and 'PEDIDO' in st.session_state.df_sandbox_mem.columns:
-                                try:
-                                    max_id_carrinho = pd.to_numeric(st.session_state.df_sandbox_mem['PEDIDO'], errors='coerce').max()
-                                    if pd.notna(max_id_carrinho) and max_id_carrinho >= prox_id_sb:
-                                        prox_id_sb = int(max_id_carrinho) + 1
-                                except: pass
+                                    try:
+                                        aba_contador = planilha_sandbox.worksheet("Contador")
+                                    except Exception:
+                                        pass
 
                             for idx, row in df_ok.iterrows():
                                 df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
@@ -7289,39 +7312,7 @@ elif menu == "📥 Importações Umove":
     # -------------------------------------------------------------------------
     with tab_carrinho:
         def obter_proximo_id_umove_seguro():
-            candidatos = []
-
-            if not st.session_state.df_sandbox_mem.empty and 'PEDIDO' in st.session_state.df_sandbox_mem.columns:
-                candidatos.append(st.session_state.df_sandbox_mem[['PEDIDO']].copy())
-
-            try:
-                df_rascunhos = gerenciar_estado_lote("LISTAR_RASCUNHOS")
-                if df_rascunhos is not None and not df_rascunhos.empty and 'DADOS_JSON' in df_rascunhos.columns:
-                    for dados_json in df_rascunhos['DADOS_JSON'].dropna().astype(str):
-                        try:
-                            df_rasc = pd.read_json(io.StringIO(dados_json), orient='records')
-                            if not df_rasc.empty and 'PEDIDO' in df_rasc.columns:
-                                candidatos.append(df_rasc[['PEDIDO']].copy())
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-
-            df_base_ids = pd.concat(candidatos, ignore_index=True) if candidatos else pd.DataFrame(columns=['PEDIDO'])
-            proximo_base = obter_proximo_id(df_base_ids, minimo_inicial=UMOVE_PEDIDO_INICIAL)
-
-            try:
-                aba_contador = planilha_sandbox.worksheet("Contador")
-                val = aba_contador.acell('A1').value
-                if val and str(val).isdigit():
-                    proximo_base = max(proximo_base, int(val))
-            except Exception:
-                pass
-
-            if 'contador_temp' in st.session_state:
-                proximo_base = max(proximo_base, int(st.session_state.contador_temp))
-
-            return max(proximo_base, UMOVE_PEDIDO_INICIAL)
+            return obter_proximo_id_umove_seguro_global()
 
         # --- BLOCAGEM DE PROCESSAMENTO: AGENDAMENTOS FIXOS ---
         df_fixos_hoje = pd.DataFrame()
