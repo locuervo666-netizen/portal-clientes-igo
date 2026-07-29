@@ -236,7 +236,8 @@ def usuarios_padrao_portal_cliente():
 
 
 def carregar_portal_clientes_login():
-    usuarios = {}
+    usuarios_nuvem = {}
+    usuarios_local = {}
 
     planilha = abrir_planilha_login_portal()
     if planilha:
@@ -254,11 +255,11 @@ def carregar_portal_clientes_login():
                     senha_hash = str(linha[idx_senha] if idx_senha < len(linha) else "").strip()
                     tomador = normalizar_tomador_portal(linha[idx_tomador] if idx_tomador < len(linha) else "TODOS")
                     if usuario and senha_hash:
-                        usuarios[usuario] = montar_config_portal_cliente(senha_hash, tomador)
+                        usuarios_nuvem[usuario] = montar_config_portal_cliente(senha_hash, tomador)
         except Exception:
-            usuarios = {}
+            usuarios_nuvem = {}
 
-    if not usuarios and os.path.exists(ARQUIVO_PORTAL_CLIENTE_LOGIN):
+    if os.path.exists(ARQUIVO_PORTAL_CLIENTE_LOGIN):
         try:
             with open(ARQUIVO_PORTAL_CLIENTE_LOGIN, "r", encoding="utf-8") as f:
                 dados = json.load(f)
@@ -271,19 +272,21 @@ def carregar_portal_clientes_login():
 
                     if isinstance(info, dict):
                         senha_hash = str(info.get("senha_hash", "")).strip()
-                        logo = str(info.get("logo", "")).strip()
                         filtro = str(info.get("filtro", "TODOS")).strip().upper() or "TODOS"
                         tomador = str(info.get("tomador", filtro)).strip().upper() or filtro
                     else:
                         senha_hash = gerar_hash_senha(str(info))
-                        logo = "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png"
-                        filtro = "TODOS"
                         tomador = "TODOS"
 
                     if senha_hash:
-                        usuarios[user_norm] = montar_config_portal_cliente(senha_hash, tomador)
+                        usuarios_local[user_norm] = montar_config_portal_cliente(senha_hash, tomador)
         except Exception:
-            usuarios = {}
+            usuarios_local = {}
+
+    # Evita perda de cadastros quando uma das fontes (nuvem/local) estiver incompleta.
+    usuarios = {}
+    usuarios.update(usuarios_local)
+    usuarios.update(usuarios_nuvem)
 
     if not usuarios:
         usuarios = usuarios_padrao_portal_cliente()
@@ -299,8 +302,39 @@ def salvar_portal_clientes_login(usuarios):
     return salvou_nuvem
 
 
-def persistir_e_recarregar_portal_clientes(usuarios):
-    salvou_nuvem = salvar_portal_clientes_login(usuarios)
+def sincronizar_usuarios_portal_para_salvar(usuarios, permitir_remocoes=False):
+    # Sincroniza com o estado mais recente para evitar sobrescrita por sessao defasada.
+    usuarios_novos = {}
+    for usuario, info in (usuarios or {}).items():
+        user_norm = normalizar_usuario_login(usuario)
+        if not user_norm:
+            continue
+        if isinstance(info, dict):
+            senha_hash = str(info.get("senha_hash", "")).strip()
+            tomador = str(info.get("tomador", info.get("filtro", "TODOS"))).strip().upper() or "TODOS"
+        else:
+            senha_hash = gerar_hash_senha(str(info))
+            tomador = "TODOS"
+
+        if senha_hash:
+            usuarios_novos[user_norm] = montar_config_portal_cliente(senha_hash, tomador)
+
+    if permitir_remocoes:
+        return usuarios_novos
+
+    usuarios_atuais = carregar_portal_clientes_login()
+    usuarios_merge = {}
+    usuarios_merge.update(usuarios_atuais)
+    usuarios_merge.update(usuarios_novos)
+    return usuarios_merge
+
+
+def persistir_e_recarregar_portal_clientes(usuarios, permitir_remocoes=False):
+    usuarios_sincronizados = sincronizar_usuarios_portal_para_salvar(
+        usuarios,
+        permitir_remocoes=permitir_remocoes,
+    )
+    salvou_nuvem = salvar_portal_clientes_login(usuarios_sincronizados)
     recarregado = carregar_portal_clientes_login()
     st.session_state.portal_clientes_login = recarregado
     return salvou_nuvem, recarregado
@@ -10975,7 +11009,7 @@ elif menu == "👥 Cadastro de Usuários":
                     usuario_remover_portal = portal_label_remover.split(" | ", 1)[0].strip()
                     if st.button("Remover usuário do portal", type="secondary", use_container_width=True):
                         portal_clientes.pop(usuario_remover_portal, None)
-                        salvou_nuvem, recarregado = persistir_e_recarregar_portal_clientes(portal_clientes)
+                        salvou_nuvem, recarregado = persistir_e_recarregar_portal_clientes(portal_clientes, permitir_remocoes=True)
                         if usuario_remover_portal not in recarregado:
                             if salvou_nuvem:
                                 registrar_feedback_cadastro_usuario("success", f"Usuario {usuario_remover_portal} removido do Portal do Cliente com sucesso.")
