@@ -1439,6 +1439,22 @@ def padronizar_texto(texto):
         'ASCII', 'ignore').decode('utf-8').upper()
 
 
+def ordenar_grupo_por_bairro(df_grupo):
+    """Ordena bairros alfabeticamente com estabilidade, mantendo a ordem dos pedidos dentro do mesmo bairro."""
+    if df_grupo is None or df_grupo.empty:
+        return df_grupo
+
+    df_ordenado = df_grupo.copy()
+    df_ordenado['_BAIRRO_ORD'] = df_ordenado.get('BAIRRO', '').apply(padronizar_texto)
+    df_ordenado['_BAIRRO_VAZIO'] = (df_ordenado['_BAIRRO_ORD'] == '')
+    df_ordenado = df_ordenado.sort_values(
+        by=['_BAIRRO_VAZIO', '_BAIRRO_ORD'],
+        ascending=[True, True],
+        kind='mergesort',
+    )
+    return df_ordenado.drop(columns=['_BAIRRO_ORD', '_BAIRRO_VAZIO'])
+
+
 def corrigir_cidade_inteligente(cidade_suja, df_rotas):
     if pd.isna(cidade_suja) or not str(cidade_suja).strip() or df_rotas.empty:
         return padronizar_texto(cidade_suja)
@@ -6400,9 +6416,10 @@ elif menu == "📥 Importações":
                             tot_qtd += count
                         msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
 
-                        for cid, group in df_ag_of.groupby('CIDADE'):
+                        for cid, group in df_ag_of.groupby('CIDADE', sort=False):
                             msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
                             items = []
+                            group = ordenar_grupo_por_bairro(group)
                             for _, row in group.iterrows():
                                 item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                 obs = str(row.get('OBSERVACOES', '')).strip()
@@ -7552,6 +7569,37 @@ elif menu == "📥 Importações Umove":
                 loc_lines = ["alternativeIdentifier;description;corporateName;state;city;cityNeighborhood;street;streetNumber;zipCode;CF_loc_responsavel_cliente;CF_loc_whats;CF_CNPJ;active"]
                 agd_lines = ["C", "command;serviceLocal;scheduleType;activitiesOrigin;active;date;hour;situation;alternativeIdentifier;agent;CF_tar_valor"]
 
+                def _formatar_data_agendada(valor_data):
+                    data_padrao = hoje_br.strftime('%d/%m/%Y')
+                    if valor_data is None:
+                        return data_padrao
+
+                    # Aceita datetime/date/Timestamp já prontos.
+                    if hasattr(valor_data, "strftime"):
+                        try:
+                            return valor_data.strftime('%d/%m/%Y')
+                        except Exception:
+                            pass
+
+                    texto = str(valor_data).strip()
+                    if not texto or texto.upper() in ["NAN", "NONE", "NAT"]:
+                        return data_padrao
+
+                    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y'):
+                        try:
+                            return datetime.strptime(texto, fmt).strftime('%d/%m/%Y')
+                        except Exception:
+                            continue
+
+                    try:
+                        data_parseada = pd.to_datetime(texto, dayfirst=True, errors='coerce')
+                        if pd.notna(data_parseada):
+                            return data_parseada.strftime('%d/%m/%Y')
+                    except Exception:
+                        pass
+
+                    return data_padrao
+
                 for idx, row in df.iterrows():
                     id_agd = str(row['PEDIDO'])
                     tomador = str(row.get('TOMADOR', '')).upper()
@@ -7577,7 +7625,8 @@ elif menu == "📥 Importações Umove":
                             schedule_type = 'visita_tox'
                     else:
                         schedule_type = "visita_tox"
-                    linha_agd = f";{id_loc};{schedule_type};7;1;{hoje_br.strftime('%d/%m/%Y')};00:10;;{id_agd};{agente_agd};"
+                    data_agendada = _formatar_data_agendada(row.get('DATA', ''))
+                    linha_agd = f";{id_loc};{schedule_type};7;1;{data_agendada};00:10;;{id_agd};{agente_agd};"
                     agd_lines.append(linha_agd)
 
                 loc_lines_unique = [loc_lines[0]] + list(dict.fromkeys(loc_lines[1:]))
@@ -7932,9 +7981,10 @@ elif menu == "📥 Importações Umove":
                             tot_qtd += count
                         msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
 
-                        for cid, group in df_ag_sb.groupby('CIDADE'):
+                        for cid, group in df_ag_sb.groupby('CIDADE', sort=False):
                             msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
                             items = []
+                            group = ordenar_grupo_por_bairro(group)
                             for _, row in group.iterrows():
                                 item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                 obs = str(row.get('OBSERVACOES', '')).strip()
