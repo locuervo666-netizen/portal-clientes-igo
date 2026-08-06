@@ -1547,6 +1547,31 @@ def corrigir_cidade_inteligente(cidade_suja, df_rotas):
     return c_limpa
 
 
+SINONIMOS_CIDADE_GERAL = {
+    'JUQUITIBA': 'JUQUITIBA',
+    'JUQUITIBA SP': 'JUQUITIBA',
+    'JUQUITIBA/SP': 'JUQUITIBA',
+    'JUQUITIBA - SP': 'JUQUITIBA',
+}
+
+
+def normalizar_cidade_operacao(cidade, df_rotas=None):
+    cidade_norm = padronizar_texto(cidade)
+    if not cidade_norm:
+        return ""
+
+    cidade_norm = re.sub(r'\s+', ' ', cidade_norm).strip()
+    cidade_norm = re.sub(r'\s*[-/]\s*[A-Z]{2}$', '', cidade_norm).strip()
+
+    if cidade_norm in SINONIMOS_CIDADE_GERAL:
+        return SINONIMOS_CIDADE_GERAL[cidade_norm]
+
+    if df_rotas is not None and not df_rotas.empty:
+        return corrigir_cidade_inteligente(cidade_norm, df_rotas)
+
+    return cidade_norm
+
+
 def despachar_para_appsheet(lista_pedidos_dicts):
     if planilha_db is None or not lista_pedidos_dicts:
         return False
@@ -2164,15 +2189,6 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
             return ''
         return obs
 
-    def _hora_item(row):
-        hora_raw = str(row.get('HORA_STATUS', row.get('HORA', ''))).strip()
-        if not hora_raw or hora_raw.upper() in ['NAN', 'NONE']:
-            return ''
-        if ' ' in hora_raw:
-            hora_raw = hora_raw.split(' ')[-1]
-        hora_raw = hora_raw[:5]
-        return hora_raw
-
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=12)
     pdf.add_page()
@@ -2199,7 +2215,7 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
             df_pdf[col] = ""
 
     if 'CIDADE' in df_pdf.columns:
-        df_pdf['_CIDADE_PDF'] = df_pdf['CIDADE'].apply(padronizar_texto)
+        df_pdf['_CIDADE_PDF'] = df_pdf['CIDADE'].apply(lambda c: normalizar_cidade_operacao(c))
     else:
         df_pdf['_CIDADE_PDF'] = 'SEM CIDADE'
     if 'BAIRRO' in df_pdf.columns:
@@ -2219,31 +2235,33 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
     total_bairros = int(df_pdf.groupby(['_CIDADE_PDF', '_BAIRRO_PDF']).ngroups) if not df_pdf.empty else 0
     total_tomadores = int(df_pdf['TOMADOR'].astype(str).str.strip().replace('', 'SEM TOMADOR').nunique()) if not df_pdf.empty else 0
 
-    def _cabecalho_bloco(cidade_nome, bairro_nome):
+    def _cabecalho_cidade(cidade_nome):
         pdf.set_fill_color(15, 23, 42)
         pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Arial", "B", 9)
+        pdf.set_font("Arial", "B", 8)
         pdf.cell(0, 6, f"CIDADE: {cidade_nome}", 1, 1, "L", True)
+
+    def _cabecalho_bairro(bairro_nome):
 
         pdf.set_fill_color(226, 232, 240)
         pdf.set_text_color(15, 23, 42)
-        pdf.set_font("Arial", "B", 8)
+        pdf.set_font("Arial", "B", 7)
         pdf.cell(0, 5, f"   BAIRRO: {bairro_nome}", 1, 1, "L", True)
 
         pdf.set_fill_color(241, 245, 249)
         pdf.set_text_color(71, 85, 105)
-        pdf.set_font("Arial", "B", 7)
-        pdf.cell(10, 5, "OK", 1, 0, "C", True)
-        pdf.cell(18, 5, "PEDIDO", 1, 0, "C", True)
-        pdf.cell(12, 5, "HORA", 1, 0, "C", True)
-        pdf.cell(43, 5, "LABORATORIO", 1, 0, "L", True)
-        pdf.cell(72, 5, "ENDERECO", 1, 0, "L", True)
-        pdf.cell(25, 5, "OBS", 1, 1, "C", True)
+        pdf.set_font("Arial", "B", 6)
+        pdf.cell(8, 5, "OK", 1, 0, "C", True)
+        pdf.cell(16, 5, "PEDIDO", 1, 0, "C", True)
+        pdf.cell(36, 5, "LABORATORIO", 1, 0, "L", True)
+        pdf.cell(80, 5, "ENDERECO", 1, 0, "L", True)
+        pdf.cell(40, 5, "OBS", 1, 1, "C", True)
 
     def _nova_pagina_com_retorno(cidade_nome, bairro_nome):
         pdf.add_page()
         pdf.rect(5, 5, 200, 287)
-        _cabecalho_bloco(cidade_nome, bairro_nome)
+        _cabecalho_cidade(cidade_nome)
+        _cabecalho_bairro(bairro_nome)
 
     pdf.set_y(15)
     pdf.set_font("Arial", "B", 14)
@@ -2277,15 +2295,15 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
         pdf.set_font("Arial", "B", 13)
         pdf.cell(tile_w, 9, valor, 1, 0, "C", True)
 
-    pdf.ln(17)
+    pdf.ln(12)
     pdf.set_text_color(15, 23, 42)
-    pdf.set_font("Arial", "B", 9)
+    pdf.set_font("Arial", "B", 8)
     pdf.cell(0, 5, "CHECKLIST OPERACIONAL", ln=True)
-    pdf.set_font("Arial", "", 7)
+    pdf.set_font("Arial", "", 6)
     pdf.set_text_color(71, 85, 105)
     pdf.multi_cell(
         0,
-        4,
+        3.5,
         "Conferir volumes, validar observacoes e assinalar cada item antes da saida. Itens em amarelo merecem revisao rapida.",
     )
     pdf.ln(1)
@@ -2293,37 +2311,36 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
     grouped_cidade = df_pdf.groupby('_CIDADE_PDF', sort=False)
     for cidade, group_cid in grouped_cidade:
         cidade_nome = _txt_pdf(cidade, 40)
+        _cabecalho_cidade(cidade_nome)
         grouped_bairro = group_cid.groupby('_BAIRRO_PDF', sort=False)
         for bairro, group_bai in grouped_bairro:
             bairro_nome = _txt_pdf(bairro, 42)
-            _cabecalho_bloco(cidade_nome, bairro_nome)
+            _cabecalho_bairro(bairro_nome)
             pdf.set_text_color(51, 65, 85)
-            pdf.set_font("Arial", "", 7)
+            pdf.set_font("Arial", "", 6)
             for idx_item, (_, row) in enumerate(group_bai.iterrows()):
                 if pdf.get_y() > 272:
                     _nova_pagina_com_retorno(cidade_nome, bairro_nome)
                     pdf.set_text_color(51, 65, 85)
-                    pdf.set_font("Arial", "", 7)
+                    pdf.set_font("Arial", "", 6)
 
                 ped = _txt_pdf(row.get('PEDIDO', ''), 18)
-                hora = _hora_item(row)
-                lab = _txt_pdf(row.get('LABORATORIO', ''), 38)
-                end = _txt_pdf(f"{row.get('ENDERECO', '')}, {row.get('NUMERO', '')}", 72)
+                lab = _txt_pdf(row.get('LABORATORIO', ''), 32)
+                end = _txt_pdf(f"{row.get('ENDERECO', '')}, {row.get('NUMERO', '')}", 80)
                 obs = _texto_obs(row.get('OBSERVACOES', ''))
 
                 fill_row = (248, 250, 252) if idx_item % 2 == 0 else (255, 255, 255)
                 fill_obs = (254, 249, 195) if obs else fill_row
 
                 pdf.set_fill_color(*fill_row)
-                pdf.cell(10, 5, "[ ]", 1, 0, "C", True)
-                pdf.cell(18, 5, ped, 1, 0, "C", True)
-                pdf.cell(12, 5, hora, 1, 0, "C", True)
-                pdf.cell(43, 5, lab, 1, 0, "L", True)
-                pdf.cell(72, 5, end, 1, 0, "L", True)
+                pdf.cell(8, 5, "[ ]", 1, 0, "C", True)
+                pdf.cell(16, 5, ped, 1, 0, "C", True)
+                pdf.cell(36, 5, lab, 1, 0, "L", True)
+                pdf.cell(80, 5, end, 1, 0, "L", True)
                 pdf.set_fill_color(*fill_obs)
-                pdf.cell(25, 5, obs[:22] if obs else "", 1, 1, "L", True)
+                pdf.cell(40, 5, obs[:40] if obs else "", 1, 1, "L", True)
 
-            pdf.ln(1)
+            pdf.ln(0.5)
 
     pdf.set_font("Arial", "I", 7)
     pdf.set_text_color(100, 116, 139)
@@ -5915,7 +5932,7 @@ elif menu == "📥 Importações":
                             df_limpo['TOMADOR'] = tom
                             df_limpo['DATA'] = dt_c.strftime("%d/%m/%Y")
 
-                            df_limpo['CIDADE'] = df_limpo['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
+                            df_limpo['CIDADE'] = df_limpo['CIDADE'].apply(lambda c: normalizar_cidade_operacao(corrigir_cidade_inteligente(c, DF_AGENTES), DF_AGENTES))
                             df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
 
                             st.session_state.df_preview_oficial = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
@@ -6561,7 +6578,7 @@ elif menu == "📥 Importações":
 
                         df_msg_of = df_ag_of.copy()
                         if 'CIDADE' in df_msg_of.columns:
-                            df_msg_of['_CIDADE_WHATS'] = df_msg_of['CIDADE'].apply(padronizar_texto)
+                            df_msg_of['_CIDADE_WHATS'] = df_msg_of['CIDADE'].apply(lambda c: normalizar_cidade_operacao(c, DF_AGENTES))
                         else:
                             df_msg_of['_CIDADE_WHATS'] = ''
                         if 'BAIRRO' in df_msg_of.columns:
@@ -7203,7 +7220,7 @@ elif menu == "📥 Importações Umove":
                             df_limpo_sb['TOMADOR'] = tom_sandbox
                             df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
 
-                            df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
+                            df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: normalizar_cidade_operacao(corrigir_cidade_inteligente(c, DF_AGENTES), DF_AGENTES))
                             df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
                             # A normalizacao ocorre apos o roteamento para nao quebrar mapeamentos legados de rota.
                             df_limpo_sb['BAIRRO'] = df_limpo_sb['BAIRRO'].apply(normalizar_bairro_whatsapp)
@@ -8145,7 +8162,7 @@ elif menu == "📥 Importações Umove":
 
                         df_msg_sb = df_ag_sb.copy()
                         if 'CIDADE' in df_msg_sb.columns:
-                            df_msg_sb['_CIDADE_WHATS'] = df_msg_sb['CIDADE'].apply(padronizar_texto)
+                            df_msg_sb['_CIDADE_WHATS'] = df_msg_sb['CIDADE'].apply(lambda c: normalizar_cidade_operacao(c, DF_AGENTES))
                         else:
                             df_msg_sb['_CIDADE_WHATS'] = ''
                         if 'BAIRRO' in df_msg_sb.columns:
