@@ -2178,6 +2178,12 @@ def gerar_excel_rota_whatsapp(df_agente):
 
 
 def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
+    W_OK = 8
+    W_PED = 16
+    W_LAB = 30
+    W_END = 72
+    W_OBS = 64
+
     def _txt_pdf(valor, limite=120):
         texto = corrigir_nomes_relatorio(padronizar_texto(valor))
         texto = re.sub(r'\s+', ' ', texto).strip()
@@ -2251,11 +2257,11 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
         pdf.set_fill_color(241, 245, 249)
         pdf.set_text_color(71, 85, 105)
         pdf.set_font("Arial", "B", 6)
-        pdf.cell(8, 5, "OK", 1, 0, "C", True)
-        pdf.cell(16, 5, "PEDIDO", 1, 0, "C", True)
-        pdf.cell(36, 5, "LABORATORIO", 1, 0, "L", True)
-        pdf.cell(80, 5, "ENDERECO", 1, 0, "L", True)
-        pdf.cell(40, 5, "OBS", 1, 1, "C", True)
+        pdf.cell(W_OK, 5, "OK", 1, 0, "C", True)
+        pdf.cell(W_PED, 5, "PEDIDO", 1, 0, "C", True)
+        pdf.cell(W_LAB, 5, "LABORATORIO", 1, 0, "L", True)
+        pdf.cell(W_END, 5, "ENDERECO", 1, 0, "L", True)
+        pdf.cell(W_OBS, 5, "OBS", 1, 1, "C", True)
 
     def _nova_pagina_com_retorno(cidade_nome, bairro_nome):
         pdf.add_page()
@@ -2325,20 +2331,20 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
                     pdf.set_font("Arial", "", 6)
 
                 ped = _txt_pdf(row.get('PEDIDO', ''), 18)
-                lab = _txt_pdf(row.get('LABORATORIO', ''), 32)
-                end = _txt_pdf(f"{row.get('ENDERECO', '')}, {row.get('NUMERO', '')}", 80)
+                lab = _txt_pdf(row.get('LABORATORIO', ''), 30)
+                end = _txt_pdf(f"{row.get('ENDERECO', '')}, {row.get('NUMERO', '')}", 72)
                 obs = _texto_obs(row.get('OBSERVACOES', ''))
 
                 fill_row = (248, 250, 252) if idx_item % 2 == 0 else (255, 255, 255)
                 fill_obs = (254, 249, 195) if obs else fill_row
 
                 pdf.set_fill_color(*fill_row)
-                pdf.cell(8, 5, "[ ]", 1, 0, "C", True)
-                pdf.cell(16, 5, ped, 1, 0, "C", True)
-                pdf.cell(36, 5, lab, 1, 0, "L", True)
-                pdf.cell(80, 5, end, 1, 0, "L", True)
+                pdf.cell(W_OK, 5, "[ ]", 1, 0, "C", True)
+                pdf.cell(W_PED, 5, ped, 1, 0, "C", True)
+                pdf.cell(W_LAB, 5, lab, 1, 0, "L", True)
+                pdf.cell(W_END, 5, end, 1, 0, "L", True)
                 pdf.set_fill_color(*fill_obs)
-                pdf.cell(40, 5, obs[:40] if obs else "", 1, 1, "L", True)
+                pdf.cell(W_OBS, 5, obs[:56] if obs else "", 1, 1, "L", True)
 
             pdf.ln(0.5)
 
