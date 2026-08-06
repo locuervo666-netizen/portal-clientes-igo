@@ -1439,13 +1439,76 @@ def padronizar_texto(texto):
         'ASCII', 'ignore').decode('utf-8').upper()
 
 
+SINONIMOS_BAIRRO_GERAL = {
+    'JD': 'JARDIM',
+    'JADIM': 'JARDIM',
+    'JARDIM': 'JARDIM',
+    'PQ': 'PARQUE',
+    'PARQ': 'PARQUE',
+    'PARQUE': 'PARQUE',
+    'VL': 'VILA',
+    'VILA': 'VILA',
+    'STA': 'SANTA',
+    'SANTA': 'SANTA',
+    'STO': 'SANTO',
+    'SANTO': 'SANTO',
+    'CH': 'CHACARA',
+    'CHA': 'CHACARA',
+    'CHACARA': 'CHACARA',
+}
+
+# Estrutura pronta para excecoes por cliente/regiao.
+# Exemplo de uso futuro:
+# SINONIMOS_BAIRRO_POR_TOMADOR['CLIENTE X'] = {'STA': 'SITIO', 'CH': 'CHACARA'}
+SINONIMOS_BAIRRO_POR_TOMADOR = {
+    '__DEFAULT__': {},
+}
+
+
+def normalizar_bairro_whatsapp(bairro, tomador=""):
+    """Unifica abreviacoes comuns de bairro e permite regras extras por tomador."""
+    bairro_norm = padronizar_texto(bairro)
+    if not bairro_norm:
+        return ""
+
+    bairro_norm = re.sub(r'\s+', ' ', bairro_norm).strip()
+    tomador_norm = padronizar_texto(tomador)
+
+    mapa_sinonimos = dict(SINONIMOS_BAIRRO_GERAL)
+    if tomador_norm and tomador_norm in SINONIMOS_BAIRRO_POR_TOMADOR:
+        mapa_sinonimos.update(SINONIMOS_BAIRRO_POR_TOMADOR[tomador_norm])
+    if '__DEFAULT__' in SINONIMOS_BAIRRO_POR_TOMADOR:
+        mapa_sinonimos.update(SINONIMOS_BAIRRO_POR_TOMADOR['__DEFAULT__'])
+
+    for alias, canonico in mapa_sinonimos.items():
+        bairro_norm = re.sub(
+            rf'^(?:{re.escape(alias)})\.?\s+',
+            f'{canonico} ',
+            bairro_norm,
+        )
+        if bairro_norm == alias:
+            bairro_norm = canonico
+
+    return re.sub(r'\s+', ' ', bairro_norm).strip()
+
+
 def ordenar_grupo_por_bairro(df_grupo):
     """Ordena bairros alfabeticamente com estabilidade, mantendo a ordem dos pedidos dentro do mesmo bairro."""
     if df_grupo is None or df_grupo.empty:
         return df_grupo
 
     df_ordenado = df_grupo.copy()
-    df_ordenado['_BAIRRO_ORD'] = df_ordenado.get('BAIRRO', '').apply(padronizar_texto)
+    if '_BAIRRO_WHATS' in df_ordenado.columns:
+        df_ordenado['_BAIRRO_ORD'] = df_ordenado['_BAIRRO_WHATS'].apply(normalizar_bairro_whatsapp)
+    elif 'TOMADOR' in df_ordenado.columns and 'BAIRRO' in df_ordenado.columns:
+        df_ordenado['_BAIRRO_ORD'] = df_ordenado.apply(
+            lambda row: normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', '')),
+            axis=1,
+        )
+    elif 'BAIRRO' in df_ordenado.columns:
+        df_ordenado['_BAIRRO_ORD'] = df_ordenado['BAIRRO'].apply(normalizar_bairro_whatsapp)
+    else:
+        df_ordenado['_BAIRRO_ORD'] = ''
     df_ordenado['_BAIRRO_VAZIO'] = (df_ordenado['_BAIRRO_ORD'] == '')
     df_ordenado = df_ordenado.sort_values(
         by=['_BAIRRO_VAZIO', '_BAIRRO_ORD'],
@@ -2090,94 +2153,172 @@ def gerar_excel_rota_whatsapp(df_agente):
 
 
 def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
+    def _txt_pdf(valor, limite=120):
+        texto = corrigir_nomes_relatorio(padronizar_texto(valor))
+        texto = re.sub(r'\s+', ' ', texto).strip()
+        return texto[:limite]
+
+    def _texto_obs(valor):
+        obs = _txt_pdf(valor, 80)
+        if not obs or obs.upper() in ['NAN', 'NONE']:
+            return ''
+        return obs
+
     pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=12)
     pdf.add_page()
     pdf.set_draw_color(15, 23, 42)
     pdf.set_line_width(0.3)
     pdf.rect(5, 5, 200, 287)
+
     try:
         logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
         if not os.path.exists(logo_path):
             req = urllib.request.Request(
                 "https://i.postimg.cc/x84nnjjq/IGO-LOGO.png",
-                headers={
-                    'User-Agent': 'Mozilla/5.0'})
+                headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file:
                 out_file.write(response.read())
-        pdf.image(logo_path, x=10, y=8, w=30)
+        pdf.image(logo_path, x=10, y=8, w=28)
     except Exception:
         pass
 
-    pdf.set_y(15)
-    pdf.set_font("Arial", "B", 14)
-    pdf.set_text_color(15, 23, 42)
-    pdf.cell(
-        0,
-        6,
-        f"ROTA OFICIAL DE OPERACAO - IGO LOGISTICA",
-        ln=True,
-        align="C")
-    pdf.set_font("Arial", "B", 10)
-    pdf.set_text_color(2, 132, 199)
-    pdf.cell(
-        0,
-        5,
-        f"AGENTE: {
-            padronizar_texto(nome_motorista)}",
-        ln=True,
-        align="C")
-    pdf.set_font("Arial", "", 8)
-    pdf.set_text_color(100, 116, 139)
-    pdf.cell(
-        0,
-        4,
-        f"Data da Rota: {data_str} | Total de Volumes: {
-            len(df_agente)}",
-        ln=True,
-        align="C")
-    pdf.ln(3)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(3)
+    df_pdf = df_agente.copy()
+    colunas_base = ['PEDIDO', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'TOMADOR', 'OBSERVACOES']
+    for col in colunas_base:
+        if col not in df_pdf.columns:
+            df_pdf[col] = ""
 
-    grouped_cidade = df_agente.groupby('CIDADE')
-    for cidade, group_cid in grouped_cidade:
-        cidade_nome = padronizar_texto(str(cidade))
+    if 'CIDADE' in df_pdf.columns:
+        df_pdf['_CIDADE_PDF'] = df_pdf['CIDADE'].apply(padronizar_texto)
+    else:
+        df_pdf['_CIDADE_PDF'] = 'SEM CIDADE'
+    if 'BAIRRO' in df_pdf.columns:
+        df_pdf['_BAIRRO_PDF'] = df_pdf.apply(
+            lambda row: normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', '')),
+            axis=1,
+        )
+    else:
+        df_pdf['_BAIRRO_PDF'] = 'SEM BAIRRO'
+
+    df_pdf['_CIDADE_PDF'] = df_pdf['_CIDADE_PDF'].replace('', 'SEM CIDADE')
+    df_pdf['_BAIRRO_PDF'] = df_pdf['_BAIRRO_PDF'].replace('', 'SEM BAIRRO')
+    df_pdf = df_pdf.sort_values(by=['_CIDADE_PDF', '_BAIRRO_PDF', 'PEDIDO'], kind='mergesort')
+
+    total_volumes = len(df_pdf)
+    total_cidades = int(df_pdf['_CIDADE_PDF'].nunique()) if not df_pdf.empty else 0
+    total_bairros = int(df_pdf.groupby(['_CIDADE_PDF', '_BAIRRO_PDF']).ngroups) if not df_pdf.empty else 0
+    total_tomadores = int(df_pdf['TOMADOR'].astype(str).str.strip().replace('', 'SEM TOMADOR').nunique()) if not df_pdf.empty else 0
+
+    def _cabecalho_bloco(cidade_nome, bairro_nome):
         pdf.set_fill_color(15, 23, 42)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Arial", "B", 9)
         pdf.cell(0, 6, f"CIDADE: {cidade_nome}", 1, 1, "L", True)
 
-        grouped_bairro = group_bai = group_cid.groupby('BAIRRO')
+        pdf.set_fill_color(226, 232, 240)
+        pdf.set_text_color(15, 23, 42)
+        pdf.set_font("Arial", "B", 8)
+        pdf.cell(0, 5, f"   BAIRRO: {bairro_nome}", 1, 1, "L", True)
+
+        pdf.set_fill_color(241, 245, 249)
+        pdf.set_text_color(71, 85, 105)
+        pdf.set_font("Arial", "B", 7)
+        pdf.cell(10, 5, "OK", 1, 0, "C", True)
+        pdf.cell(18, 5, "PEDIDO", 1, 0, "C", True)
+        pdf.cell(40, 5, "LABORATORIO", 1, 0, "L", True)
+        pdf.cell(34, 5, "BAIRRO", 1, 0, "L", True)
+        pdf.cell(58, 5, "ENDERECO", 1, 0, "L", True)
+        pdf.cell(20, 5, "OBS", 1, 1, "C", True)
+
+    def _nova_pagina_com_retorno(cidade_nome, bairro_nome):
+        pdf.add_page()
+        pdf.rect(5, 5, 200, 287)
+        _cabecalho_bloco(cidade_nome, bairro_nome)
+
+    pdf.set_y(15)
+    pdf.set_font("Arial", "B", 14)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 6, "ROTA OFICIAL DE OPERACAO - IGO LOGISTICA", ln=True, align="C")
+    pdf.set_font("Arial", "B", 10)
+    pdf.set_text_color(2, 132, 199)
+    pdf.cell(0, 5, f"AGENTE: {_txt_pdf(nome_motorista, 50)}", ln=True, align="C")
+    pdf.set_font("Arial", "", 8)
+    pdf.set_text_color(100, 116, 139)
+    pdf.cell(0, 4, f"Data da Rota: {data_str}", ln=True, align="C")
+    pdf.cell(0, 4, f"Volumes: {total_volumes} | Cidades: {total_cidades} | Bairros: {total_bairros} | Tomadores: {total_tomadores}", ln=True, align="C")
+
+    y_base = pdf.get_y() + 3
+    tile_w = 43
+    gap = 2
+    tiles = [
+        ("VOLUMES", str(total_volumes), (239, 246, 255), (15, 23, 42)),
+        ("CIDADES", str(total_cidades), (240, 253, 244), (5, 150, 105)),
+        ("BAIRROS", str(total_bairros), (255, 251, 235), (217, 119, 6)),
+        ("TOMADORES", str(total_tomadores), (254, 242, 242), (185, 28, 28)),
+    ]
+    for idx, (titulo, valor, fill, txt_color) in enumerate(tiles):
+        x = 10 + idx * (tile_w + gap)
+        pdf.set_xy(x, y_base)
+        pdf.set_fill_color(*fill)
+        pdf.set_text_color(*txt_color)
+        pdf.set_font("Arial", "B", 7)
+        pdf.cell(tile_w, 5, titulo, 1, 1, "C", True)
+        pdf.set_xy(x, y_base + 5)
+        pdf.set_font("Arial", "B", 13)
+        pdf.cell(tile_w, 9, valor, 1, 0, "C", True)
+
+    pdf.ln(17)
+    pdf.set_text_color(15, 23, 42)
+    pdf.set_font("Arial", "B", 9)
+    pdf.cell(0, 5, "CHECKLIST OPERACIONAL", ln=True)
+    pdf.set_font("Arial", "", 7)
+    pdf.set_text_color(71, 85, 105)
+    pdf.multi_cell(
+        0,
+        4,
+        "Conferir volumes, validar observacoes e assinalar cada item antes da saida. Itens em amarelo merecem revisao rapida.",
+    )
+    pdf.ln(1)
+
+    grouped_cidade = df_pdf.groupby('_CIDADE_PDF', sort=False)
+    for cidade, group_cid in grouped_cidade:
+        cidade_nome = _txt_pdf(cidade, 40)
+        grouped_bairro = group_cid.groupby('_BAIRRO_PDF', sort=False)
         for bairro, group_bai in grouped_bairro:
-            bairro_nome = padronizar_texto(str(bairro))
-            pdf.set_fill_color(226, 232, 240)
-            pdf.set_text_color(15, 23, 42)
-            pdf.set_font("Arial", "B", 8)
-            pdf.cell(0, 5, f"   BAIRRO: {bairro_nome}", 1, 1, "L", True)
-            pdf.set_fill_color(241, 245, 249)
-            pdf.set_text_color(71, 85, 105)
-            pdf.set_font("Arial", "B", 7)
-            pdf.cell(8, 5, "OK", 1, 0, "C", True)
-            pdf.cell(20, 5, "PEDIDO", 1, 0, "C", True)
-            pdf.cell(60, 5, "LABORATORIO", 1, 0, "L", True)
-            pdf.cell(77, 5, "ENDERECO", 1, 0, "L", True)
-            pdf.cell(25, 5, "TOMADOR", 1, 1, "C", True)
+            bairro_nome = _txt_pdf(bairro, 42)
+            _cabecalho_bloco(cidade_nome, bairro_nome)
             pdf.set_text_color(51, 65, 85)
             pdf.set_font("Arial", "", 7)
-            for _, row in group_bai.iterrows():
-                ped = padronizar_texto(str(row.get('PEDIDO', '')))
-                lab = corrigir_nomes_relatorio(padronizar_texto(
-                    str(row.get('LABORATORIO', ''))))[:35]
-                end = padronizar_texto(
-                    f"{str(row.get('ENDERECO', ''))}, {str(row.get('NUMERO', ''))}")[:48]
-                tom = corrigir_nomes_relatorio(
-                    padronizar_texto(str(row.get('TOMADOR', ''))))[:15]
-                pdf.cell(8, 5, "[  ]", 1, 0, "C")
-                pdf.cell(20, 5, ped, 1, 0, "C")
-                pdf.cell(60, 5, lab, 1, 0, "L")
-                pdf.cell(77, 5, end, 1, 0, "L")
-                pdf.cell(25, 5, tom, 1, 1, "C")
-        pdf.ln(2)
+            for idx_item, (_, row) in enumerate(group_bai.iterrows()):
+                if pdf.get_y() > 272:
+                    _nova_pagina_com_retorno(cidade_nome, bairro_nome)
+                    pdf.set_text_color(51, 65, 85)
+                    pdf.set_font("Arial", "", 7)
+
+                ped = _txt_pdf(row.get('PEDIDO', ''), 18)
+                lab = _txt_pdf(row.get('LABORATORIO', ''), 38)
+                bai = _txt_pdf(row.get('BAIRRO', ''), 32)
+                end = _txt_pdf(f"{row.get('ENDERECO', '')}, {row.get('NUMERO', '')}", 58)
+                obs = _texto_obs(row.get('OBSERVACOES', ''))
+
+                fill_row = (248, 250, 252) if idx_item % 2 == 0 else (255, 255, 255)
+                fill_obs = (254, 249, 195) if obs else fill_row
+
+                pdf.set_fill_color(*fill_row)
+                pdf.cell(10, 5, "[ ]", 1, 0, "C", True)
+                pdf.cell(18, 5, ped, 1, 0, "C", True)
+                pdf.cell(40, 5, lab, 1, 0, "L", True)
+                pdf.cell(34, 5, bai, 1, 0, "L", True)
+                pdf.cell(58, 5, end, 1, 0, "L", True)
+                pdf.set_fill_color(*fill_obs)
+                pdf.cell(20, 5, obs[:18] if obs else "", 1, 1, "L", True)
+
+            pdf.ln(1)
+
+    pdf.set_font("Arial", "I", 7)
+    pdf.set_text_color(100, 116, 139)
+    pdf.cell(0, 5, f"Relatorio gerado em {datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S')}", ln=True, align="R")
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
         pdf.output(tmp_pdf.name)
@@ -6409,19 +6550,35 @@ elif menu == "📥 Importações":
                         bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
                         lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
 
+                        df_msg_of = df_ag_of.copy()
+                        if 'CIDADE' in df_msg_of.columns:
+                            df_msg_of['_CIDADE_WHATS'] = df_msg_of['CIDADE'].apply(padronizar_texto)
+                        else:
+                            df_msg_of['_CIDADE_WHATS'] = ''
+                        if 'BAIRRO' in df_msg_of.columns:
+                            df_msg_of['_BAIRRO_WHATS'] = df_msg_of.apply(
+                                lambda row: normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', tom_sandbox)),
+                                axis=1,
+                            )
+                        else:
+                            df_msg_of['_BAIRRO_WHATS'] = ''
+                        df_msg_of['_CIDADE_WHATS'] = df_msg_of['_CIDADE_WHATS'].replace('', 'SEM CIDADE')
+                        df_msg_of['_BAIRRO_WHATS'] = df_msg_of['_BAIRRO_WHATS'].replace('', 'SEM BAIRRO')
+
                         msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
                         tot_qtd = 0
-                        for cid, count in df_ag_of['CIDADE'].value_counts().items():
+                        for cid, count in df_msg_of['_CIDADE_WHATS'].value_counts().items():
                             msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}")
                             tot_qtd += count
                         msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
 
-                        for cid, group in df_ag_of.groupby('CIDADE', sort=False):
+                        for cid, group in df_msg_of.groupby('_CIDADE_WHATS', sort=False):
                             msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
                             items = []
                             group = ordenar_grupo_por_bairro(group)
                             for _, row in group.iterrows():
-                                item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                bairro_msg = row.get('_BAIRRO_WHATS', normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', tom_sandbox)))
+                                item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {bairro_msg}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                 obs = str(row.get('OBSERVACOES', '')).strip()
                                 if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                 items.append(item_str)
@@ -7039,6 +7196,8 @@ elif menu == "📥 Importações Umove":
 
                             df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: corrigir_cidade_inteligente(c, DF_AGENTES))
                             df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
+                            # A normalizacao ocorre apos o roteamento para nao quebrar mapeamentos legados de rota.
+                            df_limpo_sb['BAIRRO'] = df_limpo_sb['BAIRRO'].apply(normalizar_bairro_whatsapp)
 
                             df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
 
@@ -7605,6 +7764,7 @@ elif menu == "📥 Importações Umove":
                     tomador = str(row.get('TOMADOR', '')).upper()
                     lab = str(row.get('LABORATORIO', '')).upper()
                     cep = str(row.get('CEP', ''))
+                    bairro_legado = normalizar_bairro_whatsapp(row.get('BAIRRO', ''), tomador)
 
                     id_loc = f"{tomador}-{lab}-{cep}"
                     corp_name = f"{tomador}-{lab}"
@@ -7612,7 +7772,7 @@ elif menu == "📥 Importações Umove":
                     if cnpj: cnpj = f"'{cnpj}"
 
                     numero_limpo = re.sub(r'\D', '', str(row.get('NUMERO', '')))
-                    linha_loc = f"{id_loc};{id_loc};{corp_name};{row.get('UF', '')};{row.get('CIDADE', '')};{row.get('BAIRRO', '')};{row.get('ENDERECO', '')};{numero_limpo};{cep};{tomador};;{cnpj};1"
+                    linha_loc = f"{id_loc};{id_loc};{corp_name};{row.get('UF', '')};{row.get('CIDADE', '')};{bairro_legado};{row.get('ENDERECO', '')};{numero_limpo};{cep};{tomador};;{cnpj};1"
                     loc_lines.append(linha_loc)
 
                     agente_raw = str(row.get('AGENTE_RAW', ''))
@@ -7974,19 +8134,35 @@ elif menu == "📥 Importações Umove":
                         bullet = random.choice(['> 🔸', '👉', '📌', '📦', '➖'])
                         lab_lbl = random.choice(['LABORATÓRIO', 'LOCAL', 'PONTO DE COLETA'])
 
+                        df_msg_sb = df_ag_sb.copy()
+                        if 'CIDADE' in df_msg_sb.columns:
+                            df_msg_sb['_CIDADE_WHATS'] = df_msg_sb['CIDADE'].apply(padronizar_texto)
+                        else:
+                            df_msg_sb['_CIDADE_WHATS'] = ''
+                        if 'BAIRRO' in df_msg_sb.columns:
+                            df_msg_sb['_BAIRRO_WHATS'] = df_msg_sb.apply(
+                                lambda row: normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', tom_sandbox)),
+                                axis=1,
+                            )
+                        else:
+                            df_msg_sb['_BAIRRO_WHATS'] = ''
+                        df_msg_sb['_CIDADE_WHATS'] = df_msg_sb['_CIDADE_WHATS'].replace('', 'SEM CIDADE')
+                        df_msg_sb['_BAIRRO_WHATS'] = df_msg_sb['_BAIRRO_WHATS'].replace('', 'SEM BAIRRO')
+
                         msg_parts = [f"{saudacao}rota de 🗓️ {data_str}\n", "RESUMO DA ROTA:\n", "CIDADE | QTD", sep1]
                         tot_qtd = 0
-                        for cid, count in df_ag_sb['CIDADE'].value_counts().items():
+                        for cid, count in df_msg_sb['_CIDADE_WHATS'].value_counts().items():
                             msg_parts.append(f"{str(cid).strip().ljust(20)} | {count:02d}")
                             tot_qtd += count
                         msg_parts.extend([sep1, f"TOTAL | {tot_qtd:02d}\n\n", "⬇️ DETALHES:", f"{sep2}\n"])
 
-                        for cid, group in df_ag_sb.groupby('CIDADE', sort=False):
+                        for cid, group in df_msg_sb.groupby('_CIDADE_WHATS', sort=False):
                             msg_parts.extend([sep2, f"{str(cid).strip().center(30)}", f"{sep2}\n"])
                             items = []
                             group = ordenar_grupo_por_bairro(group)
                             for _, row in group.iterrows():
-                                item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {row.get('BAIRRO', '')}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                bairro_msg = row.get('_BAIRRO_WHATS', normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', tom_sandbox)))
+                                item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {bairro_msg}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                 obs = str(row.get('OBSERVACOES', '')).strip()
                                 if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                 items.append(item_str)
