@@ -2164,6 +2164,15 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
             return ''
         return obs
 
+    def _hora_item(row):
+        hora_raw = str(row.get('HORA_STATUS', row.get('HORA', ''))).strip()
+        if not hora_raw or hora_raw.upper() in ['NAN', 'NONE']:
+            return ''
+        if ' ' in hora_raw:
+            hora_raw = hora_raw.split(' ')[-1]
+        hora_raw = hora_raw[:5]
+        return hora_raw
+
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=12)
     pdf.add_page()
@@ -2226,10 +2235,10 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
         pdf.set_font("Arial", "B", 7)
         pdf.cell(10, 5, "OK", 1, 0, "C", True)
         pdf.cell(18, 5, "PEDIDO", 1, 0, "C", True)
-        pdf.cell(40, 5, "LABORATORIO", 1, 0, "L", True)
-        pdf.cell(34, 5, "BAIRRO", 1, 0, "L", True)
-        pdf.cell(58, 5, "ENDERECO", 1, 0, "L", True)
-        pdf.cell(20, 5, "OBS", 1, 1, "C", True)
+        pdf.cell(12, 5, "HORA", 1, 0, "C", True)
+        pdf.cell(43, 5, "LABORATORIO", 1, 0, "L", True)
+        pdf.cell(72, 5, "ENDERECO", 1, 0, "L", True)
+        pdf.cell(25, 5, "OBS", 1, 1, "C", True)
 
     def _nova_pagina_com_retorno(cidade_nome, bairro_nome):
         pdf.add_page()
@@ -2297,9 +2306,9 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
                     pdf.set_font("Arial", "", 7)
 
                 ped = _txt_pdf(row.get('PEDIDO', ''), 18)
+                hora = _hora_item(row)
                 lab = _txt_pdf(row.get('LABORATORIO', ''), 38)
-                bai = _txt_pdf(row.get('BAIRRO', ''), 32)
-                end = _txt_pdf(f"{row.get('ENDERECO', '')}, {row.get('NUMERO', '')}", 58)
+                end = _txt_pdf(f"{row.get('ENDERECO', '')}, {row.get('NUMERO', '')}", 72)
                 obs = _texto_obs(row.get('OBSERVACOES', ''))
 
                 fill_row = (248, 250, 252) if idx_item % 2 == 0 else (255, 255, 255)
@@ -2308,11 +2317,11 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
                 pdf.set_fill_color(*fill_row)
                 pdf.cell(10, 5, "[ ]", 1, 0, "C", True)
                 pdf.cell(18, 5, ped, 1, 0, "C", True)
-                pdf.cell(40, 5, lab, 1, 0, "L", True)
-                pdf.cell(34, 5, bai, 1, 0, "L", True)
-                pdf.cell(58, 5, end, 1, 0, "L", True)
+                pdf.cell(12, 5, hora, 1, 0, "C", True)
+                pdf.cell(43, 5, lab, 1, 0, "L", True)
+                pdf.cell(72, 5, end, 1, 0, "L", True)
                 pdf.set_fill_color(*fill_obs)
-                pdf.cell(20, 5, obs[:18] if obs else "", 1, 1, "L", True)
+                pdf.cell(25, 5, obs[:22] if obs else "", 1, 1, "L", True)
 
             pdf.ln(1)
 
