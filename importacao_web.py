@@ -2180,9 +2180,10 @@ def gerar_excel_rota_whatsapp(df_agente):
 def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
     W_OK = 8
     W_PED = 16
-    W_LAB = 30
-    W_END = 72
-    W_OBS = 64
+    W_TOM = 22
+    W_LAB = 28
+    W_END = 54
+    W_OBS = 62
 
     def _txt_pdf(valor, limite=120):
         texto = corrigir_nomes_relatorio(padronizar_texto(valor))
@@ -2190,10 +2191,21 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
         return texto[:limite]
 
     def _texto_obs(valor):
-        obs = _txt_pdf(valor, 80)
+        obs = str(valor).strip()
         if not obs or obs.upper() in ['NAN', 'NONE']:
             return ''
+        obs = corrigir_nomes_relatorio(obs)
+        obs = re.sub(r'\s+', ' ', obs).strip()
+        obs = re.sub(r'^\[\s*COLETA\s*:\s*', '', obs, flags=re.IGNORECASE)
+        obs = re.sub(r'\]\s*-\s*', ' | ', obs)
+        obs = re.sub(r'\]$', '', obs).strip()
         return obs
+
+    def _texto_obs_whatsapp(valor):
+        obs = str(valor).strip()
+        if not obs or obs.upper() in ['NAN', 'NONE']:
+            return ''
+        return re.sub(r'\s+', ' ', corrigir_nomes_relatorio(obs)).strip()
 
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=12)
@@ -2240,8 +2252,11 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
     total_cidades = int(df_pdf['_CIDADE_PDF'].nunique()) if not df_pdf.empty else 0
     total_bairros = int(df_pdf.groupby(['_CIDADE_PDF', '_BAIRRO_PDF']).ngroups) if not df_pdf.empty else 0
     total_tomadores = int(df_pdf['TOMADOR'].astype(str).str.strip().replace('', 'SEM TOMADOR').nunique()) if not df_pdf.empty else 0
+    cidade_unica_lote = total_cidades == 1
 
     def _cabecalho_cidade(cidade_nome):
+        if cidade_unica_lote:
+            return
         pdf.set_fill_color(15, 23, 42)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Arial", "B", 8)
@@ -2259,6 +2274,7 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
         pdf.set_font("Arial", "B", 6)
         pdf.cell(W_OK, 5, "OK", 1, 0, "C", True)
         pdf.cell(W_PED, 5, "PEDIDO", 1, 0, "C", True)
+        pdf.cell(W_TOM, 5, "TOMADOR", 1, 0, "L", True)
         pdf.cell(W_LAB, 5, "LABORATORIO", 1, 0, "L", True)
         pdf.cell(W_END, 5, "ENDERECO", 1, 0, "L", True)
         pdf.cell(W_OBS, 5, "OBS", 1, 1, "C", True)
@@ -2280,12 +2296,14 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
     pdf.set_text_color(100, 116, 139)
     pdf.cell(0, 4, f"Data da Rota: {data_str}", ln=True, align="C")
     pdf.cell(0, 4, f"Volumes: {total_volumes} | Cidades: {total_cidades} | Bairros: {total_bairros} | Tomadores: {total_tomadores}", ln=True, align="C")
+    if cidade_unica_lote and not df_pdf.empty:
+        pdf.cell(0, 4, f"Cidade da Rota: {_txt_pdf(df_pdf['_CIDADE_PDF'].iloc[0], 50)}", ln=True, align="C")
 
     y_base = pdf.get_y() + 3
     tile_w = 43
     gap = 2
     tiles = [
-        ("VOLUMES", str(total_volumes), (239, 246, 255), (15, 23, 42)),
+        ("PEDIDOS", str(total_volumes), (239, 246, 255), (15, 23, 42)),
         ("CIDADES", str(total_cidades), (240, 253, 244), (5, 150, 105)),
         ("BAIRROS", str(total_bairros), (255, 251, 235), (217, 119, 6)),
         ("TOMADORES", str(total_tomadores), (254, 242, 242), (185, 28, 28)),
@@ -2331,9 +2349,13 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
                     pdf.set_font("Arial", "", 6)
 
                 ped = _txt_pdf(row.get('PEDIDO', ''), 18)
-                lab = _txt_pdf(row.get('LABORATORIO', ''), 30)
+                tom = _txt_pdf(row.get('TOMADOR', ''), 22)
+                lab = _txt_pdf(row.get('LABORATORIO', ''), 28)
                 end = _txt_pdf(f"{row.get('ENDERECO', '')}, {row.get('NUMERO', '')}", 72)
-                obs = _texto_obs(row.get('OBSERVACOES', ''))
+                obs_bruto = row.get('OBSERVACOES', '')
+                if (not str(obs_bruto).strip() or str(obs_bruto).strip().upper() in ['NAN', 'NONE']) and str(row.get('HORARIO', '')).strip():
+                    obs_bruto = f"[COLETA: {str(row.get('HORARIO', '')).strip()}]"
+                obs = _texto_obs(obs_bruto)
 
                 fill_row = (248, 250, 252) if idx_item % 2 == 0 else (255, 255, 255)
                 fill_obs = (254, 249, 195) if obs else fill_row
@@ -2341,10 +2363,11 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
                 pdf.set_fill_color(*fill_row)
                 pdf.cell(W_OK, 5, "[ ]", 1, 0, "C", True)
                 pdf.cell(W_PED, 5, ped, 1, 0, "C", True)
+                pdf.cell(W_TOM, 5, tom, 1, 0, "L", True)
                 pdf.cell(W_LAB, 5, lab, 1, 0, "L", True)
                 pdf.cell(W_END, 5, end, 1, 0, "L", True)
                 pdf.set_fill_color(*fill_obs)
-                pdf.cell(W_OBS, 5, obs[:56] if obs else "", 1, 1, "L", True)
+                pdf.cell(W_OBS, 5, obs[:62] if obs else "", 1, 1, "L", True)
 
             pdf.ln(0.5)
 
@@ -6612,6 +6635,8 @@ elif menu == "📥 Importações":
                                 bairro_msg = row.get('_BAIRRO_WHATS', normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', tom_sandbox)))
                                 item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {bairro_msg}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                 obs = str(row.get('OBSERVACOES', '')).strip()
+                                if (not obs or obs.upper() in ['NAN', 'NONE']) and str(row.get('HORARIO', '')).strip():
+                                    obs = f"[COLETA: {str(row.get('HORARIO', '')).strip()}]"
                                 if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                 items.append(item_str)
                             msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
@@ -8196,6 +8221,8 @@ elif menu == "📥 Importações Umove":
                                 bairro_msg = row.get('_BAIRRO_WHATS', normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', tom_sandbox)))
                                 item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {bairro_msg}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                 obs = str(row.get('OBSERVACOES', '')).strip()
+                                if (not obs or obs.upper() in ['NAN', 'NONE']) and str(row.get('HORARIO', '')).strip():
+                                    obs = f"[COLETA: {str(row.get('HORARIO', '')).strip()}]"
                                 if obs and obs.upper() != 'NAN': item_str += f"\n> 📝 Aviso: {obs}"
                                 items.append(item_str)
                             msg_parts.append(f"\n\n{random.choice(['. . . .', '---', ' '])}\n\n".join(items) + "\n")
