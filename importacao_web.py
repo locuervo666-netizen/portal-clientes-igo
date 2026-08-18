@@ -1688,6 +1688,67 @@ def substituir_pedido_appsheet(lista_pedidos_dicts):
         return False
 
 
+def extrair_lista_telefones_whatsapp(dados_origem):
+    campos = [
+        "TELEFONE",
+        "TELEFONE_2",
+        "TELEFONE_3",
+        "CELULAR",
+        "CELULAR_2",
+        "WHATSAPP",
+        "WHATSAPP_2",
+        "CONTATO",
+        "CONTATO_2",
+    ]
+    telefones = []
+    vistos = set()
+
+    for campo in campos:
+        valor = dados_origem.get(campo, "") if isinstance(dados_origem, dict) else ""
+        if not valor:
+            continue
+
+        for parte in re.split(r"[;,/|\\n]+", str(valor)):
+            tel = re.sub(r'\D', '', parte.strip())
+            if not tel:
+                continue
+            if len(tel) in [10, 11] and not tel.startswith('55'):
+                tel = '55' + tel
+            if len(tel) >= 12 and tel not in vistos:
+                telefones.append(tel)
+                vistos.add(tel)
+
+    return telefones
+
+
+def obter_telefones_tomador_whatsapp(tomador, dados_adicionais=None):
+    tomador_upper = str(tomador or "").strip().upper()
+    mapa_padrao = {
+        "SYNVIA": ["5519993415911", "5511981169485"],
+        "GRALAB": [],
+    }
+
+    telefones = []
+    vistos = set()
+
+    for tel in mapa_padrao.get(tomador_upper, []):
+        tel_limpo = re.sub(r'\D', '', str(tel))
+        if tel_limpo and tel_limpo not in vistos:
+            if len(tel_limpo) in [10, 11] and not tel_limpo.startswith('55'):
+                tel_limpo = '55' + tel_limpo
+            if len(tel_limpo) >= 12:
+                telefones.append(tel_limpo)
+                vistos.add(tel_limpo)
+
+    if isinstance(dados_adicionais, dict):
+        for tel in extrair_lista_telefones_whatsapp(dados_adicionais):
+            if tel not in vistos:
+                telefones.append(tel)
+                vistos.add(tel)
+
+    return telefones
+
+
 def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
     INSTANCIA = "3F14E62A63D2B28DC385B20DE66F3711"
     TOKEN = "2321563615C4242CB6031504"
@@ -3467,7 +3528,8 @@ if menu == "📊 GRID":
                                                 bairro_coleta = l_orig.get('BAIRRO', '')
                                                 complemento_coleta = l_orig.get('COMPLEMENTO', '')
                                                 telefone_cliente = l_orig.get('TELEFONE', '')
-                                                        
+                                                telefones_cliente = extrair_lista_telefones_whatsapp(l_orig)
+
                                                 endereco_completo = f"{endereco_coleta}"
                                                 if numero_coleta:
                                                     endereco_completo += f", nº {numero_coleta}"
@@ -3475,7 +3537,7 @@ if menu == "📊 GRID":
                                                     endereco_completo += f" - {complemento_coleta}"
                                                 if bairro_coleta:
                                                     endereco_completo += f", {bairro_coleta}"
-                                                        
+
                                                 msg_zap = (
                                                     f"🚨 *NOVA COLETA APROVADA* 🚨\n"
                                                     f"Olá, {tel_row.iloc[0]['NOME DO AGENTE']}!\n\n"
@@ -3492,19 +3554,23 @@ if menu == "📊 GRID":
                                                     msg_zap += f"\n📱 *Telefone Cliente:* {telefone_cliente}"
 
                                                 msg_zap += f"\n\n✅ Atualize seu GPS e boa sorte na coleta!"
-                                                        
+
                                                 enviar_whatsapp_zapi(
                                                     tel_row.iloc[0]['TELEFONE'], msg_zap)
 
-                                aba_m.clear()
-                                aba_m.update(
-                                    "A1", [
-                                        df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                if lista_para_app:
-                                    despachar_para_appsheet(lista_para_app)
-                                        
-                                st.session_state.ui_toast = {'msg': "Solicitações aprovadas!", 'icon': "🎉"}
-                                carregar_dados_completos.clear()
+                                                if telefones_cliente:
+                                                    nome_cliente = str(l_orig.get('TOMADOR', 'Cliente')).strip() or 'Cliente'
+                                                    msg_cliente = (
+                                                        f"Olá! Sua coleta foi agendada com sucesso.\n\n"
+                                                        f"📦 *Pedido:* {pid}\n"
+                                                        f"🏢 *Cliente:* {nome_cliente}\n"
+                                                        f"📅 *Data da coleta:* {data_coleta}\n"
+                                                        f"📍 *Endereço:* {endereco_completo}\n"
+                                                        f"🏙️ *Cidade:* {l_orig.get('CIDADE', '')}\n\n"
+                                                        "✅ A equipe foi informada e o prestador já foi acionado para a coleta."
+                                                    )
+                                                    for tel_cliente in telefones_cliente:
+                                                        enviar_whatsapp_zapi(tel_cliente, msg_cliente)
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Erro: {e}")
@@ -9797,6 +9863,25 @@ elif menu == "🔬 Triagem":
                                     st.warning("⚠️ Não foi possível salvar o histórico na nuvem neste momento, mas o PDF será gerado.")
 
                             pdf_manual = gerar_pdf_triagem_manual(id_rom_av, av_data, av_tomador, st.session_state.triagem_avulsa_lote)
+                            telefones_destino = obter_telefones_tomador_whatsapp(
+                                av_tomador,
+                                st.session_state.triagem_avulsa_lote[0] if st.session_state.triagem_avulsa_lote else {}
+                            )
+
+                            if telefones_destino:
+                                nome_tomador = str(av_tomador or "Cliente").strip() or "Cliente"
+                                msg_cliente = (
+                                    "Olá! Seu protocolo foi gerado com sucesso.\n\n"
+                                    f"🏢 *Tomador:* {nome_tomador}\n"
+                                    f"📦 *Lote:* {id_rom_av}\n"
+                                    f"📅 *Data da triagem:* {av_data.strftime('%d/%m/%Y')}\n\n"
+                                    "✅ Os pedidos serão entregues hoje.\n"
+                                    "Segue o protocolo em anexo para conferência."
+                                )
+                                for tel_destino in telefones_destino:
+                                    enviar_whatsapp_zapi(tel_destino, msg_cliente)
+                                    enviar_pdf_zapi(tel_destino, pdf_manual, f"PROTOCOLO_{id_rom_av}.pdf")
+
                             st.session_state.pdf_avulso_pronto = pdf_manual
                             st.session_state.id_avulso_pronto = id_rom_av
                             st.session_state.triagem_avulsa_lote = []
