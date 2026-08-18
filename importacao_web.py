@@ -2371,6 +2371,102 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
 
             pdf.ln(0.5)
 
+    # ---- LINHA DO TEMPO DA ROTA ----
+    paradas_tl = []
+    for cidade_tl, g_cid_tl in df_pdf.groupby('_CIDADE_PDF', sort=False):
+        for bairro_tl, g_bai_tl in g_cid_tl.groupby('_BAIRRO_PDF', sort=False):
+            paradas_tl.append({
+                'cidade': _txt_pdf(str(cidade_tl), 22),
+                'bairro': _txt_pdf(str(bairro_tl), 22),
+                'qtd': len(g_bai_tl),
+            })
+
+    # ~4km entre bairros da mesma cidade, ~25km entre cidades + 0.5km por volume (entregas no bairro)
+    km_estimado = sum(
+        4 if paradas_tl[i]['cidade'] == paradas_tl[i - 1]['cidade'] else 25
+        for i in range(1, len(paradas_tl))
+    ) + len(df_pdf) * 0.5
+
+    pdf.add_page()
+    pdf.rect(5, 5, 200, 287)
+    pdf.set_xy(10, 10)
+    pdf.set_font("Arial", "B", 11)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 7, "LINHA DO TEMPO DA ROTA", ln=True, align="C")
+    pdf.set_font("Arial", "", 7)
+    pdf.set_text_color(100, 116, 139)
+    pdf.cell(0, 4, "Sequencia de paradas por bairro e cidade", ln=True, align="C")
+    pdf.ln(4)
+
+    _palette_tl = [
+        (2, 132, 199), (5, 150, 105), (217, 119, 6),
+        (185, 28, 28), (109, 40, 217), (3, 105, 161),
+    ]
+    _cores_tl = {}
+    _idx_cor_tl = 0
+    for _p in paradas_tl:
+        if _p['cidade'] not in _cores_tl:
+            _cores_tl[_p['cidade']] = _palette_tl[_idx_cor_tl % len(_palette_tl)]
+            _idx_cor_tl += 1
+
+    x_line_tl = 30
+    x_text_tl = 36
+    y_tl_start = pdf.get_y()
+    n_paradas_tl = max(len(paradas_tl), 1)
+    step_tl = min(9.0, (255.0 - y_tl_start) / n_paradas_tl)
+
+    pdf.set_draw_color(210, 210, 210)
+    pdf.set_line_width(0.4)
+    pdf.line(x_line_tl, y_tl_start, x_line_tl, y_tl_start + step_tl * len(paradas_tl))
+
+    for i_tl, parada_tl in enumerate(paradas_tl):
+        r_tl, g_tl, b_tl = _cores_tl[parada_tl['cidade']]
+        y_dot = y_tl_start + i_tl * step_tl
+
+        pdf.set_fill_color(r_tl, g_tl, b_tl)
+        pdf.set_draw_color(r_tl, g_tl, b_tl)
+        pdf.ellipse(x_line_tl - 2, y_dot - 2, 4, 4, 'F')
+
+        pdf.set_xy(10, y_dot - 2.5)
+        pdf.set_font("Arial", "B", 6)
+        pdf.set_text_color(120, 120, 120)
+        pdf.cell(18, 5, f"PARADA {i_tl + 1:02d}", align="R")
+
+        pdf.set_xy(x_text_tl, y_dot - 2.5)
+        pdf.set_text_color(r_tl, g_tl, b_tl)
+        pdf.set_font("Arial", "B", 7)
+        if cidade_unica_lote:
+            label_tl = parada_tl['bairro']
+        else:
+            label_tl = f"{parada_tl['cidade']}  >  {parada_tl['bairro']}"
+        pdf.cell(120, 5, label_tl[:52])
+
+        pdf.set_fill_color(r_tl, g_tl, b_tl)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 6)
+        pdf.cell(22, 4, f"{parada_tl['qtd']} vol.", 0, 0, "C", True)
+
+        if i_tl > 0:
+            km_trecho = 4 if paradas_tl[i_tl]['cidade'] == paradas_tl[i_tl - 1]['cidade'] else 25
+            pdf.set_xy(x_line_tl - 14, y_dot - step_tl / 2 - 1.5)
+            pdf.set_font("Arial", "I", 5)
+            pdf.set_text_color(160, 160, 160)
+            pdf.cell(12, 3, f"~{km_trecho}km", align="C")
+
+    y_box = y_tl_start + step_tl * len(paradas_tl) + 8
+    pdf.set_xy(10, y_box)
+    pdf.set_fill_color(239, 246, 255)
+    pdf.set_draw_color(2, 132, 199)
+    pdf.set_line_width(0.4)
+    pdf.set_text_color(15, 23, 42)
+    pdf.set_font("Arial", "B", 9)
+    pdf.cell(0, 9, f"   ESTIMATIVA TOTAL DA ROTA:  ~{km_estimado:.0f} km", 1, 1, "L", True)
+    pdf.set_xy(10, pdf.get_y())
+    pdf.set_font("Arial", "I", 6)
+    pdf.set_text_color(100, 116, 139)
+    pdf.cell(0, 4, "   * Estimativa baseada em distancias medias por bairro/cidade (~4km entre bairros, ~25km entre cidades).", ln=True)
+    pdf.ln(3)
+
     pdf.set_font("Arial", "I", 7)
     pdf.set_text_color(100, 116, 139)
     pdf.cell(0, 5, f"Relatorio gerado em {datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S')}", ln=True, align="R")
@@ -8758,7 +8854,7 @@ elif menu == "🔬 Triagem":
         except BaseException:
             return None
 
-    # 🔥 IMPRESSORA EXCLUSIVA PARA TRIAGEM MANUAL (3 COLUNAS) 🔥
+    # 🔥 IMPRESSORA EXCLUSIVA PARA TRIAGEM MANUAL 🔥
     def gerar_pdf_triagem_manual(id_lote, data_str, tomador, lista_itens):
         pdf = FPDF()
         pdf.add_page()
@@ -8790,28 +8886,62 @@ elif menu == "🔬 Triagem":
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         pdf.ln(3)
 
+        def cortar_texto(valor, limite):
+            texto = str(valor).strip()
+            if len(texto) <= limite:
+                return texto
+            return texto[:max(0, limite - 3)].rstrip() + "..."
+
+        tem_campos_opcionais = any(
+            str(item.get('PEDIDO', '')).strip() or str(item.get('CLIENTE', '')).strip()
+            for item in lista_itens
+        )
+        larguras_tabela = [12, 18, 34, 32, 28, 28] if tem_campos_opcionais else [20, 90, 40, 40]
+        inicio_tabela = (pdf.w - sum(larguras_tabela)) / 2
+
         pdf.set_fill_color(15, 23, 42)
         pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Arial", "B", 8)
-        pdf.cell(20, 6, "ITEM", 1, 0, "C", True)
-        pdf.cell(90, 6, "NUMERO DO ENVELOPE", 1, 0, "C", True)
-        pdf.cell(40, 6, "DATA DA BIPAGEM", 1, 0, "C", True)
-        pdf.cell(40, 6, "HORA DA BIPAGEM", 1, 1, "C", True)
+        pdf.set_x(inicio_tabela)
+        if tem_campos_opcionais:
+            pdf.set_font("Arial", "B", 6)
+            pdf.cell(12, 6, "ITEM", 1, 0, "C", True)
+            pdf.cell(18, 6, "PEDIDO", 1, 0, "C", True)
+            pdf.cell(34, 6, "CLIENTE", 1, 0, "C", True)
+            pdf.cell(32, 6, "ENV.", 1, 0, "C", True)
+            pdf.cell(28, 6, "DATA", 1, 0, "C", True)
+            pdf.cell(28, 6, "HORA", 1, 1, "C", True)
+        else:
+            pdf.set_font("Arial", "B", 8)
+            pdf.cell(20, 6, "ITEM", 1, 0, "C", True)
+            pdf.cell(90, 6, "NUMERO DO ENVELOPE", 1, 0, "C", True)
+            pdf.cell(40, 6, "DATA DA BIPAGEM", 1, 0, "C", True)
+            pdf.cell(40, 6, "HORA DA BIPAGEM", 1, 1, "C", True)
 
         pdf.set_text_color(51, 65, 85)
-        pdf.set_font("Arial", "", 8)
+        pdf.set_font("Arial", "", 6 if tem_campos_opcionais else 8)
 
         for idx, item in enumerate(lista_itens, 1):
             fill = (idx % 2 == 0)
             pdf.set_fill_color(241, 245, 249) if fill else pdf.set_fill_color(255, 255, 255)
             env = str(item.get('ENVELOPE', ''))
+            pedido = str(item.get('PEDIDO', '')).strip()
+            cliente = str(item.get('CLIENTE', '')).strip()
             dt_bip = str(item.get('DATA', ''))
             hr_bip = str(item.get('HORA', ''))
 
-            pdf.cell(20, 6, str(idx), 1, 0, "C", True)
-            pdf.cell(90, 6, env, 1, 0, "C", True)
-            pdf.cell(40, 6, dt_bip, 1, 0, "C", True)
-            pdf.cell(40, 6, hr_bip, 1, 1, "C", True)
+            pdf.set_x(inicio_tabela)
+            if tem_campos_opcionais:
+                pdf.cell(12, 6, str(idx), 1, 0, "C", True)
+                pdf.cell(18, 6, cortar_texto(pedido, 9), 1, 0, "C", True)
+                pdf.cell(34, 6, cortar_texto(cliente, 14), 1, 0, "C", True)
+                pdf.cell(32, 6, cortar_texto(env, 14), 1, 0, "C", True)
+                pdf.cell(28, 6, dt_bip, 1, 0, "C", True)
+                pdf.cell(28, 6, hr_bip, 1, 1, "C", True)
+            else:
+                pdf.cell(20, 6, str(idx), 1, 0, "C", True)
+                pdf.cell(90, 6, env, 1, 0, "C", True)
+                pdf.cell(40, 6, dt_bip, 1, 0, "C", True)
+                pdf.cell(40, 6, hr_bip, 1, 1, "C", True)
 
         pdf.ln(6)
         pdf.set_font("Arial", "B", 8)
@@ -9374,13 +9504,17 @@ elif menu == "🔬 Triagem":
         if not st.session_state.pdf_avulso_pronto:
             st.markdown("---")
             with st.form("form_bip_avulso_manual", clear_on_submit=True):
-                col_bip, col_add = st.columns([4, 1], vertical_alignment="bottom")
+                col_bip, col_pedido, col_cliente = st.columns([2.2, 1.2, 2.6], vertical_alignment="bottom")
                 bip_envelope = col_bip.text_input("🔍 Bipar Código ou Digitar Número do Envelope:")
+                bip_pedido = col_pedido.text_input("🧾 Número do Pedido (opcional):", placeholder="Se houver")
+                bip_cliente = col_cliente.text_input("👤 Nome do Cliente (opcional):", placeholder="Se houver")
 
-                if col_add.form_submit_button("➕ Adicionar", use_container_width=True):
+                if st.form_submit_button("➕ Adicionar", use_container_width=True):
                     if bip_envelope.strip():
                         novo_item_manual = {
                             'ENVELOPE': bip_envelope.strip(),
+                            'PEDIDO': bip_pedido.strip(),
+                            'CLIENTE': bip_cliente.strip(),
                             'DATA': av_data.strftime("%d/%m/%Y"),
                             'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S'),
                             'TOMADOR': av_tomador if av_tomador != "Selecione..." else ""
@@ -9391,20 +9525,31 @@ elif menu == "🔬 Triagem":
 
             if st.session_state.triagem_avulsa_lote:
                 st.markdown(f"### 📦 Envelopes na Cesta: **{len(st.session_state.triagem_avulsa_lote)}**")
+
+                tem_campos_opcionais = any(
+                    str(item.get('PEDIDO', '')).strip() or str(item.get('CLIENTE', '')).strip()
+                    for item in st.session_state.triagem_avulsa_lote
+                )
                         
                 with st.container(border=True):
                     df_av_disp = pd.DataFrame(st.session_state.triagem_avulsa_lote)
                     col_list1, col_list2 = st.columns([2, 1])
                             
                     with col_list1:
-                        gb_av = GridOptionsBuilder.from_dataframe(df_av_disp[['ENVELOPE', 'DATA', 'HORA']])
+                        colunas_disp = ['ENVELOPE', 'DATA', 'HORA']
+                        if tem_campos_opcionais:
+                            colunas_disp = ['PEDIDO', 'CLIENTE'] + colunas_disp
+                        gb_av = GridOptionsBuilder.from_dataframe(df_av_disp[colunas_disp])
                         gb_av.configure_default_column(resizable=True)
+                        if tem_campos_opcionais:
+                            gb_av.configure_column("PEDIDO", header_name="🧾 Nº Pedido")
+                            gb_av.configure_column("CLIENTE", header_name="👤 Cliente")
                         gb_av.configure_column("ENVELOPE", header_name="✉️ Nº Envelope")
                         gb_av.configure_column("DATA", header_name="📅 Data")
                         gb_av.configure_column("HORA", header_name="⏱️ Hora")
                                 
                         AgGrid(
-                            df_av_disp[['ENVELOPE', 'DATA', 'HORA']], 
+                            df_av_disp[colunas_disp], 
                             gridOptions=gb_av.build(), 
                             theme="alpine", 
                             height=250,
@@ -9433,7 +9578,7 @@ elif menu == "🔬 Triagem":
                             if plan_av:
                                 try:
                                     aba_av = plan_av.sheet1
-                                    linhas_bkp = [[id_rom_av, i['DATA'], "TRIAGEM MANUAL", i.get('TOMADOR', ''), "", "", i['ENVELOPE'], i['HORA']] for i in st.session_state.triagem_avulsa_lote]
+                                    linhas_bkp = [[id_rom_av, i['DATA'], "TRIAGEM MANUAL", i.get('TOMADOR', ''), "", "", i['ENVELOPE'], i['HORA'], i.get('PEDIDO', ''), i.get('CLIENTE', '')] for i in st.session_state.triagem_avulsa_lote]
                                     aba_av.append_rows(linhas_bkp, value_input_option='USER_ENTERED')
                                 except BaseException:
                                     st.warning("⚠️ Não foi possível salvar o histórico na nuvem neste momento, mas o PDF será gerado.")
@@ -9491,7 +9636,9 @@ elif menu == "🔬 Triagem":
                                 hora_val = ln[7] if len(ln) > 7 else ""
                                 data_val = ln[1] if len(ln) > 1 else ""
                                 tomador_val = ln[3] if len(ln) > 3 else ""
-                                lista_re.append({'ENVELOPE': env_val, 'DATA': data_val, 'HORA': hora_val, 'TOMADOR': tomador_val})
+                                pedido_val = ln[8] if len(ln) > 8 else ""
+                                cliente_val = ln[9] if len(ln) > 9 else ""
+                                lista_re.append({'ENVELOPE': env_val, 'DATA': data_val, 'HORA': hora_val, 'TOMADOR': tomador_val, 'PEDIDO': pedido_val, 'CLIENTE': cliente_val})
 
                             pdf_rep_man = gerar_pdf_triagem_manual(lote_re_id, lista_re[0].get('DATA', ''), lista_re[0].get('TOMADOR', ''), lista_re)
                             c_h2.download_button("📥 REIMPRIMIR", pdf_rep_man, file_name=f"Reprint_{lote_re_id}.pdf", mime="application/pdf", type="primary", use_container_width=True)
