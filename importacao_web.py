@@ -3476,11 +3476,21 @@ if menu == "📊 GRID":
                                                 if bairro_coleta:
                                                     endereco_completo += f", {bairro_coleta}"
                                                         
-                                                msg_zap = f"🚨 *NOVA COLETA APROVADA* 🚨\nOlá, {tel_row.iloc[0]['NOME DO AGENTE']}!\n\nUm novo pedido foi aprovado e adicionado à sua rota.\n\n📦 *Pedido:* {pid}\n🏢 *Cliente:* {l_orig.get('TOMADOR', '')}\n📅 *Data da Coleta:* {data_coleta}\n\n📍 *LOCALIZAÇÃO:*\n{endereco_completo}\n🏙️ *Cidade:* {l_orig.get('CIDADE', '')}"
-                                                        
+                                                msg_zap = (
+                                                    f"🚨 *NOVA COLETA APROVADA* 🚨\n"
+                                                    f"Olá, {tel_row.iloc[0]['NOME DO AGENTE']}!\n\n"
+                                                    f"Você foi atribuído a uma nova coleta e ela foi adicionada à sua rota.\n\n"
+                                                    f"📦 *Pedido:* {pid}\n"
+                                                    f"🏢 *Cliente:* {l_orig.get('TOMADOR', '')}\n"
+                                                    f"📅 *Agendamento da coleta:* {data_coleta}\n"
+                                                    f"📍 *Endereço:* {endereco_completo}\n"
+                                                    f"🏙️ *Cidade:* {l_orig.get('CIDADE', '')}\n\n"
+                                                    f"➡️ *Atenção:* esta coleta deve ser realizada na data acima, conforme o agendamento informado."
+                                                )
+
                                                 if telefone_cliente:
                                                     msg_zap += f"\n📱 *Telefone Cliente:* {telefone_cliente}"
-                                                        
+
                                                 msg_zap += f"\n\n✅ Atualize seu GPS e boa sorte na coleta!"
                                                         
                                                 enviar_whatsapp_zapi(
