@@ -9775,10 +9775,12 @@ elif menu == "🔬 Triagem":
 
             st.markdown("---")
             with st.form("form_bip_avulso_manual", clear_on_submit=True):
-                col_bip, col_pedido, col_cliente = st.columns([2.2, 1.2, 2.6], vertical_alignment="bottom")
+                col_bip, col_pedido, col_cliente, col_cidade, col_uf = st.columns([2.2, 1.2, 2.2, 1.2, 0.7], vertical_alignment="bottom")
                 bip_envelope = col_bip.text_input("🔍 Bipar Código ou Digitar Número do Envelope:")
-                bip_pedido = col_pedido.text_input("🧾 Número do Pedido (opcional):", placeholder="Se houver")
-                bip_cliente = col_cliente.text_input("👤 Nome do Cliente (opcional):", placeholder="Se houver")
+                bip_pedido = col_pedido.text_input("🧾 Pedido (opcional):", placeholder="Se houver")
+                bip_cliente = col_cliente.text_input("👤 Cliente (opcional):", placeholder="Se houver")
+                bip_cidade = col_cidade.text_input("📍 Cidade:", placeholder="Ex: Campo Grande")
+                bip_uf = col_uf.text_input("UF:", placeholder="SP", max_chars=2)
 
                 if st.form_submit_button("➕ Adicionar", use_container_width=True):
                     if bip_envelope.strip():
@@ -9786,8 +9788,8 @@ elif menu == "🔬 Triagem":
                             'ENVELOPE': bip_envelope.strip(),
                             'PEDIDO': bip_pedido.strip(),
                             'CLIENTE': bip_cliente.strip(),
-                            'CIDADE': '',
-                            'UF': '',
+                            'CIDADE': bip_cidade.strip(),
+                            'UF': bip_uf.strip().upper(),
                             'IMPORTADO_TRIAGEM': False,
                             'DATA': av_data.strftime("%d/%m/%Y"),
                             'HORA': datetime.now(FUSO_BR).strftime('%H:%M:%S'),
