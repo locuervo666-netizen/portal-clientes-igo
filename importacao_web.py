@@ -3571,6 +3571,15 @@ if menu == "📊 GRID":
                                                     )
                                                     for tel_cliente in telefones_cliente:
                                                         enviar_whatsapp_zapi(tel_cliente, msg_cliente)
+
+                                aba_m.clear()
+                                aba_m.update(
+                                    "A1",
+                                    [df_nuvem.columns.tolist()] +
+                                    df_nuvem.fillna("").astype(str).values.tolist())
+                                if lista_para_app:
+                                    despachar_para_appsheet(lista_para_app)
+                                carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Erro: {e}")
