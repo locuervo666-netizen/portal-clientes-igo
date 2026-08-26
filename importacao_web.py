@@ -809,9 +809,108 @@ CSS_DASHBOARD = """
     .block-container {
         padding-top: 1.2rem !important;
         padding-bottom: 1rem !important;
-        padding-left: 2rem !important;
-        padding-right: 2rem !important;
-        max-width: 98% !important;
+        padding-left: 2.4rem !important;
+        padding-right: 2.4rem !important;
+        width: 100% !important;
+        max-width: 1800px !important;
+        margin: 0 auto !important;
+    }
+
+    @media (max-width: 768px) {
+        .block-container {
+            padding: 0.85rem 0.75rem 1rem !important;
+            max-width: 100% !important;
+        }
+
+        .header-container {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+        }
+
+        .header-title {
+            font-size: 18px;
+        }
+
+        .sync-status {
+            flex-wrap: wrap;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .status-chip {
+            font-size: 11px;
+            padding: 5px 9px;
+        }
+
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 0.65rem !important;
+        }
+
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+            flex: 1 1 calc(50% - 0.65rem) !important;
+            min-width: calc(50% - 0.65rem) !important;
+        }
+
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] > div {
+            width: 100% !important;
+        }
+
+        .kpi-card {
+            height: 82px;
+            padding: 12px;
+        }
+
+        .kpi-card > div:first-child {
+            font-size: 10px !important;
+        }
+
+        .kpi-card > div:last-child {
+            font-size: 24px !important;
+        }
+
+        .progress-block-main {
+            border-radius: 12px;
+            padding: 12px;
+            margin: 10px 0 14px 0;
+        }
+
+        div.stButton > button,
+        div[data-testid="stFormSubmitButton"] > button,
+        div[data-testid="stPopover"] > div > button,
+        div[data-testid="stPopover"] > button {
+            min-height: 44px !important;
+            white-space: normal !important;
+            line-height: 1.2 !important;
+        }
+
+        div[data-testid="stExpander"] {
+            border-radius: 10px !important;
+        }
+
+        .ag-theme-alpine {
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow-x: auto !important;
+            border-radius: 10px !important;
+        }
+
+        .ag-theme-alpine .ag-header-cell-text,
+        .ag-theme-alpine .ag-cell {
+            font-size: 12px !important;
+        }
+
+        .ag-theme-alpine .ag-row {
+            min-height: 42px !important;
+        }
+
+        div[data-testid="stDataFrame"],
+        div[data-testid="stTable"] {
+            overflow-x: auto !important;
+        }
     }
 
     /* ── KPI CARDS MODERNOS ── */
@@ -3994,37 +4093,37 @@ if menu == "📊 GRID":
             header_checkbox_filtered_only=True,
             suppressRowClickSelection=False)
 
-        gb.configure_column("DATA", header_name="📅 Data", width=100)
-        gb.configure_column("PEDIDO", header_name="📦 Pedido", width=100)
-        gb.configure_column("TOMADOR", header_name="🏢 Tomador", width=140)
+        gb.configure_column("DATA", header_name="📅 Data", width=100, minWidth=95, flex=0.8)
+        gb.configure_column("PEDIDO", header_name="📦 Pedido", width=100, minWidth=100, flex=0.9)
+        gb.configure_column("TOMADOR", header_name="🏢 Tomador", width=140, minWidth=130, flex=1.1)
         gb.configure_column(
             "LABORATORIO",
             header_name="🔬 Ponto de Coleta",
-            width=220)
-        gb.configure_column("CIDADE", header_name="📍 Cidade", width=140)
+            width=220, minWidth=210, flex=1.8)
+        gb.configure_column("CIDADE", header_name="📍 Cidade", width=140, minWidth=130, flex=1.1)
         gb.configure_column(
             "STATUS_DISPLAY",
             header_name="🚦 Status",
             cellRenderer=status_jscode,
-            width=160)
-        gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=100)
-        gb.configure_column("DATA_ENTREGA", header_name="🏁 Entrega", width=100)
+            width=160, minWidth=150, flex=1.3)
+        gb.configure_column("DATA_LIMITE", header_name="🎯 Previsão", width=100, minWidth=100, flex=0.9)
+        gb.configure_column("DATA_ENTREGA", header_name="🏁 Entrega", width=100, minWidth=100, flex=0.9)
         gb.configure_column(
             "COMPROVANTE",
             header_name="📎 Anexo",
             cellRenderer=link_jscode,
-            width=90)
+            width=90, minWidth=85, flex=0.7)
         gb.configure_column(
             "AGENTE_NOME",
             header_name="👤 Motorista",
-            width=130)
+            width=130, minWidth=120, flex=1.1)
         gb.configure_column("AGENTE_RAW", hide=True)
 
         # 🔥 COLUNA DE ATUALIZAÇÕES RESTAURADA COM TEXTO ORIGINAL 🔥
         gb.configure_column(
             "DETALHES",
             header_name="💬 Atualizações",
-            width=250)
+            width=250, minWidth=220, flex=2.0)
 
         gridOptions = gb.build()
 
