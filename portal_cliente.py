@@ -743,6 +743,152 @@ CSS_DASHBOARD = """
         overflow: visible !important;
     }
 
+    @media (max-width: 768px) {
+        .block-container {
+            min-height: 100vh !important;
+            padding: 0.45rem 0.65rem 0.85rem !important;
+            max-width: 100% !important;
+        }
+
+        .header-container {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px;
+            margin-bottom: 6px;
+        }
+
+        .header-title {
+            font-size: 17px;
+        }
+
+        .header-subtitle {
+            font-size: 10px;
+            line-height: 1.35;
+        }
+
+        .sync-status {
+            flex-wrap: wrap;
+            width: 100%;
+            justify-content: space-between;
+            padding: 6px 9px;
+        }
+
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 0.6rem !important;
+        }
+
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+            flex: 1 1 calc(50% - 0.6rem) !important;
+            min-width: calc(50% - 0.6rem) !important;
+        }
+
+        .kpi-deck-shell {
+            padding: 8px 7px 5px;
+            border-radius: 10px;
+        }
+
+        .kpi-card {
+            min-height: 78px;
+            padding: 11px 12px;
+        }
+
+        .kpi-card > div:first-of-type {
+            font-size: 10px !important;
+        }
+
+        .kpi-card > div:last-of-type {
+            font-size: 24px !important;
+        }
+
+        div.st-key-kpi_total,
+        div.st-key-kpi_entregue,
+        div.st-key-kpi_frus,
+        div.st-key-kpi_coletado,
+        div.st-key-kpi_pend,
+        div.st-key-kpi_aguardando,
+        div.st-key-kpi_hoje {
+            margin-top: -82px !important;
+        }
+
+        div.st-key-kpi_total button,
+        div.st-key-kpi_entregue button,
+        div.st-key-kpi_frus button,
+        div.st-key-kpi_coletado button,
+        div.st-key-kpi_pend button,
+        div.st-key-kpi_aguardando button,
+        div.st-key-kpi_hoje button {
+            height: 78px !important;
+        }
+
+        .toolbar-shell {
+            padding: 7px;
+            border-radius: 10px;
+        }
+
+        .toolbar-shell div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child {
+            flex: 1 1 100% !important;
+            min-width: 100% !important;
+        }
+
+        .toolbar-shell div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(n+2) {
+            flex: 1 1 calc(33.333% - 0.6rem) !important;
+            min-width: calc(33.333% - 0.6rem) !important;
+        }
+
+        .toolbar-shell div.stButton > button {
+            min-height: 42px !important;
+            padding-left: 5px !important;
+            padding-right: 5px !important;
+        }
+
+        div.stButton > button,
+        div[data-testid="stFormSubmitButton"] > button {
+            min-height: 44px !important;
+            white-space: normal !important;
+            line-height: 1.2 !important;
+        }
+
+        [data-testid="stTabs"] [data-baseweb="tab-list"] {
+            overflow-x: auto !important;
+            scrollbar-width: thin;
+        }
+
+        [data-testid="stTabs"] button[role="tab"] {
+            flex: 0 0 auto !important;
+            min-height: 36px !important;
+            font-size: 11px !important;
+            padding: 0 10px !important;
+        }
+
+        .ag-theme-alpine {
+            min-height: 360px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            border-radius: 10px !important;
+        }
+
+        .ag-theme-alpine .ag-header-cell-text,
+        .ag-theme-alpine .ag-cell {
+            font-size: 12px !important;
+        }
+
+        .ag-theme-alpine .ag-row {
+            min-height: 42px !important;
+        }
+
+        .progress-block-sidebar {
+            padding: 11px;
+            border-radius: 12px;
+        }
+
+        [data-testid="stDataFrame"],
+        [data-testid="stTable"] {
+            overflow-x: auto !important;
+        }
+    }
+
     [data-testid="stTabs"] {
         display: flex;
         flex-direction: column;
