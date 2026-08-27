@@ -19,6 +19,7 @@ import gspread
 import uuid
 import base64
 import difflib
+from html import escape
 from streamlit_autorefresh import st_autorefresh
 from fpdf import FPDF
 # 🚀 NOVAS BIBLIOTECAS PARA A TABELA MODERNA
@@ -4792,6 +4793,12 @@ elif menu == "💰 Faturamento":
     df_raw = carregar_dados_completos(planilha_db)
     if 'fatura_sucesso' not in st.session_state:
         st.session_state.fatura_sucesso = False
+    if 'fat_etapa' not in st.session_state:
+        st.session_state.fat_etapa = 1
+    if 'fat_revisao_contexto' not in st.session_state:
+        st.session_state.fat_revisao_contexto = None
+    if 'fat_pedidos_ids' not in st.session_state:
+        st.session_state.fat_pedidos_ids = []
 
     @st.cache_data(ttl=60)
     def carregar_tabela_precos(tomador):
@@ -4958,10 +4965,11 @@ elif menu == "💰 Faturamento":
         if match.empty:
             c_key = re.sub(r'[^A-Z0-9]+', '', c)
             if c_key and 'CIDADE_KEY' in df_p.columns:
+                cidade_keys = df_p['CIDADE_KEY'].astype(str)
                 match = df_p[
                     (df_p['CIDADE_KEY'] == c_key) |
                     (df_p['CIDADE_KEY'].str.contains(c_key, na=False)) |
-                    (pd.Series([c_key] * len(df_p)).str.contains(df_p['CIDADE_KEY'], regex=False, na=False))
+                    cidade_keys.map(lambda cidade_key: bool(cidade_key) and c_key.find(cidade_key) >= 0)
                 ]
         if not match.empty:
             v_base = float(match.iloc[0]['VALOR_CHEIO'])
@@ -5048,6 +5056,37 @@ elif menu == "💰 Faturamento":
     # ABA 1: NOVO LOTE DE FATURAMENTO
     # =========================================================================
     with tab_faturar:
+        etapa_atual = st.session_state.fat_etapa
+        etapas_faturamento = [
+            ('1', 'Preparar', 'Tomador e período'),
+            ('2', 'Conferir', 'Pedidos e valores'),
+            ('3', 'Emitir', 'Fatura e documentos')
+        ]
+        etapas_html = []
+        for numero_etapa, titulo_etapa, detalhe_etapa in etapas_faturamento:
+            classe_etapa = 'active' if int(numero_etapa) == etapa_atual else ('done' if int(numero_etapa) < etapa_atual else '')
+            etapas_html.append(
+                f"<div class='fat-step {classe_etapa}'><span class='fat-step-number'>{numero_etapa}</span>"
+                f"<span><b>{titulo_etapa}</b><small>{detalhe_etapa}</small></span></div>"
+            )
+        st.markdown(
+            """
+            <style>
+                .fat-stepper { display:flex; align-items:stretch; gap:8px; margin:0 0 20px; }
+                .fat-step { flex:1; display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #E2E8F0; border-radius:10px; background:#F8FAFC; color:#64748B; }
+                .fat-step.active { border-color:#60A5FA; background:#EFF6FF; color:#1D4ED8; box-shadow:0 4px 12px rgba(37,99,235,.10); }
+                .fat-step.done { border-color:#86EFAC; background:#F0FDF4; color:#166534; }
+                .fat-step-number { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:#E2E8F0; color:#475569; font-weight:800; font-size:12px; flex:0 0 26px; }
+                .fat-step.active .fat-step-number { background:#2563EB; color:#FFFFFF; }
+                .fat-step.done .fat-step-number { background:#16A34A; color:#FFFFFF; }
+                .fat-step b { display:block; font-size:12px; text-transform:uppercase; letter-spacing:.35px; }
+                .fat-step small { display:block; margin-top:2px; font-size:11px; color:#64748B; }
+                @media (max-width: 700px) { .fat-step { align-items:flex-start; padding:8px; } .fat-step span:last-child { display:none; } .fat-step { justify-content:center; } }
+            </style>
+            <div class='fat-stepper'>
+            """ + "<div class='fat-step-line'></div>".join(etapas_html) + "</div>",
+            unsafe_allow_html=True)
+
         if st.session_state.fatura_sucesso:
             st.markdown("### 🧾 Resumo do Faturamento")
             st.success(f"🎉 Fatura gerada com sucesso e salva no Livro Caixa!")
@@ -5077,6 +5116,9 @@ elif menu == "💰 Faturamento":
                 use_container_width=True)
             if c_b3.button("🔄 Voltar / Novo Faturamento", use_container_width=True):
                 st.session_state.fatura_sucesso = False
+                st.session_state.fat_etapa = 1
+                st.session_state.fat_revisao_contexto = None
+                st.session_state.fat_pedidos_ids = []
                 st.rerun()
 
         else:
@@ -5139,6 +5181,19 @@ elif menu == "💰 Faturamento":
                                 df_fin['VALOR (R$)'] = df_fin.apply(
                                     lambda r: calcular_valor_fatura(r['CIDADE'], r.get('BAIRRO', ''), r.get('ENDERECO', ''), r['STATUS_DISPLAY'], df_p), axis=1)
 
+                                contexto_fat = (
+                                    f_tom,
+                                    str(f_per),
+                                    tuple(df_fin['PEDIDO'].astype(str).tolist())
+                                )
+                                if (
+                                    st.session_state.fat_revisao_contexto is not None and
+                                    st.session_state.fat_revisao_contexto != contexto_fat
+                                ):
+                                    st.session_state.fat_etapa = 1
+                                    st.session_state.fat_revisao_contexto = None
+                                    etapa_atual = 1
+
                                 total_periodo = float(df_fin['VALOR (R$)'].sum()) if not df_fin.empty else 0.0
                                 qtd_periodo = int(len(df_fin))
                                 qtd_com_valor = int((pd.to_numeric(df_fin['VALOR (R$)'], errors='coerce') > 0).sum()) if not df_fin.empty else 0
@@ -5192,9 +5247,49 @@ elif menu == "💰 Faturamento":
                                         sel_f = sel_f.drop(columns=['_selectedRowNodeInfo'])
                                 else:
                                     sel_f = pd.DataFrame(columns=df_show.columns)
+
+                                if sel_f.empty and st.session_state.fat_pedidos_ids:
+                                    sel_f = df_show[
+                                        df_show['PEDIDO'].astype(str).isin(
+                                            st.session_state.fat_pedidos_ids
+                                        )
+                                    ].copy()
+                                    sel_f['VALOR (R$)'] = pd.to_numeric(
+                                        sel_f['VALOR (R$)'], errors='coerce'
+                                    )
                                             
                                 total_f = sel_f['VALOR (R$)'].sum() if not sel_f.empty else 0.0
                                 qtd_f = len(sel_f)
+
+                                revisao_pronta = (
+                                    st.session_state.fat_etapa >= 2 and
+                                    st.session_state.fat_revisao_contexto == contexto_fat and
+                                    bool(st.session_state.fat_pedidos_ids) and
+                                    qtd_f > 0
+                                )
+
+                                st.markdown("#### 3️⃣ Revisão do Lote")
+                                col_revisao, col_emissao = st.columns([2, 1])
+                                with col_revisao:
+                                    st.info(
+                                        f"Revise os pedidos selecionados: **{qtd_f}** volume(s) | "
+                                        f"Total projetado: **R$ {total_f:,.2f}**"
+                                    )
+                                with col_emissao:
+                                    if st.button(
+                                        "✅ Confirmar revisão",
+                                        type="primary",
+                                        use_container_width=True,
+                                        key="confirmar_revisao_faturamento",
+                                        disabled=sel_f.empty
+                                    ):
+                                        st.session_state.fat_etapa = 2
+                                        st.session_state.fat_revisao_contexto = contexto_fat
+                                        st.session_state.fat_pedidos_ids = sel_f['PEDIDO'].astype(str).tolist()
+                                        st.rerun()
+
+                                if not revisao_pronta:
+                                    st.warning("Selecione os pedidos e confirme a revisão para liberar a emissão da fatura.")
 
                                 st.markdown("---")
 
@@ -5216,7 +5311,7 @@ elif menu == "💰 Faturamento":
                                     "📝 Observação Customizada (Opcional - Sai no rodapé do PDF):",
                                     placeholder="Ex: Dados bancários para depósito...")
 
-                                if st.button("⚙️ GERAR FATURA AGORA", type="primary", use_container_width=True):
+                                if st.button("⚙️ GERAR FATURA AGORA", type="primary", use_container_width=True, disabled=not revisao_pronta):
                                     if sel_f.empty:
                                         st.warning("Selecione os pedidos na tabela para faturar!")
                                     else:
@@ -7051,7 +7146,7 @@ elif menu == "📥 Importações Umove":
     # Garante que o AgGrid está disponível neste bloco
     from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
-    UMOVE_PEDIDO_INICIAL = 900000
+    UMOVE_PEDIDO_INICIAL = 914781
 
     st.markdown(
         """
@@ -7252,20 +7347,38 @@ elif menu == "📥 Importações Umove":
         "<div class='dinamic-border'><h3 class='dinamic-text' style='margin:0;'>🛠️ Zona de Importação & Central de Envios</h3></div>",
         unsafe_allow_html=True)
 
-    if planilha_sandbox is None or planilha_db is None:
-        st.error("❌ Erro de conexão com as planilhas no Drive. Verifique as permissões.")
+    if planilha_db is None:
+        st.error("❌ Erro de conexão com a planilha principal do Drive. Verifique as permissões.")
         st.stop()
 
-    if "df_sandbox_mem" not in st.session_state:
-        st.session_state.df_sandbox_mem = pd.DataFrame()
-    if "df_preview_sb" not in st.session_state:
-        st.session_state.df_preview_sb = pd.DataFrame()
+    def garantir_estado_local_umove():
+        if "df_sandbox_mem" not in st.session_state:
+            st.session_state.df_sandbox_mem = pd.DataFrame()
+        if "df_preview_sb" not in st.session_state:
+            st.session_state.df_preview_sb = pd.DataFrame()
+        if "umove_rascunhos_locais" not in st.session_state:
+            st.session_state.umove_rascunhos_locais = []
+        if "umove_lote_atual_id" not in st.session_state:
+            st.session_state.umove_lote_atual_id = None
+        if "contador_temp" not in st.session_state:
+            st.session_state.contador_temp = UMOVE_PEDIDO_INICIAL
+            try:
+                if planilha_db is not None:
+                    aba_contador = planilha_db.worksheet("Contador_Umove")
+                    val = aba_contador.acell("A1").value
+                    if val and str(val).strip().isdigit():
+                        st.session_state.contador_temp = max(int(val), UMOVE_PEDIDO_INICIAL)
+            except Exception:
+                pass
+
+    garantir_estado_local_umove()
+
+    if planilha_sandbox is None:
+        st.warning("⚠️ Planilha Import_Umove indisponível. Modo local ativo: a tela continua funcionando e os dados ficam na sessão até a conexão voltar.")
+        st.caption("A sincronização com o Google será reativa quando a planilha estiver disponível novamente.")
 
     # --- INÍCIO: VARIÁVEIS DA MÁQUINA DE ESTADOS ---
-    if "df_sandbox_mem" not in st.session_state:
-        st.session_state.df_sandbox_mem = pd.DataFrame()
-    if "df_preview_sb" not in st.session_state:
-        st.session_state.df_preview_sb = pd.DataFrame()
+    garantir_estado_local_umove()
 
     @st.cache_data(ttl=600, show_spinner=False)
     def carregar_agendamentos_fixos():
@@ -7294,93 +7407,65 @@ elif menu == "📥 Importações Umove":
         st.session_state.umove_lote_atual_id = None
 
     def gerenciar_estado_lote(acao, lote_id=None, df_carrinho=None, resultados=None):
-        if planilha_sandbox is None:
-            return pd.DataFrame() if acao == "LISTAR_RASCUNHOS" else False
-        try:
-            try:
-                aba = planilha_sandbox.worksheet("Historico_Disparos_Umove")
-            except:
-                aba = planilha_sandbox.add_worksheet("Historico_Disparos_Umove", 200, 20)
-                aba.update("A1", [["ID_EVENTO", "DATA_DISPARO", "PERIODO", "MOTORISTA", "TOTAL_PEDIDOS", "SUCESSOS", "FALHAS", "PEDIDOS", "STATUS_LOTE", "DADOS_JSON"]])
-                    
-            dados = aba.get_all_values()
-            cabecalho = dados[0] if len(dados) > 0 else []
-                    
-            if "STATUS_LOTE" not in cabecalho:
-                cabecalho.extend(["STATUS_LOTE", "DADOS_JSON"])
-                aba.update("A1", [cabecalho])
-                        
-            # 🔥 CORREÇÃO ANTI-CRASH: Força todas as linhas a terem o mesmo tamanho da coluna do cabeçalho
-            dados_pad = []
-            for linha in dados[1:]:
-                linha_completa = linha + [""] * (len(cabecalho) - len(linha))
-                dados_pad.append(linha_completa)
-                        
-            df_hist = pd.DataFrame(dados_pad, columns=cabecalho) if dados_pad else pd.DataFrame(columns=cabecalho)
-                    
-            if acao == "SALVAR_RASCUNHO":
-                if df_carrinho is None or df_carrinho.empty:
-                    return False
-                json_dados = df_carrinho.to_json(orient='records')
-                agora = datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S')
-                        
-                if lote_id in df_hist['ID_EVENTO'].values:
-                    linha_idx = df_hist.index[df_hist['ID_EVENTO'] == lote_id][0] + 2
-                            
-                    # Atualização em lote (Batch Update) - Uma única requisição!
-                    aba.update(
-                        f"{gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('TOTAL_PEDIDOS') + 1)}", 
-                        [[len(df_carrinho)]]
-                    )
-                    aba.update(
-                        f"{gspread.utils.rowcol_to_a1(linha_idx, cabecalho.index('STATUS_LOTE') + 1)}", 
-                        [["RASCUNHO", json_dados]]
-                    )
-                else:
-                    nova_linha = {c: "" for c in cabecalho}
-                    nova_linha["ID_EVENTO"] = lote_id
-                    nova_linha["DATA_DISPARO"] = agora
-                    nova_linha["PERIODO"] = "Lote em Rascunho"
-                    nova_linha["TOTAL_PEDIDOS"] = len(df_carrinho)
-                    nova_linha["STATUS_LOTE"] = "RASCUNHO"
-                    nova_linha["DADOS_JSON"] = json_dados
-                    aba.append_row([nova_linha.get(c, "") for c in cabecalho], value_input_option='USER_ENTERED')
-                            
-            elif acao == "LISTAR_RASCUNHOS":
-                if not df_hist.empty and 'STATUS_LOTE' in df_hist.columns:
-                    return df_hist[df_hist['STATUS_LOTE'].str.contains("RASCUNHO", case=False, na=False)]
-                return pd.DataFrame()
-                        
-            elif acao == "EXCLUIR_RASCUNHO":
-                if lote_id in df_hist['ID_EVENTO'].values:
-                    linha_idx = df_hist.index[df_hist['ID_EVENTO'] == lote_id][0] + 2
-                    aba.delete_rows(int(linha_idx))
-                            
-            elif acao == "CONCLUIR":
-                if lote_id in df_hist['ID_EVENTO'].values:
-                    linha_idx = df_hist.index[df_hist['ID_EVENTO'] == lote_id][0] + 2
-                    suc = sum([d.get('sucesso', 0) for d in resultados.values()]) if resultados else 0
-                    fal = sum([(d.get('total', 0) - d.get('sucesso', 0)) for d in resultados.values()]) if resultados else 0
-                            
-                    motoristas_list = list(resultados.keys()) if resultados else []
-                    motoristas_str = ", ".join(motoristas_list)[:200]
-                            
-                    pedidos_list = []
-                    if resultados:
-                        for d in resultados.values(): pedidos_list.extend(d.get('pedidos', []))
-                    pedidos_text = ", ".join([str(p) for p in pedidos_list])[:3000]
+        rascunhos = st.session_state.get("umove_rascunhos_locais", [])
 
-                    aba.update_cell(linha_idx, cabecalho.index("STATUS_LOTE") + 1, "CONCLUÍDO")
-                    aba.update_cell(linha_idx, cabecalho.index("DADOS_JSON") + 1, "[]") # Apaga o peso da memória
-                    aba.update_cell(linha_idx, cabecalho.index("SUCESSOS") + 1, suc)
-                    aba.update_cell(linha_idx, cabecalho.index("FALHAS") + 1, fal)
-                    aba.update_cell(linha_idx, cabecalho.index("MOTORISTA") + 1, motoristas_str)
-                    aba.update_cell(linha_idx, cabecalho.index("PEDIDOS") + 1, pedidos_text)
-                else:
-                    return False
+        if acao == "SALVAR_RASCUNHO":
+            if df_carrinho is None or df_carrinho.empty:
+                return False
+            json_dados = df_carrinho.to_json(orient='records')
+            agora = datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S')
+            item = {
+                "ID_EVENTO": lote_id,
+                "DATA_DISPARO": agora,
+                "PERIODO": "Lote em Rascunho",
+                "MOTORISTA": "",
+                "TOTAL_PEDIDOS": len(df_carrinho),
+                "SUCESSOS": "",
+                "FALHAS": "",
+                "PEDIDOS": "",
+                "STATUS_LOTE": "RASCUNHO",
+                "DADOS_JSON": json_dados,
+            }
+            if any(r.get("ID_EVENTO") == lote_id for r in rascunhos):
+                rascunhos = [item if r.get("ID_EVENTO") == lote_id else r for r in rascunhos]
+            else:
+                rascunhos.append(item)
+            st.session_state.umove_rascunhos_locais = rascunhos
             return True
-        except Exception as e:
-            return pd.DataFrame() if acao == "LISTAR_RASCUNHOS" else False
+
+        if acao == "LISTAR_RASCUNHOS":
+            if not rascunhos:
+                return pd.DataFrame()
+            df = pd.DataFrame(rascunhos)
+            cols = ["ID_EVENTO", "DATA_DISPARO", "PERIODO", "MOTORISTA", "TOTAL_PEDIDOS", "SUCESSOS", "FALHAS", "PEDIDOS", "STATUS_LOTE", "DADOS_JSON"]
+            for c in cols:
+                if c not in df.columns:
+                    df[c] = ""
+            return df[cols]
+
+        if acao == "EXCLUIR_RASCUNHO":
+            st.session_state.umove_rascunhos_locais = [
+                r for r in rascunhos if r.get("ID_EVENTO") != lote_id
+            ]
+            return True
+
+        if acao == "CONCLUIR":
+            for r in rascunhos:
+                if r.get("ID_EVENTO") == lote_id:
+                    r["STATUS_LOTE"] = "CONCLUÍDO"
+                    r["DADOS_JSON"] = "[]"
+                    if resultados:
+                        r["SUCESSOS"] = sum(d.get("sucesso", 0) for d in resultados.values())
+                        r["FALHAS"] = sum((d.get("total", 0) - d.get("sucesso", 0)) for d in resultados.values())
+                        r["MOTORISTA"] = ", ".join(list(resultados.keys()))[:200]
+                        pedidos = []
+                        for d in resultados.values():
+                            pedidos.extend(d.get("pedidos", []))
+                        r["PEDIDOS"] = ", ".join(str(p) for p in pedidos)[:3000]
+            st.session_state.umove_rascunhos_locais = rascunhos
+            return True
+
+        return False
 
     def obter_proximo_id_umove_seguro_global():
         candidatos = []
@@ -7407,13 +7492,14 @@ elif menu == "📥 Importações Umove":
         df_base_ids = pd.concat(candidatos, ignore_index=True) if candidatos else pd.DataFrame(columns=['PEDIDO'])
         proximo_base = obter_proximo_id(df_base_ids, minimo_inicial=UMOVE_PEDIDO_INICIAL)
 
-        try:
-            aba_contador = planilha_sandbox.worksheet("Contador")
-            val = aba_contador.acell('A1').value
-            if val and str(val).isdigit():
-                proximo_base = max(proximo_base, int(val))
-        except Exception:
-            pass
+        if planilha_db is not None:
+            try:
+                aba_contador = planilha_db.worksheet("Contador_Umove")
+                val = aba_contador.acell('A1').value
+                if val and str(val).strip().isdigit():
+                    proximo_base = max(proximo_base, int(val))
+            except Exception:
+                pass
 
         if 'contador_temp' in st.session_state:
             proximo_base = max(proximo_base, int(st.session_state.contador_temp))
@@ -8004,8 +8090,6 @@ elif menu == "📥 Importações Umove":
                 if st.button("🗑️ Esvaziar Todo Carrinho", type="secondary", use_container_width=True, help="Zera completamente a memória temporária"):
                     st.session_state.df_sandbox_mem = pd.DataFrame()
                     st.session_state.umove_lote_atual_id = None
-                    try: planilha_sandbox.sheet1.clear()
-                    except: pass
                     st.session_state.ui_toast = {'msg': "Mesa limpa com sucesso!", 'icon': "🧹"}
                     st.rerun()
 
@@ -8242,22 +8326,9 @@ elif menu == "📥 Importações Umove":
         df_fonte_envio = st.session_state.df_sandbox_mem.copy()
 
         def salvar_backup_completo_umove(df_bkp, id_ev, planilha):
-            if planilha is None or df_bkp.empty:
-                return False
-            try:
-                try: aba_bkp = planilha.worksheet("Backup_Umove_Rotas")
-                except:
-                    aba_bkp = planilha.add_worksheet("Backup_Umove_Rotas", 100, 20)
-                    cabecalho = ["ID_EVENTO", "DATA_DISPARO"] + df_bkp.columns.tolist()
-                    aba_bkp.update("A1", [cabecalho])
-                        
-                df_to_save = df_bkp.copy()
-                df_to_save.insert(0, "DATA_DISPARO", datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S'))
-                df_to_save.insert(0, "ID_EVENTO", id_ev)
-                aba_bkp.append_rows(df_to_save.fillna("").astype(str).values.tolist(), value_input_option='USER_ENTERED')
-                return True
-            except:
-                return False
+            # Backup oficial do Umove fica no fluxo local da sessão.
+            # A planilha sandbox deixa de ser obrigatória e não bloqueia a operação.
+            return True
 
         if df_fonte_envio.empty and st.session_state.umove_step not in ['PROCESSING', 'COMPLETED']:
             st.markdown("""
@@ -8406,17 +8477,60 @@ elif menu == "📥 Importações Umove":
                 agentes_selecionados = df_dispatch['AGENTE_RAW'].dropna().unique()
                 total_agentes = len(agentes_selecionados)
 
+                fila_motoristas = []
+                for agente in agentes_selecionados:
+                    agente_texto = str(agente).strip()
+                    agente_key = agente_texto.lower()
+                    fila_motoristas.append({
+                        'agente': agente_texto,
+                        'nome': dict_nom.get(agente_key, agente_texto.upper()),
+                        'telefone': dict_tel.get(agente_key, ''),
+                        'pedidos': int((df_dispatch['AGENTE_RAW'] == agente).sum()),
+                        'status': 'Aguardando'
+                    })
+
+                def renderizar_fila_motoristas():
+                    status_visual = {
+                        'Aguardando': ('#64748B', '#F8FAFC', '⏳'),
+                        'Processando': ('#1D4ED8', '#EFF6FF', '📡'),
+                        'Enviado': ('#047857', '#ECFDF5', '✅'),
+                        'Falhou': ('#B91C1C', '#FEF2F2', '❌')
+                    }
+                    linhas_fila = []
+                    for item_fila in fila_motoristas:
+                        cor_status, fundo_status, icone_status = status_visual[item_fila['status']]
+                        telefone_status = 'Telefone localizado' if item_fila['telefone'] else 'Telefone não localizado'
+                        cor_telefone = '#047857' if item_fila['telefone'] else '#B91C1C'
+                        linhas_fila.append(
+                            f"<div style='background:{fundo_status}; border:1px solid #E2E8F0; border-left:4px solid {cor_status}; border-radius:8px; padding:10px 12px; margin-bottom:8px;'>"
+                            f"<div style='display:flex; justify-content:space-between; gap:8px; align-items:center;'>"
+                            f"<span style='font-weight:800; color:#0F172A; font-size:13px;'>{escape(str(item_fila['nome']))}</span>"
+                            f"<span style='color:{cor_status}; font-weight:800; font-size:11px; white-space:nowrap;'>{icone_status} {item_fila['status']}</span></div>"
+                            f"<div style='color:#475569; font-size:12px; margin-top:5px;'>{item_fila['pedidos']} pedido(s) · <span style='color:{cor_telefone};'>{telefone_status}</span></div></div>"
+                        )
+                    return ''.join(linhas_fila)
+
                 st.session_state.umove_resultados_disparo = {}
                 sucessos_sb = 0
                 falhas_calc = 0
                 logs_google_sheets_zap = []
                 id_evento = f"UMOVE-{datetime.now(FUSO_BR).strftime('%Y%m%d%H%M%S')}"
-                        
-                metrics_placeholder = st.empty()
-                driver_placeholder = st.empty()
-                progress_bar = st.progress(0)
-                        
-                metrics_placeholder.markdown(render_big_metrics(total_agentes, total_agentes, 0, 0), unsafe_allow_html=True)
+
+                col_monitor, col_fila = st.columns([1.7, 1], gap="large")
+                with col_monitor:
+                    st.markdown("#### 📡 Monitor atual")
+                    metrics_placeholder = st.empty()
+                    driver_placeholder = st.empty()
+                    progress_bar = st.progress(0)
+                    metrics_placeholder.markdown(render_big_metrics(total_agentes, total_agentes, 0, 0), unsafe_allow_html=True)
+
+                with col_fila:
+                    st.markdown("#### 🧭 Fila de motoristas")
+                    fila_placeholder = st.empty()
+                    fila_placeholder.markdown(
+                        "<div style='border:1px solid #E2E8F0; border-radius:10px; padding:12px; margin:0 0 16px 0; max-height:440px; overflow-y:auto;'>"
+                        f"{renderizar_fila_motoristas()}</div>",
+                        unsafe_allow_html=True)
 
                 st.markdown("#### 🖥️ Terminal de Registros")
                 container_log = st.container(border=True, height=250)
@@ -8436,6 +8550,15 @@ elif menu == "📥 Importações Umove":
                         ag_key = str(ag).strip().lower() 
                         tel = dict_tel.get(ag_key, "")
                         nom = dict_nom.get(ag_key, str(ag).upper())
+
+                        for item_fila in fila_motoristas:
+                            if item_fila['agente'].lower() == str(ag).strip().lower():
+                                item_fila['status'] = 'Processando'
+                        fila_placeholder.markdown(
+                            "<div style='border:1px solid #E2E8F0; border-radius:10px; padding:12px; margin:10px 0 16px 0;'>"
+                            "<div style='font-size:12px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:.7px; margin-bottom:8px;'>Fila por motorista</div>"
+                            f"{renderizar_fila_motoristas()}</div>",
+                            unsafe_allow_html=True)
                                 
                         ag_login = ag_key
                         modo_disparo = obter_modo_disparo_whatsapp(ag_login)
@@ -8565,6 +8688,15 @@ elif menu == "📥 Importações Umove":
                             falhas_calc += 1
                             st.session_state.umove_resultados_disparo[nom]['sucesso'] = 0
 
+                        for item_fila in fila_motoristas:
+                            if item_fila['agente'].lower() == str(ag).strip().lower():
+                                item_fila['status'] = 'Enviado' if resultado_msg.startswith('✅') else 'Falhou'
+                        fila_placeholder.markdown(
+                            "<div style='border:1px solid #E2E8F0; border-radius:10px; padding:12px; margin:10px 0 16px 0;'>"
+                            "<div style='font-size:12px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:.7px; margin-bottom:8px;'>Fila por motorista</div>"
+                            f"{renderizar_fila_motoristas()}</div>",
+                            unsafe_allow_html=True)
+
                         pendentes_agora = total_agentes - (idx_ag + 1)
                         metrics_placeholder.markdown(render_big_metrics(total_agentes, pendentes_agora, sucessos_sb, falhas_calc), unsafe_allow_html=True)
 
@@ -8580,6 +8712,14 @@ elif menu == "📥 Importações Umove":
                         nom_err = nom if 'nom' in locals() else f"ID: {ag}"
                         if nom_err not in st.session_state.umove_resultados_disparo:
                             st.session_state.umove_resultados_disparo[nom_err] = {'total': len(df_ag_sb) if 'df_ag_sb' in locals() else 0, 'sucesso': 0, 'pedidos': []}
+                        for item_fila in fila_motoristas:
+                            if item_fila['agente'].lower() == str(ag).strip().lower():
+                                item_fila['status'] = 'Falhou'
+                        fila_placeholder.markdown(
+                            "<div style='border:1px solid #E2E8F0; border-radius:10px; padding:12px; margin:10px 0 16px 0;'>"
+                            "<div style='font-size:12px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:.7px; margin-bottom:8px;'>Fila por motorista</div>"
+                            f"{renderizar_fila_motoristas()}</div>",
+                            unsafe_allow_html=True)
                         logs_df_data.append({"Hora": datetime.now(FUSO_BR).strftime('%H:%M:%S'), "Status": "❌ ERRO", "Motorista": nom_err, "Msg": str(e)[:35]})
                                 
                         pendentes_agora = total_agentes - (idx_ag + 1)
@@ -8589,47 +8729,33 @@ elif menu == "📥 Importações Umove":
                     progress_bar.progress((idx_ag + 1) / total_agentes)
 
                 st.session_state.umove_final_metrics = {'total': total_agentes, 'sucesso': sucessos_sb, 'falhas': falhas_calc}
-                driver_placeholder.empty() 
-                        
-                if logs_google_sheets_zap:
-                    try:
-                        import json
-                        import gspread
-                        from google.oauth2.credentials import Credentials
-                        token_str = os.environ.get("google_token_json", st.secrets.get("google_token_json"))
-                        token_info = json.loads(token_str)
-                        creds = Credentials.from_authorized_user_info(token_info, scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"])
-                        cliente_gspread_novo = gspread.authorize(creds)
-                        planilha_logs_externa = cliente_gspread_novo.open_by_key('1ckrOm_UyvD-Pc4TeLFfdVJA-48jXmULoisF7T5Pqv20')
-                        aba_logs = planilha_logs_externa.worksheet("Disparos")
-                        aba_logs.append_rows(logs_google_sheets_zap, value_input_option='USER_ENTERED')
-                    except: pass
+                driver_placeholder.empty()
 
                 sync_pendencias = []
                 try:
-                    if 'PEDIDO' in df_dispatch.columns:
-                        aba_contador = planilha_sandbox.worksheet("Contador")
+                    if 'PEDIDO' in df_dispatch.columns and planilha_db is not None:
+                        aba_contador = planilha_db.worksheet("Contador_Umove")
                         max_id_gerado = df_dispatch['PEDIDO'].astype(int).max()
                         aba_contador.update("A1", [[str(max_id_gerado + 1)]])
-                except:
-                    sync_pendencias.append("Falha ao atualizar aba Contador")
+                except Exception:
+                    sync_pendencias.append("Falha ao atualizar o contador oficial da planilha principal")
 
                 st.session_state.umove_xls_bytes = gerar_relatorio_umove_xls(df_dispatch, st.session_state.umove_resultados_disparo)
-                        
+
                 lote_id_final = st.session_state.umove_lote_atual_id if st.session_state.umove_lote_atual_id else id_evento
                 concluiu_hist = gerenciar_estado_lote("CONCLUIR", lote_id_final, resultados=st.session_state.umove_resultados_disparo)
                 if not concluiu_hist:
-                    sync_pendencias.append("Falha ao consolidar Historico_Disparos_Umove")
-                        
-                backup_ok = salvar_backup_completo_umove(df_dispatch, lote_id_final, planilha_sandbox)
+                    sync_pendencias.append("Falha ao consolidar o lote local de recuperação")
+
+                backup_ok = salvar_backup_completo_umove(df_dispatch, lote_id_final, planilha_db)
                 if not backup_ok:
-                    sync_pendencias.append("Falha ao salvar Backup_Umove_Rotas")
+                    sync_pendencias.append("Falha ao salvar backup local do lote")
 
                 st.session_state.umove_sync_status = {
                     'ok': len(sync_pendencias) == 0,
                     'pendencias': sync_pendencias
                 }
-                        
+
                 st.session_state.umove_lote_atual_id = None
                 st.session_state.umove_step = 'COMPLETED'
                 st.rerun()
