@@ -8786,7 +8786,7 @@ elif menu == "📥 Importações Umove":
                             use_container_width=True,
                             type="primary")
                 with col_rel2:
-                    if st.button("🔄 Liberar Mesa para Novo Disparo", use_container_width=True, disabled=not sync_ok):
+                    if st.button("🔄 Liberar Mesa para Novo Disparo", use_container_width=True):
                         st.session_state.umove_step = 'IDLE'
                         st.session_state.umove_xls_bytes = None
                         st.session_state.umove_resultados_disparo = {}
