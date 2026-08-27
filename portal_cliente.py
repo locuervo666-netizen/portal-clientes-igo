@@ -206,20 +206,24 @@ CSS_DASHBOARD = """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     :root {
-        --igo-bg-soft: #f3f7ff;
-        --igo-surface: #ffffff;
-        --igo-surface-2: #f8fbff;
-        --igo-line: #dbe3ef;
-        --igo-text: #0f172a;
-        --igo-muted: #64748b;
-        --igo-brand: #2563eb;
-        --igo-brand-2: #1d4ed8;
-        --igo-shadow-lg: 0 14px 34px rgba(15, 23, 42, 0.11);
+        --igo-bg-soft: #edf2f5;
+        --igo-surface: #f8fafc;
+        --igo-surface-2: #eef3f6;
+        --igo-line: #cad7e0;
+        --igo-text: #111827;
+        --igo-muted: #5b6675;
+        --igo-brand: #1f3d5c;
+        --igo-brand-2: #2d5d84;
+        --igo-success: #2e7d32;
+        --igo-warning: #d97706;
+        --igo-danger: #b42318;
+        --igo-accent: #4f81c7;
+        --igo-shadow-lg: 0 14px 34px rgba(15, 23, 42, 0.14);
     }
     [data-testid="stAppViewContainer"] {
         transition: background-color 0.3s ease;
         font-family: 'Inter', sans-serif;
-        background: #fafbfc !important;
+        background: linear-gradient(180deg, #eef3f7 0%, #e8edf2 100%) !important;
         padding-left: 0.3rem !important;
         padding-right: 0.3rem !important;
     }
@@ -236,6 +240,10 @@ CSS_DASHBOARD = """
     [data-testid="stAppViewContainer"] [data-testid="stElementContainer"] {
         padding-left: 0px !important;
         padding-right: 0px !important;
+    }
+
+    .portal-notification-wrap {
+        margin: 0 0 10px 0;
     }
 
     [data-testid="stApp"] {
@@ -376,11 +384,12 @@ CSS_DASHBOARD = """
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        border: 1px solid #bbf7d0;
-        background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+        border: 1px solid rgba(110, 231, 183, 0.58);
+        background: linear-gradient(180deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.18) 100%);
         border-radius: 10px;
         padding: 8px 10px;
         margin: 4px 0 8px 0;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
     }
     .status-online-left {
         display: flex;
@@ -424,21 +433,21 @@ CSS_DASHBOARD = """
     }
 
     .kpi-deck-shell {
-        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-        border: 1px solid rgba(203, 213, 225, 0.6);
+        background: linear-gradient(180deg, #f5f7fa 0%, #edf2f7 100%);
+        border: 1px solid rgba(148, 163, 184, 0.42);
         border-radius: 12px;
         padding: 12px 12px 8px 12px;
-        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255,255,255,0.95);
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,0.9);
         margin-bottom: 3px;
         backdrop-filter: blur(8px);
     }
 
     .toolbar-shell {
-        background: linear-gradient(180deg, #f9fafb 0%, #f3f4f6 100%);
-        border: 1px solid rgba(203, 213, 225, 0.5);
+        background: linear-gradient(180deg, #eef3f8 0%, #e3ebf3 100%);
+        border: 1px solid rgba(148, 163, 184, 0.38);
         border-radius: 12px;
         padding: 8px 10px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255,255,255,0.95);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255,255,255,0.9);
         margin-bottom: 3px;
         backdrop-filter: blur(8px);
     }
@@ -464,8 +473,8 @@ CSS_DASHBOARD = """
         overflow: hidden;
         min-height: 102px;
         backdrop-filter: blur(8px);
-        border: 1.5px solid rgba(203, 213, 225, 0.5);
-        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+        border: 1.5px solid rgba(148, 163, 184, 0.42);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255,255,255,0.8);
     }
     .kpi-card::after {
         content: "";
@@ -507,10 +516,10 @@ CSS_DASHBOARD = """
         align-items: center;
         margin-bottom: 6px;
         padding: 12px 14px;
-        border: 1px solid rgba(203, 213, 225, 0.6);
+        border: 1px solid rgba(148, 163, 184, 0.35);
         border-radius: 12px;
-        background: linear-gradient(135deg, #f0f9ff 0%, #f1f5f9 100%);
-        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255,255,255,0.95);
+        background: linear-gradient(135deg, #e8eef5 0%, #f4f7fa 34%, #dfeaf4 100%);
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,0.9);
         backdrop-filter: blur(8px);
     }
     .header-title {
@@ -668,6 +677,12 @@ CSS_DASHBOARD = """
         color: #166534;
         border-color: #86efac;
         box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
+    }
+    .progress-status-box.empty {
+        background: #f8fafc;
+        color: #475569;
+        border-color: #cbd5e1;
+        box-shadow: 0 4px 12px rgba(100, 116, 139, 0.10);
     }
     .progress-status-number {
         font-size: 26px;
@@ -1433,6 +1448,68 @@ if 'busca_grid_aplicada' not in st.session_state: st.session_state.busca_grid_ap
 def aplicar_busca_grid():
     st.session_state.busca_grid_aplicada = st.session_state.busca_grid_input.strip()
 
+
+def registrar_notificacao_portal(mensagem, tipo="sucesso", ttl_segundos=7):
+    """Registra uma notificação temporária no topo do Portal."""
+    if "portal_notificacoes" not in st.session_state:
+        st.session_state.portal_notificacoes = []
+
+    st.session_state.portal_notificacoes.append({
+        "id": f"notif-{datetime.now(FUSO_BR).timestamp()}-{len(st.session_state.portal_notificacoes)}",
+        "mensagem": mensagem,
+        "tipo": tipo,
+        "expira_em": datetime.now(FUSO_BR).timestamp() + ttl_segundos,
+    })
+
+    st.session_state.portal_notificacoes = [
+        n for n in st.session_state.portal_notificacoes
+        if n["expira_em"] > datetime.now(FUSO_BR).timestamp()
+    ]
+
+
+def render_notificacoes_portal():
+    """Renderiza as notificações temporárias no topo da tela."""
+    if "portal_notificacoes" not in st.session_state:
+        return
+
+    agora = datetime.now(FUSO_BR).timestamp()
+    st.session_state.portal_notificacoes = [
+        n for n in st.session_state.portal_notificacoes if n["expira_em"] > agora
+    ]
+
+    if not st.session_state.portal_notificacoes:
+        return
+
+    for notif in list(reversed(st.session_state.portal_notificacoes)):
+        cor_bg = {
+            "sucesso": "#ecfdf5",
+            "info": "#eff6ff",
+            "alerta": "#fff7ed",
+            "erro": "#fef2f2",
+        }.get(notif["tipo"], "#f8fafc")
+        cor_texto = {
+            "sucesso": "#166534",
+            "info": "#1d4ed8",
+            "alerta": "#b45309",
+            "erro": "#b91c1c",
+        }.get(notif["tipo"], "#334155")
+        borda = {
+            "sucesso": "#86efac",
+            "info": "#93c5fd",
+            "alerta": "#fbbf24",
+            "erro": "#fca5a5",
+        }.get(notif["tipo"], "#cbd5e1")
+
+        st.markdown(
+            f"""
+            <div style="background:{cor_bg}; border:1px solid {borda}; color:{cor_texto}; padding:12px 14px; border-radius:12px; margin-bottom:10px; font-weight:700; box-shadow:0 4px 12px rgba(15,23,42,0.05);">
+                {notif['mensagem']}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 # =======================================================
 # ⚙️ FUNÇÕES AUXILIARES (AGORA NO LUGAR CERTO!)
 # =======================================================
@@ -1527,8 +1604,24 @@ def tratar_foto(x):
     if xs.startswith("http"): return xs
     return f"https://www.appsheet.com/template/gettablefileurl?appName=APPIGOLOGISTICA-153047553&tableName=App_Tarefas&fileName={xs}"
 
-KPI_DOT_COLOR = { "TODOS": "#2563eb", "ENTREGUE": "#16a34a", "FRUSTRADA": "#dc2626", "COLETADO": "#0ea5e9", "PENDENTE": "#d97706", "Aguardando": "#475569", "HOJE": "#7c3aed" }
-KPI_BG_COLOR = { "TODOS": "#dbeafe", "ENTREGUE": "#dcfce7", "FRUSTRADA": "#fee2e2", "COLETADO": "#e0f2fe", "PENDENTE": "#fef3c7", "Aguardando": "#f1f5f9", "HOJE": "#ede9fe" }
+KPI_DOT_COLOR = {
+    "TODOS": "#1F3D5C",
+    "ENTREGUE": "#2E7D32",
+    "FRUSTRADA": "#B42318",
+    "COLETADO": "#2D5D84",
+    "PENDENTE": "#D97706",
+    "Aguardando": "#475569",
+    "HOJE": "#2D5D84"
+}
+KPI_BG_COLOR = {
+    "TODOS": "#E6EEF8",
+    "ENTREGUE": "#E7F7EB",
+    "FRUSTRADA": "#FDECEC",
+    "COLETADO": "#E6F2FA",
+    "PENDENTE": "#FFF4D6",
+    "Aguardando": "#E8EDF5",
+    "HOJE": "#E8F7F7"
+}
 KPI_META = [("TODOS", "📦 Total", "kpi_total"), ("ENTREGUE", "✅ Entregues", "kpi_entregue"), ("FRUSTRADA", "❌ Insucessos", "kpi_frus"), ("COLETADO", "🚐 Coletados", "kpi_coletado"), ("PENDENTE", "⏳ Pendentes", "kpi_pend"), ("Aguardando", "🎧 Chamados", "kpi_aguardando"), ("HOJE", "📅 Hoje", "kpi_hoje")]
 
 # =======================================================
@@ -2279,6 +2372,14 @@ else:
     nome_tomador_oficial = conf["filtro"] if conf["filtro"] != "TODOS" else "MATRIZ IGO"
     logo_tomador = obter_logo_por_tomador(conf.get("tomador", conf.get("filtro", "TODOS")))
 
+    if "portal_cco_snapshot" not in st.session_state:
+        st.session_state.portal_cco_snapshot = {}
+
+    if "portal_notificacoes" not in st.session_state:
+        st.session_state.portal_notificacoes = []
+
+    render_notificacoes_portal()
+
     # ── SIDEBAR ────────────────────────────────────────
     with st.sidebar:
         col1, col2, col3 = st.columns([1, 4, 1])
@@ -2306,8 +2407,7 @@ else:
         with st.container(border=False):
             st.markdown("<p style='font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 5px;'>🗓️ Período de Análise</p>", unsafe_allow_html=True)
             c1_dt, c2_dt = st.columns(2)
-            # Alterado de 15 para 7 dias para carregar mais rápido inicialmente
-            dt_inicio = c1_dt.date_input("De:", value=hoje_br - timedelta(days=3), format="DD/MM/YYYY")
+            dt_inicio = c1_dt.date_input("De:", value=hoje_br - timedelta(days=14), format="DD/MM/YYYY")
             dt_fim    = c2_dt.date_input("Até:", value=hoje_br, format="DD/MM/YYYY")
             datas_sel = (dt_inicio, dt_fim)
             holder_cidades = st.empty()
@@ -2364,6 +2464,32 @@ else:
     
     # Chama a função nova passando o filtro do cliente
     df_cliente = carregar_dados_nuvem(filtro_atual)
+
+    if not df_cliente.empty:
+        snapshot_novo = {}
+        for _, row in df_cliente.iterrows():
+            pedido = str(row.get('PEDIDO', '')).strip()
+            status = str(row.get('STATUS', '')).strip().upper()
+            if pedido:
+                snapshot_novo[pedido] = status
+
+        for pedido, status in snapshot_novo.items():
+            status_antigo = st.session_state.portal_cco_snapshot.get(pedido)
+            if (
+                pedido
+                and status_antigo
+                and status_antigo.strip().upper() == "AGUARDANDO APROVAÇÃO"
+                and status.strip().upper() not in ["", "AGUARDANDO APROVAÇÃO"]
+            ):
+                registrar_notificacao_portal(
+                    f"✅ Pedido {pedido} foi aprovado pelo CCO e liberado para operação.",
+                    tipo="sucesso",
+                    ttl_segundos=8,
+                )
+
+        st.session_state.portal_cco_snapshot = snapshot_novo
+
+    render_notificacoes_portal()
 
     if df_cliente.empty:
         st.info("Aguardando novas informações do Torre de Controle na base de dados...")
@@ -2537,8 +2663,12 @@ else:
                     n_tot = 0
                     pct = 0
 
-                # Determinar a cor dinâmica baseada no percentual (Bateria)
-                if pct <= 30:
+                # Dia sem pedidos é um estado neutro, não um alerta de desempenho.
+                if n_tot == 0:
+                    cor_bateria = "#94a3b8"
+                    status_class = "empty"
+                    status_label = "Sem pedidos para hoje"
+                elif pct <= 30:
                     cor_bateria = "#ef4444"  # Vermelho (Baixo)
                     status_class = "low"
                     status_label = "⚠️ Baixo Progresso"
@@ -2736,34 +2866,24 @@ Pedidos movimentados hoje
                     class StatusBadgeRenderer {
                       init(params) {
                         this.eGui = document.createElement('div');
-                        this.eGui.style.cssText = 'display: flex; align-items: center; height: 100%;';
+                                                this.eGui.style.cssText = 'display: flex; align-items: center; height: 100%; width: 100%;';
                         
                         let badge = document.createElement('span');
-                        badge.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; height: 22px;';
+                                                badge.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; padding: 4px 9px; border-radius: 7px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.35px; min-height: 22px; max-width: 100%; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
                         
                         let status = params.value ? params.value.toUpperCase() : '';
                         let text = params.value || '';
                         
                         if (status.includes('ENTREGUE') || status.includes('CONFERIDO')) {
-                          badge.style.backgroundColor = '#dcfce7';
-                          badge.style.color = '#166534'; 
-                          badge.style.border = '1px solid #bbf7d0';
-                        } else if (status.includes('FRUSTRADA') || status.includes('PROBLEMA') || status.includes('ATRASADO') || status.includes('RECUSA')) {
-                          badge.style.backgroundColor = '#fee2e2';
-                          badge.style.color = '#991b1b'; 
-                          badge.style.border = '1px solid #fecaca';
-                        } else if (status.includes('COLETADO') || status.includes('ROTA')) {
-                          badge.style.backgroundColor = '#dbeafe';
-                          badge.style.color = '#1e40af'; 
-                          badge.style.border = '1px solid #bfdbfe';
-                        } else if (status.includes('PENDENTE')) {
-                          badge.style.backgroundColor = '#fef3c7';
-                          badge.style.color = '#b45309'; 
-                          badge.style.border = '1px solid #fde68a';
+                                                    badge.style.cssText += 'background:#DCFCE7; color:#166534; border:1px solid #86EFAC;';
+                                                } else if (status.includes('FRUSTRADA') || status.includes('INSUCESSO') || status.includes('PROBLEMA') || status.includes('OCORRÊNCIA') || status.includes('ATRASADO') || status.includes('RECUSA') || status.includes('CANCELADO')) {
+                                                    badge.style.cssText += 'background:#FEE2E2; color:#991B1B; border:1px solid #FCA5A5;';
+                                                } else if (status.includes('COLETADO') || status.includes('ROTA') || status.includes('TRANSFERÊNCIA')) {
+                                                    badge.style.cssText += 'background:#DBEAFE; color:#1E40AF; border:1px solid #93C5FD;';
+                                                } else if (status.includes('PENDENTE') || status.includes('AGUARDANDO') || status.includes('CONFIRMAÇÃO')) {
+                                                    badge.style.cssText += 'background:#FEF3C7; color:#B45309; border:1px solid #FCD34D;';
                         } else {
-                          badge.style.backgroundColor = '#f1f5f9';
-                          badge.style.color = '#475569'; 
-                          badge.style.border = '1px solid #e2e8f0';
+                                                    badge.style.cssText += 'background:#F1F5F9; color:#475569; border:1px solid #CBD5E1;';
                         }
                         
                         badge.innerText = text;
