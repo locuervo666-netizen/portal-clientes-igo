@@ -7368,6 +7368,31 @@ elif menu == "📥 Importações Umove":
             except Exception:
                 return None
 
+    def ler_contador_umove():
+        aba_contador = garantir_aba_contador_umove()
+        if aba_contador is None:
+            return None
+        try:
+            val = aba_contador.acell("A1").value
+            if val and str(val).strip().isdigit():
+                return int(val)
+            return None
+        except Exception:
+            return None
+
+    def escrever_contador_umove(valor):
+        if planilha_db is None:
+            return False
+        try:
+            aba_contador = garantir_aba_contador_umove()
+            if aba_contador is None:
+                return False
+            aba_contador.update("A1", [[str(int(valor))]])
+            st.session_state.contador_temp = int(valor)
+            return True
+        except Exception:
+            return False
+
     def garantir_estado_local_umove():
         if "df_sandbox_mem" not in st.session_state:
             st.session_state.df_sandbox_mem = pd.DataFrame()
@@ -7379,14 +7404,9 @@ elif menu == "📥 Importações Umove":
             st.session_state.umove_lote_atual_id = None
         if "contador_temp" not in st.session_state:
             st.session_state.contador_temp = UMOVE_PEDIDO_INICIAL
-        aba_contador = garantir_aba_contador_umove()
-        if aba_contador is not None:
-            try:
-                val = aba_contador.acell("A1").value
-                if val and str(val).strip().isdigit():
-                    st.session_state.contador_temp = int(val)
-            except Exception:
-                pass
+        contador_lido = ler_contador_umove()
+        if contador_lido is not None:
+            st.session_state.contador_temp = contador_lido
 
     garantir_estado_local_umove()
 
@@ -7509,14 +7529,9 @@ elif menu == "📥 Importações Umove":
         df_base_ids = pd.concat(candidatos, ignore_index=True) if candidatos else pd.DataFrame(columns=['PEDIDO'])
         proximo_base = obter_proximo_id(df_base_ids, minimo_inicial=UMOVE_PEDIDO_INICIAL)
 
-        aba_contador = garantir_aba_contador_umove()
-        if aba_contador is not None:
-            try:
-                val = aba_contador.acell('A1').value
-                if val and str(val).strip().isdigit():
-                    proximo_base = int(val)
-            except Exception:
-                pass
+        contador_arquivo = ler_contador_umove()
+        if contador_arquivo is not None:
+            proximo_base = max(proximo_base, contador_arquivo)
 
         if 'contador_temp' in st.session_state:
             proximo_base = max(proximo_base, int(st.session_state.contador_temp))
@@ -7737,19 +7752,7 @@ elif menu == "📥 Importações Umove":
                                 prox_id_sb += 1
 
                             st.session_state.contador_temp = prox_id_sb
-
-                            if aba_contador is not None:
-                                try:
-                                    aba_contador.update("A1", [[str(prox_id_sb)]])
-                                except Exception:
-                                    pass
-                            else:
-                                try:
-                                    aba_contador = garantir_aba_contador_umove()
-                                    if aba_contador is not None:
-                                        aba_contador.update("A1", [[str(prox_id_sb)]])
-                                except Exception:
-                                    pass
+                            escrever_contador_umove(prox_id_sb)
                             if st.session_state.df_sandbox_mem.empty:
                                 st.session_state.df_sandbox_mem = df_ok
                             else:
@@ -8045,11 +8048,10 @@ elif menu == "📥 Importações Umove":
                                 st.session_state.df_sandbox_mem = df_fixos_hoje
                             else:
                                 st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_fixos_hoje], ignore_index=True)
-                                    
-                            try:
-                                planilha_sandbox.worksheet("Contador").update("A1", [[str(prox_id_sb)]])
-                            except: pass
-                                    
+
+                            st.session_state.contador_temp = prox_id_sb + len(df_fixos_hoje)
+                            escrever_contador_umove(st.session_state.contador_temp)
+
                             if st.session_state.umove_lote_atual_id is None:
                                 st.session_state.umove_lote_atual_id = f"LOTE-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
                             gerenciar_estado_lote("SALVAR_RASCUNHO", st.session_state.umove_lote_atual_id, st.session_state.df_sandbox_mem)
