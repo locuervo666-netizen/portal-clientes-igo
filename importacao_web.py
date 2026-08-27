@@ -7354,21 +7354,16 @@ elif menu == "📥 Importações Umove":
     def garantir_aba_contador_umove():
         if planilha_db is None:
             return None
-        valor_base = max(int(st.session_state.get("contador_temp", UMOVE_PEDIDO_INICIAL)), UMOVE_PEDIDO_INICIAL)
         try:
             aba_contador = planilha_db.worksheet("Contador_Umove")
             val = aba_contador.acell("A1").value
             if val is None or str(val).strip() == "":
-                aba_contador.update("A1", [[str(valor_base)]])
-            elif str(val).strip().isdigit():
-                valor_atual = int(val)
-                if valor_atual < valor_base:
-                    aba_contador.update("A1", [[str(valor_base)]])
+                aba_contador.update("A1", [[str(UMOVE_PEDIDO_INICIAL)]])
             return aba_contador
         except Exception:
             try:
                 aba_contador = planilha_db.add_worksheet("Contador_Umove", 10, 1)
-                aba_contador.update("A1", [[str(valor_base)]])
+                aba_contador.update("A1", [[str(UMOVE_PEDIDO_INICIAL)]])
                 return aba_contador
             except Exception:
                 return None
@@ -7389,7 +7384,7 @@ elif menu == "📥 Importações Umove":
             try:
                 val = aba_contador.acell("A1").value
                 if val and str(val).strip().isdigit():
-                    st.session_state.contador_temp = max(int(val), UMOVE_PEDIDO_INICIAL)
+                    st.session_state.contador_temp = int(val)
             except Exception:
                 pass
 
@@ -7519,7 +7514,7 @@ elif menu == "📥 Importações Umove":
             try:
                 val = aba_contador.acell('A1').value
                 if val and str(val).strip().isdigit():
-                    proximo_base = max(proximo_base, int(val))
+                    proximo_base = int(val)
             except Exception:
                 pass
 
@@ -7746,6 +7741,13 @@ elif menu == "📥 Importações Umove":
                             if aba_contador is not None:
                                 try:
                                     aba_contador.update("A1", [[str(prox_id_sb)]])
+                                except Exception:
+                                    pass
+                            else:
+                                try:
+                                    aba_contador = garantir_aba_contador_umove()
+                                    if aba_contador is not None:
+                                        aba_contador.update("A1", [[str(prox_id_sb)]])
                                 except Exception:
                                     pass
                             if st.session_state.df_sandbox_mem.empty:
