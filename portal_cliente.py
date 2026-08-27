@@ -3110,12 +3110,8 @@ Pedidos movimentados hoje
         # ===================================================
         with tab_solicitar:
             st.markdown("### ➕ Nova Solicitação de Coleta")
-            st.markdown(
-                "<p style='color:#64748b;font-size:13px;margin-top:-8px;margin-bottom:16px;'>"
-                "Escolha o ponto de coleta desejado. Solicitações após as 10:00 são agendadas "
-                "automaticamente para o próximo dia útil."
-                "</p>",
-                unsafe_allow_html=True
+            st.caption(
+                "Escolha o ponto de coleta e a data desejada. Solicitações após as 10:00 são automaticamente agendadas para o próximo dia útil."
             )
 
             df_locais = carregar_base_locais()
@@ -3123,55 +3119,89 @@ Pedidos movimentados hoje
                 st.warning("O banco de dados de locais de coleta ainda não foi sincronizado.")
             else:
                 df_cli_locais = df_locais[df_locais['TOMADOR'].str.upper().str.strip() == nome_tomador_oficial.upper().strip()]
-                
+
                 if df_cli_locais.empty:
                     st.warning(f"Nenhum ponto de coleta cadastrado para {nome_tomador_oficial}.")
                 else:
-                    with st.container(border=False):
+                    with st.container():
+                        st.markdown(
+                            """
+                            <div style="background:linear-gradient(135deg,#f8fbff,#eef6ff); border:1px solid #bfdbfe; border-radius:14px; padding:14px 16px; margin-bottom:18px;">
+                                <div style="display:flex; align-items:center; gap:10px; color:#0f172a; font-weight:700; font-size:14px;">
+                                    <span style="font-size:18px;">ℹ️</span>
+                                    Regras rápidas
+                                </div>
+                                <div style="margin-top:8px; color:#475569; font-size:13px; line-height:1.6;">
+                                    • Coletas só podem ser agendadas em dias úteis.<br>
+                                    • A solicitação entra em aprovação antes da execução.<br>
+                                    • A confirmação aparece na aba de acompanhamento.
+                                </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
                         with st.form("form_nova_coleta", clear_on_submit=True):
                             lista_labs = sorted(df_cli_locais['LABORATORIO'].unique().tolist())
-                            lab_sel    = st.selectbox(
-                                "📍 Selecione o Ponto de Coleta (Laboratório):",
-                                ["Selecione..."] + lista_labs
-                            )
+                            col_lab, col_data = st.columns([1.5, 1])
 
-                            if lab_sel != "Selecione...":
-                                local_data  = df_cli_locais[df_cli_locais['LABORATORIO'] == lab_sel].iloc[0]
-                                end_fmt = f"{local_data.get('ENDERECO','')}, {local_data.get('NUMERO','')} — {local_data.get('BAIRRO','')}"
-                                cid_fmt = f"{local_data.get('CIDADE','')}/{local_data.get('UF','')} | CEP: {local_data.get('CEP','')}"
-                                st.markdown(f"""
-                                    <div style="background:#f0f9ff;border-left:4px solid #3b82f6; padding:12px 15px;border-radius:4px;margin-bottom:15px;">
-                                        <p style="margin:0;font-size:11px;color:#64748b;font-weight:700;">
-                                            DESTINO CONFIRMADO
-                                        </p>
-                                        <p style="margin:4px 0 0;font-size:13px;color:#0f172a;">
-                                            <b>{end_fmt}</b><br>{cid_fmt}
-                                        </p>
-                                    </div>
-                                """, unsafe_allow_html=True)
+                            with col_lab:
+                                lab_sel = st.selectbox(
+                                    "📍 Ponto de Coleta",
+                                    ["Selecione..."] + lista_labs,
+                                    help="Selecione o laboratório ou ponto de coleta cadastrado para o tomador atual."
+                                )
 
-                            agora_sp    = datetime.now(FUSO_BR)
-                            data_minima = agora_sp.date() + timedelta(days=1)  # 🔥 Sempre D+1 em dias úteis
-                            
+                            agora_sp = datetime.now(FUSO_BR)
+                            data_minima = agora_sp.date() + timedelta(days=1)
                             while data_minima.weekday() >= 5:
                                 data_minima += timedelta(days=1)
 
-                            c1, _ = st.columns(2)
-                            data_coleta = c1.date_input(
-                                "📅 Data Desejada para Coleta:",
-                                min_value=data_minima,
-                                value=data_minima,
-                                format="DD/MM/YYYY"
-                            )
+                            with col_data:
+                                data_coleta = st.date_input(
+                                    "📅 Data Desejada",
+                                    min_value=data_minima,
+                                    value=data_minima,
+                                    format="DD/MM/YYYY",
+                                    help="A coleta será agendada em dia útil. Fins de semana são bloqueados."
+                                )
+
+                            if lab_sel != "Selecione...":
+                                local_data = df_cli_locais[df_cli_locais['LABORATORIO'] == lab_sel].iloc[0]
+                                end_fmt = f"{local_data.get('ENDERECO','')}, {local_data.get('NUMERO','')} — {local_data.get('BAIRRO','')}"
+                                cid_fmt = f"{local_data.get('CIDADE','')}/{local_data.get('UF','')} | CEP: {local_data.get('CEP','')}"
+                                st.markdown(
+                                    f"""
+                                    <div style="background:#f0f9ff;border:1px solid #93c5fd;border-left:5px solid #2563eb; border-radius:12px; padding:12px 14px; margin:10px 0 16px;">
+                                        <div style="font-size:11px; letter-spacing:0.08em; color:#475569; font-weight:700; text-transform:uppercase;">
+                                            Destino confirmado
+                                        </div>
+                                        <div style="margin-top:6px; color:#0f172a; font-size:13px; line-height:1.5;">
+                                            <b>{end_fmt}</b><br>
+                                            {cid_fmt}
+                                        </div>
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True,
+                                )
+
+                            st.markdown("#### Resumo da solicitação")
+                            resumo_col_1, resumo_col_2 = st.columns(2)
+                            with resumo_col_1:
+                                st.write(f"**Ponto:** {lab_sel if lab_sel != 'Selecione...' else 'Aguardando seleção'}")
+                            with resumo_col_2:
+                                st.write(f"**Data:** {data_coleta.strftime('%d/%m/%Y')}")
+
                             obs = st.text_area(
-                                "📝 Observações / Instruções (Opcional):",
-                                placeholder="Ex: Procurar por Fulano, coletar na recepção...",
-                                height=100
+                                "📝 Observações / Instruções",
+                                placeholder="Ex: Procurar por Fulano, coletar na recepção, horário preferencial...",
+                                height=100,
+                                help="Campo opcional para instruções específicas da coleta."
                             )
 
-                            if st.form_submit_button("🚀 Enviar Solicitação ao Torre de Controle.", type="primary", use_container_width=True):
+                            if st.form_submit_button("🚀 Enviar Solicitação", type="primary", use_container_width=True):
                                 if lab_sel == "Selecione...":
-                                    st.error("⚠️ Selecione um Ponto de Coleta válido.")
+                                    st.error("⚠️ Selecione um ponto de coleta válido antes de continuar.")
                                 elif data_coleta.weekday() >= 5:
                                     st.error("⚠️ Coletas não são realizadas aos finais de semana. Escolha um dia útil.")
                                 else:
@@ -3183,20 +3213,20 @@ Pedidos movimentados hoje
                                             dados_m  = aba_m.get_all_values()
 
                                             df_m_temp = pd.DataFrame(dados_m[1:], columns=dados_m[0])
-                                            
+
                                             # 🛑 INÍCIO DA TRAVA DE DUPLICIDADE (IDEMPOTÊNCIA) 🛑
                                             data_formatada = data_coleta.strftime("%d/%m/%Y")
-                                            
+
                                             filtro_duplicidade = df_m_temp[
                                                 (df_m_temp['TOMADOR'] == nome_tomador_oficial) &
                                                 (df_m_temp['LABORATORIO'] == local_data['LABORATORIO']) &
                                                 (df_m_temp['DATA'] == data_formatada) &
                                                 (df_m_temp['STATUS'] == 'AGUARDANDO APROVAÇÃO')
                                             ]
-                                            
+
                                             if not filtro_duplicidade.empty:
                                                 st.warning("⚠️ Solicitação já recebida! Já existe um pedido idêntico aguardando aprovação para este local e data.")
-                                                st.stop() # Interrompe o script para impedir a criação do pedido duplicado
+                                                st.stop()
                                             # 🛑 FIM DA TRAVA 🛑
 
                                             prox_id = obter_proximo_id(df_m_temp)
