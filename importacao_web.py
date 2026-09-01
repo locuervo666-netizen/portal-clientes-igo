@@ -153,6 +153,19 @@ def usuarios_padrao_login():
     }
 
 
+MENUS_OPERADOR = {
+    "📈 Dashboard",
+    "📊 GRID",
+    "📥 Importações",
+    "📥 Importações Umove",
+    "📝 Pedido Manual",
+    "🏷️ Gerador de Etiquetas",
+    "📁 Relatórios",
+    "🔬 Triagem",
+    "🎧 Atendimento",
+}
+
+
 def carregar_usuarios_login():
     usuarios = {}
 
@@ -178,13 +191,17 @@ def carregar_usuarios_login():
                     if senha_hash:
                         usuarios[user_norm] = {
                             "senha_hash": senha_hash,
-                            "admin": admin,
+                            "admin": admin or user_norm == "ROBSON.MELO",
                         }
         except Exception:
             usuarios = {}
 
     if not usuarios:
         usuarios = usuarios_padrao_login()
+        salvar_usuarios_login(usuarios)
+
+    if "ROBSON.MELO" in usuarios and not usuarios["ROBSON.MELO"].get("admin", False):
+        usuarios["ROBSON.MELO"]["admin"] = True
         salvar_usuarios_login(usuarios)
 
     return usuarios
@@ -1452,9 +1469,10 @@ def carregar_dados_completos(_planilha):
                                 'PROBLEMA']:
                             return s_app
                         if s_db in [
+                            'EM TRANSBORDO',
                             'EM ROTA DE ENTREGA',
                             'CONFERIDO',
-                                'COLETADO']:
+                            'COLETADO']:
                             return s_db
                         if s_app == 'COLETADO':
                             return s_app
@@ -2065,6 +2083,8 @@ def calc_status_display(row):
 
     if 'ENTREGUE' in status_final:
         res = '✅ Entregue'
+    elif 'TRANSBORDO' in status_final:
+        res = '🔄 Em Transferência para Niterói'
     elif 'COLETADO' in status_final:
         res = '📦 Coletado'
     elif 'ROTA DE COLETA' in status_final:
@@ -3462,7 +3482,13 @@ with st.sidebar:
     ]
 
     usuario_atual = st.session_state.usuarios_login.get(st.session_state.usuario_logado or "", {})
-    if usuario_atual.get("admin", False):
+    usuario_e_admin = (
+        str(st.session_state.usuario_logado or "").strip().upper() == "ROBSON.MELO"
+        or usuario_atual.get("admin", False)
+    )
+    if not usuario_e_admin:
+        menu_opcoes = [opcao for opcao in menu_opcoes if opcao in MENUS_OPERADOR]
+    else:
         menu_opcoes.append("👥 Cadastro de Usuários")
 
     menu = st.radio("Navegação Operacional:", menu_opcoes, index=1, label_visibility="collapsed")
@@ -3473,6 +3499,10 @@ with st.sidebar:
         st.session_state.autenticado = False
         st.session_state.usuario_logado = None
         st.rerun()
+
+if menu not in MENUS_OPERADOR and not usuario_e_admin:
+    st.error("Você não possui permissão para acessar este módulo.")
+    st.stop()
 
 # ✅ AUTO-REFRESH SÓ NA GRID!
 if menu == "📊 GRID":
@@ -8944,6 +8974,108 @@ elif menu == "🔬 Triagem":
         unsafe_allow_html=True)
     df_raw = carregar_dados_completos(planilha_db)
 
+    COLUNAS_TRANSBORDO = [
+        "ETAPA_LOGISTICA", "HUB_ORIGEM", "HUB_DESTINO", "DATA_TRANSBORDO",
+        "DATA_RECEBIMENTO_HUB", "LOTE_TRANSBORDO", "QR_TRANSBORDO"
+    ]
+
+    def classificar_fluxo_contraprova(tomador, uf):
+        tomador_norm = re.sub(r"[^A-Z0-9]", "", str(tomador).upper())
+        uf_norm = str(uf).strip().upper()
+        if tomador_norm in {"CONTRAPROVA", "LOGISTICACONTRAPROVA"}:
+            if uf_norm == "RJ":
+                return {"transbordo": False, "etapa": "RECEBIDO_HUB_DESTINO", "origem": "NITEROI/RJ", "destino": "NITEROI/RJ"}
+            return {"transbordo": True, "etapa": "TRANSBORDO_EM_TRANSITO", "origem": "SAO PAULO/SP", "destino": "NITEROI/RJ"}
+        return {"transbordo": False, "etapa": "TRIADO_ORIGEM", "origem": "", "destino": ""}
+
+    def garantir_colunas_transbordo(df):
+        for coluna in COLUNAS_TRANSBORDO:
+            if coluna not in df.columns:
+                df[coluna] = ""
+        return df
+
+    def gerar_pdf_protocolo_transbordo(id_lote, data_envio, volumes):
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_draw_color(15, 23, 42)
+        pdf.set_line_width(0.3)
+        pdf.rect(5, 5, 200, 287)
+        try:
+            logo_path = os.path.join(tempfile.gettempdir(), "igo_logo_temp.png")
+            if not os.path.exists(logo_path):
+                req = urllib.request.Request(LOGO_IGO, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req) as response, open(logo_path, 'wb') as out_file:
+                    out_file.write(response.read())
+            pdf.image(logo_path, x=10, y=8, w=30)
+        except Exception:
+            pass
+
+        pdf.set_y(15)
+        pdf.set_font("Arial", "B", 14)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(0, 6, "PROTOCOLO DE TRANSBORDO - IGO LOGISTICA", ln=True, align="C")
+        pdf.set_font("Arial", "B", 10)
+        pdf.set_text_color(2, 132, 199)
+        pdf.cell(0, 5, f"LOTE: {id_lote} | SAO PAULO -> NITEROI", ln=True, align="C")
+
+        qr_path = os.path.join(tempfile.gettempdir(), f"qr_transbordo_{id_lote}.png")
+        try:
+            qr = qrcode.QRCode(version=1, box_size=8, border=1)
+            qr.add_data(id_lote)
+            qr.make(fit=True)
+            qr.make_image(fill_color="black", back_color="white").save(qr_path)
+            pdf.image(qr_path, x=160, y=30, w=32)
+        except Exception:
+            pass
+
+        data_texto = data_envio.strftime('%d/%m/%Y %H:%M') if hasattr(data_envio, 'strftime') else str(data_envio)
+        pdf.set_y(31)
+        pdf.set_font("Arial", "", 9)
+        pdf.set_text_color(51, 65, 85)
+        pdf.cell(145, 5, f"Data de envio: {data_texto}", ln=True)
+        pdf.set_font("Arial", "B", 9)
+        pdf.cell(145, 5, f"QR / Codigo de recebimento: {id_lote}", ln=True)
+        pdf.set_font("Arial", "", 8)
+        pdf.multi_cell(145, 4, "No recebimento em Niteroi, biper o QR Code ou digitar o codigo do lote na aba Receber Transbordo.")
+        pdf.set_y(70)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        pdf.ln(3)
+
+        pdf.set_fill_color(15, 23, 42)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 7)
+        pdf.cell(12, 5, "ITEM", 1, 0, "C", True)
+        pdf.cell(28, 5, "PEDIDO", 1, 0, "C", True)
+        pdf.cell(72, 5, "PONTO DE COLETA", 1, 0, "C", True)
+        pdf.cell(48, 5, "CIDADE", 1, 0, "C", True)
+        pdf.cell(15, 5, "UF", 1, 0, "C", True)
+        pdf.cell(15, 5, "VOLUME", 1, 1, "C", True)
+        pdf.set_text_color(51, 65, 85)
+        pdf.set_font("Arial", "", 7)
+        for indice, volume in enumerate(volumes, 1):
+            pdf.set_fill_color(241, 245, 249) if indice % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+            pdf.cell(12, 5, str(indice), 1, 0, "C", True)
+            pdf.cell(28, 5, str(volume.get('PEDIDO', ''))[:16], 1, 0, "C", True)
+            pdf.cell(72, 5, str(volume.get('LABORATORIO', ''))[:40], 1, 0, "L", True)
+            pdf.cell(48, 5, str(volume.get('CIDADE', ''))[:26], 1, 0, "L", True)
+            pdf.cell(15, 5, str(volume.get('UF', ''))[:2], 1, 0, "C", True)
+            pdf.cell(15, 5, "OK", 1, 1, "C", True)
+
+        pdf.ln(5)
+        pdf.set_font("Arial", "B", 8)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(0, 5, f"TOTAL DE VOLUMES: {len(volumes)}", ln=True, align="R")
+        pdf.set_y(-25)
+        pdf.line(20, pdf.get_y(), 90, pdf.get_y())
+        pdf.line(120, pdf.get_y(), 190, pdf.get_y())
+        pdf.set_font("Arial", "B", 7)
+        pdf.cell(95, 4, "EXPEDICAO SAO PAULO", 0, 0, "C")
+        pdf.cell(95, 4, "RECEBIMENTO NITEROI", 0, 1, "C")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as arquivo_pdf:
+            pdf.output(arquivo_pdf.name)
+            with open(arquivo_pdf.name, "rb") as arquivo:
+                return arquivo.read()
+
     # =========================================================================
     # ⚙️ RECURSOS VISUAIS GLOBAIS E COMPONENTES UI
     # =========================================================================
@@ -9394,9 +9526,11 @@ elif menu == "🔬 Triagem":
     if 'id_avulso_pronto' not in st.session_state: st.session_state.id_avulso_pronto = None
     if 'log_triagem' not in st.session_state: st.session_state.log_triagem = []
     if 'romaneio_sucesso' not in st.session_state: st.session_state.romaneio_sucesso = False
+    if 'transbordo_protocolo_pdf' not in st.session_state: st.session_state.transbordo_protocolo_pdf = None
+    if 'transbordo_protocolo_id' not in st.session_state: st.session_state.transbordo_protocolo_id = ''
 
-    t1, t2, t3, t4 = st.tabs(["📦 1. Validação Manual & Bipar", "🚚 2. Gerar Documento de Romaneio",
-                            "📦 3. Volumes Despachados", "📝 4. Triagem Manual (Envelopes)"])
+    t1, t2, t_recebimento, t3, t4 = st.tabs(["📦 1. Validação Manual & Bipar", "🚚 2. Gerar Documento de Romaneio",
+                            "🔄 3. Receber Transbordo", "📦 4. Volumes Despachados", "📝 5. Triagem Manual (Envelopes)"])
 
     # =========================================================================
     # ABA 1: VALIDAÇÃO MANUAL E BIPAR
@@ -9437,6 +9571,10 @@ elif menu == "🔬 Triagem":
                                         aba = planilha_db.worksheet("Memoria_Sistema")
                                         pedido_alvo = str(df_raw.at[idx, 'PEDIDO'])
                                         headers = aba.row_values(1)
+                                        for coluna in COLUNAS_TRANSBORDO:
+                                            if coluna not in headers:
+                                                headers.append(coluna)
+                                        aba.update("A1", [headers])
                                         agora_bip = datetime.now(FUSO_BR)
                                         data_bip_str = agora_bip.strftime('%d/%m/%Y')
                                         hora_bip_str = agora_bip.strftime('%H:%M:%S')
@@ -9454,7 +9592,23 @@ elif menu == "🔬 Triagem":
                                                 try:
                                                     cell = aba.find(pedido_alvo, in_column=col_pedido)
                                                     if cell:
-                                                        updates = [{'range': gspread.utils.rowcol_to_a1(cell.row, col_status), 'values': [['CONFERIDO']]}]
+                                                        fluxo = classificar_fluxo_contraprova(df_raw.at[idx, 'TOMADOR'], df_raw.at[idx, 'UF'])
+                                                        status_novo = 'EM TRANSBORDO' if fluxo['transbordo'] else 'CONFERIDO'
+                                                        id_lote_transbordo = (
+                                                            f"TRB-{agora_bip.strftime('%Y%m%d%H%M%S')}-{random.randint(100, 999)}"
+                                                            if fluxo['transbordo'] else ''
+                                                        )
+                                                        updates = [{'range': gspread.utils.rowcol_to_a1(cell.row, col_status), 'values': [[status_novo]]}]
+                                                        for coluna, valor in {
+                                                            'ETAPA_LOGISTICA': fluxo['etapa'],
+                                                            'HUB_ORIGEM': fluxo['origem'],
+                                                            'HUB_DESTINO': fluxo['destino'],
+                                                            'DATA_TRANSBORDO': agora_bip.strftime('%d/%m/%Y %H:%M:%S') if fluxo['transbordo'] else '',
+                                                            'LOTE_TRANSBORDO': id_lote_transbordo,
+                                                            'QR_TRANSBORDO': id_lote_transbordo,
+                                                        }.items():
+                                                            col_indice = headers.index(coluna) + 1
+                                                            updates.append({'range': gspread.utils.rowcol_to_a1(cell.row, col_indice), 'values': [[valor]]})
                                                         # Registrar data e hora do bip se as colunas existirem
                                                         if 'DATA_BIP' in headers:
                                                             col_data_bip = headers.index('DATA_BIP') + 1
@@ -9481,7 +9635,15 @@ elif menu == "🔬 Triagem":
                                             if sucesso_update:
                                                 pass  # Sem delay adicional - fluido!
                                                 st.session_state.log_triagem.insert(0, {'PEDIDO': str(df_raw.at[idx, 'PEDIDO']), 'TOMADOR': str(df_raw.at[idx, 'TOMADOR']), 'LABORATORIO': str(df_raw.at[idx, 'LABORATORIO']), 'CIDADE': str(df_raw.at[idx, 'CIDADE']), 'DATA_BIP': data_bip_str, 'HORA': hora_bip_str})
-                                                st.session_state.ui_toast = {'msg': f"Pedido {pedido_alvo} VALIDADO! ✅ ({hora_bip_str})", 'icon': "✅"}
+                                                if fluxo['transbordo']:
+                                                    st.session_state.transbordo_protocolo_id = id_lote_transbordo
+                                                    st.session_state.transbordo_protocolo_pdf = gerar_pdf_protocolo_transbordo(
+                                                        id_lote_transbordo,
+                                                        agora_bip,
+                                                        [df_raw.iloc[idx].to_dict()],
+                                                    )
+                                                msg_fluxo = "ENVIADO PARA TRANSBORDO SP -> NITEROI" if fluxo['transbordo'] else "VALIDADO PARA ENTREGA FINAL"
+                                                st.session_state.ui_toast = {'msg': f"Pedido {pedido_alvo} {msg_fluxo}!", 'icon': "✅"}
                                                 carregar_dados_completos.clear()
                                                 # 🔥 LIBERA: Próxima bipagem pode começar
                                                 st.session_state.bipagem_em_progresso = False
@@ -9525,6 +9687,24 @@ elif menu == "🔬 Triagem":
                 st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown("---")
+            if st.session_state.transbordo_protocolo_pdf:
+                st.success(f"Protocolo do lote {st.session_state.transbordo_protocolo_id} pronto para envio com a carga.")
+                col_protocolo, col_fechar_protocolo = st.columns(2)
+                with col_protocolo:
+                    st.download_button(
+                        "📥 Baixar Protocolo de Transbordo com QR Code",
+                        data=st.session_state.transbordo_protocolo_pdf,
+                        file_name=f"Transbordo_{st.session_state.transbordo_protocolo_id}.pdf",
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True,
+                    )
+                with col_fechar_protocolo:
+                    if st.button("🔄 Concluir e Preparar Nova Triagem", use_container_width=True):
+                        st.session_state.transbordo_protocolo_pdf = None
+                        st.session_state.transbordo_protocolo_id = ''
+                        st.rerun()
+
             df_fila = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'COLETADO'].copy()
             if not df_fila.empty:
                 with st.expander("🔎 Filtrar Fila de Triagem", expanded=False):
@@ -9582,15 +9762,49 @@ elif menu == "🔬 Triagem":
                                 aba = planilha_db.worksheet("Memoria_Sistema")
                                 dados_nuvem = aba.get_all_values()
                                 df_nuvem = pd.DataFrame(dados_nuvem[1:], columns=dados_nuvem[0])
-                                df_nuvem.loc[df_nuvem['PEDIDO'].isin(p_ids), 'STATUS'] = 'CONFERIDO'
+                                df_nuvem = garantir_colunas_transbordo(df_nuvem)
+                                agora_transbordo = datetime.now(FUSO_BR)
+                                id_lote_transbordo = f"TRB-{agora_transbordo.strftime('%Y%m%d%H%M%S')}-{random.randint(100, 999)}"
+                                total_transbordo = 0
+                                volumes_lote_transbordo = []
+                                for pedido_id in p_ids:
+                                    mask_pedido = df_nuvem['PEDIDO'].astype(str).eq(str(pedido_id))
+                                    if not mask_pedido.any():
+                                        continue
+                                    linha = df_nuvem.loc[mask_pedido].iloc[0]
+                                    fluxo = classificar_fluxo_contraprova(
+                                        linha.get('TOMADOR', ''),
+                                        linha.get('UF', ''),
+                                    )
+                                    if fluxo['transbordo']:
+                                        total_transbordo += 1
+                                        volumes_lote_transbordo.extend(df_nuvem.loc[mask_pedido].to_dict('records'))
+                                        df_nuvem.loc[mask_pedido, 'STATUS'] = 'EM TRANSBORDO'
+                                        df_nuvem.loc[mask_pedido, 'ETAPA_LOGISTICA'] = fluxo['etapa']
+                                        df_nuvem.loc[mask_pedido, 'HUB_ORIGEM'] = fluxo['origem']
+                                        df_nuvem.loc[mask_pedido, 'HUB_DESTINO'] = fluxo['destino']
+                                        df_nuvem.loc[mask_pedido, 'DATA_TRANSBORDO'] = agora_transbordo.strftime('%d/%m/%Y %H:%M:%S')
+                                        df_nuvem.loc[mask_pedido, 'LOTE_TRANSBORDO'] = id_lote_transbordo
+                                        df_nuvem.loc[mask_pedido, 'QR_TRANSBORDO'] = id_lote_transbordo
+                                    else:
+                                        df_nuvem.loc[mask_pedido, 'STATUS'] = 'CONFERIDO'
+                                        df_nuvem.loc[mask_pedido, 'ETAPA_LOGISTICA'] = fluxo['etapa']
                                 aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
-                                st.session_state.ui_toast = {'msg': f"{len(p_ids)} volumes liberados!", 'icon': "🎉"}
+                                mensagem = f"{len(p_ids)} volumes processados."
+                                if total_transbordo:
+                                    st.session_state.transbordo_protocolo_id = id_lote_transbordo
+                                    st.session_state.transbordo_protocolo_pdf = gerar_pdf_protocolo_transbordo(
+                                        id_lote_transbordo, agora_transbordo, volumes_lote_transbordo
+                                    )
+                                    mensagem += f" Lote {id_lote_transbordo} com {total_transbordo} volume(s) enviado para transbordo SP -> Niterói."
+                                st.session_state.ui_toast = {'msg': mensagem, 'icon': "🎉"}
                                 time.sleep(1.0)
                                 carregar_dados_completos.clear()
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Erro: {e}")
-            else:
+
+            if df_fila.empty:
                 exibir_empty_state("🧹", "Salão Limpo", "Não há nenhum volume com status COLETADO aguardando conferência.")
 
     # =========================================================================
@@ -9739,9 +9953,14 @@ elif menu == "🔬 Triagem":
                         else:
                             p_ids_sel = df_sel_conf['PEDIDO'].astype(str).tolist()
                             sel_lista_full = df_conf[df_conf['PEDIDO'].isin(p_ids_sel)].to_dict('records')
-                                    
+                            em_transbordo = [
+                                item for item in sel_lista_full
+                                if str(item.get('ETAPA_LOGISTICA', '')).upper() == 'TRANSBORDO_EM_TRANSITO'
+                            ]
                             tomadores_unicos = list(set([str(r.get('TOMADOR', '')).strip() for r in sel_lista_full]))
-                            if len(tomadores_unicos) > 1:
+                            if em_transbordo:
+                                st.error("Há volumes aguardando recebimento em Niterói. Confirme-os na aba 'Receber Transbordo' antes do romaneio final.")
+                            elif len(tomadores_unicos) > 1:
                                 st.error("🚨 VIOLAÇÃO DE ROTA: Você selecionou pacotes com Destinos (Hubs) diferentes. O sistema impede a mistura de cargas.")
                             else:
                                 with st.spinner("Selando romaneio e gerando documentação..."):
@@ -9775,7 +9994,186 @@ elif menu == "🔬 Triagem":
                     exibir_empty_state("🚛", "Nada para Despachar", "Todos os volumes do galpão já foram despachados ou não há itens conferidos na fila.")
 
     # =========================================================================
-    # ABA 3: VOLUMES DESPACHADOS
+    # ABA 3: RECEBIMENTO DE TRANSBORDO
+    # =========================================================================
+    with t_recebimento:
+        st.markdown("#### 🔄 Recebimento na Base de Niterói")
+        df_transbordo = df_raw[df_raw['STATUS'].astype(str).str.upper() == 'EM TRANSBORDO'].copy()
+        if not df_transbordo.empty:
+            if 'HUB_DESTINO' in df_transbordo.columns:
+                df_transbordo = df_transbordo[
+                    df_transbordo['HUB_DESTINO'].astype(str).str.upper().eq('NITEROI/RJ')
+                ]
+
+        lotes_pendentes = []
+        if not df_transbordo.empty and 'LOTE_TRANSBORDO' in df_transbordo.columns:
+            lotes_pendentes = sorted([
+                lote for lote in df_transbordo['LOTE_TRANSBORDO'].fillna('').astype(str).str.strip().unique().tolist()
+                if lote and lote.upper() not in ['NAN', 'NONE']
+            ])
+
+        col_bip_lote, col_buscar_lote = st.columns([4, 1], vertical_alignment="bottom")
+        codigo_lote_bipado = col_bip_lote.text_input(
+            "🔍 Bipar QR Code ou digitar código do lote de transbordo",
+            placeholder="Ex.: TRB-20260831153000-123",
+            key='codigo_lote_recebimento_transbordo',
+        ).strip().upper()
+        buscar_lote = col_buscar_lote.button(
+            "🔎 Localizar lote",
+            use_container_width=True,
+            help="Confirma o código lido ou digitado e carrega os volumes do lote.",
+        )
+        lote_selecionado = st.selectbox(
+            "Ou selecione um lote pendente",
+            ["Selecione..."] + lotes_pendentes,
+            key='selecao_lote_recebimento_transbordo',
+        )
+        codigo_lote = (
+            codigo_lote_bipado
+            if buscar_lote and codigo_lote_bipado
+            else lote_selecionado
+        )
+        lote_validado = ''
+        if codigo_lote and codigo_lote != "Selecione..." and not df_transbordo.empty:
+            codigo_normalizado = re.sub(r'[^A-Z0-9-]', '', codigo_lote)
+            mascara_lote = (
+                df_transbordo.get('QR_TRANSBORDO', pd.Series('', index=df_transbordo.index)).astype(str).str.upper().eq(codigo_normalizado)
+                | df_transbordo.get('LOTE_TRANSBORDO', pd.Series('', index=df_transbordo.index)).astype(str).str.upper().eq(codigo_normalizado)
+            )
+            df_transbordo = df_transbordo[mascara_lote].copy()
+            if df_transbordo.empty:
+                st.error("Lote de transbordo não localizado entre as cargas pendentes para Niterói.")
+            else:
+                lote_validado = codigo_normalizado
+                st.success(f"Lote {lote_validado} localizado: {len(df_transbordo)} volume(s) prontos para conferência.")
+
+        if df_transbordo.empty:
+            st.info("Nenhum volume em transbordo aguardando recebimento em Niterói.")
+        else:
+            colunas_transbordo = [
+                coluna for coluna in ['PEDIDO', 'TOMADOR', 'LABORATORIO', 'CIDADE', 'UF', 'HUB_ORIGEM', 'HUB_DESTINO', 'DATA_TRANSBORDO']
+                if coluna in df_transbordo.columns
+            ]
+            df_transbordo_selecao = df_transbordo[colunas_transbordo].fillna('').astype(str).copy()
+            st.markdown("Selecione na tabela os volumes fisicamente recebidos para transferi-los à rota de entrega final.")
+            gb_recebimento = GridOptionsBuilder.from_dataframe(df_transbordo_selecao)
+            gb_recebimento.configure_selection(
+                'multiple',
+                use_checkbox=True,
+                header_checkbox=True,
+                header_checkbox_filtered_only=True,
+            )
+            gb_recebimento.configure_default_column(resizable=True, filterable=True, sortable=True)
+            if 'PEDIDO' in df_transbordo_selecao.columns: gb_recebimento.configure_column('PEDIDO', header_name='📦 Pedido', width=125)
+            if 'TOMADOR' in df_transbordo_selecao.columns: gb_recebimento.configure_column('TOMADOR', header_name='🏢 Tomador', width=150)
+            if 'LABORATORIO' in df_transbordo_selecao.columns: gb_recebimento.configure_column('LABORATORIO', header_name='🔬 Ponto de Coleta', width=260)
+            if 'CIDADE' in df_transbordo_selecao.columns: gb_recebimento.configure_column('CIDADE', header_name='📍 Cidade', width=150)
+            if 'UF' in df_transbordo_selecao.columns: gb_recebimento.configure_column('UF', header_name='🗺️ UF', width=80)
+            if 'HUB_ORIGEM' in df_transbordo_selecao.columns: gb_recebimento.configure_column('HUB_ORIGEM', header_name='Origem', width=140)
+            if 'HUB_DESTINO' in df_transbordo_selecao.columns: gb_recebimento.configure_column('HUB_DESTINO', header_name='Destino', width=140)
+            if 'DATA_TRANSBORDO' in df_transbordo_selecao.columns: gb_recebimento.configure_column('DATA_TRANSBORDO', header_name='📅 Envio', width=165)
+            grid_recebimento = AgGrid(
+                df_transbordo_selecao,
+                gridOptions=gb_recebimento.build(),
+                theme='alpine',
+                columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+                height=320,
+                allow_unsafe_jscode=True,
+                custom_css=custom_css_premium,
+                key='grid_recebimento_transbordo',
+            )
+            selecionados_recebimento = grid_recebimento.get('selected_rows', [])
+            if isinstance(selecionados_recebimento, pd.DataFrame):
+                df_selecionados_recebimento = selecionados_recebimento
+            elif isinstance(selecionados_recebimento, list) and selecionados_recebimento:
+                df_selecionados_recebimento = pd.DataFrame(selecionados_recebimento)
+            else:
+                df_selecionados_recebimento = pd.DataFrame(columns=df_transbordo_selecao.columns)
+            pedidos_recebidos = df_selecionados_recebimento['PEDIDO'].astype(str).tolist() if not df_selecionados_recebimento.empty else []
+            if lote_validado:
+                st.caption("Lote localizado. Marque os volumes recebidos e então transfira-os para a rota final.")
+            col_motorista, col_data = st.columns([2, 1])
+            motorista_final = col_motorista.selectbox(
+                "Motorista para a entrega final",
+                ["Selecione..."] + (sorted(DF_AGENTES['LOGIN DO AGENTE'].unique().tolist()) if not DF_AGENTES.empty else []),
+                key='motorista_final_transbordo',
+            )
+            data_entrega_final = col_data.date_input(
+                "Data da rota final",
+                value=hoje_br,
+                format="DD/MM/YYYY",
+                key='data_entrega_final_transbordo',
+            )
+            if st.button("✅ Receber e Criar Romaneio de Entrega Final", type="primary", use_container_width=True):
+                if not pedidos_recebidos or motorista_final == "Selecione...":
+                    st.warning("Selecione os volumes recebidos e o motorista da entrega final.")
+                else:
+                    try:
+                        aba = planilha_db.worksheet("Memoria_Sistema")
+                        dados_nuvem = aba.get_all_values()
+                        df_nuvem = pd.DataFrame(dados_nuvem[1:], columns=dados_nuvem[0])
+                        df_nuvem = garantir_colunas_transbordo(df_nuvem)
+                        mask_recebimento = df_nuvem['PEDIDO'].astype(str).isin(pedidos_recebidos)
+                        volumes_recebidos = df_nuvem.loc[mask_recebimento].to_dict('records')
+                        id_romaneio = f"ROM-{datetime.now(FUSO_BR).strftime('%d%m')}-{random.randint(100, 999)}"
+                        df_nuvem.loc[mask_recebimento, 'STATUS'] = 'EM ROTA DE ENTREGA'
+                        df_nuvem.loc[mask_recebimento, 'ROMANEIO'] = id_romaneio
+                        df_nuvem.loc[mask_recebimento, 'AGENTE_RAW'] = motorista_final
+                        df_nuvem.loc[mask_recebimento, 'ETAPA_LOGISTICA'] = 'RECEBIDO_HUB_DESTINO'
+                        df_nuvem.loc[mask_recebimento, 'DATA_RECEBIMENTO_HUB'] = datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M:%S')
+                        aba.update("A1", [df_nuvem.columns.tolist()] + df_nuvem.fillna("").astype(str).values.tolist())
+
+                        tomador = str(volumes_recebidos[0].get('TOMADOR', 'CONTRAPROVA'))
+                        despachar_para_appsheet([{
+                            'PEDIDO': id_romaneio,
+                            'MOTORISTA': motorista_final,
+                            'ENDERECO': 'Lote Hub Niterói',
+                            'NUMERO': f"{len(volumes_recebidos)} V",
+                            'BAIRRO': tomador,
+                            'CIDADE': 'NITEROI',
+                            'CEP': '---',
+                            'LABORATORIO': f"Lote Transbordo {len(volumes_recebidos)}",
+                            'TOMADOR': tomador,
+                            'ROMANEIO': id_romaneio,
+                        }])
+
+                        st.session_state.romaneio_pdf = gerar_pdf_romaneio(
+                            id_romaneio,
+                            data_entrega_final,
+                            motorista_final,
+                            volumes_recebidos,
+                        )
+                        st.session_state.romaneio_id = id_romaneio
+                        st.session_state.romaneio_sucesso = True
+                        st.session_state.transbordo_romaneio_pdf = st.session_state.romaneio_pdf
+                        st.session_state.transbordo_romaneio_id = id_romaneio
+                        carregar_dados_completos.clear()
+                        st.session_state.ui_toast = {'msg': f"Romaneio {id_romaneio} criado para entrega final.", 'icon': "✅"}
+                    except Exception as e:
+                        st.error(f"Erro ao criar o romaneio final: {e}")
+
+            pdf_transbordo = st.session_state.get('transbordo_romaneio_pdf')
+            id_transbordo = st.session_state.get('transbordo_romaneio_id', '')
+            if pdf_transbordo:
+                st.success(f"Romaneio final {id_transbordo} criado e atribuído ao motorista selecionado.")
+                col_pdf, col_novo = st.columns(2)
+                with col_pdf:
+                    st.download_button(
+                        "📥 Baixar Protocolo de Entrega Final (PDF)",
+                        data=pdf_transbordo,
+                        file_name=f"Romaneio_Transbordo_{id_transbordo}.pdf",
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True,
+                    )
+                with col_novo:
+                    if st.button("🔄 Concluir e Preparar Próximo Recebimento", use_container_width=True):
+                        st.session_state.transbordo_romaneio_pdf = None
+                        st.session_state.transbordo_romaneio_id = ''
+                        st.rerun()
+
+    # =========================================================================
+    # ABA 4: VOLUMES DESPACHADOS
     # =========================================================================
     with t3:
         if df_raw.empty:
@@ -11879,7 +12277,11 @@ elif menu == "👥 Cadastro de Usuários":
                 novo_usuario = normalizar_usuario_login(st.text_input("Usuário"))
                 nova_senha = st.text_input("Senha", type="password")
                 if sistema_alvo == "Sistema interno":
-                    novo_admin = st.checkbox("Administrador", value=False)
+                    novo_admin = st.checkbox(
+                        "Administrador (acesso total)",
+                        value=False,
+                        help="Operadores não acessam Financeiro, Rotas nem o Cadastro de Usuários.",
+                    )
                     novo_logo = ""
                     novo_filtro = ""
                     novo_tomador = ""
