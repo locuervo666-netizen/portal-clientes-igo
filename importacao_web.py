@@ -1255,6 +1255,7 @@ CLIENTES_AUTORIZADOS = sorted(["CAEP",
                             "MB_CAEP",
                             "CUNHA",
                             "CONTRAPROVA",
+                            "BIOLIFE SYNVIA",
                             "SAPIENS",
                             "GRALAB",
                             "SYNVIA",
@@ -9347,7 +9348,8 @@ elif menu == "🔬 Triagem":
         pdf.set_text_color(100, 116, 139)
 
         dt_s = data_str if isinstance(data_str, str) else data_str.strftime('%d/%m/%Y')
-        pdf.cell(0, 4, f"Data da Triagem: {dt_s} | Hub de Destino: {tomador}", ln=True, align="C")
+        data_emissao = datetime.now(FUSO_BR).strftime('%d/%m/%Y %H:%M')
+        pdf.cell(0, 4, f"Data da Triagem: {dt_s} | Cliente: {tomador} | Emitido em: {data_emissao}", ln=True, align="C")
         pdf.ln(3)
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         pdf.ln(3)
@@ -9369,7 +9371,7 @@ elif menu == "🔬 Triagem":
             for item in lista_itens
         )
         if protocolo_importado:
-            larguras_tabela = [12, 28, 90, 30, 30]
+            larguras_tabela = [8, 18, 54, 24, 32, 48, 12]
         else:
             larguras_tabela = [12, 20, 34, 30, 10, 30, 27, 27] if tem_campos_opcionais else [20, 90, 40, 40]
         inicio_tabela = (pdf.w - sum(larguras_tabela)) / 2
@@ -9378,12 +9380,14 @@ elif menu == "🔬 Triagem":
         pdf.set_text_color(255, 255, 255)
         pdf.set_x(inicio_tabela)
         if protocolo_importado:
-            pdf.set_font("Arial", "B", 7)
-            pdf.cell(12, 6, "ITEM", 1, 0, "C", True)
-            pdf.cell(28, 6, "ID ORIGEM", 1, 0, "C", True)
-            pdf.cell(90, 6, "PC ORIGEM", 1, 0, "C", True)
-            pdf.cell(30, 6, "DATA", 1, 0, "C", True)
-            pdf.cell(30, 6, "HORA", 1, 1, "C", True)
+            pdf.set_font("Arial", "B", 5)
+            pdf.cell(8, 6, "ITEM", 1, 0, "C", True)
+            pdf.cell(18, 6, "ID ORIGEM", 1, 0, "C", True)
+            pdf.cell(54, 6, "PC ORIGEM", 1, 0, "C", True)
+            pdf.cell(24, 6, "DATA COLETA", 1, 0, "C", True)
+            pdf.cell(32, 6, "DATA CONFERENCIA", 1, 0, "C", True)
+            pdf.cell(48, 6, "CIDADE", 1, 0, "C", True)
+            pdf.cell(12, 6, "UF", 1, 1, "C", True)
         elif tem_campos_opcionais:
             pdf.set_font("Arial", "B", 5)
             pdf.cell(12, 6, "ITEM", 1, 0, "C", True)
@@ -9402,7 +9406,7 @@ elif menu == "🔬 Triagem":
             pdf.cell(40, 6, "HORA DA BIPAGEM", 1, 1, "C", True)
 
         pdf.set_text_color(51, 65, 85)
-        pdf.set_font("Arial", "", 7 if protocolo_importado else (5 if tem_campos_opcionais else 8))
+        pdf.set_font("Arial", "", 5 if protocolo_importado else (5 if tem_campos_opcionais else 8))
 
         for idx, item in enumerate(lista_itens, 1):
             fill = (idx % 2 == 0)
@@ -9412,16 +9416,20 @@ elif menu == "🔬 Triagem":
             cliente = str(item.get('CLIENTE', '')).strip()
             cidade = str(item.get('CIDADE', '')).strip()
             uf = str(item.get('UF', '')).strip()
+            data_coleta = str(item.get('DATA_COLETA', item.get('DATA', ''))).strip()
+            data_conferencia = str(item.get('DATA_CONFERENCIA', '')).strip()
             dt_bip = str(item.get('DATA', ''))
             hr_bip = str(item.get('HORA', ''))
 
             pdf.set_x(inicio_tabela)
             if protocolo_importado:
-                pdf.cell(12, 6, str(idx), 1, 0, "C", True)
-                pdf.cell(28, 6, cortar_texto(pedido, 14), 1, 0, "C", True)
-                pdf.cell(90, 6, cortar_texto(cliente, 48), 1, 0, "C", True)
-                pdf.cell(30, 6, dt_bip, 1, 0, "C", True)
-                pdf.cell(30, 6, hr_bip, 1, 1, "C", True)
+                pdf.cell(8, 6, str(idx), 1, 0, "C", True)
+                pdf.cell(18, 6, cortar_texto(pedido, 9), 1, 0, "C", True)
+                pdf.cell(54, 6, cortar_texto(cliente, 28), 1, 0, "C", True)
+                pdf.cell(24, 6, cortar_texto(data_coleta, 12), 1, 0, "C", True)
+                pdf.cell(32, 6, cortar_texto(data_conferencia, 17), 1, 0, "C", True)
+                pdf.cell(48, 6, cortar_texto(cidade, 24), 1, 0, "C", True)
+                pdf.cell(12, 6, cortar_texto(uf, 3), 1, 1, "C", True)
             elif tem_campos_opcionais:
                 pdf.cell(12, 6, str(idx), 1, 0, "C", True)
                 pdf.cell(20, 6, cortar_texto(pedido, 10), 1, 0, "C", True)
@@ -9443,9 +9451,11 @@ elif menu == "🔬 Triagem":
         total_label = "TOTAL DE REGISTROS CONFERIDOS" if protocolo_importado else "TOTAL DE ENVELOPES CONFERIDOS"
         pdf.cell(0, 5, f"{total_label}: {len(lista_itens)}", ln=True, align="R")
         pdf.set_y(-25)
-        pdf.line(55, pdf.get_y(), 155, pdf.get_y())
+        pdf.line(20, pdf.get_y(), 90, pdf.get_y())
+        pdf.line(120, pdf.get_y(), 190, pdf.get_y())
         pdf.set_font("Arial", "B", 7)
-        pdf.cell(0, 4, "ASSINATURA DO RESPONSAVEL PELA TRIAGEM", 0, 1, "C")
+        pdf.cell(95, 4, "ASSINATURA CONFERENTE", 0, 0, "C")
+        pdf.cell(95, 4, "ASSINATURA DO RECEBEDOR", 0, 1, "C")
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
             pdf.output(tmp_pdf.name)
@@ -9496,12 +9506,14 @@ elif menu == "🔬 Triagem":
             return partes[1].strip()
         return extrair_cliente_ponto_coleta(texto)
 
-    def converter_linhas_importadas_triagem(df_importado, coluna_pedido, coluna_cliente, coluna_cidade, coluna_uf, coluna_envelope, tomador, data_triagem):
+    def converter_linhas_importadas_triagem(df_importado, coluna_pedido, coluna_cliente, coluna_data_coleta, coluna_data_conferencia, coluna_cidade, coluna_uf, coluna_envelope, tomador, data_triagem):
         agora = datetime.now(FUSO_BR).strftime('%H:%M:%S')
         itens = []
         for _, linha in df_importado.iterrows():
             pedido = str(linha.get(coluna_pedido, '')).strip()
             cliente = extrair_pc_apos_tomador(linha.get(coluna_cliente, ''), tomador)
+            data_coleta = str(linha.get(coluna_data_coleta, '')).strip() if coluna_data_coleta else ''
+            data_conferencia = str(linha.get(coluna_data_conferencia, '')).strip() if coluna_data_conferencia else ''
             cidade = str(linha.get(coluna_cidade, '')).strip()
             uf = str(linha.get(coluna_uf, '')).strip().upper()
             envelope = str(linha.get(coluna_envelope, '')).strip() if coluna_envelope else pedido
@@ -9515,6 +9527,8 @@ elif menu == "🔬 Triagem":
                 'UF': uf,
                 'IMPORTADO_TRIAGEM': True,
                 'DATA': data_triagem.strftime('%d/%m/%Y'),
+                'DATA_COLETA': data_coleta or data_triagem.strftime('%d/%m/%Y'),
+                'DATA_CONFERENCIA': data_conferencia,
                 'HORA': agora,
                 'TOMADOR': tomador,
             })
@@ -10353,6 +10367,14 @@ elif menu == "🔬 Triagem":
                                 colunas_arquivo,
                                 ['PC ORIGEM', 'PC_ORIGEM', 'Ponto de Coleta', 'PONTO_COLETA', 'CLIENTE', 'NOME DO CLIENTE', 'LABORATORIO']
                             )
+                            coluna_data_coleta_auto = encontrar_coluna_importacao(
+                                colunas_arquivo,
+                                ['Data Coleta', 'DATA_COLETA', 'Data da Coleta', 'DATA DA COLETA', 'Data']
+                            )
+                            coluna_data_conferencia_auto = encontrar_coluna_importacao(
+                                colunas_arquivo,
+                                ['Data/hora da aprovação', 'Data Hora da Aprovacao', 'Data Conferencia', 'DATA_CONFERENCIA', 'Data da Conferencia']
+                            )
                             coluna_cidade_auto = encontrar_coluna_importacao(
                                 colunas_arquivo,
                                 ['CIDADE', 'CIDADE ORIGEM', 'MUNICIPIO']
@@ -10366,7 +10388,7 @@ elif menu == "🔬 Triagem":
                                 ['Numero do Envelope', 'Numero Envelope', 'Codigo do Envelope', 'Envelope', 'ID do Envelope']
                             )
 
-                            ci1, ci2, ci3, ci4, ci5 = st.columns(5)
+                            ci1, ci2, ci3, ci4, ci5, ci6, ci7 = st.columns(7)
                             coluna_pedido_imp = ci1.selectbox(
                                 "Coluna do Pedido:",
                                 colunas_arquivo,
@@ -10379,13 +10401,29 @@ elif menu == "🔬 Triagem":
                                 index=colunas_arquivo.index(coluna_cliente_auto) if coluna_cliente_auto in colunas_arquivo else 0,
                                 key='coluna_cliente_triagem_importada'
                             )
-                            coluna_cidade_imp = ci3.selectbox(
+                            opcoes_data_coleta = ['Usar data da triagem'] + colunas_arquivo
+                            data_coleta_auto_opcao = coluna_data_coleta_auto if coluna_data_coleta_auto in colunas_arquivo else 'Usar data da triagem'
+                            coluna_data_coleta_imp = ci3.selectbox(
+                                "Coluna Data Coleta:",
+                                opcoes_data_coleta,
+                                index=opcoes_data_coleta.index(data_coleta_auto_opcao),
+                                key='coluna_data_coleta_triagem_importada'
+                            )
+                            opcoes_data_conferencia = ['Não informar'] + colunas_arquivo
+                            data_conferencia_auto_opcao = coluna_data_conferencia_auto if coluna_data_conferencia_auto in colunas_arquivo else 'Não informar'
+                            coluna_data_conferencia_imp = ci4.selectbox(
+                                "Coluna Data Conferência:",
+                                opcoes_data_conferencia,
+                                index=opcoes_data_conferencia.index(data_conferencia_auto_opcao),
+                                key='coluna_data_conferencia_triagem_importada'
+                            )
+                            coluna_cidade_imp = ci5.selectbox(
                                 "Coluna Cidade:",
                                 colunas_arquivo,
                                 index=colunas_arquivo.index(coluna_cidade_auto) if coluna_cidade_auto in colunas_arquivo else 0,
                                 key='coluna_cidade_triagem_importada'
                             )
-                            coluna_uf_imp = ci4.selectbox(
+                            coluna_uf_imp = ci6.selectbox(
                                 "Coluna UF:",
                                 colunas_arquivo,
                                 index=colunas_arquivo.index(coluna_uf_auto) if coluna_uf_auto in colunas_arquivo else 0,
@@ -10393,7 +10431,7 @@ elif menu == "🔬 Triagem":
                             )
                             opcoes_envelope = ['Usar ID da Visita'] + colunas_arquivo
                             envelope_auto_opcao = coluna_envelope_auto if coluna_envelope_auto in colunas_arquivo else 'Usar ID da Visita'
-                            coluna_envelope_imp = ci5.selectbox(
+                            coluna_envelope_imp = ci7.selectbox(
                                 "Coluna do Envelope:",
                                 opcoes_envelope,
                                 index=opcoes_envelope.index(envelope_auto_opcao),
@@ -10401,6 +10439,10 @@ elif menu == "🔬 Triagem":
                             )
 
                             colunas_preview = [coluna_pedido_imp, coluna_cliente_imp, coluna_cidade_imp, coluna_uf_imp]
+                            if coluna_data_coleta_imp != 'Usar data da triagem':
+                                colunas_preview.insert(2, coluna_data_coleta_imp)
+                            if coluna_data_conferencia_imp != 'Não informar':
+                                colunas_preview.insert(3, coluna_data_conferencia_imp)
                             if coluna_envelope_imp != 'Usar ID da Visita':
                                 colunas_preview.append(coluna_envelope_imp)
                             st.dataframe(df_importado_triagem[colunas_preview].head(10), use_container_width=True, hide_index=True)
@@ -10410,10 +10452,14 @@ elif menu == "🔬 Triagem":
                                     st.warning("Selecione o Hub de Destino antes de importar o arquivo.")
                                 else:
                                     coluna_envelope_final = None if coluna_envelope_imp == 'Usar ID da Visita' else coluna_envelope_imp
+                                    coluna_data_coleta_final = None if coluna_data_coleta_imp == 'Usar data da triagem' else coluna_data_coleta_imp
+                                    coluna_data_conferencia_final = None if coluna_data_conferencia_imp == 'Não informar' else coluna_data_conferencia_imp
                                     itens_importados = converter_linhas_importadas_triagem(
                                         df_importado_triagem,
                                         coluna_pedido_imp,
                                         coluna_cliente_imp,
+                                        coluna_data_coleta_final,
+                                        coluna_data_conferencia_final,
                                         coluna_cidade_imp,
                                         coluna_uf_imp,
                                         coluna_envelope_final,
