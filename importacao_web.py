@@ -2254,7 +2254,8 @@ def obter_login_agente(
         bairro,
         laboratorio,
         endereco="",
-        base_rotas_df=pd.DataFrame()):
+    base_rotas_df=pd.DataFrame(),
+    numero=""):
     if base_rotas_df.empty:
         return ""
     rotas_dict = {padronizar_texto(str(row['ROTA MAPEADA']).upper().replace(" ➔ ", "---").replace(
@@ -2263,13 +2264,19 @@ def obter_login_agente(
     bai = limpar_nome_local_rota(bairro)
     lab = tratar_texto_global(laboratorio)
     end = tratar_texto_global(endereco)
+    num = tratar_texto_global(numero)
 
-    for c in [
-            f"{cid}---{bai}---{end}",
+    criterios = [
             f"{cid}---{bai}---{lab}",
             f"{cid}---{lab}",
             f"{cid}---{bai}",
-            cid]:
+            cid]
+    if num and end:
+        criterios.insert(0, f"{cid}---{bai}---{end}---{num}")
+    if end:
+        criterios.insert(1, f"{cid}---{bai}---{end}")
+
+    for c in criterios:
         if c in rotas_dict:
             return rotas_dict[c]
     return ""
@@ -3627,7 +3634,8 @@ if menu == "📊 GRID":
                                                     'CIDADE', ''), l_orig.get(
                                                     'BAIRRO', ''), l_orig.get(
                                                     'LABORATORIO', ''), l_orig.get(
-                                                    'ENDERECO', ''), DF_AGENTES)
+                                                    'ENDERECO', ''), DF_AGENTES,
+                                                numero=l_orig.get('NUMERO', ''))
                                         else:
                                             mot_final = mot_aprov
 
@@ -5899,7 +5907,8 @@ elif menu == "📝 Pedido Manual":
 
                         if m_agente_escolha == "Automático (Por Rota)":
                             m_agente = obter_login_agente(
-                                cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES)
+                                cid_limpa, bai_limpo, lab_limpo, rua_limpa, DF_AGENTES,
+                                numero=num_limpo)
                         else:
                             m_agente = m_agente_escolha
 
@@ -6368,7 +6377,7 @@ elif menu == "📥 Importações":
                             df_limpo['DATA'] = dt_c.strftime("%d/%m/%Y")
 
                             df_limpo['CIDADE'] = df_limpo['CIDADE'].apply(lambda c: normalizar_cidade_operacao(corrigir_cidade_inteligente(c, DF_AGENTES), DF_AGENTES))
-                            df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
+                            df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES, numero=r.get('NUMERO', '')), axis=1)
 
                             st.session_state.df_preview_oficial = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
                             st.session_state.ui_toast = {'msg': "Processamento Concluído!", 'icon': "✅"}
@@ -6561,7 +6570,7 @@ elif menu == "📥 Importações":
                 else:
                     with st.spinner("Salvando regra..."):
                         if f_agente == "Automático (Por Rota)":
-                            f_agente = obter_login_agente(f_cid, f_bai, f_lab, f_rua, DF_AGENTES)
+                            f_agente = obter_login_agente(f_cid, f_bai, f_lab, f_rua, DF_AGENTES, numero=f_num)
 
                         nova_regra = [
                             f"REG-{str(uuid.uuid4())[:6].upper()}", f_tomador, padronizar_texto(f_lab),
@@ -6610,7 +6619,7 @@ elif menu == "📥 Importações":
                 for _, regra in df_geracao_of.iterrows():
                     agente = str(regra.get('MOTORISTA', '')).strip()
                     if not agente or agente.upper() in ['AUTOMÁTICO (POR ROTA)', 'AUTOMATICO (POR ROTA)', 'AUTOMATICO (POR ROTA)']:
-                        agente = obter_login_agente(str(regra.get('CIDADE', '')), str(regra.get('BAIRRO', '')), str(regra.get('LABORATORIO', '')), str(regra.get('ENDERECO', '')), DF_AGENTES)
+                        agente = obter_login_agente(str(regra.get('CIDADE', '')), str(regra.get('BAIRRO', '')), str(regra.get('LABORATORIO', '')), str(regra.get('ENDERECO', '')), DF_AGENTES, numero=str(regra.get('NUMERO', '')))
 
                     obs_fix = str(regra.get('OBSERVACOES', '')).strip()
                     if obs_fix and obs_fix.upper() not in ['NAN', 'NONE']: obs_fix = obs_fix + ' [FIXO]'
@@ -6713,7 +6722,7 @@ elif menu == "📥 Importações":
                             for _, regra in df_alvo.iterrows():
                                 agente = str(regra.get('MOTORISTA', '')).strip()
                                 if not agente or agente.upper() in ['AUTOMÁTICO (POR ROTA)', 'AUTOMATICO (POR ROTA)']:
-                                    agente = obter_login_agente(str(regra.get('CIDADE', '')), str(regra.get('BAIRRO', '')), str(regra.get('LABORATORIO', '')), str(regra.get('ENDERECO', '')), DF_AGENTES)
+                                    agente = obter_login_agente(str(regra.get('CIDADE', '')), str(regra.get('BAIRRO', '')), str(regra.get('LABORATORIO', '')), str(regra.get('ENDERECO', '')), DF_AGENTES, numero=str(regra.get('NUMERO', '')))
 
                                 obs_fix = str(regra.get('OBSERVACOES', '')).strip()
                                 if obs_fix and obs_fix.upper() not in ['NAN', 'NONE']: obs_fix = obs_fix + ' [FIXO]'
@@ -7182,6 +7191,24 @@ elif menu == "📥 Importações Umove":
     st.markdown(
         """
         <style>
+        @media (max-width: 768px) {
+            div[data-testid="stTabs"] div[data-baseweb="tab-list"] { flex-wrap: nowrap !important; overflow-x: auto !important; gap: 8px !important; margin: 0 -0.25rem 14px !important; padding: 0 0.25rem 4px !important; scrollbar-width: thin; }
+            div[data-testid="stTabs"] button[role="tab"] { flex: 0 0 auto !important; min-height: 42px !important; padding: 0 12px !important; font-size: 12px !important; }
+            div[data-testid="stTabs"] button[role="tab"] p { white-space: nowrap !important; }
+            div[data-testid="stHorizontalBlock"] { gap: 0.6rem !important; }
+            div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] { min-width: 100% !important; flex: 1 1 100% !important; }
+            div[data-testid="stTextInput"] input, div[data-testid="stTextArea"] textarea, div[data-testid="stDateInput"] input, div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div { font-size: 16px !important; }
+            div[data-testid="stDataFrame"], div[data-testid="stDataEditor"], .ag-theme-alpine { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+            .umove-mobile-header { align-items: flex-start !important; gap: 10px !important; margin-bottom: 18px !important; }
+            .umove-mobile-header > div:first-child { padding: 9px 12px !important; }
+            .umove-mobile-header h3 { font-size: 19px !important; line-height: 1.25 !important; }
+            .umove-mobile-header p { font-size: 12px !important; line-height: 1.45 !important; }
+            .umove-metrics, .umove-summary-metrics { flex-direction: column !important; gap: 8px !important; }
+            .umove-metrics > div, .umove-summary-metrics > div { width: 100% !important; padding: 12px !important; }
+            .umove-metrics > div > div:last-child { font-size: 30px !important; }
+            .umove-driver-card { padding: 16px !important; margin-bottom: 16px !important; }
+            .umove-driver-card > div:last-child { font-size: 25px !important; overflow-wrap: anywhere; }
+        }
         div[data-testid="stTabs"] div[data-baseweb="tab-list"] {
                 gap: 14px;
             margin-bottom: 14px;
@@ -7582,7 +7609,7 @@ elif menu == "📥 Importações Umove":
     with tab_matriz:
         # Cabeçalho Premium
         st.markdown("""
-        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+        <div class="umove-mobile-header" style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
             <div style="background-color: #EFF6FF; padding: 12px 15px; border-radius: 12px; border: 1px solid #BFDBFE; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                 <span style="font-size: 26px;">📋</span>
             </div>
@@ -7681,7 +7708,7 @@ elif menu == "📥 Importações Umove":
                             df_limpo_sb['DATA'] = dt_sandbox.strftime("%d/%m/%Y")
 
                             df_limpo_sb['CIDADE'] = df_limpo_sb['CIDADE'].apply(lambda c: normalizar_cidade_operacao(corrigir_cidade_inteligente(c, DF_AGENTES), DF_AGENTES))
-                            df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES), axis=1)
+                            df_limpo_sb['AGENTE_RAW'] = df_limpo_sb.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES, numero=r.get('NUMERO', '')), axis=1)
                             # A normalizacao ocorre apos o roteamento para nao quebrar mapeamentos legados de rota.
                             df_limpo_sb['BAIRRO'] = df_limpo_sb['BAIRRO'].apply(normalizar_bairro_whatsapp)
 
@@ -7883,7 +7910,7 @@ elif menu == "📥 Importações Umove":
                 else:
                     with st.spinner("Salvando regra..."):
                         if f_agente == "Automático (Por Rota)":
-                            f_agente = obter_login_agente(f_cid, f_bai, f_lab, f_rua, DF_AGENTES)
+                            f_agente = obter_login_agente(f_cid, f_bai, f_lab, f_rua, DF_AGENTES, numero=f_num)
 
                         nova_regra = [
                             f"REG-{str(uuid.uuid4())[:6].upper()}", f_tomador, padronizar_texto(f_lab),
@@ -8297,7 +8324,7 @@ elif menu == "📥 Importações Umove":
     with tab_envios:
         def render_big_metrics(tot, pend, suc, fal):
             return f"""
-            <div style="display:flex; gap:12px; text-align:center; margin-bottom: 20px;">
+            <div class="umove-metrics" style="display:flex; gap:12px; text-align:center; margin-bottom: 20px;">
                 <div style="flex:1; background:#F8FAFC; border: 2px solid #E2E8F0; padding:15px; border-radius:12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                     <div style="font-size:13px; font-weight:800; color:#64748B; text-transform:uppercase;">Alvos Totais</div>
                     <div style="font-size:38px; font-weight:900; color:#0F172A; line-height:1.2;">{tot}</div>
@@ -8319,7 +8346,7 @@ elif menu == "📥 Importações Umove":
 
         def render_current_driver(nom, idx, total):
             return f"""
-            <div style="background: linear-gradient(135deg, #0F172A 0%, #334155 100%); color: white; padding: 25px 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border-left: 5px solid #3B82F6;">
+            <div class="umove-driver-card" style="background: linear-gradient(135deg, #0F172A 0%, #334155 100%); color: white; padding: 25px 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border-left: 5px solid #3B82F6;">
                 <div style="font-size: 13px; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 5px;">🚀 Transmitindo Lote ({idx}/{total})</div>
                 <div style="font-size: 36px; font-weight: 900; letter-spacing: -0.5px; color: #FFFFFF;">👤 {nom}</div>
             </div>
@@ -8466,7 +8493,7 @@ elif menu == "📥 Importações Umove":
                                 periodo_str = "Desconhecido"
                                     
                             st.markdown(f"""
-                            <div style="display:flex; gap:15px; margin-bottom: 25px;">
+                            <div class="umove-summary-metrics" style="display:flex; gap:15px; margin-bottom: 25px;">
                                 <div style="flex:1; background:#F8FAFC; border-left: 4px solid #3B82F6; padding:15px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                                     <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase;">Volumes Mapeados</div>
                                     <div style="font-size:28px; font-weight:900; color:#0F172A; line-height:1.2;">{qtd_pedidos}</div>
@@ -11796,15 +11823,16 @@ elif menu == "⚙️ Rotas":
                 with st.container(border=True):
                     with st.form(f"form_rapido_{agente_filtro}", clear_on_submit=True):
                         r_cid = st.text_input("Cidade *", placeholder="Obrigatório")
-                        ca1, ca2 = st.columns(2)
+                        ca1, ca2, ca3 = st.columns(3)
                         r_bai = ca1.text_input("Bairro (Opç)")
                         r_rua = ca2.text_input("Endereço (Opç)")
+                        r_num = ca3.text_input("Número (Opç)")
                                 
                         if st.form_submit_button("➕ Adicionar Rota", use_container_width=True):
                             if not r_cid:
                                 st.error("A Cidade é obrigatória!")
                             else:
-                                rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai), tratar_texto_global(r_rua)] if p])
+                                rota_str = " ➔ ".join([p for p in [limpar_nome_local_rota(r_cid), limpar_nome_local_rota(r_bai), tratar_texto_global(r_rua), tratar_texto_global(r_num)] if p])
                                 df_novo = pd.concat([DF_AGENTES,
                                                     pd.DataFrame([{"ROTA MAPEADA": rota_str,
                                                                     "LOGIN DO AGENTE": agente_filtro,
