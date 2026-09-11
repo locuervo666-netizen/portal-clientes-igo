@@ -7413,11 +7413,7 @@ elif menu == "📥 Importações Umove":
         if planilha_db is None:
             return None
         try:
-            aba_contador = planilha_db.worksheet("Contador_Umove")
-            val = aba_contador.acell("A1").value
-            if val is None or str(val).strip() == "":
-                aba_contador.update("A1", [[str(UMOVE_PEDIDO_INICIAL)]])
-            return aba_contador
+            return planilha_db.worksheet("Contador_Umove")
         except Exception:
             try:
                 aba_contador = planilha_db.add_worksheet("Contador_Umove", 10, 1)
@@ -7462,9 +7458,11 @@ elif menu == "📥 Importações Umove":
             st.session_state.umove_lote_atual_id = None
         if "contador_temp" not in st.session_state:
             st.session_state.contador_temp = UMOVE_PEDIDO_INICIAL
-        contador_lido = ler_contador_umove()
-        if contador_lido is not None:
-            st.session_state.contador_temp = contador_lido
+        if "contador_umove_inicializado" not in st.session_state:
+            contador_lido = ler_contador_umove()
+            if contador_lido is not None:
+                st.session_state.contador_temp = contador_lido
+            st.session_state.contador_umove_inicializado = True
 
     garantir_estado_local_umove()
 
@@ -7586,10 +7584,6 @@ elif menu == "📥 Importações Umove":
 
         df_base_ids = pd.concat(candidatos, ignore_index=True) if candidatos else pd.DataFrame(columns=['PEDIDO'])
         proximo_base = obter_proximo_id(df_base_ids, minimo_inicial=UMOVE_PEDIDO_INICIAL)
-
-        contador_arquivo = ler_contador_umove()
-        if contador_arquivo is not None:
-            proximo_base = max(proximo_base, contador_arquivo)
 
         if 'contador_temp' in st.session_state:
             proximo_base = max(proximo_base, int(st.session_state.contador_temp))
@@ -7796,25 +7790,17 @@ elif menu == "📥 Importações Umove":
                         try:
                             prox_id_sb = obter_proximo_id_umove_seguro_global()
 
-                            aba_contador = None
-                            try:
-                                aba_contador = planilha_db.worksheet("Contador_Umove")
-                            except Exception:
-                                try:
-                                    aba_contador = planilha_db.add_worksheet(title="Contador_Umove", rows=10, cols=1)
-                                except Exception:
-                                    aba_contador = None
-
-                            for idx, row in df_ok.iterrows():
-                                df_ok.at[idx, 'PEDIDO'] = str(prox_id_sb)
-                                prox_id_sb += 1
-
-                            st.session_state.contador_temp = prox_id_sb
-                            escrever_contador_umove(prox_id_sb)
+                            df_ok = df_ok.copy()
+                            df_ok['PEDIDO'] = [str(pedido_id) for pedido_id in range(prox_id_sb, prox_id_sb + len(df_ok))]
+                            prox_id_sb += len(df_ok)
                             if st.session_state.df_sandbox_mem.empty:
                                 st.session_state.df_sandbox_mem = df_ok
                             else:
                                 st.session_state.df_sandbox_mem = pd.concat([st.session_state.df_sandbox_mem, df_ok], ignore_index=True)
+
+                            st.session_state.contador_temp = prox_id_sb
+                            if not escrever_contador_umove(prox_id_sb):
+                                st.warning("Carga preservada localmente. O contador será sincronizado quando a conexão retornar.")
 
                             if st.session_state.umove_lote_atual_id is None:
                                 st.session_state.umove_lote_atual_id = f"LOTE-{datetime.now(FUSO_BR).strftime('%d%m%H%M')}"
@@ -10653,12 +10639,12 @@ elif menu == "🔬 Triagem":
                                 if chave not in lotes_man_dict:
                                     lotes_man_dict[chave] = lote_num
 
-                        c_h1, c_h2 = st.columns([2, 1], vertical_alignment="bottom")
+                        c_h1, c_h2, c_h3 = st.columns([2, 1, 1], vertical_alignment="bottom")
                         lote_re = c_h1.selectbox("Reimprimir Lote Manual:", ["Selecione..."] + sorted(lotes_man_dict.keys(), reverse=True))
 
                         if lote_re != "Selecione...":
                             lote_re_id = lotes_man_dict[lote_re]
-                            linhas_re = [linha for linha in dados_av[1:] if linha[0] == lote_re_id]
+                            linhas_re = [linha for linha in dados_av[1:] if linha and linha[0] == lote_re_id]
                             lista_re = []
                             for ln in linhas_re:
                                 env_val = ln[6] if len(ln) > 6 else ""
@@ -10674,6 +10660,14 @@ elif menu == "🔬 Triagem":
 
                             pdf_rep_man = gerar_pdf_triagem_manual(lote_re_id, lista_re[0].get('DATA', ''), lista_re[0].get('TOMADOR', ''), lista_re)
                             c_h2.download_button("📥 REIMPRIMIR", pdf_rep_man, file_name=f"Reprint_{lote_re_id}.pdf", mime="application/pdf", type="primary", use_container_width=True)
+                            with c_h3.popover("🗑️ Excluir", use_container_width=True):
+                                st.warning(f"Excluir permanentemente o lote {lote_re_id} do cofre?")
+                                if st.button("Confirmar exclusão", key=f"excluir_lote_manual_{lote_re_id}", type="primary", use_container_width=True):
+                                    linhas_para_excluir = [indice for indice, linha in enumerate(dados_av[1:], start=2) if linha and linha[0] == lote_re_id]
+                                    for indice_linha in reversed(linhas_para_excluir):
+                                        aba_av.delete_rows(indice_linha)
+                                    st.session_state.ui_toast = {'msg': f"Lote {lote_re_id} removido do histórico.", 'icon': "🗑️"}
+                                    st.rerun()
                 except Exception as e:
                     st.warning("⚠️ Não foi possível carregar o histórico no momento.")
 # =============================================================================
