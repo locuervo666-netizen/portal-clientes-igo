@@ -1845,6 +1845,7 @@ def obter_telefones_tomador_whatsapp(tomador, dados_adicionais=None):
     mapa_padrao = {
         "SYNVIA": ["5519993415911", "5511981169485"],
         "GRALAB": [],
+        "INNOVATOX": ["5515996754461", "5515996924549"],
     }
 
     telefones = []
@@ -10588,12 +10589,16 @@ elif menu == "🔬 Triagem":
                             if telefones_destino:
                                 nome_tomador = str(av_tomador or "Cliente").strip() or "Cliente"
                                 msg_cliente = (
-                                    "Olá! Seu protocolo foi gerado com sucesso.\n\n"
-                                    f"🏢 *Tomador:* {nome_tomador}\n"
+                                    "Olá!\n\n"
+                                    "Confirmamos a conclusão da triagem manual dos envelopes.\n\n"
+                                    "*Protocolo de Triagem*\n"
+                                    f"🏢 *Cliente:* {nome_tomador}\n"
                                     f"📦 *Lote:* {id_rom_av}\n"
+                                    f"📋 *Envelopes conferidos:* {len(st.session_state.triagem_avulsa_lote)}\n"
                                     f"📅 *Data da triagem:* {av_data.strftime('%d/%m/%Y')}\n\n"
-                                    "✅ Os pedidos serão entregues hoje.\n"
-                                    "Segue o protocolo em anexo para conferência."
+                                    "O protocolo segue anexado para conferência e rastreabilidade.\n\n"
+                                    "Atenciosamente,\n"
+                                    "*IGO Logística*"
                                 )
                                 for tel_destino in telefones_destino:
                                     enviar_whatsapp_zapi(tel_destino, msg_cliente)
