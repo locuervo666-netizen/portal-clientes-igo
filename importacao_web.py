@@ -8164,15 +8164,27 @@ elif menu == "📥 Importações Umove":
             return obter_proximo_id_umove_seguro_global()
 
         # --- BLOCAGEM DE PROCESSAMENTO: AGENDAMENTOS FIXOS ---
-        data_minima_fixos = hoje_br + timedelta(days=1)
-        data_padrao_fixos = data_minima_fixos
+        data_minima_fixos = hoje_br
+        data_padrao_fixos = hoje_br
+        if hoje_br.weekday() == 5:
+            data_minima_fixos += timedelta(days=2)
+            data_padrao_fixos = data_minima_fixos
+        elif hoje_br.weekday() == 6:
+            data_minima_fixos += timedelta(days=1)
+            data_padrao_fixos = data_minima_fixos
         while data_padrao_fixos.weekday() == 6:
             data_padrao_fixos += timedelta(days=1)
 
         chave_data_fixos = "data_agendamento_fixos_umove"
+        chave_data_base_fixos = "data_base_agendamento_fixos_umove"
         data_salva_fixos = st.session_state.get(chave_data_fixos)
-        if data_salva_fixos is None or data_salva_fixos < data_minima_fixos:
+        if (
+            st.session_state.get(chave_data_base_fixos) != hoje_br.isoformat()
+            or data_salva_fixos is None
+            or data_salva_fixos < data_minima_fixos
+        ):
             st.session_state[chave_data_fixos] = data_padrao_fixos
+            st.session_state[chave_data_base_fixos] = hoje_br.isoformat()
 
         st.markdown("#### 📅 Preparar Pedidos Fixos")
         data_agendamento_fixos = st.date_input(
@@ -8181,7 +8193,7 @@ elif menu == "📥 Importações Umove":
             min_value=data_minima_fixos,
             format="DD/MM/YYYY",
             key=chave_data_fixos,
-            help="Hoje e datas anteriores ficam bloqueados para evitar que pedidos fixos sejam criados para uma rota já em andamento.",
+            help="Em dias úteis, os pedidos fixos são preparados para hoje. Aos sábados e domingos, o calendário começa na próxima segunda-feira.",
         )
         if data_agendamento_fixos.weekday() == 6:
             st.warning("Não há pedidos fixos aos domingos. Escolha segunda-feira ou outro dia com rota programada.")
