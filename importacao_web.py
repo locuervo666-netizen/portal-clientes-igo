@@ -8169,13 +8169,18 @@ elif menu == "📥 Importações Umove":
         while data_padrao_fixos.weekday() == 6:
             data_padrao_fixos += timedelta(days=1)
 
+        chave_data_fixos = "data_agendamento_fixos_umove"
+        data_salva_fixos = st.session_state.get(chave_data_fixos)
+        if data_salva_fixos is None or data_salva_fixos < data_minima_fixos:
+            st.session_state[chave_data_fixos] = data_padrao_fixos
+
         st.markdown("#### 📅 Preparar Pedidos Fixos")
         data_agendamento_fixos = st.date_input(
             "Data para os pedidos fixos",
             value=data_padrao_fixos,
             min_value=data_minima_fixos,
             format="DD/MM/YYYY",
-            key="data_agendamento_fixos_umove",
+            key=chave_data_fixos,
             help="Hoje e datas anteriores ficam bloqueados para evitar que pedidos fixos sejam criados para uma rota já em andamento.",
         )
         if data_agendamento_fixos.weekday() == 6:
