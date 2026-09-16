@@ -244,6 +244,12 @@ def usuarios_padrao_portal_cliente():
             "filtro": "SYNVIA",
             "tomador": "SYNVIA",
         },
+        "INNOVATOX": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": "https://i.postimg.cc/W18xqdfR/innovatox.jpg",
+            "filtro": "INNOVATOX",
+            "tomador": "INNOVATOX",
+        },
         "LOGISTICA.BAT": {
             "senha_hash": gerar_hash_senha("123"),
             "logo": "souza cruz.png",
@@ -6377,6 +6383,8 @@ elif menu == "📥 Importações":
                                     mapa[c] = 'LABORATORIO'
                                 elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']):
                                     mapa[c] = 'ENDERECO'
+                                elif 'COMPLEMENT' in cl:
+                                    mapa[c] = 'COMPLEMENTO'
                                 elif 'BAIRRO' in cl:
                                     mapa[c] = 'BAIRRO'
                                 elif any(x in cl for x in ['CIDADE', 'MUNIC']):
@@ -6392,7 +6400,7 @@ elif menu == "📥 Importações":
 
                             df_limpo.rename(columns=mapa, inplace=True)
 
-                            for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
+                            for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'COMPLEMENTO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
                                 if c not in df_limpo.columns:
                                     df_limpo[c] = ""
 
@@ -6425,8 +6433,12 @@ elif menu == "📥 Importações":
 
                             df_limpo['CIDADE'] = df_limpo['CIDADE'].apply(lambda c: normalizar_cidade_operacao(corrigir_cidade_inteligente(c, DF_AGENTES), DF_AGENTES))
                             df_limpo['AGENTE_RAW'] = df_limpo.apply(lambda r: obter_login_agente(r['CIDADE'], r['BAIRRO'], r['LABORATORIO'], r['ENDERECO'], DF_AGENTES, numero=r.get('NUMERO', '')), axis=1)
+                            df_limpo['BAIRRO'] = df_limpo.apply(
+                                lambda row: normalizar_bairro_whatsapp(row['BAIRRO'], row['TOMADOR']),
+                                axis=1,
+                            )
 
-                            st.session_state.df_preview_oficial = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
+                            st.session_state.df_preview_oficial = df_limpo[df_limpo['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'COMPLEMENTO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
                             st.session_state.ui_toast = {'msg': "Processamento Concluído!", 'icon': "✅"}
                             st.rerun()
                         except Exception as e:
@@ -6863,11 +6875,50 @@ elif menu == "📥 Importações":
             """
 
         if not df_cart_of.empty:
-            c_kpi1_of, c_kpi2_of = st.columns([1, 4])
-            c_kpi1_of.metric("TOTAL NO CARRINHO", len(df_cart_of))
-            resumo_tom_of = df_cart_of.groupby('TOMADOR').size().reset_index(name='QTD')
-            resumo_tom_str = " | ".join([f"{row['TOMADOR']}: {row['QTD']}" for _, row in resumo_tom_of.iterrows()])
-            c_kpi2_of.info(f"Detalhamento por Cliente: {resumo_tom_str}")
+            resumo_tom_of = df_cart_of.groupby('TOMADOR').size().reset_index(name='QTD').sort_values(by='QTD', ascending=False)
+            total_volumes_of = len(df_cart_of)
+            clientes_unicos_of = int(resumo_tom_of['TOMADOR'].nunique())
+            top_cliente_qtd_of = int(resumo_tom_of.iloc[0]['QTD']) if not resumo_tom_of.empty else 0
+            top_cliente_pct_of = round((top_cliente_qtd_of / total_volumes_of) * 100, 1) if total_volumes_of else 0
+            resumo_tom_str = " | ".join([
+                f"{str(row.get('TOMADOR', '')).strip() or 'SEM TOMADOR'}: {int(row.get('QTD', 0))}"
+                for _, row in resumo_tom_of.iterrows()
+            ])
+
+            st.markdown("### 🛒 Carrinho de Expedição Oficial")
+            st.markdown("<p style='font-size:13px; color:#64748B; margin-top:-8px;'>Mesa cumulativa com edição direta e transmissão monitorada para os motoristas.</p>", unsafe_allow_html=True)
+
+            col_kpi_of_1, col_kpi_of_2, col_kpi_of_3 = st.columns([1.15, 2.35, 1])
+            with col_kpi_of_1:
+                st.markdown(f"""
+                    <div class='of-card' style='text-align:center; background:linear-gradient(135deg, #0F172A 0%, #1E293B 100%); border:1px solid #334155;'>
+                        <div style='font-size:11px; font-weight:800; color:#93C5FD; text-transform:uppercase; letter-spacing:0.7px;'>Volumes no Carrinho</div>
+                        <div style='font-size:44px; font-weight:900; color:#FFFFFF; line-height:1.05; margin-top:2px;'>{total_volumes_of}</div>
+                        <div style='font-size:12px; color:#CBD5E1; margin-top:4px;'>Clientes ativos: <b>{clientes_unicos_of}</b></div>
+                        <div style='margin-top:10px; padding-top:8px; border-top:1px solid rgba(148,163,184,0.35); font-size:11px; color:#E2E8F0;'>
+                            Maior concentração: <b>{top_cliente_pct_of}%</b>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            with col_kpi_of_2:
+                st.markdown(f"""
+                    <div class='of-card' style='padding:14px;'>
+                        <div class='of-card-title'>Detalhamento por Conta de Cliente</div>
+                        <div style='font-size:14px; font-weight:600; color:#334155; margin:10px 0 2px 0; line-height:1.7;'>
+                            {resumo_tom_str}
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            with col_kpi_of_3:
+                if st.button("🗑️ Esvaziar Todo Carrinho", type="secondary", use_container_width=True, key="oficial_esvaziar_carrinho", help="Zera completamente a memória temporária"):
+                    st.session_state.df_carrinho_oficial = pd.DataFrame()
+                    st.session_state.of_step = 'IDLE'
+                    st.session_state.of_df_dispatch = pd.DataFrame()
+                    if 'contador_oficial_temp' in st.session_state:
+                        del st.session_state.contador_oficial_temp
+                    st.success("Mesa limpa e pronta para o próximo lote!")
+                    time.sleep(1)
+                    st.rerun()
 
             st.markdown("#### 🕵️‍♂️ Grid Interativa Cumulativa")
             df_editado_oficial = st.data_editor(
@@ -6883,7 +6934,18 @@ elif menu == "📥 Importações":
             # ESTADOS: IDLE e CONFIRMING (Exibe os botões em 3 colunas)
             # ---------------------------------------------------------------------
             if st.session_state.of_step in ['IDLE', 'CONFIRMING']:
-                col_inj, col_disparo, col_limp = st.columns(3)
+                st.markdown(render_big_metrics_off(len(df_editado_oficial), 0, 0, 0), unsafe_allow_html=True)
+
+                if st.session_state.of_step == 'IDLE':
+                    col_etapa_1, col_etapa_2, col_etapa_3 = st.columns(3)
+                    with col_etapa_1:
+                        st.markdown("<div class='of-card'><div class='of-card-title'>Etapa 1</div><div class='of-card-subtitle'><b>Injetar no Banco</b><br>Persistência oficial dos pedidos editados na base operacional.</div></div>", unsafe_allow_html=True)
+                    with col_etapa_2:
+                        st.markdown("<div class='of-card'><div class='of-card-title'>Etapa 2</div><div class='of-card-subtitle'><b>Disparar WhatsApp</b><br>Envio monitorado das mensagens por motorista.</div></div>", unsafe_allow_html=True)
+                    with col_etapa_3:
+                        st.markdown("<div class='of-card'><div class='of-card-title'>Etapa 3</div><div class='of-card-subtitle'><b>Finalizar a Mesa</b><br>Limpeza da carga após a conferência operacional.</div></div>", unsafe_allow_html=True)
+
+                col_inj, col_disparo, col_limp = st.columns(3, gap="medium")
 
                 with col_inj:
                     if st.button("🚀 1. Injetar Lote no Banco", type="primary", use_container_width=True):
@@ -6937,14 +6999,11 @@ elif menu == "📥 Importações":
 
                 with col_disparo:
                     if st.session_state.of_step == 'IDLE':
-                        st.markdown(render_big_metrics_off(len(df_editado_oficial), 0, 0, 0), unsafe_allow_html=True)
-                        st.markdown("<div class='of-card'><div class='of-card-title'>Transmissão ao vivo</div><div class='of-card-subtitle'>Clique para abrir o modo monitorado com atualização de status por motorista.</div></div>", unsafe_allow_html=True)
                         if st.button("🚀 INICIAR TRANSMISSÃO EM LOTE AGORA", type="primary", use_container_width=True):
                             st.session_state.of_df_dispatch = df_editado_oficial.copy()
                             st.session_state.of_step = 'CONFIRMING'
                             st.rerun()
                     else: # CONFIRMING
-                        st.markdown(render_big_metrics_off(len(df_editado_oficial), 0, 0, 0), unsafe_allow_html=True)
                         st.markdown("<div style='background-color:#FEF2F2; border:2px solid #FCA5A5; border-radius:12px; padding:18px; margin-bottom:14px;'><h4 style='margin:0; color:#991B1B;'>⚠️ Confirmação de Disparo Crítico</h4><p style='margin:6px 0 0 0; color:#7F1D1D;'>Você está prestes a disparar mensagens oficiais via WhatsApp para os motoristas do lote selecionado.</p></div>", unsafe_allow_html=True)
                         c_ok, c_cancel = st.columns(2)
                         if c_ok.button("✔️ CONFIRMAR E DISPARAR", type="primary", use_container_width=True):
@@ -7216,6 +7275,20 @@ elif menu == "📥 Importações":
                 metrics = st.session_state.of_final_metrics
                 st.markdown(render_big_metrics_off(metrics['total'], 0, metrics['sucesso'], metrics['falhas']), unsafe_allow_html=True)
                 st.success("🎉 O disparo em lote foi finalizado! O histórico foi consolidado na nuvem.")
+
+                df_relatorio_oficial = st.session_state.of_df_dispatch
+                if not df_relatorio_oficial.empty:
+                    relatorio_oficial_xls = gerar_relatorio_umove_xls(
+                        df_relatorio_oficial,
+                        st.session_state.of_resultados_disparo,
+                    )
+                    st.download_button(
+                        "📥 Baixar Relatório XLS",
+                        data=relatorio_oficial_xls,
+                        file_name=f"RELATORIO_DISPAROS_OFICIAL_{hoje_br.strftime('%d%m%Y')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
 
                 if st.button("🔄 Liberar Mesa para Novo Disparo", use_container_width=True):
                     st.session_state.of_step = 'IDLE'
