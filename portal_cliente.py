@@ -31,7 +31,9 @@ LOGOS_POR_TOMADOR = {
     "LABEST": "logo_labest.png",
     "DANILO.DUARTE": "logo_labest.png",
     "SYNVIA": LOGO_IGO,
+    "INNOVATOX": "https://i.postimg.cc/W18xqdfR/innovatox.jpg",
     "SOUZA CRUZ": "souza cruz.png",
+    "LOGISTICACONTRAPROVA": "https://i.postimg.cc/KvQGzV8R/contraprova.png",
 }
 
 
@@ -51,6 +53,12 @@ def verificar_senha(senha_digitada, senha_hash):
 
 def normalizar_tomador_portal(tomador):
     tomador_norm = str(tomador).strip().upper() or "TODOS"
+    aliases = {
+        "CONTRAPROVA": "LOGISTICACONTRAPROVA",
+        "LOGISTICA CONTRAPROVA": "LOGISTICACONTRAPROVA",
+        "LOGISTICA-CONTRAPROVA": "LOGISTICACONTRAPROVA",
+    }
+    tomador_norm = aliases.get(tomador_norm, tomador_norm)
     return tomador_norm.replace("CAEP", "SYNVIA").replace("CUNHA", "GRALAB")
 
 
@@ -108,6 +116,12 @@ def usuarios_padrao_portal_cliente():
             "logo": LOGO_IGO,
             "filtro": "SYNVIA",
             "tomador": "SYNVIA"
+        },
+        "INNOVATOX": {
+            "senha_hash": gerar_hash_senha("123"),
+            "logo": "https://i.postimg.cc/W18xqdfR/innovatox.jpg",
+            "filtro": "INNOVATOX",
+            "tomador": "INNOVATOX"
         },
         "LOGISTICA.BAT": {
             "senha_hash": gerar_hash_senha("123"),
@@ -187,8 +201,7 @@ def salvar_usuarios_portal_cliente(usuarios):
 
 
 def obter_logo_por_tomador(tomador):
-    tomador_norm = str(tomador).strip().upper()
-    tomador_norm = tomador_norm.replace("CAEP", "SYNVIA").replace("CUNHA", "GRALAB")
+    tomador_norm = normalizar_tomador_portal(tomador)
     return LOGOS_POR_TOMADOR.get(tomador_norm, LOGO_IGO)
 
 # =======================================================
@@ -206,15 +219,15 @@ CSS_DASHBOARD = """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     :root {
-        --igo-bg-soft: #edf2f5;
-        --igo-surface: #f8fafc;
-        --igo-surface-2: #eef3f6;
-        --igo-line: #cad7e0;
-        --igo-text: #111827;
-        --igo-muted: #5b6675;
-        --igo-brand: #1f3d5c;
-        --igo-brand-2: #2d5d84;
-        --igo-success: #2e7d32;
+        --igo-bg-soft: #ffffff;
+        --igo-surface: #ffffff;
+        --igo-surface-2: #f8fafc;
+        --igo-line: #dbe3ef;
+        --igo-text: #0f172a;
+        --igo-muted: #475569;
+        --igo-brand: #2563eb;
+        --igo-brand-2: #0ea5e9;
+        --igo-success: #10b981;
         --igo-warning: #d97706;
         --igo-danger: #b42318;
         --igo-accent: #4f81c7;
@@ -223,7 +236,7 @@ CSS_DASHBOARD = """
     [data-testid="stAppViewContainer"] {
         transition: background-color 0.3s ease;
         font-family: 'Inter', sans-serif;
-        background: linear-gradient(180deg, #eef3f7 0%, #e8edf2 100%) !important;
+        background-color: #ffffff !important;
         padding-left: 0.3rem !important;
         padding-right: 0.3rem !important;
     }
@@ -433,8 +446,8 @@ CSS_DASHBOARD = """
     }
 
     .kpi-deck-shell {
-        background: linear-gradient(180deg, #f5f7fa 0%, #edf2f7 100%);
-        border: 1px solid rgba(148, 163, 184, 0.42);
+        background: #ffffff;
+        border: 1px solid #dbe3ef;
         border-radius: 12px;
         padding: 12px 12px 8px 12px;
         box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,0.9);
@@ -443,8 +456,8 @@ CSS_DASHBOARD = """
     }
 
     .toolbar-shell {
-        background: linear-gradient(180deg, #eef3f8 0%, #e3ebf3 100%);
-        border: 1px solid rgba(148, 163, 184, 0.38);
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid #dbe3ef;
         border-radius: 12px;
         padding: 8px 10px;
         box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255,255,255,0.9);
@@ -516,9 +529,9 @@ CSS_DASHBOARD = """
         align-items: center;
         margin-bottom: 6px;
         padding: 12px 14px;
-        border: 1px solid rgba(148, 163, 184, 0.35);
+        border: 1px solid #dbe3ef;
         border-radius: 12px;
-        background: linear-gradient(135deg, #e8eef5 0%, #f4f7fa 34%, #dfeaf4 100%);
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 52%, #eff6ff 100%);
         box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,0.9);
         backdrop-filter: blur(8px);
     }
@@ -2254,7 +2267,7 @@ if not st.session_state.logado:
         header { display: none !important; }
         
         [data-testid="stAppViewContainer"] { 
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+            background-color: #ffffff !important;
             font-family: 'Inter', sans-serif;
         }
 
@@ -2946,7 +2959,8 @@ Pedidos movimentados hoje
                             "border-bottom": "1px solid #eef2f7 !important",
                             "display": "flex",
                             "align-items": "center",
-                            "font-size": "13px !important"
+                            "font-size": "13px !important",
+                            "text-transform": "uppercase !important"
                         },
                         ".ag-cell-focus": {"border": "none !important", "outline": "none !important"},
                         ".ag-row:hover": {
