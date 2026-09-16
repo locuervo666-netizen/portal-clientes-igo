@@ -1611,6 +1611,19 @@ def normalizar_bairro_whatsapp(bairro, tomador=""):
     return re.sub(r'\s+', ' ', bairro_norm).strip()
 
 
+def formatar_endereco_complemento(endereco, numero="", complemento=""):
+    partes = [str(endereco or '').strip()]
+    numero_texto = str(numero or '').strip()
+    complemento_texto = str(complemento or '').strip()
+
+    if numero_texto and numero_texto.upper() not in ['NAN', 'NONE']:
+        partes.append(numero_texto)
+    endereco_formatado = ', '.join(parte for parte in partes if parte)
+    if complemento_texto and complemento_texto.upper() not in ['NAN', 'NONE']:
+        endereco_formatado += f" - {complemento_texto}"
+    return endereco_formatado
+
+
 def ordenar_grupo_por_bairro(df_grupo):
     """Ordena bairros alfabeticamente com estabilidade, mantendo a ordem dos pedidos dentro do mesmo bairro."""
     if df_grupo is None or df_grupo.empty:
@@ -2367,7 +2380,7 @@ def gerar_excel_rota_whatsapp(df_agente):
     return output.getvalue()
 
 
-def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
+def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente, incluir_complemento=False):
     W_OK = 8
     W_PED = 16
     W_TOM = 22
@@ -2541,7 +2554,15 @@ def gerar_pdf_rota_whatsapp(nome_motorista, data_str, df_agente):
                 ped = _txt_pdf(row.get('PEDIDO', ''), 18)
                 tom = _txt_pdf(row.get('TOMADOR', ''), 22)
                 lab = _txt_pdf(row.get('LABORATORIO', ''), 28)
-                end = _txt_pdf(f"{row.get('ENDERECO', '')}, {row.get('NUMERO', '')}", 72)
+                if incluir_complemento:
+                    endereco_pdf = formatar_endereco_complemento(
+                        row.get('ENDERECO', ''),
+                        row.get('NUMERO', ''),
+                        row.get('COMPLEMENTO', ''),
+                    )
+                else:
+                    endereco_pdf = f"{row.get('ENDERECO', '')}, {row.get('NUMERO', '')}"
+                end = _txt_pdf(endereco_pdf, 72)
                 obs_bruto = row.get('OBSERVACOES', '')
                 if (not str(obs_bruto).strip() or str(obs_bruto).strip().upper() in ['NAN', 'NONE']) and str(row.get('HORARIO', '')).strip():
                     obs_bruto = f"[COLETA: {str(row.get('HORARIO', '')).strip()}]"
@@ -7765,6 +7786,7 @@ elif menu == "📥 Importações Umove":
                                 elif any(x in cl for x in ['CNPJ', 'CPF', 'DOCUMENTO', 'DOC']): mapa_sb[c] = 'CNPJ'
                                 elif any(x in cl for x in ['LABORAT', 'CLINIC', 'POSTO', 'NOME', 'CLIENTE']): mapa_sb[c] = 'LABORATORIO'
                                 elif any(x in cl for x in ['ENDERE', 'RUA', 'LOGRADOURO', 'AVENIDA']): mapa_sb[c] = 'ENDERECO'
+                                elif 'COMPLEMENT' in cl: mapa_sb[c] = 'COMPLEMENTO'
                                 elif 'BAIRRO' in cl: mapa_sb[c] = 'BAIRRO'
                                 elif any(x in cl for x in ['CIDADE', 'MUNIC']): mapa_sb[c] = 'CIDADE'
                                 elif any(x in cl for x in ['ESTADO', 'UF']): mapa_sb[c] = 'UF'
@@ -7774,7 +7796,7 @@ elif menu == "📥 Importações Umove":
 
                             df_limpo_sb.rename(columns=mapa_sb, inplace=True)
 
-                            for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
+                            for c in ['PEDIDO', 'LABORATORIO', 'CNPJ', 'CEP', 'ENDERECO', 'NUMERO', 'COMPLEMENTO', 'BAIRRO', 'CIDADE', 'UF', 'OBSERVACOES']:
                                 if c not in df_limpo_sb.columns:
                                     df_limpo_sb[c] = ""
 
@@ -7809,7 +7831,7 @@ elif menu == "📥 Importações Umove":
                             # A normalizacao ocorre apos o roteamento para nao quebrar mapeamentos legados de rota.
                             df_limpo_sb['BAIRRO'] = df_limpo_sb['BAIRRO'].apply(normalizar_bairro_whatsapp)
 
-                            df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
+                            df_final_sb = df_limpo_sb[df_limpo_sb['LABORATORIO'].str.strip() != ""][['DATA', 'TOMADOR', 'PEDIDO', 'LABORATORIO', 'CNPJ', 'ENDERECO', 'NUMERO', 'COMPLEMENTO', 'BAIRRO', 'CIDADE', 'UF', 'CEP', 'OBSERVACOES', 'AGENTE_RAW']]
 
                             st.session_state.df_preview_sb = df_final_sb
                             time.sleep(0.5)
@@ -8891,7 +8913,12 @@ elif menu == "📥 Importações Umove":
                             group = ordenar_grupo_por_bairro(group)
                             for _, row in group.iterrows():
                                 bairro_msg = row.get('_BAIRRO_WHATS', normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', tom_sandbox)))
-                                item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {bairro_msg}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
+                                endereco_msg = formatar_endereco_complemento(
+                                    row.get('ENDERECO', ''),
+                                    row.get('NUMERO', ''),
+                                    row.get('COMPLEMENTO', ''),
+                                )
+                                item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', 'SEM NUM')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {endereco_msg}\n> 🏘️ Bairro: {bairro_msg}\n> 📮 CEP: {row.get('CEP', '')}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                 obs = str(row.get('OBSERVACOES', '')).strip()
                                 if (not obs or obs.upper() in ['NAN', 'NONE']) and str(row.get('HORARIO', '')).strip():
                                     obs = f"[COLETA: {str(row.get('HORARIO', '')).strip()}]"
@@ -8924,11 +8951,11 @@ elif menu == "📥 Importações Umove":
                                         df_para_pdf = df_dispatch[df_dispatch['UF'] == 'RJ']
                                         nome_arq_pdf = f"COLETAS_GERAL_RJ_{hoje_br.strftime('%d%m')}.pdf"
                                         # Passamos "RJ - GERAL" no lugar do nome dele para o cabeçalho do PDF ficar coerente
-                                        pdf_bytes = gerar_pdf_rota_whatsapp("RJ - GERAL", data_str, df_para_pdf)
+                                        pdf_bytes = gerar_pdf_rota_whatsapp("RJ - GERAL", data_str, df_para_pdf, incluir_complemento=True)
                                     else:
                                         df_para_pdf = df_ag_sb
                                         nome_arq_pdf = f"ROTA_IGO_{nom.replace(' ', '_')}_{hoje_br.strftime('%d%m')}.pdf"
-                                        pdf_bytes = gerar_pdf_rota_whatsapp(nom, data_str, df_para_pdf)
+                                        pdf_bytes = gerar_pdf_rota_whatsapp(nom, data_str, df_para_pdf, incluir_complemento=True)
                                                 
                                     enviar_pdf_zapi(tel, pdf_bytes, nome_arq_pdf)
                                     time.sleep(2.5)
