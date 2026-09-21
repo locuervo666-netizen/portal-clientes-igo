@@ -7099,6 +7099,9 @@ elif menu == "📥 Importações":
                         ag_key = str(ag).strip().lower()
                         tel = dict_tel.get(ag_key, "")
                         nom = dict_nom.get(ag_key, str(ag).upper())
+                        modo_disparo = obter_modo_disparo_whatsapp(ag_key)
+                        is_autorizado_pdf = modo_disparo in ['PDF', 'PDF_XLS']
+                        is_autorizado_xls = modo_disparo in ['XLS', 'PDF_XLS']
 
                         st.session_state.of_resultados_disparo[nom] = {'total': len(df_ag_of), 'sucesso': 0, 'pedidos': df_ag_of['PEDIDO'].tolist()}
 
@@ -7133,7 +7136,7 @@ elif menu == "📥 Importações":
                             df_msg_of['_CIDADE_WHATS'] = ''
                         if 'BAIRRO' in df_msg_of.columns:
                             df_msg_of['_BAIRRO_WHATS'] = df_msg_of.apply(
-                                lambda row: normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', tom_sandbox)),
+                                lambda row: normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', '')),
                                 axis=1,
                             )
                         else:
@@ -7153,7 +7156,7 @@ elif menu == "📥 Importações":
                             items = []
                             group = ordenar_grupo_por_bairro(group)
                             for _, row in group.iterrows():
-                                bairro_msg = row.get('_BAIRRO_WHATS', normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', tom_sandbox)))
+                                bairro_msg = row.get('_BAIRRO_WHATS', normalizar_bairro_whatsapp(row.get('BAIRRO', ''), row.get('TOMADOR', '')))
                                 item_str = f"{bullet} PEDIDO: {row.get('PEDIDO', '')}\n> 🔬 {lab_lbl}: {row.get('LABORATORIO', '')}\n> 📍 Rua: {row.get('ENDERECO', '')}, {row.get('NUMERO', '')}\n> 🏘️ Bairro: {bairro_msg}\n> 🏢 Tomador: {row.get('TOMADOR', '')}"
                                 obs = str(row.get('OBSERVACOES', '')).strip()
                                 if (not obs or obs.upper() in ['NAN', 'NONE']) and str(row.get('HORARIO', '')).strip():
