@@ -1866,6 +1866,7 @@ def obter_telefones_tomador_whatsapp(tomador, dados_adicionais=None):
         "SYNVIA": ["5519993415911", "5511981169485"],
         "GRALAB": [],
         "INNOVATOX": ["5515996754461", "5515996924549"],
+        "LABEST": ["5511996487256", "5511956552551", "5511943106668"],
     }
 
     telefones = []
