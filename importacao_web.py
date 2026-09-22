@@ -9953,6 +9953,12 @@ elif menu == "🔬 Triagem":
 
     # 🔥 IMPRESSORA EXCLUSIVA PARA TRIAGEM MANUAL 🔥
     def gerar_pdf_triagem_manual(id_lote, data_str, tomador, lista_itens):
+        def chave_ordenacao_pedido(item):
+            pedido = str(item.get('PEDIDO', '')).strip()
+            correspondencia = re.search(r'\d+', pedido)
+            return (0, int(correspondencia.group())) if correspondencia else (1, pedido.upper())
+
+        lista_itens = sorted(lista_itens, key=chave_ordenacao_pedido)
         pdf = FPDF()
         pdf.add_page()
         pdf.set_draw_color(15, 23, 42)
