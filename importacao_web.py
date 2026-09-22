@@ -1273,7 +1273,8 @@ CLIENTES_AUTORIZADOS = sorted(["CAEP",
                             "BRASILIENSE",
                             "SOUZA CRUZ",
                             "HEXALIFE",
-                            "ECOLYZER"])
+                            "ECOLYZER",
+                            "EDNA JAGUARIBE"])
 
 
 def corrigir_nomes_relatorio(texto):
@@ -6105,6 +6106,122 @@ elif menu == "📥 Importações":
         st.session_state[cache_key_ts] = agora
         return df_m.copy()
 
+    def gerar_pedidos_fixos_automaticos_oficial():
+        """Insere na base oficial as regras ativas do dia, uma única vez por regra."""
+        data_referencia = datetime.now(FUSO_BR).date()
+        dia_semana = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
+        dia_regra = dia_semana[data_referencia.weekday()]
+        if dia_regra == 'DOM' or planilha_db is None:
+            return 0
+
+        try:
+            aba_regras = planilha_db.worksheet("Agendamentos_Fixos_Oficial")
+            dados_regras = gsheets_call("leitura regras fixas oficiais", aba_regras.get_all_values)
+            if len(dados_regras) <= 1:
+                return 0
+
+            df_regras = worksheet_values_to_df(dados_regras)
+            if dia_regra not in df_regras.columns or 'STATUS' not in df_regras.columns:
+                return 0
+            regras_ativas = df_regras[
+                (df_regras['STATUS'].astype(str).str.strip().str.upper() == 'ATIVO') &
+                (df_regras[dia_regra].astype(str).str.strip().str.upper() == 'SIM')
+            ].copy()
+            if regras_ativas.empty:
+                return 0
+
+            aba_memoria = planilha_db.worksheet("Memoria_Sistema")
+            dados_memoria = gsheets_call("leitura base para pedidos fixos", aba_memoria.get_all_values)
+            if not dados_memoria:
+                return 0
+
+            cabecalho = dados_memoria[0]
+            indices = {str(coluna).strip().upper(): indice for indice, coluna in enumerate(cabecalho)}
+            obrigatorias = {'DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'OBSERVACOES'}
+            if not obrigatorias.issubset(indices):
+                return 0
+
+            data_texto = data_referencia.strftime('%d/%m/%Y')
+            existentes_por_regra = set()
+            existentes_por_endereco = set()
+            for linha in dados_memoria[1:]:
+                valores = linha + [''] * (len(cabecalho) - len(linha))
+                if str(valores[indices['DATA']]).strip() != data_texto:
+                    continue
+                observacao = str(valores[indices['OBSERVACOES']]).upper()
+                marcador = re.search(r'\[FIXO:([^\]]+)\]', observacao)
+                if marcador:
+                    existentes_por_regra.add(marcador.group(1).strip())
+                existentes_por_endereco.add(tuple(
+                    str(valores[indices[coluna]]).strip().upper()
+                    for coluna in ['TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO']
+                ))
+
+            df_memoria = worksheet_values_to_df(dados_memoria)
+            proximo_id = obter_proximo_id(df_memoria, minimo_inicial=2000)
+            novas_linhas = []
+            for _, regra in regras_ativas.iterrows():
+                id_regra = str(regra.get('ID_REGRA', '')).strip().upper()
+                identidade = tuple(
+                    str(regra.get(coluna, '')).strip().upper()
+                    for coluna in ['TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO']
+                )
+                if id_regra in existentes_por_regra or identidade in existentes_por_endereco:
+                    continue
+
+                agente = str(regra.get('MOTORISTA', '')).strip()
+                if not agente or agente.upper() in ['AUTOMÁTICO (POR ROTA)', 'AUTOMATICO (POR ROTA)']:
+                    agente = obter_login_agente(
+                        str(regra.get('CIDADE', '')), str(regra.get('BAIRRO', '')),
+                        str(regra.get('LABORATORIO', '')), str(regra.get('ENDERECO', '')),
+                        DF_AGENTES, numero=str(regra.get('NUMERO', '')),
+                    )
+
+                observacao = str(regra.get('OBSERVACOES', '')).strip()
+                if observacao.upper() in ['NAN', 'NONE']:
+                    observacao = ''
+                marcador_regra = f"[FIXO:{id_regra}]" if id_regra else '[FIXO]'
+                observacao = f"{observacao} {marcador_regra}".strip()
+                prazo = calcular_sla_dias(regra.get('UF', 'SP'), regra.get('CIDADE', ''), regra.get('TOMADOR', ''))
+                pedido = {
+                    'DATA': data_texto,
+                    'PEDIDO': str(proximo_id),
+                    'TOMADOR': regra.get('TOMADOR', ''),
+                    'LABORATORIO': regra.get('LABORATORIO', ''),
+                    'ENDERECO': regra.get('ENDERECO', ''),
+                    'NUMERO': regra.get('NUMERO', ''),
+                    'BAIRRO': regra.get('BAIRRO', ''),
+                    'CIDADE': regra.get('CIDADE', ''),
+                    'UF': regra.get('UF', ''),
+                    'CEP': regra.get('CEP', ''),
+                    'STATUS': 'PENDENTE',
+                    'AGENTE_RAW': agente,
+                    'PRAZO_DIAS': str(prazo),
+                    'DATA_LIMITE': str(calcular_data_limite(data_texto, int(prazo))),
+                    'ZAP_ENVIADO': '',
+                    'FATURA': '',
+                    'OBSERVACOES': observacao,
+                }
+                novas_linhas.append([pedido.get(str(coluna).strip().upper(), '') for coluna in cabecalho])
+                existentes_por_regra.add(id_regra)
+                existentes_por_endereco.add(identidade)
+                proximo_id += 1
+
+            if not novas_linhas:
+                return 0
+            gsheets_call(
+                "insercao automatica pedidos fixos",
+                aba_memoria.append_rows,
+                novas_linhas,
+                value_input_option='USER_ENTERED',
+            )
+            st.session_state.pop('of_memoria_cache_df', None)
+            st.session_state.pop('of_memoria_cache_ts', None)
+            carregar_dados_completos.clear()
+            return len(novas_linhas)
+        except Exception:
+            return 0
+
     # 🔥 PING SILENCIOSO (ANTI-TIMEOUT DO RENDER) 🔥
     components.html(
         """
@@ -6149,6 +6266,15 @@ elif menu == "📥 Importações":
         st.session_state['f_uf_of'] = ""
     if 'cep_version_of' not in st.session_state:
         st.session_state['cep_version_of'] = 0
+
+    if st.session_state.get('of_fixos_gerados_em') != datetime.now(FUSO_BR).date().isoformat():
+        qtd_fixos_automaticos = gerar_pedidos_fixos_automaticos_oficial()
+        st.session_state.of_fixos_gerados_em = datetime.now(FUSO_BR).date().isoformat()
+        if qtd_fixos_automaticos:
+            st.session_state.ui_toast = {
+                'msg': f'{qtd_fixos_automaticos} pedido(s) fixo(s) inserido(s) automaticamente na GRID.',
+                'icon': '✅',
+            }
 
     st.markdown(
         """
@@ -6673,7 +6799,15 @@ elif menu == "📥 Importações":
             st.info(f"{len(df_geracao_of)} pedido(s) fixo(s) encontrados para {dt_fixos_of.strftime('%d/%m/%Y')} ({dia_selecionado_of}).")
             st.dataframe(df_geracao_of[['TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'BAIRRO', 'CIDADE', 'UF', 'MOTORISTA', 'OBSERVACOES']].fillna(""), use_container_width=True)
 
-            if st.button("➕ Adicionar Regras Fixas ao Preview Oficial", key="btn_add_fixos_preview_of"):
+            gerar_para_hoje = dt_fixos_of == datetime.now(FUSO_BR).date()
+            if gerar_para_hoje:
+                st.info("Os pedidos fixos de hoje sao inseridos automaticamente na GRID ao abrir Importacoes.")
+
+            if st.button(
+                "➕ Adicionar Regras Fixas ao Preview Oficial",
+                key="btn_add_fixos_preview_of",
+                disabled=gerar_para_hoje,
+            ):
                 novos_fixos = []
                 for _, regra in df_geracao_of.iterrows():
                     agente = str(regra.get('MOTORISTA', '')).strip()
@@ -6824,8 +6958,7 @@ elif menu == "📥 Importações":
 
         incluir_fixos_of = False
         if not df_fixos_hoje_of.empty:
-            st.info(f"💡 O sistema encontrou **{len(df_fixos_hoje_of)} pedidos fixos** programados para hoje ({dia_atual}).")
-            incluir_fixos_of = st.toggle("👉 INCLUIR PEDIDOS FIXOS NA CARGA OFICIAL DE HOJE", value=False, key="toggle_fixos_oficial")
+            st.info(f"💡 {len(df_fixos_hoje_of)} pedido(s) fixo(s) ativo(s) de hoje ja sao inseridos automaticamente na GRID ao abrir Importacoes.")
         else:
             st.info("Nenhum pedido fixo programado para hoje.")
 
