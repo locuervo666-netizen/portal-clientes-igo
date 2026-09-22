@@ -3225,6 +3225,123 @@ def gerar_pdf_rolo_duplo_premium(lista_codigos, sigla_final, larg_pagina, alt_pa
 # =============================================================================
 # 🧭 NAVEGAÇÃO E SIDEBAR (MODERNA)
 # =============================================================================
+def sincronizar_pedidos_fixos_oficiais_na_abertura():
+    """Cria os pedidos e tarefas fixas do dia ao iniciar uma sessão autenticada."""
+    data_referencia = datetime.now(FUSO_BR).date()
+    data_texto = data_referencia.strftime('%d/%m/%Y')
+    dia_semana = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
+    dia_regra = dia_semana[data_referencia.weekday()]
+    if dia_regra == 'DOM' or planilha_db is None:
+        return 0
+
+    try:
+        aba_regras = planilha_db.worksheet("Agendamentos_Fixos_Oficial")
+        dados_regras = aba_regras.get_all_values()
+        if len(dados_regras) <= 1:
+            return 0
+        df_regras = pd.DataFrame(dados_regras[1:], columns=dados_regras[0])
+        if dia_regra not in df_regras.columns or 'STATUS' not in df_regras.columns:
+            return 0
+        regras_ativas = df_regras[
+            (df_regras['STATUS'].astype(str).str.strip().str.upper() == 'ATIVO') &
+            (df_regras[dia_regra].astype(str).str.strip().str.upper() == 'SIM')
+        ]
+        if regras_ativas.empty:
+            return 0
+
+        aba_memoria = planilha_db.worksheet("Memoria_Sistema")
+        dados_memoria = aba_memoria.get_all_values()
+        if not dados_memoria:
+            return 0
+        cabecalho = dados_memoria[0]
+        indices = {str(coluna).strip().upper(): indice for indice, coluna in enumerate(cabecalho)}
+        obrigatorias = {'DATA', 'PEDIDO', 'TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO', 'OBSERVACOES'}
+        if not obrigatorias.issubset(indices):
+            return 0
+
+        regras_processadas = set()
+        enderecos_processados = set()
+        for linha in dados_memoria[1:]:
+            valores = linha + [''] * (len(cabecalho) - len(linha))
+            if str(valores[indices['DATA']]).strip() != data_texto:
+                continue
+            marcador = re.search(r'\[FIXO:([^\]]+)\]', str(valores[indices['OBSERVACOES']]).upper())
+            if marcador:
+                regras_processadas.add(marcador.group(1).strip())
+            enderecos_processados.add(tuple(
+                str(valores[indices[coluna]]).strip().upper()
+                for coluna in ['TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO']
+            ))
+
+        df_memoria = pd.DataFrame(dados_memoria[1:], columns=cabecalho)
+        proximo_id = obter_proximo_id(df_memoria, minimo_inicial=2000)
+        novas_linhas = []
+        for _, regra in regras_ativas.iterrows():
+            id_regra = str(regra.get('ID_REGRA', '')).strip().upper()
+            identidade = tuple(str(regra.get(coluna, '')).strip().upper() for coluna in ['TOMADOR', 'LABORATORIO', 'ENDERECO', 'NUMERO'])
+            if id_regra in regras_processadas or identidade in enderecos_processados:
+                continue
+            agente = str(regra.get('MOTORISTA', '')).strip()
+            if not agente or agente.upper() in ['AUTOMÁTICO (POR ROTA)', 'AUTOMATICO (POR ROTA)']:
+                agente = obter_login_agente(
+                    str(regra.get('CIDADE', '')), str(regra.get('BAIRRO', '')),
+                    str(regra.get('LABORATORIO', '')), str(regra.get('ENDERECO', '')),
+                    DF_AGENTES, numero=str(regra.get('NUMERO', '')),
+                )
+            observacao = str(regra.get('OBSERVACOES', '')).strip()
+            observacao = '' if observacao.upper() in ['NAN', 'NONE'] else observacao
+            observacao = f"{observacao} [FIXO:{id_regra}]".strip() if id_regra else f"{observacao} [FIXO]".strip()
+            prazo = calcular_sla_dias(regra.get('UF', 'SP'), regra.get('CIDADE', ''), regra.get('TOMADOR', ''))
+            pedido = {
+                'DATA': data_texto, 'PEDIDO': str(proximo_id), 'TOMADOR': regra.get('TOMADOR', ''),
+                'LABORATORIO': regra.get('LABORATORIO', ''), 'ENDERECO': regra.get('ENDERECO', ''),
+                'NUMERO': regra.get('NUMERO', ''), 'BAIRRO': regra.get('BAIRRO', ''),
+                'CIDADE': regra.get('CIDADE', ''), 'UF': regra.get('UF', ''), 'CEP': regra.get('CEP', ''),
+                'STATUS': 'PENDENTE', 'AGENTE_RAW': agente, 'PRAZO_DIAS': str(prazo),
+                'DATA_LIMITE': str(calcular_data_limite(data_texto, int(prazo))),
+                'ZAP_ENVIADO': '', 'FATURA': '', 'OBSERVACOES': observacao,
+            }
+            novas_linhas.append([pedido.get(str(coluna).strip().upper(), '') for coluna in cabecalho])
+            regras_processadas.add(id_regra)
+            enderecos_processados.add(identidade)
+            proximo_id += 1
+
+        if novas_linhas:
+            aba_memoria.append_rows(novas_linhas, value_input_option='USER_ENTERED')
+            dados_memoria += novas_linhas
+            carregar_dados_completos.clear()
+
+        dados_app = planilha_db.worksheet("App_Tarefas").get_all_values()
+        cabecalho_app = dados_app[0] if dados_app else []
+        indice_pedido_app = next((indice for indice, coluna in enumerate(cabecalho_app) if str(coluna).strip().upper() == 'PEDIDO'), None)
+        pedidos_no_app = {
+            str(linha[indice_pedido_app]).strip() for linha in dados_app[1:]
+            if indice_pedido_app is not None and len(linha) > indice_pedido_app
+        }
+        tarefas_pendentes = []
+        for linha in dados_memoria[1:]:
+            valores = linha + [''] * (len(cabecalho) - len(linha))
+            pedido_id = str(valores[indices['PEDIDO']]).strip()
+            agente = str(valores[indices.get('AGENTE_RAW', -1)]).strip() if 'AGENTE_RAW' in indices else ''
+            if (str(valores[indices['DATA']]).strip() != data_texto or '[FIXO' not in str(valores[indices['OBSERVACOES']]).upper()
+                    or not pedido_id or not agente or pedido_id in pedidos_no_app):
+                continue
+            tarefas_pendentes.append({
+                'PEDIDO': pedido_id, 'MOTORISTA': agente, 'ENDERECO': valores[indices['ENDERECO']],
+                'NUMERO': valores[indices['NUMERO']], 'BAIRRO': valores[indices.get('BAIRRO', -1)] if 'BAIRRO' in indices else '',
+                'CIDADE': valores[indices.get('CIDADE', -1)] if 'CIDADE' in indices else '',
+                'CEP': valores[indices.get('CEP', -1)] if 'CEP' in indices else '',
+                'LABORATORIO': valores[indices['LABORATORIO']], 'TOMADOR': valores[indices['TOMADOR']],
+                'OBSERVACOES': valores[indices['OBSERVACOES']],
+            })
+        if tarefas_pendentes and not despachar_para_appsheet(tarefas_pendentes):
+            raise RuntimeError("Nao foi possivel criar as tarefas dos pedidos fixos no AppSheet.")
+        return len(novas_linhas)
+    except Exception as erro:
+        st.session_state.of_fixos_erro_app = str(erro)
+        return 0
+
+
 if 'filtro_kpi_admin' not in st.session_state:
     st.session_state.filtro_kpi_admin = "TODOS"
 
@@ -3540,6 +3657,16 @@ with st.sidebar:
 if menu not in MENUS_OPERADOR and not usuario_e_admin:
     st.error("Você não possui permissão para acessar este módulo.")
     st.stop()
+
+data_fixos_abertura = datetime.now(FUSO_BR).date().isoformat()
+if st.session_state.get('of_fixos_gerados_em') != data_fixos_abertura:
+    qtd_fixos_automaticos = sincronizar_pedidos_fixos_oficiais_na_abertura()
+    st.session_state.of_fixos_gerados_em = data_fixos_abertura
+    if qtd_fixos_automaticos:
+        st.session_state.ui_toast = {
+            'msg': f'{qtd_fixos_automaticos} pedido(s) fixo(s) inserido(s) automaticamente na GRID.',
+            'icon': '✅',
+        }
 
 # ✅ AUTO-REFRESH SÓ NA GRID!
 if menu == "📊 GRID":
@@ -6208,13 +6335,59 @@ elif menu == "📥 Importações":
                 proximo_id += 1
 
             if not novas_linhas:
-                return 0
-            gsheets_call(
-                "insercao automatica pedidos fixos",
-                aba_memoria.append_rows,
-                novas_linhas,
-                value_input_option='USER_ENTERED',
-            )
+                dados_memoria_atualizados = dados_memoria
+            else:
+                gsheets_call(
+                    "insercao automatica pedidos fixos",
+                    aba_memoria.append_rows,
+                    novas_linhas,
+                    value_input_option='USER_ENTERED',
+                )
+                dados_memoria_atualizados = dados_memoria + novas_linhas
+
+            try:
+                aba_app = planilha_db.worksheet("App_Tarefas")
+                dados_app = gsheets_call("leitura tarefas AppSheet", aba_app.get_all_values)
+                cabecalho_app = dados_app[0] if dados_app else []
+                indice_pedido_app = next(
+                    (indice for indice, coluna in enumerate(cabecalho_app)
+                     if str(coluna).strip().upper() == 'PEDIDO'),
+                    None,
+                )
+                pedidos_no_app = {
+                    str(linha[indice_pedido_app]).strip()
+                    for linha in dados_app[1:]
+                    if indice_pedido_app is not None and len(linha) > indice_pedido_app
+                }
+                tarefas_fixas_pendentes = []
+                for linha in dados_memoria_atualizados[1:]:
+                    valores = linha + [''] * (len(cabecalho) - len(linha))
+                    if str(valores[indices['DATA']]).strip() != data_texto:
+                        continue
+                    if '[FIXO' not in str(valores[indices['OBSERVACOES']]).upper():
+                        continue
+                    pedido_id = str(valores[indices['PEDIDO']]).strip()
+                    agente = str(valores[indices.get('AGENTE_RAW', -1)]).strip() if 'AGENTE_RAW' in indices else ''
+                    if not pedido_id or not agente or pedido_id in pedidos_no_app:
+                        continue
+                    tarefas_fixas_pendentes.append({
+                        'PEDIDO': pedido_id,
+                        'MOTORISTA': agente,
+                        'ENDERECO': valores[indices['ENDERECO']],
+                        'NUMERO': valores[indices['NUMERO']],
+                        'BAIRRO': valores[indices.get('BAIRRO', -1)] if 'BAIRRO' in indices else '',
+                        'CIDADE': valores[indices.get('CIDADE', -1)] if 'CIDADE' in indices else '',
+                        'CEP': valores[indices.get('CEP', -1)] if 'CEP' in indices else '',
+                        'LABORATORIO': valores[indices['LABORATORIO']],
+                        'TOMADOR': valores[indices['TOMADOR']],
+                        'OBSERVACOES': valores[indices['OBSERVACOES']],
+                    })
+                if tarefas_fixas_pendentes and not despachar_para_appsheet(tarefas_fixas_pendentes):
+                    raise RuntimeError("Nao foi possivel criar as tarefas dos pedidos fixos no AppSheet.")
+                st.session_state.pop('of_fixos_erro_app', None)
+            except Exception as erro_app:
+                st.session_state.of_fixos_erro_app = str(erro_app)
+
             st.session_state.pop('of_memoria_cache_df', None)
             st.session_state.pop('of_memoria_cache_ts', None)
             carregar_dados_completos.clear()
@@ -6275,6 +6448,11 @@ elif menu == "📥 Importações":
                 'msg': f'{qtd_fixos_automaticos} pedido(s) fixo(s) inserido(s) automaticamente na GRID.',
                 'icon': '✅',
             }
+    if st.session_state.get('of_fixos_erro_app'):
+        st.error(
+            "Os pedidos fixos foram inseridos na GRID, mas houve falha ao criar as tarefas no AppSheet: "
+            f"{st.session_state.of_fixos_erro_app}"
+        )
 
     st.markdown(
         """
@@ -13375,6 +13553,7 @@ elif menu == "📈 Dashboard":
                     def get_logo_url(tomador):
                         logos = {
                             "ECOLYZER": "https://lh3.googleusercontent.com/d/1NdbO7olL6GUQDN3krRnyICfgNC07Di2Z",
+                            "EDNA JAGUARIBE": "https://i.postimg.cc/qRqm4Lnh/edna-jaguaribe.png",
                             "GRALAB": "https://lh3.googleusercontent.com/d/1SeNj-i590Q6ft-pUcSIk-OKKHiOYtAxU",
                             "CUNHA": "https://lh3.googleusercontent.com/d/1SeNj-i590Q6ft-pUcSIk-OKKHiOYtAxU",
                             "LABEST": "https://lh3.googleusercontent.com/d/15pSrGXFBvpaJwVYrgJkBa01RPgPNsdnT",
