@@ -1902,7 +1902,7 @@ def enviar_whatsapp_zapi(telefone_destino, texto_mensagem):
         "Content-Type": "application/json",
         "Client-Token": CLIENT_TOKEN}
     try:
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=headers, timeout=20)
         return response.status_code in [200, 201]
     except Exception:
         return False
@@ -1926,7 +1926,7 @@ def enviar_pdf_zapi(telefone_destino, pdf_bytes, nome_arquivo):
         "Content-Type": "application/json",
         "Client-Token": CLIENT_TOKEN}
     try:
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
         return response.status_code in [200, 201]
     except Exception:
         return False
@@ -1950,7 +1950,7 @@ def enviar_excel_zapi(telefone_destino, xls_bytes, nome_arquivo):
         "Content-Type": "application/json",
         "Client-Token": CLIENT_TOKEN}
     try:
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
         return response.status_code in [200, 201]
     except Exception:
         return False
