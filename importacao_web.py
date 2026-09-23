@@ -4392,11 +4392,12 @@ if menu == "📊 GRID":
             df_grid_final,
             gridOptions=gridOptions,
             theme="alpine",
-            columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+            columns_auto_size_mode=ColumnsAutoSizeMode.NO_AUTOSIZE,
             height=550,
             allow_unsafe_jscode=True,
             custom_css=custom_css,
-            update_mode="SELECTION_CHANGED"
+            update_mode="SELECTION_CHANGED",
+            key="grid_principal_operacional"
         )
 
         sel_list = tabela_renderizada.get('selected_rows', [])
