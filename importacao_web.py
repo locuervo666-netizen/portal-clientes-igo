@@ -160,7 +160,6 @@ MENUS_OPERADOR = {
     "📥 Importações Umove",
     "📝 Pedido Manual",
     "🏷️ Gerador de Etiquetas",
-    "📁 Relatórios",
     "🔬 Triagem",
     "🎧 Atendimento",
 }
@@ -3630,7 +3629,6 @@ with st.sidebar:
         "📥 Importações Umove",
         "📝 Pedido Manual",
         "🏷️ Gerador de Etiquetas", # <--- COLE ESTA LINHA AQUI
-        "📁 Relatórios",
         "⚙️ Rotas",
         "🔬 Triagem",
         "🎧 Atendimento"
@@ -4193,6 +4191,29 @@ if menu == "📊 GRID":
                 f"Nenhum pedido encontrado com os filtros atuais. Total carregado: {len(df_raw)} | Após filtros: {len(df_f)}."
             )
 
+        tamanho_pagina_grid = 100
+        total_paginas_grid = max(1, (len(df_grid_final) + tamanho_pagina_grid - 1) // tamanho_pagina_grid)
+        pagina_atual_grid = int(st.session_state.get('grid_principal_pagina', 1))
+        pagina_atual_grid = min(max(1, pagina_atual_grid), total_paginas_grid)
+
+        col_anterior, col_status_pagina, col_proxima = st.columns([1, 2, 1])
+        if col_anterior.button("Anterior", disabled=pagina_atual_grid == 1, use_container_width=True, key="grid_principal_anterior"):
+            st.session_state.grid_principal_pagina = pagina_atual_grid - 1
+            st.rerun()
+        col_status_pagina.markdown(
+            f"<p style='text-align:center; color:#475569; font-size:13px; margin:8px 0;'>"
+            f"Exibindo {len(df_grid_final)} pedidos em {total_paginas_grid} pagina(s) | Pagina {pagina_atual_grid}</p>",
+            unsafe_allow_html=True,
+        )
+        if col_proxima.button("Proxima", disabled=pagina_atual_grid == total_paginas_grid, use_container_width=True, key="grid_principal_proxima"):
+            st.session_state.grid_principal_pagina = pagina_atual_grid + 1
+            st.rerun()
+
+        st.session_state.grid_principal_pagina = pagina_atual_grid
+        inicio_pagina_grid = (pagina_atual_grid - 1) * tamanho_pagina_grid
+        fim_pagina_grid = inicio_pagina_grid + tamanho_pagina_grid
+        df_grid_exibido = df_grid_final.iloc[inicio_pagina_grid:fim_pagina_grid].copy()
+
         st.markdown(
             f"<p style='color:#64748B; font-size:13px; margin-bottom: 5px;'>Selecione as caixas na tabela para libertar as ações no topo. Marque a caixa e use o botão 'Ver Detalhes' para abrir o pop-up da linha.</p>",
             unsafe_allow_html=True)
@@ -4276,13 +4297,9 @@ if menu == "📊 GRID":
         }
         """)
 
-        gb = GridOptionsBuilder.from_dataframe(df_grid_final)
-        gb.configure_pagination(
-            paginationAutoPageSize=False,
-            paginationPageSize=15)
+        gb = GridOptionsBuilder.from_dataframe(df_grid_exibido)
         gb.configure_grid_options(
-            pagination=True,
-            suppressPaginationPanel=False,
+            pagination=False,
             domLayout='normal',
             alwaysShowVerticalScroll=True,
             alwaysShowHorizontalScroll=True
@@ -4389,7 +4406,7 @@ if menu == "📊 GRID":
         }
 
         tabela_renderizada = AgGrid(
-            df_grid_final,
+            df_grid_exibido,
             gridOptions=gridOptions,
             theme="alpine",
             columns_auto_size_mode=ColumnsAutoSizeMode.NO_AUTOSIZE,
@@ -4404,7 +4421,7 @@ if menu == "📊 GRID":
         if sel_list is not None and len(sel_list) > 0:
             linhas_selecionadas = pd.DataFrame(sel_list)
         else:
-            linhas_selecionadas = pd.DataFrame(columns=df_grid_final.columns)
+            linhas_selecionadas = pd.DataFrame(columns=df_grid_exibido.columns)
 
         p_ids = linhas_selecionadas["PEDIDO"].astype(
             str).tolist() if not linhas_selecionadas.empty else []
