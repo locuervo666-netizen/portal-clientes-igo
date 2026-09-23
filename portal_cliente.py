@@ -3017,7 +3017,7 @@ Pedidos movimentados hoje
                         df_final[colunas_visiveis],
                         gridOptions=gridOptions,
                         theme="alpine",
-                        columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
+                        columns_auto_size_mode=ColumnsAutoSizeMode.NO_AUTOSIZE,
                         height=625,
                         allow_unsafe_jscode=True,
                         custom_css=custom_css,
