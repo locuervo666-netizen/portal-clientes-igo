@@ -1209,6 +1209,23 @@ def carregar_dados_nuvem(cliente_filtro):
                     rom_mask = df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)
                     rom_dict = df_app_clean[rom_mask].set_index('PEDIDO').to_dict('index')
 
+                    # Uma mesma operação pode ter mais de uma atualização no App_Tarefas.
+                    # Mantém a última foto de entrega preenchida antes de preservar só o último status.
+                    if 'A_FOTO_ENT' in df_app_clean.columns:
+                        fotos_entrega = df_app_clean[['PEDIDO', 'A_FOTO_ENT']].copy()
+                        fotos_entrega['A_FOTO_ENT'] = fotos_entrega['A_FOTO_ENT'].astype(str).str.strip()
+                        fotos_entrega = fotos_entrega[
+                            fotos_entrega['A_FOTO_ENT'].notna() &
+                            ~fotos_entrega['A_FOTO_ENT'].str.upper().isin(['', 'NAN', 'NONE'])
+                        ]
+                        if not fotos_entrega.empty:
+                            foto_entrega_por_pedido = fotos_entrega.drop_duplicates(
+                                subset=['PEDIDO'], keep='last'
+                            ).set_index('PEDIDO')['A_FOTO_ENT']
+                            df_app_clean['A_FOTO_ENT'] = df_app_clean['PEDIDO'].map(
+                                foto_entrega_por_pedido
+                            ).combine_first(df_app_clean['A_FOTO_ENT'])
+
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
 
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
