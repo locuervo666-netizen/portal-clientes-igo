@@ -1781,39 +1781,6 @@ def render_header_status(pedido_data, status):
     """
     st.markdown(html_barra, unsafe_allow_html=True)
 
-def render_info_dados_pedido(pedido_data, status):
-    """Renderiza seção de dados do pedido (cliente, endereço, datas)"""
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🏢 Cliente (Ponto de Coleta)</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-size:14px; font-weight:700; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin:2px 0 12px 0;'>{pedido_data.get('LABORATORIO', 'N/A')}</p>", unsafe_allow_html=True)
-    
-    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📍 Endereço de Coleta</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='" + MODAL_STYLES['subtitulo'] + "'>{formatar_endereco(pedido_data)}</p>", unsafe_allow_html=True)
-    
-    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📅 Datas da Corrida</p>", unsafe_allow_html=True)
-    timeline = render_timeline(pedido_data, status)
-    st.markdown(timeline, unsafe_allow_html=True)
-    
-    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🎯 SLA Acordado</p>", unsafe_allow_html=True)
-    data_limite = limpar_valor(pedido_data.get('DATA_LIMITE', '---'), "Não definida")
-    st.markdown(f"<p style='font-size:13px; color:#1e293b; margin:2px 0 12px 0;'>📌 Previsão: <b style='color:#2563eb;'>{data_limite}</b></p>", unsafe_allow_html=True)
-
-def render_motorista(pedido_data, status):
-    """Renderiza seção de motorista"""
-    mot_info = formatar_motorista(pedido_data, status)
-    
-    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>👤 Motorista (Entregador)</p>", unsafe_allow_html=True)
-    
-    if mot_info["duplo"]:
-        motorista_html = f"<p style='margin:2px 0 12px 0;font-size:13px;font-weight:600;color:#334155;'>📦 Coleta: <span style='color:#3b82f6;'>{mot_info['coleta']}</span><br>✅ Entrega: <span style='color:#3b82f6;'>{mot_info['entrega']}</span></p>"
-    else:
-        motorista_html = f"<p style='margin:2px 0 12px 0;font-size:14px;font-weight:700;color:#3b82f6;'>🚐 {mot_info['coleta']}</p>"
-    
-    st.markdown(motorista_html, unsafe_allow_html=True)
-    
-    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📈 Nível de Serviço (Local)</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-size:13px; color:#1e293b; margin:2px 0 0 0; font-weight:500;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')} <br> {pedido_data.get('OTD_LAB', '')}</p>", unsafe_allow_html=True)
-
 def render_timeline(pedido_data, status):
     """Renderiza timeline de datas e horas"""
     data_efetiva = limpar_valor(pedido_data.get('DATA_EFETIVA', '---')).replace(" 00:00:00", "")
@@ -1858,7 +1825,7 @@ def render_timeline(pedido_data, status):
     elif any(x in s for x in ["FRUSTRADA", "PROBLEMA"]):
         return f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>📦 Coleta: <b>{pedido_data.get('DATA', '---')}{hora_coleta_str}</b><br><span style='color:#ef4444;'>❌ Tentativa: <b>{data_efetiva}{hora_entrega_str}</b></span></p>"
     else:
-        return f"<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>⏳ Previsão de Coleta: <b>{pedido_data.get('ETA_LAB', 'Em mapeamento')}</b></p>"
+        return "<p style='margin:2px 0 12px 0;font-size:13px;color:#334155;'>⏳ Coleta aguardando atualização operacional.</p>"
 
 def render_historico_ponto(pedido_data, df_historico):
     """Renderiza histórico do ponto de coleta"""
@@ -1971,26 +1938,14 @@ def render_observacoes(pedido_data, status):
 # 📑 FUNÇÕES PARA RENDERIZAR AS ABAS
 # =======================================================
 def render_tab_dados_principais(pedido_data, status):
-    """ABA 1: Dados Principais - Reorganizada por Urgência e Atores"""
-    # ⏱️ LINHA 1: Urgência e Prazos (Sinais Vitais no Topo)
-    col1, col2, col3 = st.columns(3)
+    """Dados principais da operação, sem métricas históricas."""
+    # Mostra apenas o prazo desta operação, sem recalcular percentuais do ponto.
     data_limite = limpar_valor(pedido_data.get('DATA_LIMITE', '---'), "Não definida")
-    
-    with col1:
-        with st.container(border=True):
-            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🎯 Previsão / SLA</p>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:15px; color:{MODAL_COLORS['brand']}; font-weight:700; margin:8px 0;'>{data_limite}</p>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:11px; color:#64748b;'>Prazo limite acordado</p>", unsafe_allow_html=True)
-            
-    with col2:
-        with st.container(border=True):
-            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📈 Nível de Serviço</p>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:13px; color:#334155; font-weight:600; margin:8px 0;'>{pedido_data.get('SLA_LAB', 'Em mapeamento')}</p>", unsafe_allow_html=True)
-            
-    with col3:
-        with st.container(border=True):
-            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>⭐ Performance Geral</p>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:13px; color:#334155; font-weight:600; margin:8px 0;'>{pedido_data.get('OTD_LAB', 'Sem histórico')}</p>", unsafe_allow_html=True)
+
+    with st.container(border=True):
+        st.markdown("<p style='" + MODAL_STYLES['header'] + "'>🎯 Prazo da Operação</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:15px; color:{MODAL_COLORS['brand']}; font-weight:700; margin:8px 0;'>{data_limite}</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size:11px; color:#64748b;'>Prazo limite acordado</p>", unsafe_allow_html=True)
 
     st.divider()
 
@@ -2095,6 +2050,9 @@ def render_tab_observacoes(pedido_data, status):
         with st.container(border=True):
             st.info(f"**💬 Atualizações da Base**\n\n{pedido_data.get('DETALHES', 'Nenhuma observação pendente.')}{rodape_hora}")
 
+def selecionar_secao_detalhes(chave_secao, secao):
+    st.session_state[chave_secao] = secao
+
 # =======================================================
 # 🪟 FUNÇÃO DO POP-UP MEGAZORD (REFATORADA COM ABAS)
 # =======================================================
@@ -2116,35 +2074,39 @@ def modal_detalhes_pedido(pedido_data):
     
     foto_entrega = tratar_foto(limpar_valor(pedido_data.get('FOTO_ENTREGA', '')))
     possui_foto_entrega = foto_entrega.startswith("http")
-    nomes_abas = [
-        "📋 Dados Principais",
-        "📷 Comprovantes",
-    ]
+    secoes = ["📋 Dados", "📷 Coleta"]
     if possui_foto_entrega:
-        nomes_abas.append("✅ Entrega")
-    nomes_abas.append("⚠️ Observações")
-    abas = st.tabs(nomes_abas)
-    tab_dados, tab_comprovantes = abas[:2]
-    tab_entrega = abas[2] if possui_foto_entrega else None
-    tab_observacoes = abas[-1]
-    
-    # ABA 1: Dados Principais
-    with tab_dados:
+        secoes.append("✅ Entrega")
+    secoes.append("⚠️ Observações")
+    chave_secao = f"detalhes_secao_{pedido_data.get('PEDIDO', '')}"
+    if st.session_state.get(chave_secao) not in secoes:
+        st.session_state[chave_secao] = "📋 Dados"
+
+    botoes_secao = st.columns(len(secoes))
+    for coluna, secao in zip(botoes_secao, secoes):
+        with coluna:
+            if st.button(
+                secao,
+                key=f"{chave_secao}_{secao}",
+                use_container_width=True,
+                type="primary" if st.session_state[chave_secao] == secao else "secondary",
+                on_click=selecionar_secao_detalhes,
+                args=(chave_secao, secao),
+            ):
+                pass
+
+    secao_atual = st.session_state[chave_secao]
+
+    if secao_atual == "📋 Dados":
         st.markdown("<br>", unsafe_allow_html=True)
         render_tab_dados_principais(pedido_data, status)
-    
-    # ABA 2: Comprovantes
-    with tab_comprovantes:
+    elif secao_atual == "📷 Coleta":
         st.markdown("<br>", unsafe_allow_html=True)
         render_tab_comprovantes(pedido_data, status)
-    
-    if tab_entrega:
-        with tab_entrega:
-            st.markdown("<br>", unsafe_allow_html=True)
-            render_tab_entrega(pedido_data)
-
-    # Aba final: Observações
-    with tab_observacoes:
+    elif secao_atual == "✅ Entrega":
+        st.markdown("<br>", unsafe_allow_html=True)
+        render_tab_entrega(pedido_data)
+    else:
         st.markdown("<br>", unsafe_allow_html=True)
         render_tab_observacoes(pedido_data, status)
     
@@ -2184,49 +2146,6 @@ def modal_detalhes_pedido(pedido_data):
             st.session_state.ignorar_selecao_grid = True
             st.session_state.grid_key += 1 # 🔥 Limpa a seleção da grid
             st.rerun()
-# 🔥 ADICIONE ESTA FUNÇÃO NAS SUAS FUNÇÕES AUXILIARES
-@st.cache_data(ttl=600)
-def calcular_metricas_laboratorio(df):
-    """Calcula SLA, OTD e ETA apenas quando necessário"""
-    lab_stats = {}
-    for lab in df['LABORATORIO'].unique():
-        if not lab or pd.isna(lab): continue
-        df_lab = df[df['LABORATORIO'] == lab]
-        
-        sucessos = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)])
-        frustradas = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado|Recusa', case=False, na=False)])
-        total_finalizados = sucessos + frustradas
-        
-        # OTD (On-Time Delivery)
-        df_entregues = df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Conferido', case=False, na=False)]
-        total_entregues = len(df_entregues)
-        no_prazo = 0
-        for _, row in df_entregues.iterrows():
-            try:
-                dt_ef = pd.to_datetime(str(row.get('DATA_EFETIVA','')).replace(" 00:00:00", "").strip(), format='%d/%m/%Y').date()
-                dt_lim = pd.to_datetime(str(row.get('DATA_LIMITE','')).strip(), format='%d/%m/%Y').date()
-                if dt_ef <= dt_lim: no_prazo += 1
-            except: pass
-            
-        otd_pct = round((no_prazo / total_entregues) * 100) if total_entregues > 0 else 0
-        pct_suc = round((sucessos / total_finalizados) * 100) if total_finalizados > 0 else 0
-        pct_fru = round((frustradas / total_finalizados) * 100) if total_finalizados > 0 else 0
-        
-        # ETA (Média de horas)
-        df_hora = df_lab[df_lab['HORA_LIMPA'].str.contains(r'^\d{2}:\d{2}$', regex=True, na=False) & df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)]
-        eta_str = "Pouco histórico"
-        if len(df_hora) >= 3:
-            mins = df_hora['HORA_LIMPA'].apply(lambda x: int(x.split(':')[0])*60 + int(x.split(':')[1]))
-            med_min = int(mins.median())
-            eta_str = f"Entre {max(0, med_min-15)//60:02d}:{(max(0, med_min-15)%60):02d} e {(min(1440, med_min+15)//60):02d}:{(min(1440, med_min+15)%60):02d}"
-            
-        lab_stats[lab] = {
-            'SLA': f"🟢 {pct_suc}% Sucesso | 🔴 {pct_fru}% Frustradas" if total_finalizados >= 5 else "Em mapeamento",
-            'ETA': eta_str,
-            'OTD': f"🎯 {otd_pct}% Entregues no Prazo" if total_entregues > 0 else "Sem entregas"
-        }
-    return lab_stats
-
 # =======================================================
 # 🔐 3. TELA DE LOGIN (MODELO BLINDADO E CENTRALIZADO)
 # =======================================================
@@ -2477,66 +2396,7 @@ else:
     if df_cliente.empty:
         st.info("Aguardando novas informações do Torre de Controle na base de dados...")
     else:
-        # 🔥 MOTOR DE ETA E SLA (CÁLCULO 100% E OTD PONTUALIDADE) 🔥
         df_cliente['STATUS_DISPLAY'] = df_cliente.apply(get_st, axis=1)
-        
-        lab_stats = {}
-        for lab in df_cliente['LABORATORIO'].unique():
-            if not lab or pd.isna(lab): continue
-            df_lab = df_cliente[df_cliente['LABORATORIO'] == lab]
-            
-            sucessos = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)])
-            frustradas = len(df_lab[df_lab['STATUS_DISPLAY'].str.contains('Frustrada|Problema|Cancelado|Recusa', case=False, na=False)])
-            
-            total_finalizados = sucessos + frustradas
-            
-            if total_finalizados > 0:
-                pct_sucesso = round((sucessos / total_finalizados) * 100)
-                pct_frustrada = round((frustradas / total_finalizados) * 100)
-            else:
-                pct_sucesso = 0
-                pct_frustrada = 0
-                
-            # CÁLCULO DO OTD (ON-TIME DELIVERY)
-            df_entregues = df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Conferido', case=False, na=False)]
-            total_entregues = len(df_entregues)
-            otd_sucesso = 0
-            
-            if total_entregues > 0:
-                no_prazo = 0
-                for _, row in df_entregues.iterrows():
-                    try:
-                        dt_ef = pd.to_datetime(str(row.get('DATA_EFETIVA','')).replace(" 00:00:00", "").strip(), format='%d/%m/%Y').date()
-                        dt_lim = pd.to_datetime(str(row.get('DATA_LIMITE','')).strip(), format='%d/%m/%Y').date()
-                        if dt_ef <= dt_lim:
-                            no_prazo += 1
-                    except:
-                        pass
-                otd_sucesso = round((no_prazo / total_entregues) * 100)
-            
-            df_hora = df_lab[df_lab['HORA_LIMPA'].str.contains(r'^\d{2}:\d{2}$', regex=True, na=False) & df_lab['STATUS_DISPLAY'].str.contains('Entregue|Coletado', case=False, na=False)]
-            eta_str = "Em mapeamento (Pouco histórico)"
-            
-            if len(df_hora) >= 3:
-                mins = df_hora['HORA_LIMPA'].apply(lambda x: int(x.split(':')[0])*60 + int(x.split(':')[1]))
-                med_min = int(mins.median())
-                min_start = max(0, med_min - 15)
-                min_end = min(1440, med_min + 15)
-                h_s, m_s = divmod(min_start, 60)
-                h_e, m_e = divmod(min_end, 60)
-                eta_str = f"Entre {h_s:02d}:{m_s:02d} e {h_e:02d}:{m_e:02d}"
-                
-            lab_stats[lab] = {
-                'SLA': f"🟢 {pct_sucesso}% Sucesso | 🔴 {pct_frustrada}% Frustradas" if total_finalizados >= 5 else "Em mapeamento (Poucas coletas)",
-                'ETA': eta_str,
-                'OTD': f"🎯 {otd_sucesso}% Entregues no Prazo" if total_entregues > 0 else "Sem entregas finalizadas"
-            }
-
-        df_cliente['SLA_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('SLA', 'Em mapeamento'))
-        df_cliente['ETA_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('ETA', 'Em mapeamento'))
-        df_cliente['OTD_LAB'] = df_cliente['LABORATORIO'].apply(lambda x: lab_stats.get(x, {}).get('OTD', 'Sem entregas finalizadas'))
-        
-        # 🔥 A FUNÇÃO ESTÁ AQUI NOVAMENTE 🔥
         df_cliente['DETALHES'] = df_cliente.apply(get_detalhes, axis=1)
 
         tab_grid, tab_solicitar, tab_chamados = st.tabs([
