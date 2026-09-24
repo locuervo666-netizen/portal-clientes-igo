@@ -2018,43 +2018,23 @@ def render_tab_dados_principais(pedido_data, status):
         st.markdown(timeline, unsafe_allow_html=True)
 
 def render_tab_comprovantes(pedido_data, status):
-    """ABA 2: Comprovantes - Fotos de Coleta e Entrega (Layout Amigável + Ultra Rápido)"""
+    """ABA 2: Comprovantes de coleta ou canhoto genérico."""
     foto_coleta = tratar_foto(limpar_valor(pedido_data.get('FOTO_COLETA', '')))
-    foto_entrega = tratar_foto(limpar_valor(pedido_data.get('FOTO_ENTREGA', '')))
     foto_gen = limpar_valor(pedido_data.get('COMPROVANTE', ''))
     
-    # Se tiver fotos separadas
-    if (foto_coleta and foto_coleta.startswith("http")) or (foto_entrega and foto_entrega.startswith("http")):
-        if foto_coleta and foto_coleta.startswith("http"):
-            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📸 Comprovante de Coleta</p>", unsafe_allow_html=True)
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                st.image(foto_coleta, use_container_width=True, caption="Foto tirada no momento da coleta")
-                # ✨ BOTÃO HTML INSTANTÂNEO (Fim do travamento do requests.get)
-                botao_coleta_html = f"""
-                    <a href="{foto_coleta}" target="_blank" style="text-decoration: none;">
-                        <div style="width: 100%; text-align: center; padding: 8px; margin-top: 5px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                            🔍 Visualizar / Salvar Coleta
-                        </div>
-                    </a>
-                """
-                st.markdown(botao_coleta_html, unsafe_allow_html=True)
-        
-        if foto_entrega and foto_entrega.startswith("http"):
-            st.divider()
-            st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📸 Comprovante de Entrega</p>", unsafe_allow_html=True)
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                st.image(foto_entrega, use_container_width=True, caption="Foto tirada no momento da entrega")
-                # ✨ BOTÃO HTML INSTANTÂNEO (Fim do travamento do requests.get)
-                botao_entrega_html = f"""
-                    <a href="{foto_entrega}" target="_blank" style="text-decoration: none;">
-                        <div style="width: 100%; text-align: center; padding: 8px; margin-top: 5px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                            🔍 Visualizar / Salvar Entrega
-                        </div>
-                    </a>
-                """
-                st.markdown(botao_entrega_html, unsafe_allow_html=True)
+    if foto_coleta and foto_coleta.startswith("http"):
+        st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📸 Comprovante de Coleta</p>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image(foto_coleta, use_container_width=True, caption="Foto tirada no momento da coleta")
+            botao_coleta_html = f"""
+                <a href="{foto_coleta}" target="_blank" style="text-decoration: none;">
+                    <div style="width: 100%; text-align: center; padding: 8px; margin-top: 5px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                        🔍 Visualizar / Salvar Coleta
+                    </div>
+                </a>
+            """
+            st.markdown(botao_coleta_html, unsafe_allow_html=True)
     
     # Fallback para foto genérica
     elif foto_gen and foto_gen.startswith("http"):
@@ -2078,60 +2058,20 @@ def render_tab_comprovantes(pedido_data, status):
     else:
         st.info("📷 **Aguardando anexo do canhoto da operação.**\n\nAs fotos serão anexadas após a conclusão da operação.")
 
-def render_tab_historico(pedido_data, df_historico):
-    """ABA 3: Histórico - Carregado apenas quando a aba é selecionada"""
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # O processamento pesado só ocorre aqui, dentro da aba
-    if df_historico is None or df_historico.empty:
-        st.info("📋 Nenhum histórico disponível.")
-        return
-    
-    lab_atual = pedido_data.get('LABORATORIO', '')
-    # O filtro é rápido em DataFrames pequenos
-    df_lab = df_historico[df_historico['LABORATORIO'] == lab_atual].copy()
-    df_lab = df_lab[df_lab['STATUS_DISPLAY'].str.contains('Entregue|Frustrada|Cancelado|Coletado|Recusada|Conferido', case=False, na=False)]
-    df_lab = df_lab.sort_values('DATA', ascending=False).head(5)
-    
-    if df_lab.empty:
-        st.info("📋 Nenhum histórico encontrado para este ponto.")
-        return
-    
-    # ✨ AJUSTE 3: Título corrigido para puxar o nome do laboratório real
-    st.markdown(f"<p style='{MODAL_STYLES['header']}'>📋 Últimas 5 Operações de {lab_atual}</p>", unsafe_allow_html=True)
-    
-    # Criar tabela de histórico
-    historico_dados = []
-    for _, row in df_lab.iterrows():
-        # ✨ AJUSTE 1: A coluna STATUS_DISPLAY já tem o emoji de origem, então usamos ela direto!
-        status_hist = str(row.get('STATUS_DISPLAY', ''))
-        
-        # ✨ AJUSTE 2: Resgatando a data E a hora da operação
-        data_hist = str(row.get('DATA', '')).strip()
-        hora_hist = str(row.get('HORA_LIMPA', '')).strip()
-        data_completa = f"{data_hist} às {hora_hist}" if hora_hist else data_hist
-        
-        historico_dados.append({
-            "Status": status_hist,
-            "Pedido": row.get('PEDIDO', 'N/A'),
-            "Data": data_completa,
-            "Motorista": limpar_valor(row.get('MOTORISTA_COLETA', ''), '---')
-        })
-    
-    # Exibir como dataframe
-    st.dataframe(
-        pd.DataFrame(historico_dados),
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Status": st.column_config.TextColumn("Status", width="medium"),
-            "Pedido": st.column_config.TextColumn("Pedido", width="small"),
-            "Data": st.column_config.TextColumn("Data e Hora da Coleta", width="medium"),
-            "Motorista": st.column_config.TextColumn("Motorista", width="medium"),
-        }
-    )
-    
-    st.caption(f"📊 Mostrando {len(historico_dados)} operações | 📍 Ponto: {lab_atual}")
+def render_tab_entrega(pedido_data):
+    """Exibe o comprovante de entrega quando disponível."""
+    foto_entrega = tratar_foto(limpar_valor(pedido_data.get('FOTO_ENTREGA', '')))
+    st.markdown("<p style='" + MODAL_STYLES['header'] + "'>📸 Comprovante de Entrega</p>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.image(foto_entrega, use_container_width=True, caption="Foto tirada no momento da entrega")
+        st.markdown(f"""
+            <a href="{foto_entrega}" target="_blank" style="text-decoration: none;">
+                <div style="width: 100%; text-align: center; padding: 8px; margin-top: 5px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                    🔍 Visualizar / Salvar Entrega
+                </div>
+            </a>
+        """, unsafe_allow_html=True)
 
 def render_tab_observacoes(pedido_data, status):
     """ABA 4: Observações - Motivos e Detalhes (Agora com a Hora)"""
@@ -2152,46 +2092,52 @@ def render_tab_observacoes(pedido_data, status):
 # 🪟 FUNÇÃO DO POP-UP MEGAZORD (REFATORADA COM ABAS)
 # =======================================================
 @st.dialog("📋 Detalhes da Operação", width="large", dismissible=False)
-def modal_detalhes_pedido(pedido_data, df_historico=None):
+def modal_detalhes_pedido(pedido_data):
     """
     🪟 MODAL REFATORADO COM ABAS - Estrutura Limpa e Organizada
     
     Renderiza detalhes completos de uma operação/pedido com sistema de ABAS:
     - 📋 ABA 1: DADOS PRINCIPAIS (Cliente, Endereço, Timeline, SLA, Motorista)
-    - 📷 ABA 2: COMPROVANTES (Fotos de Coleta e Entrega)
-    - 📊 ABA 3: HISTÓRICO (Últimas operações do ponto)
-    - ⚠️ ABA 4: OBSERVAÇÕES (Motivos/Detalhes)
+    - 📷 ABA 2: COMPROVANTES (Coleta ou canhoto)
+    - ✅ ABA de ENTREGA, quando houver foto de entrega
+    - ⚠️ ABA final: OBSERVAÇÕES (Motivos/Detalhes)
     """
     status = str(pedido_data.get('STATUS_DISPLAY', '')).upper()
     
     # 🎯 Renderizar Cabeçalho + Barra de Progresso
     render_header_status(pedido_data, status)
     
-    # 📑 Sistema de ABAS
-    tab1, tab2, tab3, tab4 = st.tabs([
+    foto_entrega = tratar_foto(limpar_valor(pedido_data.get('FOTO_ENTREGA', '')))
+    possui_foto_entrega = foto_entrega.startswith("http")
+    nomes_abas = [
         "📋 Dados Principais",
         "📷 Comprovantes",
-        "📊 Histórico",
-        "⚠️ Observações"
-    ])
+    ]
+    if possui_foto_entrega:
+        nomes_abas.append("✅ Entrega")
+    nomes_abas.append("⚠️ Observações")
+    abas = st.tabs(nomes_abas)
+    tab_dados, tab_comprovantes = abas[:2]
+    tab_entrega = abas[2] if possui_foto_entrega else None
+    tab_observacoes = abas[-1]
     
     # ABA 1: Dados Principais
-    with tab1:
+    with tab_dados:
         st.markdown("<br>", unsafe_allow_html=True)
         render_tab_dados_principais(pedido_data, status)
     
     # ABA 2: Comprovantes
-    with tab2:
+    with tab_comprovantes:
         st.markdown("<br>", unsafe_allow_html=True)
         render_tab_comprovantes(pedido_data, status)
     
-    # ABA 3: Histórico
-    with tab3:
-        st.markdown("<br>", unsafe_allow_html=True)
-        render_tab_historico(pedido_data, df_historico)
-    
-    # ABA 4: Observações
-    with tab4:
+    if tab_entrega:
+        with tab_entrega:
+            st.markdown("<br>", unsafe_allow_html=True)
+            render_tab_entrega(pedido_data)
+
+    # Aba final: Observações
+    with tab_observacoes:
         st.markdown("<br>", unsafe_allow_html=True)
         render_tab_observacoes(pedido_data, status)
     
@@ -3081,11 +3027,7 @@ Pedidos movimentados hoje
                         dados_completos_linha = df_final[df_final['PEDIDO'] == st.session_state.pedido_modal].iloc[0].to_dict()
                         st.session_state.modal_renderizado_antes = True  # Marca que o modal foi renderizado
                         
-                        # 🔥 MEGA OTIMIZAÇÃO: Filtra apenas o histórico do laboratório clicado ANTES de carregar a janela
-                        lab_alvo = dados_completos_linha.get('LABORATORIO', '')
-                        df_hist_leve = df_final[df_final['LABORATORIO'] == lab_alvo] if lab_alvo else pd.DataFrame()
-                        
-                        modal_detalhes_pedido(dados_completos_linha, df_hist_leve)
+                        modal_detalhes_pedido(dados_completos_linha)
                         
                         # Evita reabrir automaticamente em refresh quando o usuário fecha pelo X.
                         # O próximo clique na grid volta a abrir normalmente.
