@@ -1206,8 +1206,8 @@ def carregar_dados_nuvem(cliente_filtro):
                         mot_coleta_dict = {}
                         mot_entrega_dict = {}
 
-                    rom_mask = df_app_clean['PEDIDO'].str.startswith('ROM-', na=False)
-                    rom_dict = df_app_clean[rom_mask].set_index('PEDIDO').to_dict('index')
+                    def normalizar_chave_romaneio(valor):
+                        return re.sub(r'[^A-Z0-9]', '', str(valor).upper())
 
                     # Uma mesma operação pode ter mais de uma atualização no App_Tarefas.
                     # Mantém a última foto de entrega preenchida antes de preservar só o último status.
@@ -1227,6 +1227,11 @@ def carregar_dados_nuvem(cliente_filtro):
                             ).combine_first(df_app_clean['A_FOTO_ENT'])
 
                     df_app_clean.drop_duplicates(subset=['PEDIDO'], keep='last', inplace=True)
+                    rom_mask = df_app_clean['PEDIDO'].map(normalizar_chave_romaneio).str.startswith('ROM', na=False)
+                    rom_dict = {
+                        normalizar_chave_romaneio(pedido): dados
+                        for pedido, dados in df_app_clean.loc[rom_mask].set_index('PEDIDO').to_dict('index').items()
+                    }
 
                     df['PEDIDO'] = df['PEDIDO'].astype(str).str.strip()
                     df = pd.merge(df, df_app_clean, on='PEDIDO', how='left')
@@ -1245,7 +1250,7 @@ def carregar_dados_nuvem(cliente_filtro):
 
                     def get_app_val(row, col_app):
                         val = str(row.get(col_app, '')).strip()
-                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        rom_id = normalizar_chave_romaneio(row.get('ROMANEIO', ''))
                         if rom_id in rom_dict:
                             rom_val = str(rom_dict[rom_id].get(col_app, '')).strip()
                             if rom_val and rom_val.upper() != 'NAN':
@@ -1308,12 +1313,14 @@ def carregar_dados_nuvem(cliente_filtro):
                     
                     # Fotos Separadas
                     df['FOTO_COLETA'] = df['A_FO'].combine_first(df['A_FOTO_COL']).fillna("")
-                    df['FOTO_ENTREGA'] = df['A_FOTO_ENT'].fillna("")
+                    df['FOTO_ENTREGA'] = df.apply(
+                        lambda r: get_app_val(r, 'A_FOTO_ENT'), axis=1
+                    )
 
                     def get_true_status_portal(row):
                         s_db  = str(row.get('STATUS', '')).strip().upper()
                         s_app = str(row.get('A_ST', '')).strip().upper()
-                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        rom_id = normalizar_chave_romaneio(row.get('ROMANEIO', ''))
 
                         if rom_id in rom_dict:
                             s_rom = str(rom_dict[rom_id].get('A_ST', '')).strip().upper()
@@ -1335,7 +1342,7 @@ def carregar_dados_nuvem(cliente_filtro):
                             return "-"
 
                         d_db   = str(row.get('DATA_ENTREGA', '')).strip()
-                        rom_id = str(row.get('ROMANEIO', '')).strip()
+                        rom_id = normalizar_chave_romaneio(row.get('ROMANEIO', ''))
 
                         if rom_id in rom_dict:
                             d_rom = str(rom_dict[rom_id].get('A_DT_ENTREGA', '')).strip()
