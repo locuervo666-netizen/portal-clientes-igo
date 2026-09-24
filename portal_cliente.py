@@ -32,7 +32,7 @@ LOGOS_POR_TOMADOR = {
     "DANILO.DUARTE": "logo_labest.png",
     "SYNVIA": LOGO_IGO,
     "INNOVATOX": "https://i.postimg.cc/W18xqdfR/innovatox.jpg",
-    "SOUZA CRUZ": "souza cruz.png",
+    "SOUZA CRUZ": "https://i.postimg.cc/BQbDdNjR/BAT.png",
     "LOGISTICACONTRAPROVA": "https://i.postimg.cc/KvQGzV8R/contraprova.png",
 }
 
