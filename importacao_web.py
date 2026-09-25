@@ -1715,50 +1715,37 @@ def despachar_para_appsheet(lista_pedidos_dicts):
         return False
     try:
         aba = planilha_db.worksheet("App_Tarefas")
-        cabecalho = aba.row_values(1)
-        cabecalho_normalizado = [
-            str(coluna).strip().upper().replace(" ", "").replace("?", "")
-            for coluna in cabecalho
-        ]
-        if "DATAAGENDADA" not in cabecalho_normalizado:
-            aba.update_cell(1, len(cabecalho) + 1, "DATA_AGENDADA")
-            cabecalho.append("DATA_AGENDADA")
-            cabecalho_normalizado.append("DATAAGENDADA")
-
-        idx_data_agendada = cabecalho_normalizado.index("DATAAGENDADA")
         linhas = []
         for p in lista_pedidos_dicts:
             mot_raw = str(p.get('MOTORISTA', p.get('AGENTE_RAW', '')))
             mot_app = mot_raw.split('|')[0].strip()
-            linha = [
-                str(
-                    uuid.uuid4())[ 
-                    :8].upper(), str(
-                    p.get(
-                        'PEDIDO', '')), mot_app, "PENDENTE", str(
+            linhas.append(
+                [
+                    str(
+                        uuid.uuid4())[
+                        :8].upper(), str(
                         p.get(
-                            'ENDERECO', '')), str(
-                                p.get(
-                                    'NUMERO', '')), str(
-                                        p.get(
-                                            'BAIRRO', '')), str(
-                                                p.get(
-                                                    'CIDADE', '')), str(
-                                                        p.get(
-                                                            'CEP', '')), "", str(
-                                                                p.get(
-                                                                    'OBSERVACOES', '')), str(
-                                                                        p.get(
-                                                                            'LABORATORIO', '')), str(
-                                                                                p.get(
-                                                                                    'TOMADOR', '')), str(
-                                                                                        p.get(
-                                                                                            'QR_CODE', '')), "", str(
-                                                                                                p.get(
-                                                                                                    'ROMANEIO', '')), "", ""]
-            linha.extend([""] * (len(cabecalho) - len(linha)))
-            linha[idx_data_agendada] = str(p.get('DATA_AGENDADA', p.get('DATA', '')))
-            linhas.append(linha)
+                            'PEDIDO', '')), mot_app, "PENDENTE", str(
+                            p.get(
+                                'ENDERECO', '')), str(
+                                    p.get(
+                                        'NUMERO', '')), str(
+                                            p.get(
+                                                'BAIRRO', '')), str(
+                                                    p.get(
+                                                        'CIDADE', '')), str(
+                                                            p.get(
+                                                                'CEP', '')), "", str(
+                                                                    p.get(
+                                                                        'OBSERVACOES', '')), str(
+                                                                            p.get(
+                                                                                'LABORATORIO', '')), str(
+                                                                                    p.get(
+                                                                                        'TOMADOR', '')), str(
+                                                                                            p.get(
+                                                                                                'QR_CODE', '')), "", str(
+                                                                                                    p.get(
+                                                                                                        'ROMANEIO', '')), "", ""])
         aba.append_rows(linhas, value_input_option='USER_ENTERED')
         return True
     except Exception as e:
