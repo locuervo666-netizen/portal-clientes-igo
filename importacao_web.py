@@ -1326,6 +1326,58 @@ def carregar_dados_agentes(_planilha):
             "TIPO_DISPARO_WHATSAPP"])
 
 
+@st.cache_data(ttl=90, show_spinner=False)
+def carregar_solicitacoes_aprovacao(_planilha):
+    try:
+        if not _planilha:
+            return None
+
+        planilha = _planilha
+        gc = planilha.client
+        aba_m = planilha.worksheet("Memoria_Sistema")
+        cabecalhos = [str(c).strip().upper() for c in aba_m.row_values(1)]
+        if "STATUS" not in cabecalhos:
+            return pd.DataFrame()
+
+        idx_status = cabecalhos.index("STATUS") + 1
+        letra_status = ""
+        while idx_status > 0:
+            idx_status, resto = divmod(idx_status - 1, 26)
+            letra_status = chr(65 + resto) + letra_status
+
+        query = urllib.parse.quote(
+            f"SELECT * WHERE UPPER({letra_status}) = 'AGUARDANDO APROVAÇÃO'"
+        )
+        url = (
+            f"https://docs.google.com/spreadsheets/d/{planilha.id}/gviz/tq"
+            f"?tqx=out:csv&gid={aba_m.id}&tq={query}"
+        )
+
+        try:
+            from google.auth.transport.requests import Request
+            gc.auth.refresh(Request())
+            resposta = requests.get(
+                url,
+                headers={"Authorization": f"Bearer {gc.auth.token}"},
+                timeout=15,
+            )
+            resposta.raise_for_status()
+            df = pd.read_csv(io.StringIO(resposta.text), dtype=str)
+        except Exception:
+            dados = aba_m.get_all_values()
+            if len(dados) <= 1:
+                return pd.DataFrame(columns=cabecalhos)
+            df = pd.DataFrame(dados[1:], columns=dados[0])
+
+        df.columns = df.columns.str.strip().str.upper()
+        if "STATUS" not in df.columns:
+            return pd.DataFrame()
+        status = df["STATUS"].astype(str).str.strip().str.upper()
+        return df.loc[status == "AGUARDANDO APROVAÇÃO"].copy()
+    except Exception:
+        return None
+
+
 # 🔥 TTL Aumentado de 20s para 10 min (600s). Evita Erro 429! 🔥
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_completos(_planilha):
@@ -2301,6 +2353,118 @@ def obter_login_agente(
         if c in rotas_dict:
             return rotas_dict[c]
     return ""
+
+
+def analisar_alertas_cobertura_rotas(df_agentes, df_pedidos):
+    colunas_pedidos = [
+        coluna for coluna in [
+            'PEDIDO', 'DATA', 'STATUS', 'TOMADOR', 'LABORATORIO',
+            'CIDADE', 'BAIRRO', 'ENDERECO', 'NUMERO', 'AGENTE_RAW'
+        ] if coluna in df_pedidos.columns
+    ]
+    df_sem_motorista = df_pedidos.iloc[0:0].copy()
+    if not df_pedidos.empty and 'AGENTE_RAW' in df_pedidos.columns:
+        agentes_pedidos = df_pedidos['AGENTE_RAW'].fillna('').astype(str).str.strip().str.upper()
+        mask_sem_motorista = agentes_pedidos.isin([
+            '', 'NAN', 'NONE', 'SEM ROTA DEFINIDA', 'SEM MOTORISTA', 'SEM AGENTE'
+        ])
+        if 'STATUS' in df_pedidos.columns:
+            status_pedidos = df_pedidos['STATUS'].fillna('').astype(str).str.strip().str.upper()
+            mask_encerrados = status_pedidos.str.contains(
+                r'ENTREGUE|CANCELADO|FRUSTRADA|PROBLEMA|RECUSADA', na=False
+            )
+            mask_sem_motorista &= ~mask_encerrados
+        df_sem_motorista = df_pedidos.loc[mask_sem_motorista, colunas_pedidos].copy()
+
+    colunas_alertas = ['ROTA', 'MOTORISTAS']
+    df_rotas_duplicadas = pd.DataFrame(columns=colunas_alertas)
+    colunas_similares = ['ROTA 1', 'MOTORISTA 1', 'ROTA 2', 'MOTORISTA 2', 'SIMILARIDADE']
+    df_rotas_similares = pd.DataFrame(columns=colunas_similares)
+
+    colunas_obrigatorias = {'ROTA MAPEADA', 'LOGIN DO AGENTE'}
+    if df_agentes.empty or not colunas_obrigatorias.issubset(df_agentes.columns):
+        return df_sem_motorista, df_rotas_duplicadas, df_rotas_similares
+
+    rotas = []
+    rotas_por_chave = {}
+    for _, linha in df_agentes.iterrows():
+        rota_original = str(linha.get('ROTA MAPEADA', '')).strip()
+        login = str(linha.get('LOGIN DO AGENTE', '')).strip()
+        rota_com_separadores = re.sub(
+            r'\s*(?:---|➔|->)\s*', '---', rota_original
+        )
+        rota_norm = padronizar_texto(rota_com_separadores).strip('- ')
+        login_norm = padronizar_texto(login)
+        if not rota_norm or rota_norm == 'SEM ROTA DEFINIDA' or not login_norm:
+            continue
+
+        nome = str(linha.get('NOME DO AGENTE', '')).strip()
+        agente_label = f"{nome} ({login})" if nome and nome.upper() != 'NAN' else login
+        registro = {
+            'rota': rota_original,
+            'rota_norm': rota_norm,
+            'login_norm': login_norm,
+            'agente': agente_label,
+        }
+        rotas.append(registro)
+        rotas_por_chave.setdefault(rota_norm, []).append(registro)
+
+    duplicadas = []
+    for chave, registros in rotas_por_chave.items():
+        motoristas = {registro['login_norm']: registro['agente'] for registro in registros}
+        if len(motoristas) > 1:
+            duplicadas.append({
+                'ROTA': registros[0]['rota'],
+                'MOTORISTAS': ', '.join(sorted(motoristas.values())),
+            })
+    if duplicadas:
+        df_rotas_duplicadas = pd.DataFrame(duplicadas, columns=colunas_alertas)
+
+    rotas_por_cidade = {}
+    for registro in rotas:
+        partes = re.split(r'\s*(?:---|➔|->)\s*', registro['rota_norm'])
+        if len(partes) < 2:
+            continue
+        cidade = partes[0].strip()
+        complemento = ' '.join(parte.strip() for parte in partes[1:] if parte.strip())
+        if len(cidade) < 3 or len(complemento) < 5:
+            continue
+        rotas_por_cidade.setdefault(cidade, []).append((registro, complemento))
+
+    similares = {}
+    for registros_cidade in rotas_por_cidade.values():
+        for indice, (rota_a, complemento_a) in enumerate(registros_cidade):
+            for rota_b, complemento_b in registros_cidade[indice + 1:]:
+                if rota_a['login_norm'] == rota_b['login_norm']:
+                    continue
+                if rota_a['rota_norm'] == rota_b['rota_norm']:
+                    continue
+                similaridade = difflib.SequenceMatcher(
+                    None, complemento_a, complemento_b
+                ).ratio()
+                if similaridade < 0.84:
+                    continue
+                chave_par = tuple(sorted((
+                    f"{rota_a['rota_norm']}|{rota_a['login_norm']}",
+                    f"{rota_b['rota_norm']}|{rota_b['login_norm']}",
+                )))
+                similares[chave_par] = {
+                    'ROTA 1': rota_a['rota'],
+                    'MOTORISTA 1': rota_a['agente'],
+                    'ROTA 2': rota_b['rota'],
+                    'MOTORISTA 2': rota_b['agente'],
+                    'SIMILARIDADE': f'{similaridade:.0%}',
+                    '_ORDEM': similaridade,
+                }
+
+    if similares:
+        registros_similares = sorted(
+            similares.values(), key=lambda registro: registro['_ORDEM'], reverse=True
+        )[:100]
+        df_rotas_similares = pd.DataFrame(registros_similares).drop(columns=['_ORDEM'])
+        df_rotas_similares = df_rotas_similares[colunas_similares]
+
+    return df_sem_motorista, df_rotas_duplicadas, df_rotas_similares
 
 
 def gerar_excel_memoria(df):
@@ -3731,8 +3895,10 @@ if menu == "📊 GRID":
                 f"🎧 **HELPDESK:** Existem **{qtd_chamados_abertos} chamado(s)** de clientes aguardando sua resposta na aba de Atendimento!")
 
         # CAIXA DE ENTRADA DO PORTAL DO CLIENTE
-        df_aprovacao = df_raw[df_raw['STATUS'].astype(
-            str).str.upper() == 'AGUARDANDO APROVAÇÃO'].copy()
+        df_aprovacao = carregar_solicitacoes_aprovacao(planilha_db)
+        if df_aprovacao is None:
+            st.warning("Não foi possível atualizar as solicitações do portal agora.")
+            df_aprovacao = pd.DataFrame()
         if not df_aprovacao.empty:
             st.error(
                 f"🚨 **Atenção:** Existem {
@@ -3879,6 +4045,7 @@ if menu == "📊 GRID":
                                 if lista_para_app:
                                     despachar_para_appsheet(lista_para_app)
                                 carregar_dados_completos.clear()
+                                carregar_solicitacoes_aprovacao.clear()
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Erro: {e}")
@@ -3904,6 +4071,7 @@ if menu == "📊 GRID":
                                 st.success("Recusadas!")
                                 time.sleep(2)
                                 carregar_dados_completos.clear()
+                                carregar_solicitacoes_aprovacao.clear()
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Erro: {e}")
@@ -12371,9 +12539,57 @@ elif menu == "⚙️ Rotas":
         unsafe_allow_html=True,
     )
 
+    def transferir_rota_individual(rota_nome, login_origem, login_destino):
+        df_rotas_full = DF_AGENTES.copy()
+        dados_destino = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == login_destino]
+        dados_origem = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == login_origem]
+        if dados_destino.empty or dados_origem.empty:
+            raise ValueError("Motorista de origem ou destino não encontrado.")
+
+        mask_transfer = (
+            (df_rotas_full['LOGIN DO AGENTE'] == login_origem) &
+            (df_rotas_full['ROTA MAPEADA'] == rota_nome)
+        )
+        if not mask_transfer.any():
+            raise ValueError("A rota não está mais vinculada ao motorista selecionado.")
+
+        dados_destino = dados_destino.iloc[0]
+        dados_origem = dados_origem.iloc[0]
+        df_rotas_full.loc[mask_transfer, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [
+            login_destino, dados_destino['NOME DO AGENTE'], dados_destino['TELEFONE']
+        ]
+        df_rotas_full = df_rotas_full.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
+
+        rotas_reais_origem = df_rotas_full[
+            (df_rotas_full['LOGIN DO AGENTE'] == login_origem) &
+            (df_rotas_full['ROTA MAPEADA'] != "SEM ROTA DEFINIDA")
+        ]
+        if rotas_reais_origem.empty and not (
+            (df_rotas_full['LOGIN DO AGENTE'] == login_origem) &
+            (df_rotas_full['ROTA MAPEADA'] == "SEM ROTA DEFINIDA")
+        ).any():
+            df_rotas_full = pd.concat([
+                df_rotas_full,
+                pd.DataFrame([{
+                    "ROTA MAPEADA": "SEM ROTA DEFINIDA",
+                    "LOGIN DO AGENTE": login_origem,
+                    "NOME DO AGENTE": dados_origem['NOME DO AGENTE'],
+                    "TELEFONE": dados_origem['TELEFONE'],
+                    "TIPO_DISPARO_WHATSAPP": dados_origem.get('TIPO_DISPARO_WHATSAPP', 'NOTIFICACAO')
+                }])
+            ], ignore_index=True)
+
+        aba_agentes = planilha_db.worksheet("Agentes")
+        aba_agentes.clear()
+        aba_agentes.update(
+            "A1",
+            [df_rotas_full.columns.tolist()] + df_rotas_full.fillna("").astype(str).values.tolist()
+        )
+        carregar_dados_agentes.clear()
+
     # 🔄 ABAS REORGANIZADAS: 'Atrelar Rota' removida (agora 100% dentro de Gerenciar Perfil)
-    tab_agente, tab_busca, tab_tabela, tab_sistema = st.tabs(
-        ["👤 Cadastrar Motorista", "🔎 Explorador", "📋 Gerenciar Perfil e Transferências", "⚠️ Admin"])
+    tab_agente, tab_busca, tab_tabela, tab_sistema, tab_alertas = st.tabs(
+        ["👤 Cadastrar Motorista", "🔎 Explorador", "📋 Gerenciar Perfil e Transferências", "⚠️ Admin", "🚨 Cobertura"])
 
     # -------------------------------------------------------------------------
     # CADASTRAR MOTORISTA
@@ -12414,8 +12630,6 @@ elif menu == "⚙️ Rotas":
     # -------------------------------------------------------------------------
     with tab_busca:
         st.markdown("#### 🔎 Explorador Geográfico de Rotas")
-        st.info("Descubra rapidamente qual motorista é responsável por uma determinada região. Ideal para checar se uma cidade já está coberta pelo sistema.")
-                
         with st.container(border=True):
             termo_busca = st.text_input("🌍 Digite o local (Cidade, Bairro ou Rua):", placeholder="Ex: ANGRA DOS REIS")
                     
@@ -12424,10 +12638,62 @@ elif menu == "⚙️ Rotas":
                 df_result = DF_AGENTES[mask_busca].copy()
 
                 if not df_result.empty:
-                    st.success(f"✅ Encontrado(s) **{len(df_result)} mapeamento(s)** para esta pesquisa.")
-                    df_result_show = df_result[['ROTA MAPEADA', 'NOME DO AGENTE', 'LOGIN DO AGENTE', 'TELEFONE']].copy()
-                    df_result_show.rename(columns={'ROTA MAPEADA': '📍 Localidade Coberta', 'NOME DO AGENTE': '👤 Motorista', 'LOGIN DO AGENTE': '🔑 Login', 'TELEFONE': '📱 Contato'}, inplace=True)
-                    st.dataframe(df_result_show, hide_index=True, use_container_width=True)
+                    st.caption(f"{len(df_result)} rota(s) encontrada(s)")
+
+                    agentes_unicos_busca = DF_AGENTES.drop_duplicates('LOGIN DO AGENTE')
+                    destinos_por_login = {
+                        row['LOGIN DO AGENTE']: f"{row['NOME DO AGENTE']} ({row['LOGIN DO AGENTE']})"
+                        for _, row in agentes_unicos_busca.iterrows()
+                    }
+                    for idx_resultado, (_, resultado) in enumerate(df_result.iterrows()):
+                        rota_resultado = str(resultado['ROTA MAPEADA'])
+                        login_origem = str(resultado['LOGIN DO AGENTE'])
+                        chave_resultado = f"{idx_resultado}_{login_origem}_{rota_resultado}"
+                        destinos = sorted(login for login in destinos_por_login if login != login_origem)
+                        with st.container(border=True):
+                            linha_resultado = st.columns([8, 1.2], vertical_alignment="center")
+                            linha_resultado[0].markdown(
+                                f"""<div style="display:grid;grid-template-columns:minmax(0, 2fr) minmax(130px, 1fr);align-items:center;gap:18px;padding:10px 14px;background:#f1f7ff;border-left:4px solid #38bdf8;border-radius:6px;">
+                                    <div><div style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;">Localidade</div><div style="font-size:14px;font-weight:750;color:#0f2f52;">{escape(rota_resultado)}</div></div>
+                                    <div><div style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;">Motorista</div><div style="font-size:13px;font-weight:700;color:#14532d;">{escape(str(resultado['NOME DO AGENTE']))}</div></div>
+                                </div>""",
+                                unsafe_allow_html=True
+                            )
+                            if destinos:
+                                with linha_resultado[1].popover("⇄", help="Transferir esta rota para outro motorista"):
+                                    st.markdown(f"**Transferir {escape(rota_resultado)} para:**")
+                                    login_destino = st.selectbox(
+                                        "Motorista de destino:",
+                                        options=["Selecione..."] + destinos,
+                                        format_func=lambda login: destinos_por_login.get(login, login),
+                                        key=f"busca_transfer_destino_{chave_resultado}"
+                                    )
+                                    if st.button(
+                                        "Confirmar",
+                                        key=f"busca_transfer_confirmar_{chave_resultado}",
+                                        type="primary",
+                                        use_container_width=True
+                                    ):
+                                        if login_destino == "Selecione...":
+                                            st.warning("Selecione o motorista de destino.")
+                                        else:
+                                            try:
+                                                with st.spinner("Transferindo rota..."):
+                                                    transferir_rota_individual(
+                                                        rota_resultado, login_origem, login_destino
+                                                    )
+                                                st.session_state.ui_toast = {
+                                                    'msg': f"Rota transferida para {destinos_por_login[login_destino]}!",
+                                                    'icon': "🔄"
+                                                }
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Erro ao transferir rota: {e}")
+                            else:
+                                linha_resultado[1].button(
+                                    "⇄", disabled=True, key=f"busca_transfer_sem_destino_{chave_resultado}",
+                                    help="Cadastre outro motorista antes de transferir"
+                                )
                 else:
                     st.warning("⚠️ Nenhum motorista atrelado a este local. Mapeie uma nova rota para cobrir essa região.")
 
@@ -12685,38 +12951,13 @@ elif menu == "⚙️ Rotas":
                                 )
                                 if st.button("Confirmar", key=f"btn_confirm_transf_{idx}", type="primary", use_container_width=True):
                                     if para_motorista != "Selecione...":
-                                        with st.spinner("Movendo rota..."):
-                                            df_rotas_full = DF_AGENTES.copy()
-                                            dados_novo = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == para_motorista].iloc[0]
-                                            dados_agente_original = df_rotas_full[df_rotas_full['LOGIN DO AGENTE'] == agente_filtro].iloc[0]
-                                                    
-                                            # Transferir esta rota específica
-                                            mask_transfer = (df_rotas_full['LOGIN DO AGENTE'] == agente_filtro) & (df_rotas_full['ROTA MAPEADA'] == rota_nome)
-                                            df_rotas_full.loc[mask_transfer, ['LOGIN DO AGENTE', 'NOME DO AGENTE', 'TELEFONE']] = [para_motorista, dados_novo['NOME DO AGENTE'], dados_novo['TELEFONE']]
-                                            df_rotas_full = df_rotas_full.drop_duplicates(subset=["ROTA MAPEADA", "LOGIN DO AGENTE"])
-                                                    
-                                            # 🔥 GARANTIA: Se o agente ficou sem rotas reais, adiciona "SEM ROTA DEFINIDA"
-                                            rotas_reais_agente = df_rotas_full[(df_rotas_full['LOGIN DO AGENTE'] == agente_filtro) & (df_rotas_full['ROTA MAPEADA'] != "SEM ROTA DEFINIDA")]
-                                            if rotas_reais_agente.empty and not any((df_rotas_full['LOGIN DO AGENTE'] == agente_filtro) & (df_rotas_full['ROTA MAPEADA'] == "SEM ROTA DEFINIDA")):
-                                                df_rotas_full = pd.concat([
-                                                    df_rotas_full,
-                                                    pd.DataFrame([{
-                                                        "ROTA MAPEADA": "SEM ROTA DEFINIDA",
-                                                        "LOGIN DO AGENTE": agente_filtro,
-                                                        "NOME DO AGENTE": dados_agente_original['NOME DO AGENTE'],
-                                                        "TELEFONE": dados_agente_original['TELEFONE'],
-                                                        "TIPO_DISPARO_WHATSAPP": dados_agente_original.get('TIPO_DISPARO_WHATSAPP', modo_disparo_atual)
-                                                    }])
-                                                ], ignore_index=True)
-                                                    
-                                            try:
-                                                planilha_db.worksheet("Agentes").clear()
-                                                planilha_db.worksheet("Agentes").update("A1", [df_rotas_full.columns.tolist()] + df_rotas_full.fillna("").astype(str).values.tolist())
-                                                carregar_dados_agentes.clear()
-                                                time.sleep(0.5)
-                                                st.rerun()
-                                            except Exception as e:
-                                                st.error(f"Erro: {e}")
+                                        try:
+                                            with st.spinner("Movendo rota..."):
+                                                transferir_rota_individual(rota_nome, agente_filtro, para_motorista)
+                                            st.session_state.ui_toast = {'msg': f"Rota transferida para {dict_para[para_motorista]}!", 'icon': "🔄"}
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Erro ao transferir rota: {e}")
                                     
                             # ❌ Botão de exclusão
                             if col_del.button("❌", key=f"del_{idx}", help="Excluir esta rota", use_container_width=True):
@@ -12817,6 +13058,48 @@ elif menu == "⚙️ Rotas":
                                     st.error(f"Erro Crítico ao limpar o banco: {e}")
                         else:
                             if senha_reset: st.error("❌ Senha incorreta.")
+
+    # -------------------------------------------------------------------------
+    # COBERTURA E ALERTAS DE ROTEIRIZACAO
+    # -------------------------------------------------------------------------
+    with tab_alertas:
+        st.markdown("#### 🚨 Cobertura e Alertas de Rotas")
+        df_pedidos_rotas = carregar_dados_completos(planilha_db)
+        df_sem_motorista, df_rotas_duplicadas, df_rotas_similares = analisar_alertas_cobertura_rotas(
+            DF_AGENTES, df_pedidos_rotas
+        )
+
+        metrica_sem_motorista, metrica_duplicadas, metrica_similares = st.columns(3)
+        metrica_sem_motorista.metric("Pedidos ativos sem motorista", len(df_sem_motorista))
+        metrica_duplicadas.metric("Rotas duplicadas", len(df_rotas_duplicadas))
+        metrica_similares.metric("Possiveis sobreposicoes", len(df_rotas_similares))
+        st.caption("Os alertas são informativos. Nenhum pedido ou vínculo de rota é alterado automaticamente.")
+
+        st.markdown("##### Pedidos ativos sem motorista")
+        if df_pedidos_rotas.empty:
+            st.info("A base de pedidos está vazia ou indisponível para análise.")
+        elif 'AGENTE_RAW' not in df_pedidos_rotas.columns:
+            st.warning("A base de pedidos não contém a coluna AGENTE_RAW; não foi possível verificar os responsáveis.")
+        elif df_sem_motorista.empty:
+            st.success("Todos os pedidos ativos possuem motorista vinculado.")
+        else:
+            st.error(f"{len(df_sem_motorista)} pedido(s) ativo(s) sem motorista.")
+            st.dataframe(df_sem_motorista, hide_index=True, use_container_width=True)
+
+        st.markdown("##### Rotas idênticas vinculadas a agentes diferentes")
+        if df_rotas_duplicadas.empty:
+            st.success("Nenhuma rota idêntica vinculada a mais de um agente.")
+        else:
+            st.warning(f"{len(df_rotas_duplicadas)} rota(s) duplicada(s) para revisão.")
+            st.dataframe(df_rotas_duplicadas, hide_index=True, use_container_width=True)
+
+        st.markdown("##### Possiveis sobreposicoes geograficas")
+        st.caption("A comparação é textual e serve como triagem. Rotas específicas por laboratório podem ser intencionais.")
+        if df_rotas_similares.empty:
+            st.success("Nenhum par de rotas semelhantes foi encontrado em agentes diferentes.")
+        else:
+            st.warning(f"{len(df_rotas_similares)} par(es) de rotas semelhantes para revisão manual.")
+            st.dataframe(df_rotas_similares, hide_index=True, use_container_width=True)
 # =============================================================================
 # 🎧 MÓDULO NOVO: ATENDIMENTO / HELPDESK
 # =============================================================================
