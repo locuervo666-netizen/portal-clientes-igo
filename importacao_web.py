@@ -1,4 +1,4 @@
-import streamlit as st
+        import streamlit as st
 import pandas as pd
 import io
 import csv
@@ -1346,7 +1346,7 @@ def carregar_solicitacoes_aprovacao(_planilha):
             letra_status = chr(65 + resto) + letra_status
 
         query = urllib.parse.quote(
-            f"SELECT * WHERE UPPER({letra_status}) = 'AGUARDANDO APROVAÇÃO'"
+            f"SELECT * WHERE UPPER({letra_status}) CONTAINS 'AGUARDANDO'"
         )
         url = (
             f"https://docs.google.com/spreadsheets/d/{planilha.id}/gviz/tq"
@@ -1363,6 +1363,9 @@ def carregar_solicitacoes_aprovacao(_planilha):
             )
             resposta.raise_for_status()
             df = pd.read_csv(io.StringIO(resposta.text), dtype=str)
+            df.columns = df.columns.str.strip().str.upper()
+            if "STATUS" not in df.columns:
+                raise ValueError("A resposta GViz não contém a coluna STATUS")
         except Exception:
             dados = aba_m.get_all_values()
             if len(dados) <= 1:
@@ -1504,6 +1507,8 @@ def carregar_dados_completos(_planilha):
                         s_db = str(row.get('STATUS', '')).strip().upper()
                         s_app = str(row.get('APP_STATUS', '')).strip().upper()
                         rom_id = str(row.get('ROMANEIO', '')).strip()
+                        if s_db == 'AGUARDANDO APROVAÇÃO':
+                            return s_db
                         if rom_id in rom_dict:
                             s_rom = str(
                                 rom_dict[rom_id].get(
